@@ -54,7 +54,8 @@ rustup target add aarch64-apple-darwin x86_64-apple-darwin
 bash scripts/build-xcframework.sh        # → clients/apple/SlipstreamCore.xcframework
 cd clients/apple
 swift build && swift test                # loopback/remote tests self-skip without a host
-swift run SlipstreamClient                    # the app; or open Package.swift in Xcode
+swift run SlipstreamClient                # the unbundled dev shell (CLI)
+open Slipstream.xcodeproj                 # the real app: ⌘R builds + runs Slipstream.app
 
 bash test-loopback.sh                    # full loopback proof: builds slipstream-host
                                          # (synthetic source — runs on macOS), streams
@@ -67,6 +68,24 @@ bash test-loopback.sh                    # full loopback proof: builds slipstrea
 SLIPSTREAM_REMOTE_HOST=<box-ip> swift test --filter RemoteFirstLightTests   # headless
 SLIPSTREAM_AUTOCONNECT=<box-ip> SLIPSTREAM_MODE=1280x720x60 swift run SlipstreamClient # on glass
 ```
+
+## Xcode project (`Slipstream.xcodeproj`)
+
+The app target **Slipstream** wraps the same sources as the `swift run` shell
+(`Sources/SlipstreamClient`, a synchronized folder — no duplication) plus `App/` (asset
+catalog) and links `SlipstreamKit` from the local package. Generated Info.plist, ad-hoc
+signing, bundle id `io.unom.slipstream`. Notes:
+
+- **App icon**: `App/Assets.xcassets` ships an empty `AppIcon` slot. For an Icon Composer
+  `.icon`: add the file to the project (target Slipstream), set it as the App Icon in the
+  target's General tab, and delete the placeholder `AppIcon.appiconset`. Heads-up: CLI
+  `actool` (Xcode 26.5) crashed compiling `slipstream_Logo.icon` — if Xcode does the same,
+  suspect the icon bundle (it has a duplicate-named layer, "…Layer-3 2.svg"), not the
+  project.
+- **Tests from Xcode**: the package tests run with `swift test`; to get them on ⌘U, add
+  `SlipstreamKitTests` once via Edit Scheme → Test → + (Xcode persists it into the shared
+  scheme — a hand-written package-test reference doesn't resolve headlessly).
+- `xcodebuild -project Slipstream.xcodeproj -scheme Slipstream build` works headlessly.
 
 ## Notes for whoever picks this up next
 
