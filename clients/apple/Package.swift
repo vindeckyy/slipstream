@@ -1,21 +1,21 @@
 // swift-tools-version: 5.9
-// LumenKit — Swift wrapper around the lumen-core C ABI (lumen/1 client connector) plus the
-// SwiftUI/VideoToolbox presentation layer. Build LumenCore.xcframework first:
+// SlipstreamKit — Swift wrapper around the slipstream-core C ABI (slipstream/1 client connector) plus the
+// SwiftUI/VideoToolbox presentation layer. Build SlipstreamCore.xcframework first:
 //   bash ../../scripts/build-xcframework.sh   (on a Mac; see README.md)
 import PackageDescription
 
 let package = Package(
-    name: "LumenKit",
+    name: "SlipstreamKit",
     platforms: [.macOS(.v14), .iOS(.v17)],
     products: [
-        .library(name: "LumenKit", targets: ["LumenKit"]),
-        .executable(name: "LumenClient", targets: ["LumenClient"]),
+        .library(name: "SlipstreamKit", targets: ["SlipstreamKit"]),
+        .executable(name: "SlipstreamClient", targets: ["SlipstreamClient"]),
     ],
     targets: [
-        .binaryTarget(name: "LumenCore", path: "LumenCore.xcframework"),
+        .binaryTarget(name: "SlipstreamCore", path: "SlipstreamCore.xcframework"),
         .target(
-            name: "LumenKit",
-            dependencies: ["LumenCore"],
+            name: "SlipstreamKit",
+            dependencies: ["SlipstreamCore"],
             linkerSettings: [
                 // Rust staticlib system deps.
                 .linkedFramework("Security"),
@@ -23,8 +23,8 @@ let package = Package(
                 .linkedLibrary("resolv"),
             ]
         ),
-        // Development app shell (swift run LumenClient): connect form → stream + input.
-        .executableTarget(name: "LumenClient", dependencies: ["LumenKit"]),
-        .testTarget(name: "LumenKitTests", dependencies: ["LumenKit"]),
+        // Development app shell (swift run SlipstreamClient): connect form → stream + input.
+        .executableTarget(name: "SlipstreamClient", dependencies: ["SlipstreamKit"]),
+        .testTarget(name: "SlipstreamKitTests", dependencies: ["SlipstreamKit"]),
     ]
 )
