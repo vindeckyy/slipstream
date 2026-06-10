@@ -1953,6 +1953,7 @@ name = "slipstream-client-rs"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "opus",
  "slipstream-core",
  "quinn",
  "tokio",
