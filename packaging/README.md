@@ -62,7 +62,8 @@ sudo bootc switch ghcr.io/<you>/bazzite-slipstream && systemctl reboot
 ## First-run setup (either option)
 
 ```sh
-sudo usermod -aG input "$USER"          # virtual gamepads need /dev/uinput (then re-login)
+ujust add-user-to-input-group           # virtual gamepads need /dev/uinput (then re-login).
+                                        # On Bazzite use ujust, NOT `usermod -aG input` (atomic OS — it won't stick).
 mkdir -p ~/.config/slipstream
 cp /usr/share/slipstream/host.env.bazzite ~/.config/slipstream/host.env   # edit (gamescope app, etc.)
 systemctl --user enable --now slipstream-host
