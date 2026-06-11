@@ -6,7 +6,7 @@ import PackageDescription
 
 let package = Package(
     name: "SlipstreamKit",
-    platforms: [.macOS(.v14), .iOS(.v17)],
+    platforms: [.macOS(.v14), .iOS(.v17), .tvOS(.v17)],
     products: [
         .library(name: "SlipstreamKit", targets: ["SlipstreamKit"]),
         .executable(name: "SlipstreamClient", targets: ["SlipstreamClient"]),
