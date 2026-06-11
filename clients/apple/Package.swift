@@ -24,6 +24,9 @@ let package = Package(
             ]
         ),
         // Development app shell (swift run SlipstreamClient): connect form → stream + input.
+        // (The tvOS slide-transition package is referenced by the Xcode PROJECT only —
+        // its manifest breaks SwiftPM whole-graph validation on macOS, and only the
+        // Slipstream-tvOS target links it; the #if os(tvOS) import never compiles here.)
         .executableTarget(name: "SlipstreamClient", dependencies: ["SlipstreamKit"]),
         .testTarget(name: "SlipstreamKitTests", dependencies: ["SlipstreamKit"]),
     ]
