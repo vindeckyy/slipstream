@@ -4,10 +4,15 @@ The slipstream host is Linux-only and links system FFmpeg (NVENC), PipeWire, Opu
 the NVIDIA driver. This directory packages it for the **Fedora Atomic / Bazzite** world
 (rpm-ostree + bootc), where most of those deps are already present.
 
+> 👉 **End-to-end Bazzite setup walkthrough** (install → udev/group → `host.env` → service →
+> firewall → verify → troubleshooting): [`bazzite/README.md`](bazzite/README.md). This file is the
+> higher-level packaging rationale.
+
 ```
 packaging/
   rpm/slipstream.spec      # the RPM (builds slipstream-host from source with cargo)
   bazzite/host.env        # gamescope-default config for a Bazzite appliance
+  bazzite/README.md       # step-by-step Bazzite setup guide
   bootc/Containerfile     # bake slipstream into a Bazzite-based atomic image
   copr/                   # COPR build-from-SCM settings
 ```
