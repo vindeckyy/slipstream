@@ -12,3 +12,6 @@ src/paraglide
 
 # local env (SLIPSTREAM_UI_PASSWORD etc.)
 .env
+
+# Paraglide/inlang machine-local cache:
+project.inlang/cache
