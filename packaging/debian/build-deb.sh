@@ -37,6 +37,9 @@ SHAREDIR="$STAGE/usr/share/$PKG"
 # --- file layout (matches the RPM %install) ----------------------------------
 install -Dm0755 "$BIN"                              "$STAGE/usr/bin/$PKG"
 install -Dm0644 scripts/60-slipstream.rules         "$STAGE/usr/lib/udev/rules.d/60-slipstream.rules"
+# UDP socket-buffer tuning (32 MB) — without it the kernel clamps the host's SO_SNDBUF to ~416 KB
+# and high-bitrate frames overflow it (send-side packet loss). systemd-sysctl applies it at boot.
+install -Dm0644 scripts/99-slipstream-net.conf      "$STAGE/usr/lib/sysctl.d/99-slipstream-net.conf"
 install -Dm0644 scripts/slipstream-host.service     "$STAGE/usr/lib/systemd/user/slipstream-host.service"
 install -Dm0755 scripts/headless/run-headless-kde.sh   "$SHAREDIR/headless/run-headless-kde.sh"
 install -Dm0755 scripts/headless/run-headless-sway.sh  "$SHAREDIR/headless/run-headless-sway.sh"
@@ -133,6 +136,8 @@ if [ "$1" = "configure" ]; then
     # Pick up the /dev/uinput rule without a reboot (best-effort, no-op in containers).
     udevadm control --reload-rules 2>/dev/null || true
     udevadm trigger --subsystem-match=misc 2>/dev/null || true
+    # Apply the UDP socket-buffer tuning now (also auto-applied at boot by systemd-sysctl).
+    sysctl -p /usr/lib/sysctl.d/99-slipstream-net.conf >/dev/null 2>&1 || true
     echo "slipstream-host installed. Add yourself to the 'input' group for virtual gamepads:"
     echo "    sudo usermod -aG input \"\$USER\"   # then re-login"
     echo "Config:  mkdir -p ~/.config/slipstream && cp /usr/share/slipstream-host/host.env.example ~/.config/slipstream/host.env"
