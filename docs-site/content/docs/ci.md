@@ -58,12 +58,13 @@ ssh enricobuehler@192.168.1.135 GITHUB_ACTIONS_TOKEN=<token> bash -s \
 ## Deployment
 
 `docker.yml`'s `deploy-docs` job ships this docs site after every image push: it syncs
-`compose.production.yml` to `~/slipstream-docs` on **home-main-2** and runs
-`docker compose pull && up -d` there over SSH (same pattern and secret set as
-`unom/website`: `DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_PORT` / `DEPLOY_SSH_KEY`, the
-`unom-ci-deploy` key). The container binds host port **3220**; Caddy on
-`github-pages-1` serves it as <https://docs.slipstream.unom.io> (vhost tracked in
-`unom/reverse-proxy`). The host and the web console are NOT deployed — the console
+`compose.production.yml` to `~/slipstream-docs` on **github-actions** (the DMZ services VM
+website and cms deploy to) and runs `docker compose pull && up -d` there over SSH (same
+pattern and secret set as `unom/website`: `DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_PORT` /
+`DEPLOY_SSH_KEY`, the `unom-ci-deploy` key). The container binds host port **3220**;
+Caddy on `github-pages-1` serves it as <https://docs.slipstream.unom.io> (vhost in
+`unom/reverse-proxy`, UniFi firewall allowlist Caddy→github-actions:3220 in `vindeckyy/slipstream`
+`proxmox/github-actions`). The host and the web console are NOT deployed — the console
 fronts a slipstream host's management API on whatever box runs the host.
 
 ## Troubleshooting
