@@ -123,7 +123,7 @@ Description: Low-latency desktop/game streaming host (Moonlight + slipstream/1)
  .
  NVENC + GPU EGL come from the NVIDIA driver (libnvidia-encode / libEGL_nvidia),
  installed out of band. After install: add yourself to the 'input' group for virtual
- gamepads, then `systemctl --user enable --now slipstream-host`.
+ gamepads, then enable the systemd user service slipstream-host.
 EOF
 
 cat > "$STAGE/DEBIAN/postinst" <<'EOF'
