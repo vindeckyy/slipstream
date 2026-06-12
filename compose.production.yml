@@ -1,0 +1,11 @@
+# Production compose for the deployed slipstream pieces — runs on home-main-2 under
+# ~/slipstream-docs (synced there by .github/workflows/docker.yml's deploy job; pattern
+# follows unom/website + unom/cms). Caddy on github-pages-1 serves
+# docs.slipstream.unom.io -> home-main-2:3220 (vhost in unom/reverse-proxy).
+name: slipstream-docs-prod
+services:
+  docs:
+    image: github.com/vindeckyy/slipstream/unom/slipstream-docs:latest
+    restart: unless-stopped
+    ports:
+      - "3220:3000"
