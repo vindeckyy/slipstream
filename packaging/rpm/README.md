@@ -15,14 +15,28 @@ paths — same spec (`slipstream.spec`) — just self-hosted in GitHub instead o
 ## Install on a Bazzite host (one-time)
 
 ```sh
-# Trust + add the repo (rpm-ostree reads /etc/yum.repos.d). Public registry, no auth.
-curl -fsSL https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/bazzite.repo \
-  | sudo tee /etc/yum.repos.d/slipstream.repo
+# Add the repo. Our RPMs are unsigned, but GitHub GPG-signs the repo METADATA — so verify that
+# (repo_gpgcheck=1) and skip the per-package signature check (gpgcheck=0). The signed metadata
+# carries each package's SHA256, so authenticity still holds. (Don't just curl GitHub's served
+# bazzite.repo — it sets gpgcheck=1, which fails on unsigned packages.)
+sudo tee /etc/yum.repos.d/slipstream.repo >/dev/null <<'REPO'
+[github-unom-bazzite]
+name=slipstream (unom, Bazzite)
+baseurl=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/bazzite
+enabled=1
+gpgcheck=0
+repo_gpgcheck=1
+gpgkey=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/repository.key
+REPO
 
 # Layer the package, then reboot into the new deployment.
 rpm-ostree install slipstream
 systemctl reboot
 ```
+
+> If `rpm-ostree` can't complete the metadata GPG check non-interactively, set `repo_gpgcheck=0`
+> (TLS-only trust to the self-hosted registry). Proper per-package signing (`gpgcheck=1`) would
+> need a CI signing key + `rpm --addsign` — future hardening, not wired up.
 
 After reboot, as the desktop user:
 
