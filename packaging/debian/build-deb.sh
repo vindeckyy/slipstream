@@ -41,6 +41,10 @@ install -Dm0644 scripts/60-slipstream.rules         "$STAGE/usr/lib/udev/rules.d
 # and high-bitrate frames overflow it (send-side packet loss). systemd-sysctl applies it at boot.
 install -Dm0644 scripts/99-slipstream-net.conf      "$STAGE/usr/lib/sysctl.d/99-slipstream-net.conf"
 install -Dm0644 scripts/slipstream-host.service     "$STAGE/usr/lib/systemd/user/slipstream-host.service"
+# The source unit's ExecStart points at the dev source tree; a packaged install has the binary at
+# /usr/bin. Rewrite it so a fresh apt install (no hand-rolled unit) starts the installed binary.
+sed -i 's#%h/slipstream/target/release/slipstream-host#/usr/bin/slipstream-host#' \
+    "$STAGE/usr/lib/systemd/user/slipstream-host.service"
 install -Dm0755 scripts/headless/run-headless-kde.sh   "$SHAREDIR/headless/run-headless-kde.sh"
 install -Dm0755 scripts/headless/run-headless-sway.sh  "$SHAREDIR/headless/run-headless-sway.sh"
 install -Dm0644 scripts/host.env.example           "$SHAREDIR/host.env.example"
