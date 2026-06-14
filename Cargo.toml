@@ -5,6 +5,7 @@ members = [
     "crates/slipstream-host",
     "crates/slipstream-client-rs",
     "crates/slipstream-client-linux",
+    "crates/slipstream-android",
     "tools/latency-probe",
     "tools/loss-harness",
 ]
