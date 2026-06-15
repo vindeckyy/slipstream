@@ -45,12 +45,18 @@ install -Dm0644 scripts/slipstream-host.service     "$STAGE/usr/lib/systemd/user
 # /usr/bin. Rewrite it so a fresh apt install (no hand-rolled unit) starts the installed binary.
 sed -i 's#%h/slipstream/target/release/slipstream-host#/usr/bin/slipstream-host#' \
     "$STAGE/usr/lib/systemd/user/slipstream-host.service"
+# Optional headless KWin session unit (the kwin --virtual appliance), as the RPM/Arch ship.
+# Repoint its ExecStart from the dev source tree to the packaged script. NOT enabled by default.
+install -Dm0644 scripts/slipstream-kde-session.service "$STAGE/usr/lib/systemd/user/slipstream-kde-session.service"
+sed -i 's#%h/slipstream/scripts/headless/run-headless-kde.sh#/usr/share/slipstream-host/headless/run-headless-kde.sh#' \
+    "$STAGE/usr/lib/systemd/user/slipstream-kde-session.service"
 install -Dm0755 scripts/headless/run-headless-kde.sh   "$SHAREDIR/headless/run-headless-kde.sh"
 install -Dm0755 scripts/headless/run-headless-sway.sh  "$SHAREDIR/headless/run-headless-sway.sh"
 install -Dm0644 scripts/headless/kde-authorized        "$SHAREDIR/headless/kde-authorized"
 install -Dm0644 scripts/headless/slipstream-sink.conf   "$SHAREDIR/headless/slipstream-sink.conf"
 install -Dm0644 scripts/host.env.example           "$SHAREDIR/host.env.example"
 install -Dm0644 packaging/bazzite/host.env         "$SHAREDIR/host.env.bazzite"
+install -Dm0644 packaging/kde/host.env             "$SHAREDIR/host.env.kde"
 install -Dm0644 docs/api/openapi.json              "$SHAREDIR/openapi.json"
 install -Dm0644 LICENSE-MIT                         "$DOCDIR/LICENSE-MIT"
 install -Dm0644 LICENSE-APACHE                      "$DOCDIR/LICENSE-APACHE"
