@@ -33,3 +33,16 @@ copr-cli buildscm slipstream \
 Note: COPR caps build time/RAM; a full `cargo build --release` of the host (FFmpeg/PipeWire
 sys-crates + aws-lc-rs) is heavy but within the default COPR limits. If a chroot OOMs, lower
 parallelism with `CARGO_BUILD_JOBS` in the spec's `%build`.
+
+## The web console subpackage (`slipstream-web`)
+
+The spec can also build the management web console as a noarch `slipstream-web` subpackage, but it's
+gated behind `%bcond_with web` and **OFF by default** — building the Nitro/Node SSR bundle needs
+`bun`, which COPR's mock chroot does not provide. So a stock COPR build produces only `slipstream`
++ `slipstream-client`.
+
+Two ways to get the console:
+- **Recommended:** install it from the GitHub RPM registry (`packaging/rpm/README.md`, Option A),
+  whose CI builder image has `bun` and builds `--with web`. (This is what `bootc/Containerfile` does.)
+- **In COPR:** add `bun` to the chroot (a custom mock config / external repo) and set the build
+  option `--with web` on the project, then `dnf install slipstream-web`.

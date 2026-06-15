@@ -32,10 +32,12 @@ There are two supported paths on Bazzite, driven by different files in `packagin
 | **B — bootc / OCI image** | `packaging/bootc/Containerfile` | Bakes slipstream into a `FROM bazzite-nvidia` image once; you `bootc switch` any number of hosts onto it | Fleets, reproducible appliances, no per-host drift |
 
 **Trade-off:** Path A is a per-host package layer — simple, but each host accumulates its own
-layered-package state. Path B builds one image (RPM Fusion + COPR + the package + udev rule
-pre-installed) that you push to a registry and rebase hosts onto atomically — no per-host
-`rpm-ostree install` drift, at the cost of running a `podman build`/`push` pipeline. Both
-ultimately install the **same RPM** and require the **same first-run setup** (sections 3–6).
+layered-package state. Path B builds one image (RPM Fusion + the GitHub RPM repo + the host and
+**web console** + udev rule pre-installed) that you push to a registry and rebase hosts onto
+atomically — no per-host `rpm-ostree install` drift, at the cost of running a `podman build`/`push`
+pipeline. Both require the **same first-run setup** (sections 3–6); note Path B installs from the
+**GitHub RPM registry** (which carries `slipstream-web`), whereas Path A's COPR builds host+client
+only — for the web console on Path A, layer from the GitHub registry instead (`../rpm/README.md`).
 
 ### Path A — rpm-ostree layering from the COPR
 
@@ -64,8 +66,10 @@ systemctl reboot
 
 The image is built **off-host** (on any machine with `podman`) from
 `packaging/bootc/Containerfile`, which bases on `ghcr.io/ublue-os/bazzite-nvidia:stable`
-(override with `--build-arg BASE_IMAGE=…`), enables RPM Fusion free + nonfree, enables the COPR
-(`--build-arg SLIPSTREAM_COPR=…`, default `enricobuehler/slipstream`), and installs the package.
+(override with `--build-arg BASE_IMAGE=…`), enables RPM Fusion free + nonfree, adds the GitHub RPM
+repo (`--build-arg SLIPSTREAM_RPM_GROUP=…`, default `bazzite`), and installs the host **and the web
+console** (`slipstream slipstream-web`). It uses the GitHub registry rather than the COPR specifically
+because the registry carries `slipstream-web` (COPR's mock chroot can't build it — no `bun`).
 
 ```sh
 # Build + push (run from the repo root, on your builder machine):
@@ -76,9 +80,10 @@ podman push  ghcr.io/<you>/bazzite-slipstream
 sudo bootc switch ghcr.io/<you>/bazzite-slipstream && systemctl reboot
 ```
 
-> ⚠️ The image build runs `dnf5 copr enable enricobuehler/slipstream` — so **Path B also depends on
-> the COPR being published** (or on you pointing `SLIPSTREAM_COPR` at a COPR you've built yourself).
-> If the COPR doesn't exist, the `podman build` fails at the install step.
+> ⚠️ The image installs from the **GitHub RPM registry** (group `bazzite`), so **Path B depends on
+> that registry being populated** — CI (`.github/workflows/rpm.yml`) publishes `slipstream` +
+> `slipstream-web` on every push to `main`. Packages are unsigned with GPG-signed metadata
+> (`repo_gpgcheck=1`), matching `packaging/rpm/README.md`.
 
 ---
 
@@ -215,6 +220,10 @@ into the user unit directory.
 ```sh
 systemctl --user daemon-reload
 systemctl --user enable --now slipstream-host
+# Management web console (pairing + status), if you installed slipstream-web (it ships in the GitHub
+# RPM registry / bootc image — COPR can't build it; see ../rpm/README.md). Read the login password:
+systemctl --user enable --now slipstream-web
+journalctl --user -u slipstream-web-init | sed -n 's/.*password generated: //p'   # then open http://<host-ip>:3000
 ```
 
 Check health and logs:

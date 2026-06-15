@@ -91,9 +91,20 @@ ujust add-user-to-input-group           # virtual gamepads need /dev/uinput (the
 mkdir -p ~/.config/slipstream
 cp /usr/share/slipstream/host.env.bazzite ~/.config/slipstream/host.env   # edit (gamescope app, etc.)
 systemctl --user enable --now slipstream-host
+
+# Management web console (pairing + status) — pulled in by default (the host RPM Recommends it;
+# `--no-install-recommends` / headless-only boxes can skip it). Enable it and read the login password:
+systemctl --user enable --now slipstream-web
+journalctl --user -u slipstream-web-init | sed -n 's/.*password generated: //p'   # then open http://<host-ip>:3000
 ```
 
-Pair a stock Moonlight client (mDNS-discovered), or connect the native slipstream/1 client.
+Pair a stock Moonlight client (mDNS-discovered), or connect the native slipstream/1 client — via the
+web console at `http://<host-ip>:3000` or directly.
+
+> ⚠️ **COPR caveat:** COPR's mock chroot has no `bun`, so a COPR build produces only
+> `slipstream` + `slipstream-client` — **not** `slipstream-web`. For the console on a COPR/bootc host,
+> install from the **GitHub RPM registry** (Option A — it carries `slipstream-web`), which is also why
+> `bootc/Containerfile` installs from there rather than COPR.
 
 ## Why not Flatpak (for the HOST)?
 

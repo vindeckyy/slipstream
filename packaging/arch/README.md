@@ -1,11 +1,16 @@
 # slipstream on Arch Linux / SteamOS
 
 Packaging for slipstream on Arch and Arch-derived immutable distros (SteamOS 3, etc.). The
-`PKGBUILD` is a **split package** producing both **`slipstream-host`** (the gaming-rig host) and
+`PKGBUILD` is a **split package** producing **`slipstream-host`** (the gaming-rig host) and
 **`slipstream-client`** (the GTK4 couch/Deck client) — mirrors the rpm subpackages
-(`packaging/rpm/slipstream.spec`) and the two deb build scripts. On a **Steam Deck you want
+(`packaging/rpm/slipstream.spec`) and the deb build scripts. On a **Steam Deck you want
 `slipstream-client`** (it's what the [Decky plugin](../../clients/decky/) launches); on a gaming
 rig, `slipstream-host`.
+
+A third member, **`slipstream-web`** (the browser management console — pairing + status), is
+**opt-in**: build it by setting `PF_WITH_WEB=1`, which requires **`bun`** at build time (`bun-bin`
+from the AUR if it isn't in your repos; the console then runs on plain `nodejs`). A default
+`makepkg` builds only host+client with no JS tooling — mirroring the RPM spec's `%bcond_with web`.
 
 > ⚠️ **Host encode is NVENC-only today.** `crates/slipstream-host/src/encode/linux.rs` implements
 > `hevc_nvenc`/`av1_nvenc`/`h264_nvenc` + a CUDA zero-copy path — there is **no VAAPI encoder**. So
@@ -22,6 +27,8 @@ cd packaging/arch
 PF_SRCDIR="$(git rev-parse --show-toplevel)" makepkg -f --holdver
 # …or build the tagged release the AUR way:
 makepkg -si
+# …add the web console too (needs bun / bun-bin):
+PF_WITH_WEB=1 PF_SRCDIR="$(git rev-parse --show-toplevel)" makepkg -f --holdver
 ```
 Then the standard first-run (printed by the install scriptlet):
 ```sh
@@ -29,6 +36,9 @@ sudo usermod -aG input "$USER"          # virtual gamepads; re-login after
 mkdir -p ~/.config/slipstream
 cp /usr/share/slipstream/host.env.bazzite ~/.config/slipstream/host.env   # gamescope backend
 systemctl --user enable --now slipstream-host
+# Web console (if you installed the slipstream-web package): enable it + read the login password.
+systemctl --user enable --now slipstream-web
+journalctl --user -u slipstream-web-init | sed -n 's/.*password generated: //p'   # open http://<host-ip>:3000
 ```
 NVENC/EGL come from the NVIDIA driver: `sudo pacman -S --needed nvidia-utils`. Arch's stock
 `ffmpeg` already has NVENC built in — no RPM-Fusion-style swap needed (unlike Fedora).
