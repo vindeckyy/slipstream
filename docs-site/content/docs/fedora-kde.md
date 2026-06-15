@@ -64,10 +64,11 @@ sudo tee /etc/yum.repos.d/slipstream.repo >/dev/null <<'REPO'
 name=slipstream
 baseurl=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/fedora-44
 enabled=1
-# Packages are unsigned; the repo METADATA is GitHub-signed — verify that, skip per-package sig.
-gpgcheck=0
+# Packages are GPG-signed (gpgcheck=1) AND the repo metadata is GitHub-signed (repo_gpgcheck=1).
+gpgcheck=1
 repo_gpgcheck=1
 gpgkey=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/repository.key
+       https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-keys/1/RPM-GPG-KEY-slipstream
 REPO
 
 sudo dnf install slipstream

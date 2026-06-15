@@ -40,15 +40,16 @@ push), mirroring the [Debian/apt](debian/README.md) setup. Add one repo file, in
 updates with `rpm-ostree upgrade` — no COPR account needed. Full guide: [`rpm/README.md`](rpm/README.md).
 
 ```sh
-# unsigned pkgs + GitHub-signed metadata → repo_gpgcheck=1, gpgcheck=0 (see rpm/README.md)
+# GPG-signed pkgs + GitHub-signed metadata → gpgcheck=1, repo_gpgcheck=1 (see rpm/README.md)
 sudo tee /etc/yum.repos.d/slipstream.repo >/dev/null <<'REPO'
 [github-unom-bazzite]
 name=slipstream (unom, Bazzite)
 baseurl=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/bazzite
 enabled=1
-gpgcheck=0
+gpgcheck=1
 repo_gpgcheck=1
 gpgkey=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/repository.key
+       https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-keys/1/RPM-GPG-KEY-slipstream
 REPO
 rpm-ostree install slipstream && systemctl reboot
 # updates:  rpm-ostree upgrade && systemctl reboot

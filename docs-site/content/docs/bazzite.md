@@ -18,18 +18,17 @@ Atomic box layers and updates it with `rpm-ostree`. Add the repo, then layer the
 console and reboot:
 
 ```sh
-# Add the repo. Our RPMs are unsigned, but GitHub GPG-signs the repo METADATA — verify that
-# (repo_gpgcheck=1) and skip the per-package signature check (gpgcheck=0). The signed metadata
-# carries each package's SHA256, so authenticity still holds. (Don't curl GitHub's served
-# bazzite.repo verbatim — it sets gpgcheck=1, which fails on unsigned packages.)
+# Add the repo. Packages are GPG-signed (gpgcheck=1, the packages@unom.io key) AND the repo
+# metadata is GitHub-signed (repo_gpgcheck=1); gpgkey lists both keys so dnf imports each.
 sudo tee /etc/yum.repos.d/slipstream.repo >/dev/null <<'REPO'
 [github-unom-bazzite]
 name=slipstream (unom, Bazzite)
 baseurl=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/bazzite
 enabled=1
-gpgcheck=0
+gpgcheck=1
 repo_gpgcheck=1
 gpgkey=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/repository.key
+       https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-keys/1/RPM-GPG-KEY-slipstream
 REPO
 
 # Layer the host + the web console, then reboot into the new deployment.

@@ -17,18 +17,17 @@ paths — same spec (`slipstream.spec`) — just self-hosted in GitHub instead o
 ## Install on a Bazzite host (one-time)
 
 ```sh
-# Add the repo. Our RPMs are unsigned, but GitHub GPG-signs the repo METADATA — so verify that
-# (repo_gpgcheck=1) and skip the per-package signature check (gpgcheck=0). The signed metadata
-# carries each package's SHA256, so authenticity still holds. (Don't just curl GitHub's served
-# bazzite.repo — it sets gpgcheck=1, which fails on unsigned packages.)
+# Add the repo. Packages are GPG-signed (gpgcheck=1, the packages@unom.io key) AND the repo
+# metadata is GitHub-signed (repo_gpgcheck=1); gpgkey lists both so dnf/rpm-ostree imports each.
 sudo tee /etc/yum.repos.d/slipstream.repo >/dev/null <<'REPO'
 [github-unom-bazzite]
 name=slipstream (unom, Bazzite)
 baseurl=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/bazzite
 enabled=1
-gpgcheck=0
+gpgcheck=1
 repo_gpgcheck=1
 gpgkey=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/repository.key
+       https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-keys/1/RPM-GPG-KEY-slipstream
 REPO
 
 # Layer the host + the web console (pairing/status), then reboot into the new deployment.
@@ -41,18 +40,19 @@ systemctl reboot
 > If `rpm-ostree` can't complete the metadata GPG check non-interactively, set `repo_gpgcheck=0`
 > (TLS-only trust to the self-hosted registry).
 
-## Enabling per-package signing (`gpgcheck=1`)
+## Per-package signing (`gpgcheck=1`, active)
 
-CI is wired to GPG-sign each RPM (`packaging/rpm/sign-rpms.sh`, run from `rpm.yml`), but it's
-**dormant** until you provide a signing key — until then packages publish unsigned and the repo
-above uses `gpgcheck=0`. This is a self-hosted registry served over HTTPS with GPG-signed metadata
-(`repo_gpgcheck=1`), so per-package signing is hardening, not a correctness fix. (Note: this is a
-GPG/OpenPGP key — a `step-ca`/X.509 cert can't sign RPMs; step-ca is for the registry/console TLS.)
+CI GPG-signs every RPM: `packaging/rpm/sign-rpms.sh` (run from `rpm.yml` between build and publish)
+signs with the dedicated EdDSA key **`packages@unom.io`** (`AF245C506F4E4763`) and self-verifies
+with `rpmkeys --checksig` before publishing, so an unsigned/bad build never reaches the registry.
+The public key is served from the registry (the `gpgkey=` URL above) and committed at
+`packaging/rpm/RPM-GPG-KEY-slipstream`. (This is a GPG/OpenPGP key — a `step-ca`/X.509 cert can't
+sign RPMs; step-ca is only for registry/console TLS.)
 
-One-time setup:
+How it was set up (and how to rotate the key):
 
 ```sh
-# 1. Generate a DEDICATED, passphrase-less signing key (separate from the GitHub registry key).
+# 1. Generate a DEDICATED, passphrase-less signing key (separate from the GitHub metadata key).
 gpg --batch --gen-key <<EOF
 %no-protection
 Key-Type: eddsa
@@ -62,19 +62,17 @@ Name-Email: packages@unom.io
 Expire-Date: 0
 %commit
 EOF
-gpg --armor --export-secret-keys packages@unom.io   # -> paste into the CI secret below
-gpg --armor --export             packages@unom.io > RPM-GPG-KEY-slipstream   # the PUBLIC key
+gpg --armor --export-secret-keys packages@unom.io   # -> the RPM_GPG_PRIVATE_KEY CI secret
+gpg --armor --export             packages@unom.io > packaging/rpm/RPM-GPG-KEY-slipstream  # public half
 
-# 2. In the repo's GitHub Actions secrets, add RPM_GPG_PRIVATE_KEY = the armored PRIVATE key
-#    (and RPM_GPG_PASSPHRASE only if the key has one). The next CI run signs + self-verifies.
-
-# 3. Publish RPM-GPG-KEY-slipstream where clients can fetch it, then on each host import it and
-#    flip the repo to gpgcheck=1:
-sudo rpm --import https://github.com/vindeckyy/slipstream/.../RPM-GPG-KEY-slipstream
-sudo sed -i 's/^gpgcheck=0/gpgcheck=1/' /etc/yum.repos.d/slipstream.repo
+# 2. Add the armored PRIVATE key as the RPM_GPG_PRIVATE_KEY GitHub Actions secret. Commit the public
+#    half and publish it to the registry so the gpgkey= URL resolves:
+curl --user "<user>:<write:package-PAT>" --upload-file packaging/rpm/RPM-GPG-KEY-slipstream \
+  https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-keys/1/RPM-GPG-KEY-slipstream
 ```
 
-Do **not** flip `gpgcheck=1` before a signed build has published, or installs will fail.
+Rotating the key means a new generic-registry version (bump `slipstream-keys/1` → `/2` and the
+`gpgkey=` URL), since the registry rejects re-uploading an existing file.
 
 After reboot, as the desktop user:
 
