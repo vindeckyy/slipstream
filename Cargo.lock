@@ -2586,6 +2586,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "slipstream-client-windows"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "async-channel",
+ "ffmpeg-next",
+ "mdns-sd",
+ "opus",
+ "slipstream-core",
+ "serde",
+ "serde_json",
+ "tracing",
+ "tracing-subscriber",
+ "wasapi",
+]
+
+[[package]]
 name = "slipstream-core"
 version = "0.0.1"
 dependencies = [
