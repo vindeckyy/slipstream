@@ -2,7 +2,7 @@
 //!
 //! Drives access units through the in-process loopback at increasing loss rates, for
 //! both FEC schemes, and prints how many frames survive. A pure-software stand-in for
-//! `tc netem` that needs no network and runs anywhere `slipstream_core` builds. The real M3
+//! `tc netem` that needs no network and runs anywhere `slipstream_core` builds. The real slipstream/1
 //! harness adds `tc netem` jitter/reorder on the UDP path.
 
 use slipstream_core::config::{Config, FecConfig, FecScheme, ProtocolPhase, Role};

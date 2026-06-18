@@ -20,8 +20,8 @@ full session: video AUs, **Opus audio** (`nextAudio()`), **rumble** (`nextRumble
 **DualSense feedback** (`nextHidOutput()` — lightbar, player LEDs, adaptive-trigger
 effects), input incl. gamepads + DualSense touchpad/motion (`sendTouchpad`/`sendMotion`),
 and **cert pinning + TOFU** (`pinSHA256:`/`hostFingerprint`) — see
-`m3.rs::tests::c_abi_connection_roundtrip` (three sequential sessions: TOFU, pinned
-reconnect, wrong-pin rejection). The host (`slipstream-host m3-host`) is a persistent listener:
+`slipstream1.rs::tests::c_abi_connection_roundtrip` (three sequential sessions: TOFU, pinned
+reconnect, wrong-pin rejection). The host (`slipstream-host slipstream1-host`) is a persistent listener:
 reconnect at will during development.
 
 What's here, all compiled and tested on macOS (Xcode 26.5 / Swift 6.3):
@@ -127,10 +127,10 @@ bash test-loopback.sh                    # full loopback proof: builds slipstrea
                                          # (synthetic source — runs on macOS), streams
                                          # byte-verified frames into the Swift client
 
-# against the real host (Linux box, see CLAUDE.md "Running on this box") — m3-host is a
+# against the real host (Linux box, see CLAUDE.md "Running on this box") — slipstream1-host is a
 # persistent listener, reconnect at will:
 #   SLIPSTREAM_COMPOSITOR=gamescope SLIPSTREAM_GAMESCOPE_APP=vkcube SLIPSTREAM_ZEROCOPY=1 \
-#   cargo run -rp slipstream-host -- m3-host --source virtual --seconds 60
+#   cargo run -rp slipstream-host -- slipstream1-host --source virtual --seconds 60
 SLIPSTREAM_REMOTE_HOST=<box-ip> swift test --filter RemoteFirstLightTests   # headless
 #   (+ SLIPSTREAM_REMOTE_PORT / SLIPSTREAM_REMOTE_COMPOSITOR=gamescope|kwin|… /
 #    SLIPSTREAM_REMOTE_PIN=<arming-pin> for the remote pairing test)

@@ -276,7 +276,7 @@ slipstream/
 │   │   ├── src/vdisplay/     # trait + kwin/wlroots/mutter impls
 │   │   ├── src/input/        # reis + uinput
 │   │   └── src/web/          # axum config/pairing API
-│   └── slipstream-client-rs/      # reference Rust client (M4)
+│   └── slipstream-probe/      # reference Rust client (M4)
 ├── clients/
 │   ├── apple/                # Swift package, imports slipstream_core.h (M5)
 │   └── android/              # Kotlin + JNI (later)

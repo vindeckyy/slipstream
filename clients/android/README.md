@@ -11,7 +11,7 @@ machine, trust logic) instead of re-porting it into Kotlin.
 
 | Side | Owns |
 |------|------|
-| **Rust** (`crates/slipstream-android` → `libslipstream_android.so`) | the JNI seam, `NativeClient` (QUIC control + UDP data plane), AnnexB→`AMediaCodec` decode, Opus+Oboe audio, VK keymap, latency math, trust/pairing |
+| **Rust** (`clients/android/native` → `libslipstream_android.so`) | the JNI seam, `NativeClient` (QUIC control + UDP data plane), AnnexB→`AMediaCodec` decode, Opus+Oboe audio, VK keymap, latency math, trust/pairing |
 | **Kotlin** (`clients/android`) | Compose UI (host grid / settings / stream), `SurfaceView` lifecycle, input capture, `NsdManager` discovery, Keystore identity, permissions |
 
 The single seam is `io.unom.slipstream.kit.NativeBridge` ⇄ `Java_io_unom_slipstream_kit_NativeBridge_*`.
@@ -19,7 +19,7 @@ The single seam is `io.unom.slipstream.kit.NativeBridge` ⇄ `Java_io_unom_slips
 ## Layout
 
 ```
-crates/slipstream-android/          Rust cdylib (workspace member)
+clients/android/native/          Rust cdylib (workspace member)
   src/lib.rs                       JNI_OnLoad + abiVersion/coreVersion (native-link proof)
   src/session.rs                   session handle lifecycle (connect/close); plane pumps = TODO
 
@@ -63,7 +63,7 @@ The debug APK lands in `app/build/outputs/apk/debug/`. The scaffold screen calls
 - **Scaffold (done):** Gradle modules, cargo-ndk wiring, JNI native-link proof, phone+TV-installable
   manifest. `crates/slipstream-core` `rcgen` switched to the `ring` backend so the client `.so` is
   aws-lc-free.
-- **Next (M4 Android stage 1):** video decode (`AMediaCodec` async → `SurfaceView`), audio
+- **Next (Android stage 1):** video decode (`AMediaCodec` async → `SurfaceView`), audio
   (Opus + Oboe + jitter ring), input capture → `send_input`, pairing/identity (Keystore-wrapped),
   mDNS discovery, the phone/TV Compose UI. The Rust-side homes are stubbed in
-  `crates/slipstream-android/src/session.rs` with port pointers to `crates/slipstream-client-linux`.
+  `clients/android/native/src/session.rs` with port pointers to `clients/linux`.

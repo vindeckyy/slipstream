@@ -2540,7 +2540,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "slipstream-android"
+name = "slipstream-client-android"
 version = "0.0.1"
 dependencies = [
  "android_logger",
@@ -2567,20 +2567,6 @@ dependencies = [
  "sdl3",
  "serde",
  "serde_json",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "slipstream-client-rs"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "mdns-sd",
- "opus",
- "slipstream-core",
- "quinn",
- "tokio",
  "tracing",
  "tracing-subscriber",
 ]
@@ -2691,6 +2677,20 @@ dependencies = [
  "windows-service",
  "x509-parser",
  "xkbcommon",
+]
+
+[[package]]
+name = "slipstream-probe"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "mdns-sd",
+ "opus",
+ "slipstream-core",
+ "quinn",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

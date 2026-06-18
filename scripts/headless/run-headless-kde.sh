@@ -14,7 +14,7 @@
 #
 # Then in another shell:
 #   WAYLAND_DISPLAY=wayland-kde XDG_CURRENT_DESKTOP=KDE SLIPSTREAM_ZEROCOPY=1 \
-#     slipstream-host m3-host --source virtual --seconds 14400
+#     slipstream-host slipstream1-host --source virtual --seconds 14400
 set -euo pipefail
 
 RES="${1:-1920x1080}"

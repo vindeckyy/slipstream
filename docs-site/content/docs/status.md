@@ -11,10 +11,10 @@ and the design in the [Implementation Plan](/docs/implementation-plan); this pag
 
 | Milestone | State |
 |---|---|
-| **M1** — `slipstream-core` + C ABI (protocol · FEC · crypto) | ✅ complete & hardened |
-| **M2** — GameStream host (Moonlight-compatible) | ✅ working end-to-end; HDR/surround-audio polish open |
-| **M3** — `slipstream/1` native protocol (QUIC control + UDP data) | ✅ full session planes, validated live |
-| **M4** — native client decode + present (Apple first) | 🟡 macOS stage 1 live; stage-2 presenter built + decode-tested (opt-in, present needs live validation). **Linux GTK client stage 1 live** (2026-06-12) |
+| **Core** — `slipstream-core` + C ABI (protocol · FEC · crypto) | ✅ complete & hardened |
+| **GameStream host** (Moonlight-compatible) | ✅ working end-to-end; HDR/surround-audio polish open |
+| **Native protocol** — `slipstream/1` (QUIC control + UDP data) | ✅ full session planes, validated live |
+| **Native clients** — decode + present (Apple first) | 🟡 macOS stage 1 live; stage-2 presenter built + decode-tested (opt-in, present needs live validation). **Linux GTK client stage 1 live** (2026-06-12) |
 
 ## Live on the boxes
 
@@ -29,7 +29,7 @@ All three appliances advertise over mDNS (`_slipstream._udp`) and require PIN pa
 ## Progress log
 
 ### 2026-06-12
-- **Native Linux client — stage 1, first light** (`crates/slipstream-client-linux`, binary
+- **Native Linux client — stage 1, first light** (`clients/linux`, binary
   `slipstream-client`). GTK4/libadwaita app on the **Option A** architecture picked after a
   six-angle research pass (toolkits / hw decode / Wayland presentation / input capture /
   prior art / codebase): links `slipstream-core` directly as a crate (no C ABI;
@@ -81,7 +81,7 @@ All three appliances advertise over mDNS (`_slipstream._udp`) and require PIN pa
   client's capture→reassembled latency valid **cross-machine**. Validated GNOME box → dev box:
   offset −1.57 ms removed, **p50 1.30 ms** skew-corrected. (`05bc9ab`)
 - **Native LAN auto-discovery** — host advertises `_slipstream._udp` (TXT: fingerprint, pairing,
-  proto); `slipstream-client-rs --discover` lists hosts. Validated cross-LAN. (`4fff464`)
+  proto); `slipstream-probe --discover` lists hosts. Validated cross-LAN. (`4fff464`)
 - **Third test box stood up** — home-worker-3 (Ubuntu 26.04, RTX 4090, GNOME 50): first GNOME/Mutter
   zero-copy streaming on a real desktop; **1 Gbps probe clean** (625 MB/5 s, `send_dropped=0`).
   Two physical-NVIDIA gotchas documented in [Ubuntu — GNOME](/docs/ubuntu-gnome).

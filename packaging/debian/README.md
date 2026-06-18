@@ -10,7 +10,7 @@ The same workflow also publishes **`slipstream-web`** (the browser management co
 status) and **`slipstream-client`** (the GTK4 couch/Deck client). `slipstream-host` **Recommends**
 `slipstream-web`, so a default `apt install slipstream-host` pulls the console too (alongside the
 udev/sysctl bits) unless you've disabled weak deps; `slipstream-client` is independent — install it
-on the box you stream *to*. (`slipstream-client-rs` is the headless reference/test tool, not packaged
+on the box you stream *to*. (`slipstream-probe` is the headless reference/test tool, not packaged
 here.)
 
 Package layout mirrors the Fedora RPM (`../rpm/slipstream.spec`): the host binary, the `/dev/uinput`

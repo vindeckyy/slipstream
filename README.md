@@ -12,10 +12,10 @@ negotiated extension. See [`docs/implementation-plan.md`](docs/implementation-pl
 
 | Milestone | State |
 |-----------|-------|
-| **M1 — `slipstream-core` + C ABI** | ✅ done & hardened (FEC, packetization, AES-GCM, session, adversarial-review fixes, `slipstream_core.h`) |
-| **M2 — GameStream host → stock Moonlight** | ✅ live end-to-end: pairing, RTSP, audio, per-client virtual output at native res, GPU zero-copy NVENC, gamepads |
-| **M3 — `slipstream/1` native protocol** | ✅ validated live: QUIC control + GF(2¹⁶) FEC/AES data plane, SPAKE2 PIN pairing, mid-stream mode renegotiation |
-| **M4 — client decode + present (Apple)** | 🟡 macOS first light: AnnexB→VideoToolbox HEVC on glass + input/pairing over `slipstream/1` (`clients/apple`); iOS + presenter next |
+| **Core — `slipstream-core` + C ABI** | ✅ done & hardened (FEC, packetization, AES-GCM, session, adversarial-review fixes, `slipstream_core.h`) |
+| **GameStream host → stock Moonlight** | ✅ live end-to-end: pairing, RTSP, audio, per-client virtual output at native res, GPU zero-copy NVENC, gamepads |
+| **Native protocol — `slipstream/1`** | ✅ validated live: QUIC control + GF(2¹⁶) FEC/AES data plane, SPAKE2 PIN pairing, mid-stream mode renegotiation |
+| **Native clients — decode + present** | 🟡 macOS first light: AnnexB→VideoToolbox HEVC on glass + input/pairing over `slipstream/1` (`clients/apple`); iOS + presenter next |
 | **Web console + management API** | ✅ TanStack web console (`web/`) over the OpenAPI mgmt API: host status, paired devices, on-demand native pairing (arm → show PIN) |
 
 The **GameStream host works with a stock Moonlight client** — validated live on NVIDIA
@@ -26,7 +26,7 @@ per-session virtual output (KWin, gamescope, Mutter, Sway backends), encoded wit
 **`slipstream/1`** protocol adds a QUIC control plane and a GF(2¹⁶) Leopard-FEC + AES-GCM data
 plane (p50 ~0.8 ms capture→reassembled at 720p120). Its trust model is **SPAKE2 PIN pairing by
 default** — a new host requires the PIN ceremony; trust-on-first-use is an explicit host opt-in
-(`m3-host --allow-tofu` / `serve --open`, advertised as `pair=optional`) for fully trusted LANs. Both
+(`slipstream1-host --allow-tofu` / `serve --open`, advertised as `pair=optional`) for fully trusted LANs. Both
 run from **one process** (`serve --native`), managed through a REST API + web console. Builds
 against FFmpeg 7 or 8; deployed live on Bazzite. Full status: [`CLAUDE.md`](CLAUDE.md);
 roadmap, setup guides & progress: the docs site ([`docs-site/`](docs-site) — Fumadocs;
@@ -55,9 +55,12 @@ Building from source (below) is a fallback.
 ```
 crates/
   slipstream-core/        protocol · FEC · pacing · crypto · quic — the C ABI (lib + cdylib + staticlib)
-  slipstream-host/        Linux host: vdisplay · capture · encode · inject · gamestream · m3 · mgmt · native_pairing
-  slipstream-client-rs/   slipstream/1 reference client (M3 headless; M4 adds decode+present)
-clients/{apple,android}/   native client scaffolds (import slipstream_core.h); apple = macOS first light
+  slipstream-host/        Linux host: vdisplay · capture · encode · inject · gamestream · slipstream1 · mgmt · native_pairing
+clients/
+  probe/                 slipstream/1 reference/probe client (headless test + latency measurement)
+  linux/   windows/      native desktop clients (Rust: GTK4 / WinUI 3, link slipstream-core directly)
+  apple/   android/      Swift (macOS+iOS) · Kotlin app + native/ Rust JNI core
+  decky/                 Steam Deck Decky plugin
 web/                       TanStack web console (host status · paired devices · pairing) over the mgmt API
 packaging/                 Fedora/Bazzite RPM · bootc image · COPR (see packaging/bazzite/README.md)
 include/slipstream_core.h       cbindgen-generated C header (checked in)

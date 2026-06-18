@@ -81,7 +81,7 @@ argv and a clear `client-not-found` error surface to the UI. The child PID is tr
   installed and runnable on the Deck — via `.deb`/RPM/flatpak, or symlinked into
   `~/.local/bin`.
 - **avahi** (`avahi-daemon` + `avahi-browse`) for discovery — present on SteamOS/Bazzite.
-- A slipstream/1 host on the LAN (`slipstream-host serve --native` or `m3-host`).
+- A slipstream/1 host on the LAN (`slipstream-host serve --native` or `slipstream1-host`).
 
 ## Build
 
