@@ -4,7 +4,8 @@ description: The ways to connect to a slipstream host — the Apple app, Moonlig
 ---
 
 A slipstream host accepts clients over its own `slipstream/1` protocol (the Apple and Linux apps) and
-over GameStream (Moonlight). Pick whichever fits the device you're streaming *to*.
+over GameStream (Moonlight). Pick whichever fits the device you're streaming *to*. Ready to install?
+**[Install a Client](/docs/install-client)** has the step-by-step for every device.
 
 ## Apple app (Mac, iPhone, iPad, Apple TV)
 
@@ -36,16 +37,15 @@ protocol's FEC/encryption extensions, but for a healthy LAN that rarely matters.
 PipeWire audio, and SDL3 controllers (rumble, lightbar, DualSense touchpad/motion). Like the Apple
 app it discovers hosts on your network automatically, does PIN pairing, and pins reconnects.
 
-It ships as a real package, not just a source build:
+It ships as a real package, not just a source build — full steps in
+[Install a Client](/docs/install-client#linux-desktop-flatpak):
 
-- **Ubuntu / Debian** — `apt install slipstream-client` from the slipstream apt registry
-  (see `packaging/debian/README.md`).
-- **Fedora / Bazzite** — `rpm-ostree install slipstream-client` from the GitHub RPM registry
-  (see `packaging/rpm/README.md`).
-- **Arch / SteamOS** — the `slipstream-client` split package from the `PKGBUILD`
-  (see `packaging/arch/README.md`).
-- **Steam Deck / any Flatpak distro** — the `io.unom.Slipstream` Flatpak bundle
-  (see `packaging/flatpak/README.md`); this is what the Decky plugin launches.
+- **Any Flatpak distro (recommended)** — `flatpak install https://flatpak.unom.io/io.unom.Slipstream.flatpakref`
+  from the hosted [`flatpak.unom.io`](/docs/install-client#linux-desktop-flatpak) repo, then
+  `flatpak update`; this is also what the Decky plugin launches.
+- **Ubuntu / Debian** — `apt install slipstream-client` from the slipstream apt registry.
+- **Fedora / Bazzite** — `rpm-ostree install slipstream-client` from the GitHub RPM registry.
+- **Arch / SteamOS** — the `slipstream-client` split package from the `PKGBUILD`.
 
 Launch it, pick your host from the list, and stream. For scripting you can skip the host list and
 connect straight away:
