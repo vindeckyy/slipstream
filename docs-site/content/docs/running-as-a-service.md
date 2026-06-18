@@ -77,6 +77,22 @@ to be up by the time a client connects, so the ordering is soft.)
 On Bazzite, the host launches its own gamescope/Steam session per client, so you don't need a separate
 session unit — see [Bazzite](/docs/bazzite).
 
+## Windows
+
+On Windows the host runs as a `LocalSystem` service that launches into the interactive session, so it
+captures the secure desktop (UAC / lock screen) and survives reboots with nobody logged in — the same
+model Sunshine/Apollo use.
+
+The easy path is the **signed installer**: download `slipstream-host-setup-<ver>.exe` from the package
+registry ([`slipstream-host-windows`](https://github.com/vindeckyy/slipstream/unom/-/packages)) and run it. It drops the host
+into `C:\Program Files\slipstream`, optionally installs the bundled **SudoVDA** virtual-display driver,
+and registers + starts the service for you (`/VERYSILENT` for unattended). Upgrades and uninstall are
+handled through Add/Remove Programs.
+
+Prefer the CLI? Run `slipstream-host service install` from an elevated prompt — see
+[Windows service](https://github.com/vindeckyy/slipstream.git/src/branch/main/docs/windows-service.md). Either
+way you need an NVIDIA GPU + driver (the host is NVENC-only on Windows).
+
 ## Verifying
 
 After a reboot, from another machine on the network:
