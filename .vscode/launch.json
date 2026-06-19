@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:slipstream}/clients/apple",
+            "name": "Debug SlipstreamClient (clients/apple)",
+            "target": "SlipstreamClient",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug SlipstreamClient (clients/apple)"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:slipstream}/clients/apple",
+            "name": "Release SlipstreamClient (clients/apple)",
+            "target": "SlipstreamClient",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release SlipstreamClient (clients/apple)"
+        }
+    ]
+}
