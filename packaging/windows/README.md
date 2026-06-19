@@ -3,6 +3,14 @@
 A one-file, signed `setup.exe` for the slipstream streaming **host** on Windows, published to GitHub's
 generic package registry (`slipstream-host-windows`) by `.github/workflows/windows-host.yml`.
 
+## x64 only (no ARM64)
+
+Unlike the client (which ships x64 + ARM64 MSIX), the host is **x64-only by design**. It is coupled to
+an NVIDIA GPU (NVENC, via `nvEncodeAPI64.dll` from the driver) and the **SudoVDA** virtual-display
+driver — neither exists on Windows ARM64 (no ARM64 NVIDIA driver; the vendored SudoVDA is x64-only). An
+ARM64 host would install but couldn't encode or create a virtual display, so we don't build one.
+Revisit if NVIDIA-ARM Windows PCs + an ARM64 SudoVDA ever ship.
+
 ## Why not MSIX (like the client)
 
 The host installs a **`LocalSystem` SCM service** that `CreateProcessAsUserW`'s from Session 0 into the
