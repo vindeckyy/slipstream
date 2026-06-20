@@ -13,7 +13,8 @@ steps, the web console) — those are the source of truth, so this page doesn't 
 |--------|-----------------|------------------------|-------|
 | **Ubuntu / Debian** | apt | `sudo apt install slipstream-host` | [Ubuntu — GNOME](/docs/ubuntu-gnome) · [Ubuntu — KDE](/docs/ubuntu-kde) · [packaging/debian](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/debian/README.md) |
 | **Fedora / Bazzite** | rpm-ostree | `rpm-ostree install slipstream slipstream-web` | [Fedora — KDE](/docs/fedora-kde) · [Bazzite](/docs/bazzite) · [packaging/rpm](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/rpm/README.md) |
-| **Arch / Steam Deck** | PKGBUILD / sysext | `makepkg -si` (Arch) · sysext `.raw` (SteamOS/Deck) | [packaging/arch](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/arch/README.md) |
+| **Arch** | PKGBUILD | `makepkg -si` | [packaging/arch](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/arch/README.md) |
+| **Steam Deck (host)** | on-device script | `bash scripts/steamdeck/install.sh` | [Steam Deck (Host)](/docs/steam-deck-host) |
 
 Each registry is public — no auth, you just trust the repo's signing key. Adding the repo is a
 one-time step covered in the linked guide; after that, normal `apt upgrade` / `rpm-ostree upgrade`
