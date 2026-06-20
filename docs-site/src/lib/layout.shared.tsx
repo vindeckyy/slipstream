@@ -1,10 +1,21 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared'
+import BrandMark from '@/components/BrandMark'
 
 // Shared chrome (nav title, links) for both the docs layout and the home layout.
+// The lens mark + wordmark mirror the slipstream marketing site's header.
 export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
-      title: 'slipstream',
+      title: (
+        <>
+          <BrandMark className="size-6" />
+          <span className="font-display font-semibold tracking-tight">slipstream</span>
+        </>
+      ),
     },
+    links: [
+      { text: 'Docs', url: '/docs' },
+      { text: 'Website', url: 'https://slipstream.unom.io' },
+    ],
   }
 }
