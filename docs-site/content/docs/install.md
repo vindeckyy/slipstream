@@ -15,7 +15,7 @@ On **Windows** (NVIDIA), the host ships as a signed installer instead — see [W
 | **Ubuntu / Debian** | apt | `sudo apt install slipstream-host` | [Ubuntu — GNOME](/docs/ubuntu-gnome) · [Ubuntu — KDE](/docs/ubuntu-kde) · [packaging/debian](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/debian/README.md) |
 | **Fedora / Bazzite** | rpm-ostree | `rpm-ostree install slipstream slipstream-web` | [Fedora — KDE](/docs/fedora-kde) · [Bazzite](/docs/bazzite) · [packaging/rpm](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/rpm/README.md) |
 | **Arch** | PKGBUILD | `makepkg -si` | [packaging/arch](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/arch/README.md) |
-| **Steam Deck (host)** | on-device script | `bash scripts/steamdeck/install.sh` | [Steam Deck (Host)](/docs/steam-deck-host) |
+| **SteamOS (host)** | on-device script | `bash scripts/steamdeck/install.sh` | [SteamOS (Host)](/docs/steamos-host) |
 
 Each registry is public — no auth, you just trust the repo's signing key. Adding the repo is a
 one-time step covered in the linked guide; after that, normal `apt upgrade` / `rpm-ostree upgrade`
@@ -62,8 +62,11 @@ You need an NVIDIA GPU + driver (the host is NVENC-only on Windows). More detail
 2. Start the host inside your desktop session:
 
    ```sh
-   slipstream-host serve --native
+   slipstream-host serve
    ```
+
+   Bare `serve` is the secure native-only default (native `slipstream/1` + the web console). On a
+   trusted LAN, add `--gamestream` to also serve stock [Moonlight](/docs/moonlight) clients.
 
 3. Enable the web console and read its login password, then open `http://<host-ip>:3000`:
 
