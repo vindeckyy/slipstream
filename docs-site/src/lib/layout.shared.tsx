@@ -16,6 +16,7 @@ export function baseOptions(): BaseLayoutProps {
     },
     links: [
       { text: 'Docs', url: '/docs' },
+      { text: 'API', url: '/api' },
       { text: 'Website', url: 'https://slipstream.unom.io' },
       { text: 'Source code', url: 'https://github.com/vindeckyy/slipstream.git' },
     ],
