@@ -2,9 +2,11 @@
 
 `slipstream-host` is published as a `.deb` to **GitHub's Debian package registry** in the public
 `unom` org, so the Ubuntu hosts update with plain `apt`. CI (`.github/workflows/deb.yml`) builds
-and publishes on every push to `main` (a rolling `0.2.0~ciN.g<sha>` build) and on `host-v*` tags
-(a clean `X.Y.Z`) — the rolling builds outrank the stray `0.1.1`, so plain `apt upgrade` always
-gets the latest (no version pin needed).
+and publishes on every push to `main` (a rolling `0.3.0~ciN.g<sha>` build to the **`canary`** apt
+distribution) and on `vX.Y.Z` tags (a clean `X.Y.Z` to the **`stable`** distribution, plus attached
+to the unified GitHub Release). The two are separate apt distributions, so a stable box never jumps
+to a canary build — see [Release Channels](https://slipstream.unom.io/docs/channels). The repo line
+below subscribes to `stable`; swap `stable` → `canary` for the latest main builds.
 
 The same workflow also publishes **`slipstream-web`** (the browser management console — pairing +
 status) and **`slipstream-client`** (the GTK4 couch/Deck client). `slipstream-host` **Recommends**
