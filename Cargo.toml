@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/slipstream-core",
     "crates/slipstream-host",
+    "crates/pf-vdisplay-proto",
     "clients/probe",
     "clients/linux",
     "clients/windows",
