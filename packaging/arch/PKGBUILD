@@ -86,6 +86,12 @@ package_slipstream-host() {
   install -Dm0644 "$R/scripts/slipstream-kde-session.service" "$pkgdir/usr/lib/systemd/user/slipstream-kde-session.service"
   sed -i 's#%h/slipstream/scripts/headless/run-headless-kde.sh#/usr/share/slipstream/headless/run-headless-kde.sh#' \
     "$pkgdir/usr/lib/systemd/user/slipstream-kde-session.service"
+  # KWin Desktop-mode authorization: non-launcher .desktop whose X-KDE-Wayland-Interfaces lets the
+  # host bind KWin's restricted zkde_screencast (virtual output) + fake_input globals on an
+  # interactive Plasma session. Must ship with the host (KWin caches the per-exe grant on first
+  # connect). See the file's header comment.
+  install -Dm0644 "$R/packaging/linux/io.unom.Slipstream.Host.desktop" \
+    "$pkgdir/usr/share/applications/io.unom.Slipstream.Host.desktop"
   # headless session helpers + env templates + OpenAPI doc
   install -Dm0755 "$R/scripts/headless/run-headless-kde.sh"  "$pkgdir/usr/share/slipstream/headless/run-headless-kde.sh"
   install -Dm0755 "$R/scripts/headless/run-headless-sway.sh" "$pkgdir/usr/share/slipstream/headless/run-headless-sway.sh"
