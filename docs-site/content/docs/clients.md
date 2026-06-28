@@ -44,7 +44,7 @@ It ships as a real package, not just a source build — full steps in
 
 - **Any Flatpak distro (recommended)** — `flatpak install https://flatpak.unom.io/io.unom.Slipstream.flatpakref`
   from the hosted [`flatpak.unom.io`](/docs/install-client#linux-desktop-flatpak) repo, then
-  `flatpak update`; this is also what the Decky plugin launches.
+  `flatpak update`; this is also what the [Decky plugin](/docs/steam-deck) launches.
 - **Ubuntu / Debian** — `apt install slipstream-client` from the slipstream apt registry.
 - **Fedora / Bazzite** — `rpm-ostree install slipstream-client` from the GitHub RPM registry.
 - **Arch / SteamOS** — the `slipstream-client` split package from the `PKGBUILD`.
@@ -108,7 +108,8 @@ slipstream-probe --connect <host>:9777 --pin <fp>  # connect to one
 | You're streaming to… | Use |
 |---|---|
 | A Mac, iPhone, iPad, or Apple TV | The **Apple app** |
-| A Linux desktop or laptop, or a Steam Deck | **`slipstream-client`** (GTK4) |
+| A Linux desktop or laptop | **`slipstream-client`** (GTK4) |
+| A **Steam Deck** | The **[Decky plugin](/docs/steam-deck)** in Gaming Mode, or the GTK4 client in Desktop Mode |
 | An Android phone or TV | The **Android app** |
 | Windows | The native **`slipstream-client`** (signed MSIX) or **Moonlight** |
 | A browser, a smart TV, or any other device | **Moonlight** |
