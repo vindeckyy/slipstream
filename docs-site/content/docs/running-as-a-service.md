@@ -95,13 +95,14 @@ model Sunshine/Apollo use.
 
 The easy path is the **signed installer**: download `slipstream-host-setup-<ver>.exe` from the package
 registry ([`slipstream-host-windows`](https://github.com/vindeckyy/slipstream/unom/-/packages)) and run it. It drops the host
-into `C:\Program Files\slipstream`, optionally installs the bundled **SudoVDA** virtual-display driver,
-and registers + starts the service for you (`/VERYSILENT` for unattended). Upgrades and uninstall are
+into `C:\Program Files\slipstream`, installs the bundled **pf-vdisplay** virtual-display driver, and
+registers + starts the service for you (`/VERYSILENT` for unattended). Upgrades and uninstall are
 handled through Add/Remove Programs.
 
 Prefer the CLI? Run `slipstream-host service install` from an elevated prompt — see
-[Windows service](https://github.com/vindeckyy/slipstream.git/src/branch/main/docs/windows-service.md). Either
-way you need an NVIDIA GPU + driver (the host is NVENC-only on Windows).
+[Windows service](https://github.com/vindeckyy/slipstream.git/src/branch/main/docs/windows-service.md). For
+hardware encode you need a GPU — NVIDIA (NVENC), AMD (AMF), or Intel (QSV); the host falls back to
+software H.264 without one.
 
 ## Verifying
 
