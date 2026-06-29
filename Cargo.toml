@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/slipstream-core",
     "crates/slipstream-host",
+    "crates/slipstream-host/vendor/usbip-sim",
     "crates/pf-driver-proto",
     "clients/probe",
     "clients/linux",
