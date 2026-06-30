@@ -111,6 +111,30 @@ journalctl --user -u slipstream-host -f          # watch a client connect
 The host now listens on `9777` (native slipstream/1) + the GameStream ports, and advertises over
 mDNS. It requires **PIN pairing** by default (secure on a LAN); pair once from your client.
 
+### Web console
+
+The console (status, paired devices, arm pairing) ships as `slipstream-web` — enable it, then open
+`http://<host-ip>:3000`:
+
+```sh
+systemctl --user enable --now slipstream-web
+```
+
+#### Console login password
+
+The console is password-protected. On first start `slipstream-web-init` generates a random login
+password and saves it to `~/.config/slipstream/web-password` (as `SLIPSTREAM_UI_PASSWORD=…`). Read it
+back at any time — from the init service's journal, or straight from the file:
+
+```sh
+journalctl --user -u slipstream-web-init | sed -n 's/.*password generated: //p'
+sed -n 's/^SLIPSTREAM_UI_PASSWORD=//p' ~/.config/slipstream/web-password
+```
+
+To set your own password, edit that file (`SLIPSTREAM_UI_PASSWORD=<your-password>`) and restart the
+console: `systemctl --user restart slipstream-web`. Forgot it? This is the recovery path linked from
+the console login screen — see [Forgot your Password?](/docs/forgot-password).
+
 ## 4. Connect a client
 
 From any [client](/docs/clients) — `slipstream-client --discover` finds the host on the LAN. On

@@ -36,10 +36,11 @@ parallelism with `CARGO_BUILD_JOBS` in the spec's `%build`.
 
 ## The web console subpackage (`slipstream-web`)
 
-The spec can also build the management web console as a noarch `slipstream-web` subpackage, but it's
-gated behind `%bcond_with web` and **OFF by default** — building the Nitro/Node SSR bundle needs
-`bun`, which COPR's mock chroot does not provide. So a stock COPR build produces only `slipstream`
-+ `slipstream-client`.
+The spec can also build the management web console as a `slipstream-web` subpackage, but it's
+gated behind `%bcond_with web` and **OFF by default** — building (and now *running*) the Nitro
+console needs `bun`, which COPR's mock chroot does not provide. The package vendors the build env's
+bun binary (the console serves HTTPS — HTTP/1.1 over TLS — via `Bun.serve`), so it is arch-specific, not noarch.
+A stock COPR build produces only `slipstream` + `slipstream-client`.
 
 Two ways to get the console:
 - **Recommended:** install it from the GitHub RPM registry (`packaging/rpm/README.md`, Option A),

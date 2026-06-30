@@ -107,6 +107,21 @@ systemctl --user enable --now slipstream-web
 journalctl --user -u slipstream-web-init | sed -n 's/.*password generated: //p'
 ```
 
+#### Console login password
+
+The console is password-protected. On first start `slipstream-web-init` generates a random login
+password and saves it to `~/.config/slipstream/web-password` (as `SLIPSTREAM_UI_PASSWORD=…`). Read it
+back at any time — from the init service's journal, or straight from the file:
+
+```sh
+journalctl --user -u slipstream-web-init | sed -n 's/.*password generated: //p'
+sed -n 's/^SLIPSTREAM_UI_PASSWORD=//p' ~/.config/slipstream/web-password
+```
+
+To set your own password, edit that file (`SLIPSTREAM_UI_PASSWORD=<your-password>`) and restart the
+console: `systemctl --user restart slipstream-web`. Forgot it? This is the recovery path linked from
+the console login screen — see [Forgot your Password?](/docs/forgot-password).
+
 To run the host automatically at boot — including on a **headless** machine with no monitor — see
 [Running as a Service](/docs/running-as-a-service).
 

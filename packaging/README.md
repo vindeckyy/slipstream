@@ -96,11 +96,11 @@ systemctl --user enable --now slipstream-host
 # Management web console (pairing + status) — pulled in by default (the host RPM Recommends it;
 # `--no-install-recommends` / headless-only boxes can skip it). Enable it and read the login password:
 systemctl --user enable --now slipstream-web
-journalctl --user -u slipstream-web-init | sed -n 's/.*password generated: //p'   # then open http://<host-ip>:3000
+journalctl --user -u slipstream-web-init | sed -n 's/.*password generated: //p'   # then open https://<host-ip>:3000
 ```
 
 Pair a stock Moonlight client (mDNS-discovered), or connect the native slipstream/1 client — via the
-web console at `http://<host-ip>:3000` or directly.
+web console at `https://<host-ip>:3000` or directly.
 
 > ⚠️ **COPR caveat:** COPR's mock chroot has no `bun`, so a COPR build produces only
 > `slipstream` + `slipstream-client` — **not** `slipstream-web`. For the console on a COPR/bootc host,
