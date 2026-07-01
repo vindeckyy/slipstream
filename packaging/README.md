@@ -73,7 +73,7 @@ rpm-ostree install slipstream && systemctl reboot
    systemctl reboot
    ```
 
-## Option B — bootc (image-based, atomic)
+## Option C — bootc (image-based, atomic)
 
 Layer slipstream into a Bazzite image once, then rebase any number of hosts onto it — no
 per-host drift. See `bootc/Containerfile`:
