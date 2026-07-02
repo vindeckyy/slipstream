@@ -2745,11 +2745,13 @@ dependencies = [
  "opus",
  "pipewire",
  "slipstream-core",
+ "rustls",
  "sdl3",
  "serde",
  "serde_json",
  "tracing",
  "tracing-subscriber",
+ "ureq",
 ]
 
 [[package]]
