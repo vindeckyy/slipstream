@@ -18,6 +18,7 @@ export function baseOptions(): BaseLayoutProps {
       { text: 'Docs', url: '/docs' },
       { text: 'API', url: '/api' },
       { text: 'Website', url: 'https://slipstream.unom.io' },
+      { text: 'Support', url: 'https://ko-fi.com/slipstream' },
       { text: 'Source code', url: 'https://github.com/vindeckyy/slipstream.git' },
       { text: 'Discord', url: 'https://discord.gg/kaPNvzMuGU' },
       { text: 'Reddit', url: 'https://www.reddit.com/r/Slipstream/' },
