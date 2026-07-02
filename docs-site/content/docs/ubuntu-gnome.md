@@ -103,7 +103,7 @@ The console (status, paired devices, arm pairing) ships as `slipstream-web`:
 
 ```sh
 systemctl --user enable --now slipstream-web
-# read the auto-generated login password, then open http://<host-ip>:3000
+# read the auto-generated login password, then open http://<host-ip>:47992
 journalctl --user -u slipstream-web-init | sed -n 's/.*password generated: //p'
 ```
 

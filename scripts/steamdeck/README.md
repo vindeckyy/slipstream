@@ -47,7 +47,7 @@ Note: unlike a bare `serve` (native-only by default), the Deck install enables `
 default so stock Moonlight clients work out of the box; `--no-gamestream` turns that surface off.
 
 Env overrides: `SLIPSTREAM_SRC` (source dir, default `~/slipstream`), `SLIPSTREAM_BOX` (container name,
-default `pf2`), `SLIPSTREAM_MGMT_PORT` (47990), `SLIPSTREAM_WEB_PORT` (3000).
+default `pf2`), `SLIPSTREAM_MGMT_PORT` (47990), `SLIPSTREAM_WEB_PORT` (47992).
 
 ## What gets installed
 
