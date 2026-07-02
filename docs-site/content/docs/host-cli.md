@@ -67,8 +67,8 @@ slipstream-host slipstream1-host --source virtual
 | `--require-pairing` | Only serve paired devices (implies `--allow-pairing`). |
 
 `--max-concurrent`, `--allow-pairing`, and `--require-pairing` are **`slipstream1-host`-only** — `serve` does not
-accept them. On `serve` you arm pairing from the web console instead, and concurrency is not
-yet capped from the command line.
+accept them. On `serve` you arm pairing from the web console instead, and concurrency is fixed at
+the built-in default (4 sessions) rather than settable from the command line.
 
 Both `serve` and `slipstream1-host` advertise the host on the network so clients can discover it. List
 hosts from another machine with `slipstream-probe --discover`.

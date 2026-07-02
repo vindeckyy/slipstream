@@ -108,7 +108,8 @@ read it from `%ProgramData%\slipstream\web-password`.
 ## Dev iteration on the test box (driver)
 
 Two helpers wrap the painful manual steps of iterating on the pf-vdisplay driver against a live host
-service. Run **elevated**; both default to the `SlipstreamHost` service.
+service. Run **elevated**; both default to the `SlipstreamHost` service. (The `C:\t-goal1\...` probe
+path below is the maintainer's test box — substitute your own `slipstream-probe.exe` build.)
 
 ```powershell
 # Recover a WEDGED driver. Symptom: every session fails with

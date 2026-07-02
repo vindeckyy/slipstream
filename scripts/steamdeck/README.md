@@ -39,8 +39,12 @@ git clone https://github.com/vindeckyy/slipstream.git ~/slipstream
 bash ~/slipstream/scripts/steamdeck/install.sh            # PIN pairing required (secure default)
 bash ~/slipstream/scripts/steamdeck/install.sh --open     # trusted LAN: accept unpaired clients
 bash ~/slipstream/scripts/steamdeck/install.sh --no-web   # host only, no web console
+bash ~/slipstream/scripts/steamdeck/install.sh --no-gamestream  # native slipstream/1 only, no Moonlight surface
 bash ~/slipstream/scripts/steamdeck/update.sh             # after pulling new source
 ```
+
+Note: unlike a bare `serve` (native-only by default), the Deck install enables `--gamestream` by
+default so stock Moonlight clients work out of the box; `--no-gamestream` turns that surface off.
 
 Env overrides: `SLIPSTREAM_SRC` (source dir, default `~/slipstream`), `SLIPSTREAM_BOX` (container name,
 default `pf2`), `SLIPSTREAM_MGMT_PORT` (47990), `SLIPSTREAM_WEB_PORT` (3000).

@@ -96,5 +96,3 @@ The check follows the [channel](/docs/channels) you installed from: a plugin ins
 
 The plugin source lives in
 [`clients/decky`](https://github.com/vindeckyy/slipstream.git/src/branch/main/clients/decky/README.md).
-</content>
-</invoke>
