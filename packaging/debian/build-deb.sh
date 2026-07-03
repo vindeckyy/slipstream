@@ -28,6 +28,11 @@ if [ ! -x "$BIN" ]; then
   echo "==> building $PKG (release)"
   SLIPSTREAM_BUILD_VERSION="$VERSION" cargo build --release -p "$PKG" --locked   # stamp --version (build.rs)
 fi
+TRAY_BIN="target/release/slipstream-tray"
+if [ ! -x "$TRAY_BIN" ]; then
+  echo "==> building slipstream-tray (release)"
+  cargo build --release -p slipstream-tray --locked
+fi
 
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
@@ -57,6 +62,16 @@ sed -i 's#%h/slipstream/scripts/headless/run-headless-kde.sh#/usr/share/slipstre
 # connect, so it has to be present before the host ever connects. See the file's header comment.
 install -Dm0644 packaging/linux/io.unom.Slipstream.Host.desktop \
     "$STAGE/usr/share/applications/io.unom.Slipstream.Host.desktop"
+# Status tray: the per-user SNI icon + its XDG autostart entry (self-gating: --autostart exits
+# silently for users who don't run a host) + the hicolor status icons it names.
+install -Dm0755 "$TRAY_BIN"                        "$STAGE/usr/bin/slipstream-tray"
+install -Dm0644 packaging/linux/io.unom.Slipstream.Tray.desktop \
+    "$STAGE/etc/xdg/autostart/io.unom.Slipstream.Tray.desktop"
+for sz in 22x22 48x48; do
+  for png in packaging/linux/icons/hicolor/$sz/apps/*.png; do
+    install -Dm0644 "$png" "$STAGE/usr/share/icons/hicolor/$sz/apps/$(basename "$png")"
+  done
+done
 install -Dm0755 scripts/headless/run-headless-kde.sh   "$SHAREDIR/headless/run-headless-kde.sh"
 install -Dm0755 scripts/headless/run-headless-sway.sh  "$SHAREDIR/headless/run-headless-sway.sh"
 install -Dm0644 scripts/headless/kde-authorized        "$SHAREDIR/headless/kde-authorized"

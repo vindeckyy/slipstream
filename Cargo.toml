@@ -4,6 +4,7 @@ members = [
     "crates/slipstream-core",
     "crates/slipstream-host",
     "crates/slipstream-host/vendor/usbip-sim",
+    "crates/slipstream-tray",
     "crates/pf-driver-proto",
     "clients/probe",
     "clients/linux",
