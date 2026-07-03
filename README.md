@@ -49,7 +49,7 @@ protocol, FEC, and crypto, linked into the host and every client over a stable C
 | **Core** — `slipstream-core` + C ABI (protocol · FEC · crypto · QUIC) | ✅ Complete & hardened |
 | **GameStream host** → stock Moonlight | ✅ Live end-to-end: pairing, RTSP, audio, per-client virtual output at native resolution, GPU zero-copy NVENC, gamepads |
 | **Native protocol** — `slipstream/1` | ✅ Validated live: QUIC control + GF(2¹⁶) FEC/AES-GCM data plane, PIN pairing, mDNS discovery, mid-stream mode renegotiation |
-| **Windows host** (x64) | 🟡 Implemented & shipping as a signed installer: DXGI/WGC capture · its own all-Rust IddCx **virtual display** (secure-desktop capable) · GPU encode (NVENC on NVIDIA, AMF/QSV on AMD/Intel, software H.264 without a GPU) · WASAPI audio · bundled virtual-gamepad drivers (no ViGEmBus) · HDR incl. Vulkan-game HDR. NVIDIA live-validated; AMD/Intel CI-green |
+| **Windows host** (Windows 11 22H2+, x64) | 🟡 Implemented & shipping as a signed installer: DXGI/WGC capture · its own all-Rust IddCx **virtual display** (secure-desktop capable) · GPU encode (NVENC on NVIDIA, AMF/QSV on AMD/Intel, software H.264 without a GPU) · WASAPI audio · bundled virtual-gamepad drivers (no ViGEmBus) · HDR incl. Vulkan-game HDR. NVIDIA live-validated; AMD/Intel CI-green |
 | **macOS / iOS / tvOS client** (`clients/apple`) | ✅ Streaming live: VideoToolbox decode, controllers incl. DualSense, discovery, pairing, speed test |
 | **Linux client** (`clients/linux`, GTK4) | ✅ Streaming live: FFmpeg + VAAPI zero-copy decode, PipeWire audio, SDL3 controllers; ships as Flatpak/apt/rpm/Arch |
 | **Android client** (`clients/android`, phone + TV) | ✅ Streaming live: AMediaCodec decode + HDR10, AAudio audio, controllers, discovery, pairing |
@@ -82,7 +82,7 @@ Windows host also ships as a signed installer (all-vendor: NVIDIA, AMD, Intel).
 | **Ubuntu / Debian** (apt) | `sudo apt install slipstream-host` *(after adding the repo)* | [Ubuntu — GNOME](https://docs.slipstream.unom.io/docs/ubuntu-gnome) · [KDE](https://docs.slipstream.unom.io/docs/ubuntu-kde) |
 | **Fedora / Bazzite** (rpm-ostree) | `rpm-ostree install slipstream slipstream-web` *(or the bootc image)* | [Fedora — KDE](https://docs.slipstream.unom.io/docs/fedora-kde) · [Bazzite](https://docs.slipstream.unom.io/docs/bazzite) |
 | **Arch / Steam Deck** (PKGBUILD / sysext) | `makepkg -si` *(Arch)* · sysext `.raw` *(SteamOS)* | [packaging/arch](packaging/arch/README.md) |
-| **Windows** (x64) | signed `setup.exe` from the package registry | [Windows Host](https://docs.slipstream.unom.io/docs/windows-host) |
+| **Windows** (11 22H2+, x64) | signed `setup.exe` from the package registry | [Windows Host](https://docs.slipstream.unom.io/docs/windows-host) |
 
 `slipstream-host` is the streaming host; `slipstream-web` is the browser console (pairing + status).
 After install, run `slipstream-host serve` inside your desktop session (the secure native default;

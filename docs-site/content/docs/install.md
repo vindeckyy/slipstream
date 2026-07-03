@@ -6,7 +6,11 @@ description: Install the slipstream host — on Linux from its package registry,
 On Linux, the package registries are the real distribution channel. Pick your distro, add the repo, and
 install with your native package manager. Each row links to the full per-distro guide (add the repo,
 first-run steps, the web console) — those are the source of truth, so this page doesn't duplicate them.
-On **Windows** (NVIDIA), the host ships as a signed installer instead — see [Windows](#windows-nvidia).
+On **Windows**, the host ships as a signed installer instead — see [Windows](#windows).
+
+> **First, read [Security & Safe Use](/docs/security).** A streaming host is remote control of the
+> machine. It's built for trusted local networks — don't expose it to the internet, and be thoughtful
+> about which machine you host on (especially on Windows).
 
 ## Pick your distro
 
@@ -26,10 +30,10 @@ tracks new builds automatically.
 > at the **canary** channel instead (`canary` apt distribution / `*-canary` rpm group). See
 > [Release Channels](/docs/channels).
 
-## Windows (NVIDIA)
+## Windows
 
-slipstream also runs as a native host on **Windows 10/11 (x64) with an NVIDIA GPU**, shipped as a
-signed installer — see [Windows Host](/docs/windows-host) for what it includes and its limitations.
+slipstream also runs as a native host on **Windows 11 22H2+ (x64)**, shipped as a signed
+installer — see [Windows Host](/docs/windows-host) for what it includes and its limitations.
 
 1. From the [packages page](https://github.com/vindeckyy/slipstream/unom/-/packages) (generic group), download the newest
    **`slipstream-host-setup-<ver>.exe`** and its matching **`.cer`**.
@@ -53,7 +57,7 @@ fallback without one. More detail — including the CLI `slipstream-host service
 
 ## What the packages are
 
-- **`slipstream-host`** — the streaming host. Install this on your Linux + NVIDIA gaming machine.
+- **`slipstream-host`** — the streaming host. Install this on your Linux gaming machine.
 - **`slipstream-web`** — the browser management console (pairing + status). Recommended alongside the
   host; on RPM list it explicitly (`rpm-ostree install slipstream slipstream-web`).
 - **`slipstream-client`** — the GTK4 desktop client, for streaming *to* a Linux box (also shipped via
