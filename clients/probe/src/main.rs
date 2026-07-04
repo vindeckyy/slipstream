@@ -412,7 +412,7 @@ async fn session(args: Args) -> Result<()> {
     io::write_msg(
         &mut send,
         &Hello {
-            abi_version: slipstream_core::ABI_VERSION,
+            abi_version: slipstream_core::WIRE_VERSION,
             mode: args.mode,
             compositor: args.compositor,
             gamepad: args.gamepad,
