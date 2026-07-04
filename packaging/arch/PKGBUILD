@@ -138,9 +138,9 @@ package_slipstream-host() {
   # firewall). Stock Arch ships none, so they're a no-op there; CachyOS et al. ship firewalld, so
   #   sudo firewall-cmd --reload && sudo firewall-cmd --permanent --add-service=slipstream-gamestream && sudo firewall-cmd --reload
   # (or =slipstream-native). See README.md → Firewall.
-  install -Dm0644 "$R/packaging/arch/slipstream-gamestream.xml" \
+  install -Dm0644 "$R/packaging/linux/slipstream-gamestream.xml" \
     "$pkgdir/usr/lib/firewalld/services/slipstream-gamestream.xml"
-  install -Dm0644 "$R/packaging/arch/slipstream-native.xml" \
+  install -Dm0644 "$R/packaging/linux/slipstream-native.xml" \
     "$pkgdir/usr/lib/firewalld/services/slipstream-native.xml"
   install -Dm0644 "$R/LICENSE-MIT"    "$pkgdir/usr/share/licenses/slipstream-host/LICENSE-MIT"
   install -Dm0644 "$R/LICENSE-APACHE" "$pkgdir/usr/share/licenses/slipstream-host/LICENSE-APACHE"

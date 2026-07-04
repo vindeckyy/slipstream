@@ -80,6 +80,13 @@ install -Dm0644 scripts/host.env.example           "$SHAREDIR/host.env.example"
 install -Dm0644 packaging/bazzite/host.env         "$SHAREDIR/host.env.bazzite"
 install -Dm0644 packaging/kde/host.env             "$SHAREDIR/host.env.kde"
 install -Dm0644 api/openapi.json              "$SHAREDIR/openapi.json"
+# firewalld service definitions (shared across all Linux packaging). NOT auto-enabled — the postinst
+# only prints the enable command when firewalld is present. Debian/Ubuntu ship no active firewall
+# (Ubuntu's ufw is installed-but-inactive), so these are a no-op unless the admin runs firewalld.
+install -Dm0644 packaging/linux/slipstream-gamestream.xml \
+                "$STAGE/usr/lib/firewalld/services/slipstream-gamestream.xml"
+install -Dm0644 packaging/linux/slipstream-native.xml \
+                "$STAGE/usr/lib/firewalld/services/slipstream-native.xml"
 install -Dm0644 LICENSE-MIT                         "$DOCDIR/LICENSE-MIT"
 install -Dm0644 LICENSE-APACHE                      "$DOCDIR/LICENSE-APACHE"
 install -Dm0644 README.md                           "$DOCDIR/README.md"
@@ -186,6 +193,12 @@ if [ "$1" = "configure" ]; then
     echo "    sudo usermod -aG input \"\$USER\"   # then re-login"
     echo "Config:  mkdir -p ~/.config/slipstream && cp /usr/share/slipstream-host/host.env.example ~/.config/slipstream/host.env"
     echo "Enable:  systemctl --user enable --now slipstream-host"
+    # Debian/Ubuntu ship no active firewall; only hint firewalld users (ufw users: see README).
+    if command -v firewall-cmd >/dev/null 2>&1; then
+        echo "Firewall (firewalld detected): sudo firewall-cmd --reload &&"
+        echo "    sudo firewall-cmd --permanent --add-service=slipstream-gamestream && sudo firewall-cmd --reload"
+        echo "    (use slipstream-native for the native-only host)"
+    fi
 fi
 exit 0
 EOF
