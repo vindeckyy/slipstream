@@ -24,36 +24,43 @@ mid-stream. You flip between Gaming Mode and Desktop with Bazzite's normal Steam
 
 ## Install
 
-The host ships as an RPM in slipstream's **GitHub RPM registry** (public), so a Bazzite / Fedora
-Atomic box layers and updates it with `rpm-ostree`. Add the repo, then layer the host plus the web
-console and reboot:
+The host installs as a **systemd system extension (sysext)** — no `rpm-ostree` layering. The
+Bazzite docs treat layering as a last resort (layered packages slow every OS update and can block
+upgrades until removed); a sysext never enters an rpm-ostree transaction: it overlays `/usr`
+read-only from `/var/lib/extensions/`, survives OS updates, installs and updates **without a
+reboot**, and is removable in one command. This is the same mechanism the Fedora Atomic
+maintainers ship via the [fedora-sysexts](https://fedora-sysexts.github.io/) project.
 
 ```sh
-# Add the repo. Packages are GPG-signed (gpgcheck=1, the packages@unom.io key) AND the repo
-# metadata is GitHub-signed (repo_gpgcheck=1); gpgkey lists both keys so dnf imports each.
-sudo tee /etc/yum.repos.d/slipstream.repo >/dev/null <<'REPO'
-[github-unom-bazzite]
-name=slipstream (unom, Bazzite)
-baseurl=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/bazzite
-enabled=1
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/repository.key
-       https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-keys/1/RPM-GPG-KEY-slipstream
-REPO
-
-# Layer the host + the web console, then reboot into the new deployment.
-# (slipstream Recommends slipstream-web; list it explicitly so it's pulled regardless of weak-dep
-# settings — the GitHub registry carries slipstream-web, which COPR can't build.)
-rpm-ostree install slipstream slipstream-web
-systemctl reboot
+# One-time bootstrap (afterwards the updater is on PATH as `slipstream-sysext`):
+curl -fsSLO https://github.com/vindeckyy/slipstream.git/raw/branch/main/packaging/bazzite/slipstream-sysext.sh
+sudo bash slipstream-sysext.sh install          # add `--channel canary` for rolling builds
 ```
 
-`rpm-ostree upgrade` then tracks new builds automatically (Bazzite's auto-update timer does this
-for you). For a fully baked appliance image there's also a **bootc** Containerfile that installs
-the same RPMs from this registry — see `packaging/bootc/` and `packaging/rpm/README.md` in the repo.
-Building from source works too (Bazzite is Fedora Atomic underneath, and its FFmpeg builds the host
-fine — same steps as [Fedora KDE](/docs/fedora-kde)), but the registry is the supported path.
+That downloads the newest image (host + tray + web console, SHA-256-verified over HTTPS from
+slipstream's package registry), merges it, and applies the udev/sysctl setup on the spot — the
+host is usable immediately, no reboot. From then on:
+
+```sh
+sudo slipstream-sysext update     # fetch + merge the newest build
+sudo slipstream-sysext status     # channel, installed vs latest version
+sudo slipstream-sysext remove     # unmerge and delete — the box is back to stock
+```
+
+Two things to know:
+
+- **After a Bazzite major rebase** (Fedora 43 → 44) the old image **refuses to load** rather than
+  run against mismatched system libraries — run `sudo slipstream-sysext update` once and it fetches
+  the image built for the new base.
+- **Already layering slipstream?** Install the sysext (it shadows the layered copy immediately),
+  then drop the layer so it stops slowing your updates:
+  `sudo rpm-ostree uninstall slipstream slipstream-web && systemctl reboot`.
+
+For a fully baked appliance image there's also a **bootc** Containerfile that installs the RPMs
+from the registry at image-build time — see `packaging/bootc/` in the repo. Plain `rpm-ostree`
+layering from the [RPM registry](https://github.com/vindeckyy/slipstream/unom/-/packages) keeps working too (see
+`packaging/bazzite/README.md`), but the sysext is the supported default. Building from source
+also works (Bazzite is Fedora Atomic underneath — same steps as [Fedora KDE](/docs/fedora-kde)).
 
 ## Allow controller input
 
