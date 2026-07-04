@@ -9,7 +9,7 @@ to a canary build — see [Release Channels](https://slipstream.unom.io/docs/cha
 below subscribes to `stable`; swap `stable` → `canary` for the latest main builds.
 
 The same workflow also publishes **`slipstream-web`** (the browser management console — pairing +
-status) and **`slipstream-client`** (the GTK4 couch/Deck client). `slipstream-host` **Recommends**
+status) and **`slipstream-client`** (the native GTK4/libadwaita Linux client). `slipstream-host` **Recommends**
 `slipstream-web`, so a default `apt install slipstream-host` pulls the console too (alongside the
 udev/sysctl bits) unless you've disabled weak deps; `slipstream-client` is independent — install it
 on the box you stream *to*. (`slipstream-probe` is the headless reference/test tool, not packaged

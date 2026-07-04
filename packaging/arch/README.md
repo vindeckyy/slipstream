@@ -1,9 +1,9 @@
 # slipstream on Arch Linux / SteamOS
 
 Packaging for slipstream on Arch and Arch-derived immutable distros. The `PKGBUILD` is a **split
-package** producing **`slipstream-host`** (the gaming-rig host) and **`slipstream-client`** (the GTK4
-couch/Deck client) — mirrors the rpm subpackages (`packaging/rpm/slipstream.spec`) and the deb build
-scripts. On a **Steam Deck used as a client you want `slipstream-client`** (it's what the
+package** producing **`slipstream-host`** (the gaming-rig host) and **`slipstream-client`** (the native
+GTK4/libadwaita Linux client) — mirrors the rpm subpackages (`packaging/rpm/slipstream.spec`) and the
+deb build scripts. On a **Steam Deck used as a client you want `slipstream-client`** (it's what the
 [Decky plugin](../../clients/decky/) launches); on a gaming rig, `slipstream-host`.
 
 > **Steam Deck as a HOST:** don't use this PKGBUILD — SteamOS's read-only root makes `makepkg`/sysext
@@ -42,15 +42,13 @@ curl -fsS https://github.com/vindeckyy/slipstream/api/packages/unom/arch/reposit
 sudo pacman-key --lsign-key E0CA04465C99C936E0B0C6510A317015A34DDD69
 
 # 2. Add the repo (pick ONE channel — slipstream for releases, slipstream-canary for main builds).
-sudo tee -a /etc/pacman.conf >/dev/null <<'EOF'
-
-[slipstream]
-Server = https://github.com/vindeckyy/slipstream/api/packages/unom/arch/$repo/$arch
-EOF
+#    printf, not a heredoc, so this works in fish too (CachyOS's default shell has no `<<EOF`).
+printf '\n[slipstream]\nServer = https://github.com/vindeckyy/slipstream/api/packages/unom/arch/$repo/$arch\n' \
+  | sudo tee -a /etc/pacman.conf >/dev/null
 
 # 3. Sync + install.
 sudo pacman -Sy slipstream-host        # gaming rig
-sudo pacman -Sy slipstream-client      # couch/Deck side
+sudo pacman -Sy slipstream-client      # the native GTK4 Linux client
 sudo pacman -Sy slipstream-web         # optional browser management console
 ```
 
@@ -139,7 +137,31 @@ so it's a much lighter sysext than the host.
 
 ## Firewall
 
-If the host box runs a firewall, open the ports it listens on. The **native `slipstream/1`** plane:
+**Stock Arch ships no firewall** — every port is open by default, so there is nothing to do.
+Spins that enable one **do not** get their ports opened for you: an Arch package never touches the
+admin's running firewall. **CachyOS is the common case** — its installer turns on `firewalld` by
+default, so out of the box the host is unreachable until you allow it.
+
+The `slipstream-host` package ships **firewalld service definitions** (installed to
+`/usr/lib/firewalld/services/`) so enabling is one command — pick the plane your host serves:
+
+```sh
+# Reload once so firewalld picks up the just-installed service definition, add it, reload to apply.
+sudo firewall-cmd --reload
+sudo firewall-cmd --permanent --add-service=slipstream-gamestream   # Moonlight/GameStream host
+#                              --add-service=slipstream-native       # …or the native-only host
+sudo firewall-cmd --reload
+```
+
+`slipstream-gamestream` opens the fixed Moonlight ports + mDNS; `slipstream-native` opens the QUIC
+control port (UDP 9777) + mDNS. Enable both if the host runs `serve --gamestream` (which serves
+both planes). The **data plane is an *ephemeral* UDP port** negotiated per session, so there is no
+fixed data port in either service; a restrictive firewall must additionally allow a UDP range (the
+project does not pin one). The mgmt REST API (TCP 47990) binds to loopback by default — leave it
+closed unless you move it off loopback with `--mgmt-bind IP:PORT` (which then requires
+`--mgmt-token`).
+
+For a non-firewalld setup, open the ports directly. The **native `slipstream/1`** plane:
 
 - **QUIC control plane: UDP 9777** (`serve --native-port N` to change).
 - **Data plane: an *ephemeral* UDP port** — negotiated per session, so there is no fixed port to
@@ -182,6 +204,9 @@ udp dport { 47998-48010, 5353 } accept
 - `PKGBUILD` — split package: `slipstream-host` + `slipstream-client` (builds the working tree via
   `PF_SRCDIR`, or a git tag for AUR).
 - `slipstream-host.install` / `slipstream-client.install` — pacman scriptlets (udev reload + sysctl +
-  first-run hint), mirror the RPM `%post` / deb postinst.
+  first-run hint, incl. the firewalld enable command when firewalld is present), mirror the RPM
+  `%post` / deb postinst.
+- `slipstream-gamestream.xml` / `slipstream-native.xml` — firewalld service definitions the host
+  package installs to `/usr/lib/firewalld/services/` (not auto-enabled; see Firewall above).
 - `build-sysext.sh` — wraps either built `.pkg.tar.zst` into a `systemd-sysext` `.raw` for SteamOS
   (derives the name from the package, so it works for host or client).

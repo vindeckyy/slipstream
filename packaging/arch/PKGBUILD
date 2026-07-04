@@ -1,7 +1,7 @@
 # Maintainer: unom <noreply@anthropic.com>
 #
 # Arch Linux / SteamOS split package: slipstream-host (the gaming-rig HOST, NVENC) and
-# slipstream-client (the GTK4 couch/Deck CLIENT). Mirrors the rpm subpackages
+# slipstream-client (the native GTK4/libadwaita Linux CLIENT). Mirrors the rpm subpackages
 # (packaging/rpm/slipstream.spec) and the two deb build scripts. On a Steam Deck you want
 # `slipstream-client` (it's what the Decky plugin launches); on a gaming rig, `slipstream-host`.
 #
@@ -134,13 +134,21 @@ package_slipstream-host() {
   install -Dm0644 "$R/packaging/bazzite/gamescope-headless-session" \
     "$pkgdir/etc/gamescope-session-plus/sessions.d/steam"
   install -Dm0644 "$R/api/openapi.json"                 "$pkgdir/usr/share/slipstream/openapi.json"
+  # firewalld service definitions — NOT auto-enabled (Arch packages never touch the admin's
+  # firewall). Stock Arch ships none, so they're a no-op there; CachyOS et al. ship firewalld, so
+  #   sudo firewall-cmd --reload && sudo firewall-cmd --permanent --add-service=slipstream-gamestream && sudo firewall-cmd --reload
+  # (or =slipstream-native). See README.md → Firewall.
+  install -Dm0644 "$R/packaging/arch/slipstream-gamestream.xml" \
+    "$pkgdir/usr/lib/firewalld/services/slipstream-gamestream.xml"
+  install -Dm0644 "$R/packaging/arch/slipstream-native.xml" \
+    "$pkgdir/usr/lib/firewalld/services/slipstream-native.xml"
   install -Dm0644 "$R/LICENSE-MIT"    "$pkgdir/usr/share/licenses/slipstream-host/LICENSE-MIT"
   install -Dm0644 "$R/LICENSE-APACHE" "$pkgdir/usr/share/licenses/slipstream-host/LICENSE-APACHE"
   install -Dm0644 "$R/README.md"      "$pkgdir/usr/share/doc/slipstream-host/README.md"
 }
 
 package_slipstream-client() {
-  pkgdesc="Low-latency desktop/game streaming CLIENT (GTK4) — the couch/Deck side"
+  pkgdesc="Low-latency desktop/game streaming CLIENT — native GTK4/libadwaita Linux app"
   # The GTK4/libadwaita client: SDL3 gamepads, FFmpeg (VAAPI) decode, PipeWire audio/mic.
   depends=('gtk4' 'libadwaita' 'sdl3' 'ffmpeg' 'pipewire' 'wireplumber' 'pipewire-pulse'
            'opus' 'libglvnd')
