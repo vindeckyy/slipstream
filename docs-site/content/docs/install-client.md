@@ -48,7 +48,7 @@ see the linked guide — then it tracks updates with your normal `apt upgrade` /
 |--------|---------|-------|
 | **Ubuntu / Debian** | `sudo apt install slipstream-client` | [packaging/debian](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/debian/README.md) |
 | **Fedora / Bazzite** | `rpm-ostree install slipstream-client` | [packaging/rpm](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/rpm/README.md) |
-| **Arch / SteamOS** | `slipstream-client` from the `PKGBUILD` | [packaging/arch](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/arch/README.md) |
+| **Arch** | `sudo pacman -Sy slipstream-client` (signed binary repo) | [Arch Linux](/docs/arch) |
 
 Then launch it, pick your host from the list, and stream. For scripting, skip the picker:
 

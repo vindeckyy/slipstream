@@ -19,7 +19,7 @@ On **Windows**, the host ships as a signed installer instead — see [Windows](#
 | **Ubuntu / Debian** | apt | `sudo apt install slipstream-host` | [Ubuntu — GNOME](/docs/ubuntu-gnome) · [Ubuntu — KDE](/docs/ubuntu-kde) · [packaging/debian](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/debian/README.md) |
 | **Bazzite / Fedora Atomic** | systemd-sysext | `sudo bash slipstream-sysext.sh install` (no layering, no reboot) | [Bazzite](/docs/bazzite) · [packaging/bazzite](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/bazzite/README.md) |
 | **Fedora (dnf)** | dnf / rpm-ostree | `dnf install slipstream slipstream-web` | [Fedora — KDE](/docs/fedora-kde) · [packaging/rpm](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/rpm/README.md) |
-| **Arch** | pacman | `pacman -Sy slipstream-host` (binary repo) | [packaging/arch](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/arch/README.md) |
+| **Arch** | pacman | `pacman -Sy slipstream-host` (binary repo) | [Arch Linux](/docs/arch) · [packaging/arch](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/arch/README.md) |
 | **SteamOS (host)** | on-device script | `bash scripts/steamdeck/install.sh` | [SteamOS (Host)](/docs/steamos-host) |
 
 Each registry is public — no auth, you just trust the repo's signing key. Adding the repo is a

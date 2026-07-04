@@ -47,7 +47,7 @@ It ships as a real package, not just a source build — full steps in
   `flatpak update`; this is also what the [Decky plugin](/docs/steam-deck) launches.
 - **Ubuntu / Debian** — `apt install slipstream-client` from the slipstream apt registry.
 - **Fedora / Bazzite** — `rpm-ostree install slipstream-client` from the GitHub RPM registry.
-- **Arch / SteamOS** — the `slipstream-client` split package from the `PKGBUILD`.
+- **Arch** — `sudo pacman -Sy slipstream-client` from the signed binary repo (see [Arch Linux](/docs/arch)).
 
 Launch it, pick your host from the list, and stream. For scripting you can skip the host list and
 connect straight away:
