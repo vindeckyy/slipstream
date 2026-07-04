@@ -83,8 +83,9 @@ Windows host also ships as a signed installer (all-vendor: NVIDIA, AMD, Intel).
 | Platform | Install | Guide |
 |--------|---------|-------|
 | **Ubuntu / Debian** (apt) | `sudo apt install slipstream-host` *(after adding the repo)* | [Ubuntu — GNOME](https://docs.slipstream.unom.io/docs/ubuntu-gnome) · [KDE](https://docs.slipstream.unom.io/docs/ubuntu-kde) |
-| **Fedora / Bazzite** (rpm-ostree) | `rpm-ostree install slipstream slipstream-web` *(or the bootc image)* | [Fedora — KDE](https://docs.slipstream.unom.io/docs/fedora-kde) · [Bazzite](https://docs.slipstream.unom.io/docs/bazzite) |
-| **Arch / Steam Deck** (PKGBUILD / sysext) | `makepkg -si` *(Arch)* · sysext `.raw` *(SteamOS)* | [packaging/arch](packaging/arch/README.md) |
+| **Bazzite / Fedora Atomic** (systemd-sysext) | `sudo bash slipstream-sysext.sh install` *(no layering, no reboot; rpm-ostree + bootc also supported)* | [Bazzite](https://docs.slipstream.unom.io/docs/bazzite) |
+| **Fedora** (dnf) | `dnf install slipstream slipstream-web` *(after adding the repo)* | [Fedora — KDE](https://docs.slipstream.unom.io/docs/fedora-kde) |
+| **Arch / Steam Deck** (pacman / sysext) | `pacman -Sy slipstream-host` *(binary repo)* · sysext `.raw` *(SteamOS)* | [packaging/arch](packaging/arch/README.md) |
 | **Windows** (11 22H2+, x64) | signed `setup.exe` from the package registry | [Windows Host](https://docs.slipstream.unom.io/docs/windows-host) |
 
 `slipstream-host` is the streaming host; `slipstream-web` is the browser console (pairing + status).

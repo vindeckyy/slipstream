@@ -25,6 +25,8 @@ track per machine; switching is a one-line change.
 |---|---|---|
 | **apt** (host/client) | `deb [signed-by=…] https://github.com/vindeckyy/slipstream/api/packages/unom/debian canary main` | `… debian stable main` |
 | **rpm** (host) | baseurl `…/rpm/bazzite-canary` (or `fedora-44-canary`) | `…/rpm/bazzite` (or `fedora-44`) |
+| **sysext** (Bazzite host) | `sudo slipstream-sysext install --channel canary` | `… install` / default (feeds `…/slipstream-sysext/f43[-canary]`) |
+| **pacman** (Arch host/client) | `[slipstream-canary]` repo section | `[slipstream]` (`Server = …/api/packages/unom/arch/$repo/$arch`) |
 | **Flatpak** (client) | `flatpak install --user https://flatpak.unom.io/io.unom.Slipstream.Canary.flatpakref` | `…/io.unom.Slipstream.flatpakref` |
 | **Decky** (Steam Deck) | install-from-URL `…/generic/slipstream-decky/canary/slipstream.zip` | `…/slipstream-decky/latest/slipstream.zip` |
 | **Windows client** (MSIX) | `…/generic/slipstream-client-windows/canary/slipstream-client-windows_x64.msix` | `…/latest/…` + the release page |

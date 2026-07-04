@@ -17,13 +17,14 @@ On **Windows**, the host ships as a signed installer instead — see [Windows](#
 | Distro | Package manager | One-command happy path | Guide |
 |--------|-----------------|------------------------|-------|
 | **Ubuntu / Debian** | apt | `sudo apt install slipstream-host` | [Ubuntu — GNOME](/docs/ubuntu-gnome) · [Ubuntu — KDE](/docs/ubuntu-kde) · [packaging/debian](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/debian/README.md) |
-| **Fedora / Bazzite** | rpm-ostree | `rpm-ostree install slipstream slipstream-web` | [Fedora — KDE](/docs/fedora-kde) · [Bazzite](/docs/bazzite) · [packaging/rpm](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/rpm/README.md) |
-| **Arch** | PKGBUILD | `makepkg -si` | [packaging/arch](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/arch/README.md) |
+| **Bazzite / Fedora Atomic** | systemd-sysext | `sudo bash slipstream-sysext.sh install` (no layering, no reboot) | [Bazzite](/docs/bazzite) · [packaging/bazzite](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/bazzite/README.md) |
+| **Fedora (dnf)** | dnf / rpm-ostree | `dnf install slipstream slipstream-web` | [Fedora — KDE](/docs/fedora-kde) · [packaging/rpm](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/rpm/README.md) |
+| **Arch** | pacman | `pacman -Sy slipstream-host` (binary repo) | [packaging/arch](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/arch/README.md) |
 | **SteamOS (host)** | on-device script | `bash scripts/steamdeck/install.sh` | [SteamOS (Host)](/docs/steamos-host) |
 
 Each registry is public — no auth, you just trust the repo's signing key. Adding the repo is a
-one-time step covered in the linked guide; after that, normal `apt upgrade` / `rpm-ostree upgrade`
-tracks new builds automatically.
+one-time step covered in the linked guide; after that, normal `apt upgrade` / `dnf upgrade` /
+`pacman -Syu` (or `sudo slipstream-sysext update` on Bazzite) tracks new builds.
 
 > **Stable vs canary.** The repos in the per-distro guides are the **stable** channel — it only
 > moves when a `vX.Y.Z` release is cut. For the latest `main` build (fast, possibly broken), point
@@ -59,7 +60,8 @@ fallback without one. More detail — including the CLI `slipstream-host service
 
 - **`slipstream-host`** — the streaming host. Install this on your Linux gaming machine.
 - **`slipstream-web`** — the browser management console (pairing + status). Recommended alongside the
-  host; on RPM list it explicitly (`rpm-ostree install slipstream slipstream-web`).
+  host; on RPM list it explicitly (`dnf install slipstream slipstream-web`) — the Bazzite sysext
+  image already includes it.
 - **`slipstream-client`** — the GTK4 desktop client, for streaming *to* a Linux box (also shipped via
   apt / RPM / Arch / Flatpak). On a Steam Deck, this is the package you want.
 
