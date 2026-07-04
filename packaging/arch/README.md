@@ -30,24 +30,33 @@ every push and publishes the packages to the **GitHub Arch package registry** �
 repo, so an Arch box installs and updates slipstream with `pacman -Syu` like everything else.
 Two repos mirror the deb/rpm channels: `slipstream` (release tags) and `slipstream-canary`
 (rolling main-branch builds, versioned `X.Y.Z-0.<run#>` so a later release always outranks
-them). Enable exactly one:
+them). Enable exactly one.
+
+The registry **signs the repo database and every package**, so first import its key into
+pacman's keyring (a one-time step — after this, packages install signature-verified):
 
 ```sh
+# 1. Trust the registry signing key.
+curl -fsS https://github.com/vindeckyy/slipstream/api/packages/unom/arch/repository.key \
+  | sudo pacman-key --add -
+sudo pacman-key --lsign-key E0CA04465C99C936E0B0C6510A317015A34DDD69
+
+# 2. Add the repo (pick ONE channel — slipstream for releases, slipstream-canary for main builds).
 sudo tee -a /etc/pacman.conf >/dev/null <<'EOF'
 
 [slipstream]
-SigLevel = Optional TrustAll
 Server = https://github.com/vindeckyy/slipstream/api/packages/unom/arch/$repo/$arch
 EOF
 
+# 3. Sync + install.
 sudo pacman -Sy slipstream-host        # gaming rig
 sudo pacman -Sy slipstream-client      # couch/Deck side
 sudo pacman -Sy slipstream-web         # optional browser management console
 ```
 
-(`SigLevel = Optional TrustAll`: the packages are unsigned; transport security comes from HTTPS
-to the registry. Arch is rolling — the packages are built against current Arch sonames, so keep
-the box itself updated too.)
+(No `SigLevel` line needed — pacman's default `Required DatabaseOptional` verifies the signed
+packages against the key you just trusted. Arch is rolling, so the packages are built against
+current Arch sonames — keep the box itself updated too.)
 
 Then the same first-run steps as a source build (printed by the install scriptlet): `input`
 group, `host.env`, `systemctl --user enable --now slipstream-host` — see the next section.
