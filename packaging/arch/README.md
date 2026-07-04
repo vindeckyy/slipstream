@@ -23,7 +23,36 @@ default `makepkg` builds only host+client with no JS tooling — mirroring the R
 > Arch + NVIDIA **and** AMD/Intel (incl. the Steam Deck — see the on-device path above). The client
 > decodes via VAAPI on AMD/Intel with a software fallback.
 
-## Arch Linux (mutable)
+## Install from the binary repo (recommended)
+
+CI (`.github/workflows/arch.yml`) builds this PKGBUILD in an `archlinux:base-devel` container on
+every push and publishes the packages to the **GitHub Arch package registry** — a plain pacman
+repo, so an Arch box installs and updates slipstream with `pacman -Syu` like everything else.
+Two repos mirror the deb/rpm channels: `slipstream` (release tags) and `slipstream-canary`
+(rolling main-branch builds, versioned `X.Y.Z-0.<run#>` so a later release always outranks
+them). Enable exactly one:
+
+```sh
+sudo tee -a /etc/pacman.conf >/dev/null <<'EOF'
+
+[slipstream]
+SigLevel = Optional TrustAll
+Server = https://github.com/vindeckyy/slipstream/api/packages/unom/arch/$repo/$arch
+EOF
+
+sudo pacman -Sy slipstream-host        # gaming rig
+sudo pacman -Sy slipstream-client      # couch/Deck side
+sudo pacman -Sy slipstream-web         # optional browser management console
+```
+
+(`SigLevel = Optional TrustAll`: the packages are unsigned; transport security comes from HTTPS
+to the registry. Arch is rolling — the packages are built against current Arch sonames, so keep
+the box itself updated too.)
+
+Then the same first-run steps as a source build (printed by the install scriptlet): `input`
+group, `host.env`, `systemctl --user enable --now slipstream-host` — see the next section.
+
+## Build from source — Arch Linux (mutable)
 
 ```sh
 cd packaging/arch
