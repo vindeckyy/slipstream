@@ -16,9 +16,9 @@ On **Windows**, the host ships as a signed installer instead — see [Windows](#
 
 | Distro | Package manager | One-command happy path | Guide |
 |--------|-----------------|------------------------|-------|
-| **Ubuntu / Debian** | apt | `sudo apt install slipstream-host` | [Ubuntu — GNOME](/docs/ubuntu-gnome) · [Ubuntu — KDE](/docs/ubuntu-kde) · [packaging/debian](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/debian/README.md) |
+| **Ubuntu / Debian** | apt | `sudo apt install slipstream-host` | [Ubuntu / Debian](/docs/ubuntu) · [packaging/debian](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/debian/README.md) |
 | **Bazzite / Fedora Atomic** | systemd-sysext | `sudo bash slipstream-sysext.sh install` (no layering, no reboot) | [Bazzite](/docs/bazzite) · [packaging/bazzite](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/bazzite/README.md) |
-| **Fedora (dnf)** | dnf / rpm-ostree | `dnf install slipstream slipstream-web` | [Fedora — KDE](/docs/fedora-kde) · [packaging/rpm](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/rpm/README.md) |
+| **Fedora (dnf)** | dnf / rpm-ostree | `dnf install slipstream slipstream-web` | [Fedora](/docs/fedora) · [packaging/rpm](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/rpm/README.md) |
 | **Arch** | pacman | `pacman -Sy slipstream-host` (binary repo) | [Arch Linux](/docs/arch) · [packaging/arch](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/arch/README.md) |
 | **SteamOS (host)** | on-device script | `bash scripts/steamdeck/install.sh` | [SteamOS (Host)](/docs/steamos-host) |
 
@@ -79,12 +79,21 @@ fallback without one. More detail — including the CLI `slipstream-host service
    Bare `serve` is the secure native-only default (native `slipstream/1` + the web console). On a
    trusted LAN, add `--gamestream` to also serve stock [Moonlight](/docs/moonlight) clients.
 
-3. Enable the web console and read its login password, then open `http://<host-ip>:47992`:
+3. Enable the web console:
 
    ```sh
    systemctl --user enable --now slipstream-web
-   journalctl --user -u slipstream-web-init | sed -n 's/.*password generated: //p'
    ```
+
+   Then open `http://<host-ip>:47992`. Reading its [login password](/docs/web-console#login-password)
+   and [arming PIN pairing](/docs/web-console#arm-pairing) are covered in
+   [The Web Console](/docs/web-console).
+
+### Configure your desktop
+
+How the virtual display and input work depends on your desktop — see [KDE](/docs/kde),
+[GNOME](/docs/gnome), [Steam / gamescope](/docs/gamescope), or [Sway](/docs/sway) for the
+compositor-specific setup.
 
 From there, follow the [Quick Start](/docs/quickstart) to pair your first client. To run the host
 automatically at boot, see [Running as a Service](/docs/running-as-a-service).
