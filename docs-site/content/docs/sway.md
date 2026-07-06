@@ -27,7 +27,7 @@ these in `~/.config/slipstream/host.env`:
 SLIPSTREAM_COMPOSITOR=wlroots      # aliases: sway, hyprland
 SLIPSTREAM_INPUT_BACKEND=wlr
 SLIPSTREAM_VIDEO_SOURCE=virtual
-SLIPSTREAM_ZEROCOPY=1              # GPU zero-copy capture→encode; auto-falls back to CPU
+# GPU zero-copy capture→encode is ON by default; auto-falls back to CPU. Set SLIPSTREAM_ZEROCOPY=0 to force CPU.
 ```
 
 See [Configuration](/docs/configuration) for the full reference.

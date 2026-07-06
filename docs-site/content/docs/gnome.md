@@ -21,7 +21,7 @@ WAYLAND_DISPLAY=wayland-0
 XDG_CURRENT_DESKTOP=GNOME
 SLIPSTREAM_COMPOSITOR=mutter
 SLIPSTREAM_VIDEO_SOURCE=virtual
-SLIPSTREAM_ZEROCOPY=1
+# GPU zero-copy (dmabuf → CUDA → NVENC) is ON by default; auto-falls back to CPU. Set =0 to force CPU.
 SLIPSTREAM_INPUT_BACKEND=libei
 ```
 

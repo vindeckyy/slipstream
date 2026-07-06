@@ -13,8 +13,8 @@
 #   bash scripts/headless/run-headless-kde.sh [WxH]    # default 1920x1080
 #
 # Then in another shell:
-#   WAYLAND_DISPLAY=wayland-kde XDG_CURRENT_DESKTOP=KDE SLIPSTREAM_ZEROCOPY=1 \
-#     slipstream-host slipstream1-host --source virtual --seconds 14400
+#   WAYLAND_DISPLAY=wayland-kde XDG_CURRENT_DESKTOP=KDE \
+#     slipstream-host slipstream1-host --source virtual --seconds 14400   # zero-copy is on by default
 set -euo pipefail
 
 RES="${1:-1920x1080}"
