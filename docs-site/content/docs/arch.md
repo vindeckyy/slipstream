@@ -128,8 +128,9 @@ sudo ufw allow slipstream-web                                                   
 sudo firewall-cmd --permanent --add-service=slipstream-web && sudo firewall-cmd --reload  # firewalld
 ```
 
-That opens **TCP 47992** (HTTPS, login-gated). The mgmt API (47990) stays loopback-only and is never
-opened. Full port lists (`nftables`, explicit ports) are in
+That opens **TCP 47992** (HTTPS, login-gated). The mgmt API (47990) is opened for paired clients by the
+`slipstream-native` profile (game-library browsing over mTLS); off-loopback it serves only read-only
+status/library, and every admin action stays loopback-only. Full port lists (`nftables`, explicit ports) are in
 [`packaging/arch/README.md`](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/arch/README.md#firewall).
 
 ## 6. Connect a client
