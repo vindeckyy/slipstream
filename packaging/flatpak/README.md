@@ -1,6 +1,8 @@
 # slipstream client — Flatpak (Steam Deck / SteamOS, and any flatpak distro)
 
-The native Linux **client** (crate `slipstream-client-linux`, binary `slipstream-client`) is
+The native Linux **client** — the shell (crate `slipstream-client-linux`, binary
+`slipstream-client`) plus the Vulkan session binary it execs for streaming (crate
+`slipstream-client-session`, binary `slipstream-session`) — is
 published two ways by CI (`.github/workflows/flatpak.yml`), on every push to `main` (a rolling
 `0.0.1-ciN.<sha>` build) and on `v*` tags (a clean `X.Y.Z`):
 
