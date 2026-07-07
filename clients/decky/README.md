@@ -43,10 +43,12 @@ read-only, so the flatpak (which bundles libadwaita/SDL3) is the canonical clien
 **Install Plugin from URL**, paste:
 
 ```
-https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/latest/slipstream.zip
+https://github.com/vindeckyy/slipstream/pf-decky
 ```
 
-(or a pinned `.../slipstream-decky/<version>/slipstream.zip`). The plugin then **self-updates** without
+(short link for `https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/latest/slipstream.zip`;
+for a pinned version use `https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/<version>/slipstream.zip`
+directly). The plugin then **self-updates** without
 the Decky store — when a newer build exists, an **Update** button appears and drives Decky
 Loader's own (SHA-256-verified) install. Installs and updates can take a couple of minutes on some
 networks: Decky's installer also contacts its plugin store first, which may be slow or blackholed

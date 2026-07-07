@@ -43,14 +43,18 @@ developer toolchain — just paste a URL into Decky:
 3. Paste the **stable** link and confirm:
 
    ```
-   https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/latest/slipstream.zip
+   https://github.com/vindeckyy/slipstream/pf-decky
    ```
 
 The **slipstream** panel appears in the Quick Access Menu right away — no Deck restart needed.
 
-> **Channels.** The link above is the **stable** channel (moves on `vX.Y.Z` releases). For the latest
-> `main` build use the **canary** zip — `…/generic/slipstream-decky/canary/slipstream.zip` — or pin an
-> exact version with `…/slipstream-decky/<version>/slipstream.zip`. See [Release Channels](/docs/channels).
+> **Channels.** `https://github.com/vindeckyy/slipstream/pf-decky` is a short link to the **stable** channel (moves on
+> `vX.Y.Z` releases), currently
+> `https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/latest/slipstream.zip`. For the
+> latest `main` build use the **canary** zip —
+> `https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/canary/slipstream.zip` — or pin an
+> exact version with `https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/<version>/slipstream.zip`.
+> See [Release Channels](/docs/channels).
 
 ## Use it
 
