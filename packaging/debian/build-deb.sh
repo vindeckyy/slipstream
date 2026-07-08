@@ -42,6 +42,8 @@ SHAREDIR="$STAGE/usr/share/$PKG"
 # --- file layout (matches the RPM %install) ----------------------------------
 install -Dm0755 "$BIN"                              "$STAGE/usr/bin/$PKG"
 install -Dm0644 scripts/60-slipstream.rules         "$STAGE/usr/lib/udev/rules.d/60-slipstream.rules"
+# vhci-hcd autoload — usbip transport for the virtual Steam Deck pad (Steam only adopts USB pads).
+install -Dm0644 scripts/slipstream-modules.conf     "$STAGE/usr/lib/modules-load.d/slipstream.conf"
 # UDP socket-buffer tuning (32 MB) — without it the kernel clamps the host's SO_SNDBUF to ~416 KB
 # and high-bitrate frames overflow it (send-side packet loss). systemd-sysctl applies it at boot.
 install -Dm0644 scripts/99-slipstream-net.conf      "$STAGE/usr/lib/sysctl.d/99-slipstream-net.conf"
