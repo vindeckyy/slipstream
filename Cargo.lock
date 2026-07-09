@@ -2794,6 +2794,7 @@ dependencies = [
  "ash",
  "pf-client-core",
  "pf-presenter",
+ "slipstream-core",
  "sdl3",
  "skia-safe",
  "tracing",
