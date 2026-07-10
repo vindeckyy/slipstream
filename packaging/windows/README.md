@@ -3,7 +3,7 @@
 A one-file, signed `setup.exe` for the slipstream streaming **host** on Windows, published to GitHub's
 generic package registry (`slipstream-host-windows`) by `.github/workflows/windows-host.yml`.
 
-> Full picture (drivers-from-source, toolchain, CI, dev loop): **[`design/windows-build-and-packaging.md`](../../design/windows-build-and-packaging.md)**. This README is the `packaging/windows/` file index.
+> Full picture (drivers-from-source, toolchain, CI, dev loop): **slipstream-planning: `windows-build-and-packaging.md`** (internal planning repo). This README is the `packaging/windows/` file index.
 
 ## Windows 11 22H2+ only (no Windows 10)
 
@@ -135,7 +135,7 @@ fresh install uses the generated random console password — read it from
 > needed). Building from source keeps `.dll`/`.inf`/`.cat` in lockstep. nefcon (the device-node tool -
 > the install creates the `root\pf_vdisplay` node with it, **never** `devgen`, which leaves persistent
 > phantom devices) is fetched + SHA-256-verified from its pinned release in `stage-pf-vdisplay.ps1`. See
-> [`design/windows-build-and-packaging.md`](../../design/windows-build-and-packaging.md) for the toolchain
+> slipstream-planning: `windows-build-and-packaging.md` (internal planning repo) for the toolchain
 > + signing details.
 
 ## Dev iteration on the test box (driver)
@@ -179,4 +179,5 @@ Push a `vX.Y.Z` tag — one tag releases every platform (see
 [Release Channels](https://slipstream.unom.io/docs/channels)). The workflow builds, signs, and
 publishes `slipstream-host-setup-X.Y.Z.exe` + the public `.cer`, refreshes the stable `latest/`
 alias, and attaches the installer to the unified GitHub Release. Main pushes publish rolling
-`0.3.<run>` **canary** builds to the `canary/` alias.
+`<next-minor>.<run>` **canary** builds (base derived from the latest stable tag by
+`scripts/ci/pf-version.ps1`) to the `canary/` alias.

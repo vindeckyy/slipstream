@@ -12,5 +12,5 @@ builds. Use it to sanity-check the FEC before reaching for the real `slipstream/
 cargo run -p loss-harness        # from the repo root
 ```
 
-Part of the measurement tooling (design/implementation-plan §10), alongside
+Part of the measurement tooling (slipstream-planning: `implementation-plan.md` §10), alongside
 [`latency-probe`](../latency-probe/README.md).
