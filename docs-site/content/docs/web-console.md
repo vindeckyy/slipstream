@@ -5,7 +5,8 @@ description: Enable the slipstream browser console, read or change its login pas
 
 The web console is the browser UI for a slipstream host — live status, paired devices, and the PIN
 pairing flow. It ships as the **`slipstream-web`** systemd user unit on Linux and the **`SlipstreamWeb`**
-task on Windows, and serves on **`http://<host-ip>:47992`**. It's the surface you expose on the LAN to
+task on Windows, and serves on **`https://<host-ip>:47992`** (HTTPS with the host's own self-signed
+identity cert — your browser warns once; trust it and continue). It's the surface you expose on the LAN to
 administer the host; the host's own management API (47990) keeps every admin action loopback-only and
 off-loopback serves only read-only status + game-library browsing to paired clients.
 
@@ -19,11 +20,11 @@ off-loopback serves only read-only status + game-library browsing to paired clie
 
   ```sh
   systemctl --user enable --now slipstream-web
-  # then browse to http://<host-ip>:47992
+  # then browse to https://<host-ip>:47992
   ```
 
 - **Windows host:** the installer sets up the console, its runtime, and the `SlipstreamWeb` task and
-  starts it at boot. There is nothing to enable — open `http://<this-PC>:47992`.
+  starts it at boot. There is nothing to enable — open `https://<this-PC>:47992`.
 
 - **SteamOS host:** the install script builds and starts the console as a user service for you. It
   prints the URL when it finishes.

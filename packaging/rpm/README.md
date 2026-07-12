@@ -85,7 +85,7 @@ ujust add-user-to-input-group           # virtual gamepads need /dev/uinput (re-
 mkdir -p ~/.config/slipstream
 cp /usr/share/slipstream/host.env.bazzite ~/.config/slipstream/host.env   # gamescope defaults
 systemctl --user enable --now slipstream-host
-# Web console — enable it and read the auto-generated login password (then open http://<host-ip>:47992):
+# Web console — enable it and read the auto-generated login password (then open https://<host-ip>:47992):
 systemctl --user enable --now slipstream-web
 journalctl --user -u slipstream-web-init | sed -n 's/.*password generated: //p'
 ```
