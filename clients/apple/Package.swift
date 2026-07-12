@@ -40,6 +40,8 @@ let package = Package(
         // its manifest breaks SwiftPM whole-graph validation on macOS, and only the
         // Slipstream-tvOS target links it; the #if os(tvOS) import never compiles here.)
         .executableTarget(name: "SlipstreamClient", dependencies: ["SlipstreamKit"]),
-        .testTarget(name: "SlipstreamKitTests", dependencies: ["SlipstreamKit"]),
+        // SlipstreamCore is a direct dep too so the wire tests can name the C ABI's
+        // `SlipstreamInputEvent` / `SLIPSTREAM_INPUT_KIND_*` when asserting the gamepad byte layout.
+        .testTarget(name: "SlipstreamKitTests", dependencies: ["SlipstreamKit", "SlipstreamCore"]),
     ]
 )
