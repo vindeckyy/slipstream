@@ -42,6 +42,13 @@ let package = Package(
         .executableTarget(name: "SlipstreamClient", dependencies: ["SlipstreamKit"]),
         // SlipstreamCore is a direct dep too so the wire tests can name the C ABI's
         // `SlipstreamInputEvent` / `SLIPSTREAM_INPUT_KIND_*` when asserting the gamepad byte layout.
-        .testTarget(name: "SlipstreamKitTests", dependencies: ["SlipstreamKit", "SlipstreamCore"]),
+        .testTarget(
+            name: "SlipstreamKitTests", dependencies: ["SlipstreamKit", "SlipstreamCore"],
+            resources: [
+                // PyroWave golden fixtures: host-encoded AUs + upstream-decoded reference
+                // planes (regenerate with slipstream-host's `pyrowave_dump_golden` on a
+                // Vulkan box — see PyroWaveDecoderTests.swift).
+                .copy("PyroWaveFixtures")
+            ]),
     ]
 )
