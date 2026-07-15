@@ -94,6 +94,18 @@ slipstream-client --headless --connect <host>:9777  # no window: connect, count 
 
 Prefer the broadest compatibility, or no install? **Moonlight** also streams to Windows (see below).
 
+## webOS (LG TV) — community
+
+[`pf-webos`](https://github.com/dyptan-io/pf-webos) is a native client for LG webOS TVs, built and
+maintained by the community ([dyptan-io](https://github.com/dyptan-io)) on top of slipstream's
+`slipstream/1` protocol and core. It's not an official slipstream app, but it speaks the real protocol
+directly (not Moonlight/GameStream) — LAN discovery or add-by-IP, PIN pairing with pinned reconnects,
+hardware video decode via webOS's NDL DirectMedia API, and a browsable game library with cover art,
+navigable with the Magic Remote.
+
+It ships as a sideloadable `.ipk` (homebrew package) rather than through the LG Content Store — see
+[Install a Client](/docs/install-client#lg-webos-tv-community) for the sideload steps.
+
 ## Linux reference client (headless)
 
 `slipstream-probe` (in the repo) is a command-line client for the native protocol, used for
@@ -114,7 +126,8 @@ slipstream-probe --connect <host>:9777 --pin <fp>  # connect to one
 | A **Steam Deck** | The **[Decky plugin](/docs/steam-deck)** in Gaming Mode, or the GTK4 client in Desktop Mode |
 | An Android phone or TV | The **Android app** |
 | Windows | The native **`slipstream-client`** (signed MSIX) or **Moonlight** |
-| A browser, a smart TV, or any other device | **Moonlight** |
+| An **LG webOS TV** | The community **[`pf-webos`](https://github.com/dyptan-io/pf-webos)** client, or **Moonlight** |
+| A browser, another smart TV, or any other device | **Moonlight** |
 | Automated tests / latency measurement | **`slipstream-probe`** (headless) |
 
 Whichever you choose, the first connection needs a one-time [pairing](/docs/pairing).
