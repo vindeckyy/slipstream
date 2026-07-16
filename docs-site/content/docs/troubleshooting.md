@@ -3,6 +3,30 @@ title: Troubleshooting
 description: Common problems setting up or using a slipstream host, and how to fix them.
 ---
 
+## Another streaming host (Sunshine, Apollo, …) is installed
+
+Slipstream is a Moonlight-compatible host. So are **Sunshine** and its forks (**Apollo**,
+**Vibeshine**, **Vibepollo**, **LuminalShine**, …). Running one of them **at the same time** as
+Slipstream is **not supported**: they bind the *same* GameStream ports (47984/47989 and
+47998–48010, plus a web UI on 47990 that collides with Slipstream's management API), advertise the
+*same* `_nvstream` mDNS name, and often install a *conflicting virtual-display driver*. The result
+is `address already in use` errors, pairing that silently fails, the wrong host answering a client,
+and capture/display glitches.
+
+- Slipstream warns about this automatically: the host logs it at startup (visible in the web
+  console's **Logs** tab and the system tray tooltip), and the Windows installer warns before
+  installing. To check on demand, run:
+
+  ```
+  slipstream-host detect-conflicts
+  ```
+
+  It lists any conflicting host found (installed or running) and exits non-zero if there is one.
+- **Fix:** stop and uninstall the other host, then start Slipstream — e.g. stop the service
+  (`sudo systemctl disable --now sunshine` / on Windows `sc stop SunshineService`) and uninstall it.
+  If you only want to try Slipstream without removing the other host, at least make sure the other
+  host is fully **stopped** first (they cannot both run at once).
+
 ## The host isn't found on the network
 
 - Make sure the host is actually running (`systemctl --user status slipstream-host`, or you see it

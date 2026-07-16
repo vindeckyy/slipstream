@@ -210,6 +210,14 @@ if [ "$1" = "configure" ]; then
         echo "    sudo firewall-cmd --permanent --add-service=slipstream-native && sudo firewall-cmd --reload"
         echo "    (use slipstream-gamestream for the Moonlight-compat host)"
     fi
+    # Conflicting Moonlight-compatible host (Sunshine/Apollo/...): reuse the host's own detector so
+    # the warning lives in one place. Exit 1 = found; never fail the install on it.
+    if command -v slipstream-host >/dev/null 2>&1; then
+        if ! conflict="$(slipstream-host detect-conflicts 2>/dev/null)"; then
+            echo ""
+            echo "$conflict"
+        fi
+    fi
 fi
 exit 0
 EOF
