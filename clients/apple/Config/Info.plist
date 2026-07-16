@@ -19,5 +19,19 @@
 	<array>
 		<string>_slipstream._udp</string>
 	</array>
+	<!-- Deep links: slipstream://connect/<host-uuid>[?launch=<GameEntry.id>]. Emitted by the
+	     launcher widget and Siri/Shortcuts; routed by ContentView.onOpenURL into the existing
+	     connect path. Shared across all three targets (tvOS/macOS accept it harmlessly). -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>io.unom.slipstream.deeplink</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>slipstream</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
