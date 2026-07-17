@@ -52,7 +52,7 @@
       packages = forAllSystems (system:
         let pf = packagesFor system;
         in {
-          inherit (pf) slipstream-host slipstream-client;
+          inherit (pf) slipstream-host slipstream-client slipstream-web slipstream-scripting slipstream-tray;
           default = pf.slipstream-host;
         });
 
@@ -68,14 +68,26 @@
             type = "app";
             program = "${pf.slipstream-client}/bin/slipstream-client";
           };
+          # `nix run .#slipstream-web` — the console (auto-wire the mgmt token / cert via env or the
+          # NixOS module; see packaging/nix/README.md).
+          slipstream-web = {
+            type = "app";
+            program = "${pf.slipstream-web}/bin/slipstream-web-server";
+          };
+          # `nix run .#slipstream-scripting -- --list` — the plugin/script runner.
+          slipstream-scripting = {
+            type = "app";
+            program = "${pf.slipstream-scripting}/bin/slipstream-scripting";
+          };
           default = self.apps.${system}.slipstream-host;
         });
 
-      # `nix flake check` builds both packages.
+      # `nix flake check` builds every package (web included — needs its deps hash filled in, see
+      # packaging/nix/README.md).
       checks = forAllSystems (system:
         let pf = packagesFor system;
         in {
-          inherit (pf) slipstream-host slipstream-client;
+          inherit (pf) slipstream-host slipstream-client slipstream-web slipstream-scripting;
         });
 
       # `nix develop` — the pinned toolchain plus every system lib the workspace links, wired so

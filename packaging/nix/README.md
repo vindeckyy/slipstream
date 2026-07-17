@@ -16,8 +16,10 @@ and the native Linux **client**, a **NixOS module** that wires up everything the
 | --- | --- |
 | `packages.x86_64-linux.slipstream-host` | `slipstream-host` + `slipstream-tray` (built with `nvenc` + `vulkan-encode`, like CI) |
 | `packages.x86_64-linux.slipstream-client` | `slipstream-client` (GTK4 shell) + `slipstream-session` (Vulkan streamer, without the Skia OSD — see caveats) |
+| `packages.x86_64-linux.slipstream-web` | the management web console (bun-built Nitro SSR bundle; SPAKE2 pairing + host status) |
+| `packages.x86_64-linux.slipstream-scripting` | the plugin/script runner (bun-bundled Effect SDK; supervises host automation) |
 | `packages.x86_64-linux.default` | = `slipstream-host` |
-| `nixosModules.default` | `services.slipstream.host` / `services.slipstream.client` |
+| `nixosModules.default` | `services.slipstream.host` / `.client` / `.web` / `.scripting` |
 | `devShells.x86_64-linux.default` | pinned Rust (from `rust-toolchain.toml`) + all build deps |
 | `apps` / `checks` / `formatter` | `nix run`, `nix flake check`, `nix fmt` |
 
@@ -105,6 +107,39 @@ systemctl --user enable --now slipstream-host
 
 `services.slipstream.client`: `enable`, `openFirewall` (UDP 5353), `package`.
 
+`services.slipstream.web` (the management console — **on by default whenever the host is enabled**,
+mirroring the RPM's `Recommends: slipstream-web`):
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `enable` | `host.enable` | Run the console as a `systemd --user` service on **TCP 47992 (HTTPS)**. Set `false` for a console-less host. |
+| `openFirewall` | `host.openFirewall` | Open TCP 47992 so other devices on the LAN can reach it. |
+| `autoStart` | `host.autoStart` | Add the console user service to `default.target` (appliance mode). |
+| `package` | flake's | Override the package. |
+
+The console is **auto-wired** to the host on the same box: it reads the host's per-user
+`~/.config/slipstream/{mgmt-token,cert.pem,key.pem}` (written by `serve`), serves HTTPS with the
+host's own identity cert, and proxies the loopback mgmt API with the bearer token injected
+server-side (never sent to the browser). A login password is generated on first start — read it
+with `journalctl --user -u slipstream-web-init` (or `~/.config/slipstream/web-password`). Then open
+`https://<host-ip>:47992` and trust the self-signed host cert once. Enable it (with the host) via
+`systemctl --user enable --now slipstream-web`.
+
+`services.slipstream.scripting` (the plugin/script runner — installed with the host, but **opt-in to
+run**):
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `enable` | `host.enable` | Install the runner + define its `systemd --user` unit `slipstream-scripting`. |
+| `autoStart` | `false` | Add the unit to `default.target`. Off even on an auto-start host — running operator scripts/plugins is a deliberate opt-in. |
+| `package` | flake's | Override the package. |
+
+The runner discovers loose scripts under `~/.config/slipstream/scripts` and installed
+`slipstream-plugin-*` packages under `~/.config/slipstream/plugins`, and supervises each as an Effect
+fiber (SIGTERM shuts the tree down structurally so plugin finalizers run). A plugin auto-wires to
+the host's mgmt token + identity cert. It's inert until you add automation, so the unit ships
+un-started; turn it on with `systemctl --user enable --now slipstream-scripting`.
+
 ### What the host module configures for you
 
 Everything the RPM's `%install` + `%post` do, declaratively:
@@ -175,6 +210,24 @@ The shell exports `PF_FFVK_VULKAN_INCLUDE` (Vulkan headers for pf-ffvk bindgen) 
 - **First build compiles from scratch** (no split dep cache — pyrowave-sys builds a CMake tree in
   its build.rs that a crane "dummy" source would drop) and has no public binary cache, so expect a
   long initial build. `nix develop` gives incremental rebuilds.
+- **The status tray is built in its own derivation, on purpose.** `slipstream-tray` uses `ksni`'s
+  `async-io` zbus executor with no tokio runtime (by design — see `crates/slipstream-tray/Cargo.toml`).
+  Cargo unifies features across everything in one `cargo build`, so co-building the tray with the
+  host would pull the host's `ashpd → zbus/tokio` onto the tray's shared `zbus`, and the tray then
+  panics at startup (`there is no reactor running, must be called from the context of a Tokio 1.x
+  runtime`). Building it as a separate `-p slipstream-tray` invocation keeps its `zbus` on async-io;
+  the host package copies the resulting binary into its `$out`. (The deb/rpm/arch builds co-build the
+  two in one `cargo build`, so they share this latent crash on Linux — a separate fix.)
+- **The bun packages (`slipstream-web`, `slipstream-scripting`) — their `bun install` deps hashes.**
+  Both build their `node_modules` in a *fixed-output derivation* (`bun install` needs the network +
+  the read-public `@unom` npm registry). Each `outputHash` (in `packaging/nix/packages.nix`) is
+  pinned to a resolved dependency set and **must be refreshed when its lockfile changes** —
+  `web/bun.lock` for the console, `sdk/bun.lock` for the runner: set that `outputHash = lib.fakeHash`,
+  run `nix build .#slipstream-web` (or `.#slipstream-scripting`), and copy the `got: sha256-…` value
+  Nix prints back into the field. Everything downstream is offline (the console's codegen + vite
+  build; the runner's `bun build --target=bun` bundle), so only the deps FODs ever need network.
+  Both launchers exec `pkgs.bun` from the store — unlike the deb/rpm, which vendor a bun binary
+  because apt/dnf have none.
 - **Commit `flake.lock`:** it pins the input revisions (nixpkgs / crane / rust-overlay). It is
   generated on first eval and checked in.
 - **Session Skia OSD is off under Nix.** `slipstream-session`'s default `ui` feature draws its

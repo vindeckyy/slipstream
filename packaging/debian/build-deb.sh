@@ -156,7 +156,9 @@ DEPENDS="$SHDEPS, libei1, pipewire, wireplumber"
 # slipstream-web = the management web console (pairing + status) every user needs — a separate
 # Architecture:all .deb; Recommends so `apt install slipstream-host` pulls it by default, while a
 # headless/encoding-only box can opt out with --no-install-recommends.
-RECOMMENDS="ffmpeg, gamescope, pipewire-pulse, mesa-va-drivers, intel-media-va-driver, slipstream-web"
+# slipstream-scripting = the plugin/script runner (host automation on bun). Recommends so it's pulled
+# by default; its systemd --user unit ships disabled (inert until you add scripts/plugins).
+RECOMMENDS="ffmpeg, gamescope, pipewire-pulse, mesa-va-drivers, intel-media-va-driver, slipstream-web, slipstream-scripting"
 SUGGESTS="kwin-wayland, mutter"
 
 INSTALLED_KB="$(du -k -s "$STAGE" | cut -f1)"
