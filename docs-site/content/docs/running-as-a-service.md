@@ -87,7 +87,7 @@ Intel (QSV); the host falls back to software H.264 without one.
 After a reboot, from another machine on the network:
 
 ```sh
-slipstream-probe --discover     # or just look for the host in a native client / Moonlight
+slipstream-probe --discover     # source-build dev tool (not packaged); or just open a native client / Moonlight and look for the host
 ```
 
 If the host is listed, it's up. If not, check `journalctl --user -u slipstream-host` on the host.

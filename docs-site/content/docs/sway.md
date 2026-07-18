@@ -27,7 +27,7 @@ The host auto-detects a wlroots session, so you usually need nothing here. To fo
 these in `~/.config/slipstream/host.env`:
 
 ```ini
-SLIPSTREAM_COMPOSITOR=wlroots      # aliases: sway, wlr (Hyprland has its own: SLIPSTREAM_COMPOSITOR=hyprland)
+SLIPSTREAM_COMPOSITOR=wlroots      # aliases: sway, wlr, hyprland (all the wlroots family; the exact backend is auto-detected)
 SLIPSTREAM_INPUT_BACKEND=wlr
 SLIPSTREAM_VIDEO_SOURCE=virtual
 # GPU zero-copy capture→encode is ON by default; auto-falls back to CPU. Set SLIPSTREAM_ZEROCOPY=0 to force CPU.

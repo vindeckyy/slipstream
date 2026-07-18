@@ -37,13 +37,13 @@ slipstream also runs as a native host on **Windows 11 22H2+ (x64)**, shipped as 
 installer — see [Windows Host](/docs/windows-host) for what it includes and its limitations.
 
 1. From the [packages page](https://github.com/vindeckyy/slipstream/unom/-/packages) (generic group), download the newest
-   **`slipstream-host-setup-<ver>.exe`** and its matching **`.cer`**.
+   **`slipstream-host-setup-<ver>.exe`** and the matching **`slipstream-host-windows_<ver>.cer`**.
 2. **Trust the publisher certificate once.** The installer is signed with a self-signed certificate
    whose public `.cer` is published next to it — the **same certificate for every release**, so this is
    genuinely one-time and later updates need nothing. In an **admin** PowerShell:
 
    ```powershell
-   Import-Certificate -FilePath .\slipstream-host-setup.cer `
+   Import-Certificate -FilePath .\slipstream-host-windows_<ver>.cer `
      -CertStoreLocation Cert:\LocalMachine\TrustedPublisher
    ```
 
