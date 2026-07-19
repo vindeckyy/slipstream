@@ -72,7 +72,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $layout 'Assets') | Out-Nul
 # session client the shell spawns for every stream (sibling resolution — see clients/windows/
 # src/spawn.rs); Skia links statically and vulkan-1.dll is a GPU-driver component, so the session
 # adds no DLLs of its own.
-$required = @('slipstream-client.exe', 'slipstream-session.exe', 'Microsoft.WindowsAppRuntime.Bootstrap.dll', 'SDL3.dll', 'resources.pri')
+$required = @('slipstream-client.exe', 'slipstream-session.exe', 'slipstream-console.exe', 'Microsoft.WindowsAppRuntime.Bootstrap.dll', 'SDL3.dll', 'resources.pri')
 foreach ($f in $required) {
     $src = Join-Path $TargetDir $f
     if (-not (Test-Path $src)) { throw "missing build artifact '$f' in $TargetDir (did 'cargo build --release' run?)" }
