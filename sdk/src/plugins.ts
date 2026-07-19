@@ -13,20 +13,46 @@ export const REGISTRY = "https://github.com/vindeckyy/slipstream/api/packages/un
 /** Where plugin packages install: `<config_dir>/plugins` (matches runner.ts discovery). */
 export const pluginsDirDefault = (): string => path.join(configDir(), "plugins");
 
+export interface ResolveOptions {
+	/**
+	 * Allow names that resolve on the PUBLIC npm registry (unscoped `slipstream-plugin-*`, foreign
+	 * scopes, arbitrary paths). Off by default: only the `@slipstream` scope — pinned to the GitHub
+	 * registry by [`ensureBunfig`] — installs without it, so a typo or a squatted look-alike
+	 * package can't silently pull operator-privileged code from npmjs.org (the CLI flag is
+	 * `--allow-public-registry`).
+	 */
+	allowPublicRegistry?: boolean;
+}
+
 /**
  * Resolve a friendly plugin name to its npm package. A bare first-party name maps into the
  * `@slipstream` scope (`playnite` → `@slipstream/plugin-playnite`, `rom-manager` →
- * `@slipstream/plugin-rom-manager`); a scoped name (`@…/…`), the unscoped plugin convention
- * (`slipstream-plugin-…`), or any name with a `/` is used verbatim.
+ * `@slipstream/plugin-rom-manager`); an `@slipstream/…` name is used verbatim. Anything else —
+ * the unscoped `slipstream-plugin-…` convention, foreign scopes, registry paths — resolves on
+ * the public registry and is refused unless [`ResolveOptions.allowPublicRegistry`] is set.
  */
-export const resolvePackage = (name: string): string => {
+export const resolvePackage = (
+	name: string,
+	opts: ResolveOptions = {},
+): string => {
 	const n = name.trim();
 	if (!n) throw new Error("empty plugin name");
-	if (n.startsWith("@")) return n; // already scoped, e.g. @slipstream/plugin-playnite
-	if (n.startsWith("slipstream-plugin-")) return n; // unscoped plugin convention, verbatim
-	if (n.includes("/")) return n; // some other registry path — trust it
-	return `@slipstream/plugin-${n}`; // bare first-party name
+	if (!n.startsWith("@") && !n.includes("/") && !n.startsWith("slipstream-plugin-")) {
+		return `@slipstream/plugin-${n}`; // bare first-party name
+	}
+	if (n.startsWith("@slipstream/")) return n; // first-party scope, pinned to our registry
+	if (!opts.allowPublicRegistry) {
+		throw new Error(
+			`'${n}' would install from the PUBLIC npm registry, not Slipstream's. Plugins run ` +
+				"with operator privileges - install only code you trust. If you mean it, re-run " +
+				"with --allow-public-registry.",
+		);
+	}
+	return n;
 };
+
+/** Does this resolved package name install from Slipstream's own (GitHub) registry? */
+const isFirstParty = (pkg: string): boolean => pkg.startsWith("@slipstream/");
 
 /** Create the plugins dir (and parents) if needed. On Windows the ACL lockdown is the host's job. */
 export const ensurePluginsDir = (dir = pluginsDirDefault()): string => {
@@ -66,7 +92,7 @@ export const ensureBunfig = (dir = pluginsDirDefault()): void => {
 	}
 };
 
-export interface PkgOpts {
+export interface PkgOpts extends ResolveOptions {
 	/** Plugins dir. Default `<config_dir>/plugins`. */
 	dir?: string;
 	/** Line sink for progress. Default stdout. */
@@ -101,12 +127,26 @@ const runBun = (action: "add" | "remove", pkgs: string[], opts: PkgOpts): void =
 };
 
 /** Install one or more plugins by friendly name or package. */
-export const addPlugins = (names: string[], opts: PkgOpts = {}): void =>
-	runBun("add", names.map(resolvePackage), opts);
+export const addPlugins = (names: string[], opts: PkgOpts = {}): void => {
+	const pkgs = names.map((n) => resolvePackage(n, opts));
+	const log = opts.log ?? ((l: string) => console.log(l));
+	for (const pkg of pkgs.filter((p) => !isFirstParty(p))) {
+		log(
+			`[plugins] WARNING: ${pkg} installs from the public npm registry - it is not ` +
+				"published by Slipstream. It will run with operator privileges.",
+		);
+	}
+	runBun("add", pkgs, opts);
+};
 
-/** Uninstall one or more plugins by friendly name or package. */
+/** Uninstall one or more plugins by friendly name or package. Removal is always safe — a name
+ * never gates on the registry it once came from. */
 export const removePlugins = (names: string[], opts: PkgOpts = {}): void =>
-	runBun("remove", names.map(resolvePackage), opts);
+	runBun(
+		"remove",
+		names.map((n) => resolvePackage(n, { allowPublicRegistry: true })),
+		opts,
+	);
 
 export interface InstalledPlugin {
 	/** npm package name, e.g. `@slipstream/plugin-playnite` or `slipstream-plugin-foo`. */

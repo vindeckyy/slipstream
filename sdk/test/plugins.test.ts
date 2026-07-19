@@ -37,12 +37,28 @@ describe("resolvePackage", () => {
 		expect(resolvePackage("rom-manager")).toBe("@slipstream/plugin-rom-manager");
 	});
 
-	test("passes through scoped, unscoped-convention, and pathed names verbatim", () => {
+	test("passes @slipstream-scoped names through verbatim (our registry, no gate)", () => {
 		expect(resolvePackage("@slipstream/plugin-playnite")).toBe(
 			"@slipstream/plugin-playnite",
 		);
-		expect(resolvePackage("@someone/plugin-x")).toBe("@someone/plugin-x");
-		expect(resolvePackage("slipstream-plugin-custom")).toBe("slipstream-plugin-custom");
+	});
+
+	test("refuses public-registry names without allowPublicRegistry", () => {
+		expect(() => resolvePackage("slipstream-plugin-custom")).toThrow(
+			/public/i,
+		);
+		expect(() => resolvePackage("@someone/plugin-x")).toThrow(/public/i);
+		expect(() => resolvePackage("some/registry-path")).toThrow(/public/i);
+	});
+
+	test("passes public-registry names through with allowPublicRegistry", () => {
+		const allow = { allowPublicRegistry: true };
+		expect(resolvePackage("slipstream-plugin-custom", allow)).toBe(
+			"slipstream-plugin-custom",
+		);
+		expect(resolvePackage("@someone/plugin-x", allow)).toBe(
+			"@someone/plugin-x",
+		);
 	});
 
 	test("trims and rejects empty", () => {
