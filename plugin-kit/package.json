@@ -1,0 +1,58 @@
+{
+	"name": "@slipstream/plugin-kit",
+	"version": "0.1.0",
+	"description": "Effect-based framework for slipstream plugins: lifecycle runtime, config/state, sync engine, UI serving, CLI scaffold, and browser helpers.",
+	"type": "module",
+	"license": "MIT OR Apache-2.0",
+	"homepage": "https://github.com/vindeckyy/slipstream.git/src/branch/main/plugin-kit",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/vindeckyy/slipstream.git",
+		"directory": "plugin-kit"
+	},
+	"bugs": {
+		"url": "https://github.com/vindeckyy/slipstream.git/issues"
+	},
+	"keywords": ["slipstream", "plugin", "framework", "effect"],
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./react": {
+			"types": "./dist/react/index.d.ts",
+			"default": "./dist/react/index.js"
+		},
+		"./theme.css": "./dist/theme.css"
+	},
+	"files": ["dist", "README.md"],
+	"publishConfig": {
+		"registry": "https://github.com/vindeckyy/slipstream/api/packages/unom/npm/"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"build": "tsc -p tsconfig.build.json && cp src/theme.css dist/theme.css",
+		"test": "bun test",
+		"prepublishOnly": "bun run build"
+	},
+	"peerDependencies": {
+		"effect": "^4.0.0-beta.98",
+		"@slipstream/host": "^0.1.1",
+		"react": ">=19",
+		"@effect/atom-react": "^4.0.0-beta.99",
+		"@unom/ui": ">=0.9.0"
+	},
+	"peerDependenciesMeta": {
+		"react": { "optional": true },
+		"@effect/atom-react": { "optional": true },
+		"@unom/ui": { "optional": true }
+	},
+	"devDependencies": {
+		"effect": "4.0.0-beta.99",
+		"@slipstream/host": "file:../sdk",
+		"@types/bun": "^1.3.0",
+		"typescript": "^5.9.3"
+	}
+}
