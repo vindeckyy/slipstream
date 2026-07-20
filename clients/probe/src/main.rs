@@ -487,8 +487,11 @@ async fn session(args: Args) -> Result<()> {
                 // host/network split is exactly what it exists to report. Old hosts ignore the bit.
                 // PROBE_SEQ: the shared-core reassembler windows probe-space frames, so the probe
                 // qualifies for `--speed-test` bursts; without the bit the host declines them.
+                // STREAMED_AU: the same shared reassembler accepts sentinel-headed streamed
+                // blocks, and the probe is exactly the tool that measures the overlap win.
                 let mut caps = slipstream_core::quic::VIDEO_CAP_HOST_TIMING
-                    | slipstream_core::quic::VIDEO_CAP_PROBE_SEQ;
+                    | slipstream_core::quic::VIDEO_CAP_PROBE_SEQ
+                    | slipstream_core::quic::VIDEO_CAP_STREAMED_AU;
                 if std::env::var_os("SLIPSTREAM_CLIENT_10BIT").is_some() {
                     caps |= slipstream_core::quic::VIDEO_CAP_10BIT;
                 }
