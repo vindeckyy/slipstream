@@ -101,10 +101,13 @@ ok "build deps ready"
 
 # --- 2. build host (+ web) -------------------------------------------------
 log "Building slipstream-host (release) — first build is slow (~10-15 min)"
+# vulkan-encode matches the packaged builds (deb/arch): the raw Vulkan Video HEVC/AV1 backend
+# (real RFI loss recovery). Pure-Rust ash — no extra system dep. A featureless hand build would
+# silently fall back to libav VAAPI.
 distrobox enter "$BOX" -- bash -lc "
 set -e
 export PATH=\$HOME/.cargo/bin:\$PATH CARGO_TARGET_DIR='$TARGET_DIR'
-cd '$SRC' && cargo build -r -p slipstream-host
+cd '$SRC' && cargo build -r -p slipstream-host --features slipstream-host/vulkan-encode
 "
 [ -x "$BIN" ] || die "build did not produce $BIN"
 ok "host binary: $BIN"
@@ -126,8 +129,12 @@ mkdir -p "$CONFIG"
 if [ ! -f "$CONFIG/host.env" ]; then
     cat > "$CONFIG/host.env" <<'EOF'
 # slipstream Steam Deck host config (sourced by the slipstream-host user service).
-# Auto encoder: VAAPI on the Deck's AMD GPU, NVENC on NVIDIA.
+# Auto encoder: Vulkan Video (or VAAPI fallback) on the Deck's AMD GPU, NVENC on NVIDIA.
 SLIPSTREAM_ENCODER=auto
+# Van Gogh (LCD/OLED Deck) RADV still gates VK_KHR_video_encode_* behind this perftest flag;
+# without it the Vulkan backend can't open and sessions fall back to libav VAAPI. Harmless on
+# GPUs where encode is exposed by default.
+RADV_PERFTEST=video_encode
 # The host auto-detects the live session (Game Mode gamescope / Desktop KDE) per connect.
 # Override the compositor only if detection misbehaves: SLIPSTREAM_COMPOSITOR=gamescope
 EOF
@@ -135,6 +142,16 @@ EOF
 else
     ok "host.env exists (left as-is)"
 fi
+
+# KWin authorization for Desktop-Mode streaming (and mid-stream Game↔Desktop switches): KWin
+# resolves a connecting client's /proc/<pid>/exe against a .desktop `Exec=` and only then grants
+# the restricted Wayland globals it lists (see packaging/linux/io.unom.Slipstream.Host.desktop).
+# Exec must therefore be THIS install's binary path, not the packaged /usr/bin one. KWin reads
+# grants at session start — after first install, restart the Desktop session (Game Mode and back).
+mkdir -p "$HOME/.local/share/applications"
+sed "s|^Exec=.*|Exec=$BIN|" "$SRC/packaging/linux/io.unom.Slipstream.Host.desktop" \
+    > "$HOME/.local/share/applications/io.unom.Slipstream.Host.desktop"
+ok "KWin desktop-capture authorization (io.unom.Slipstream.Host.desktop → $BIN)"
 
 if [ "$WITH_WEB" = 1 ] && [ ! -f "$CONFIG/web.env" ]; then
     # Random login password + session secret for the web console, generated once.
