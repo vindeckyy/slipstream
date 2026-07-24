@@ -52,6 +52,11 @@ SHAREDIR="$STAGE/usr/share/$PKG"
 # --- file layout (matches the RPM %install) ----------------------------------
 install -Dm0755 "$BIN"                              "$STAGE/usr/bin/$PKG"
 install -Dm0644 scripts/60-slipstream.rules         "$STAGE/usr/lib/udev/rules.d/60-slipstream.rules"
+# Managed gamescope takeover on DM-autologin boxes: root helper + polkit action so the host can
+# stop/restore the display manager for the stream (the helper derives the DM unit itself).
+install -Dm0755 scripts/pf-dm-helper               "$STAGE/usr/libexec/slipstream/pf-dm-helper"
+install -Dm0644 scripts/io.unom.slipstream.dm-helper.policy \
+                                                   "$STAGE/usr/share/polkit-1/actions/io.unom.slipstream.dm-helper.policy"
 # vhci-hcd autoload — usbip transport for the virtual Steam Deck pad (Steam only adopts USB pads).
 install -Dm0644 scripts/slipstream-modules.conf     "$STAGE/usr/lib/modules-load.d/slipstream.conf"
 # UDP socket-buffer tuning (32 MB) — without it the kernel clamps the host's SO_SNDBUF to ~416 KB

@@ -129,6 +129,14 @@ package_slipstream-host() {
   install -Dm0755 "$T/slipstream-host"                 "$pkgdir/usr/bin/slipstream-host"
   # /dev/uinput + /dev/uhid -> input group (virtual gamepads + DualSense UHID)
   install -Dm0644 "$R/scripts/60-slipstream.rules"     "$pkgdir/usr/lib/udev/rules.d/60-slipstream.rules"
+  # Managed gamescope takeover on DM-autologin boxes: root helper + polkit action so the host can
+  # stop/restore the display manager for the stream. Arch has no /usr/libexec — install under
+  # /usr/lib/slipstream and rewrite the policy's exec.path annotation to match (the host probes both).
+  install -Dm0755 "$R/scripts/pf-dm-helper"           "$pkgdir/usr/lib/slipstream/pf-dm-helper"
+  install -Dm0644 "$R/scripts/io.unom.slipstream.dm-helper.policy" \
+    "$pkgdir/usr/share/polkit-1/actions/io.unom.slipstream.dm-helper.policy"
+  sed -i 's#/usr/libexec/slipstream/pf-dm-helper#/usr/lib/slipstream/pf-dm-helper#' \
+    "$pkgdir/usr/share/polkit-1/actions/io.unom.slipstream.dm-helper.policy"
   # vhci-hcd autoload — usbip transport for the virtual Steam Deck pad (Steam only adopts USB pads)
   install -Dm0644 "$R/scripts/slipstream-modules.conf" "$pkgdir/usr/lib/modules-load.d/slipstream.conf"
   # 32 MB UDP socket buffers (send-side headroom at high bitrate)
