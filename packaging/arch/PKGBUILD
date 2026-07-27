@@ -161,6 +161,12 @@ package_slipstream-host() {
   install -Dm0644 "$R/scripts/slipstream-host.service" "$pkgdir/usr/lib/systemd/user/slipstream-host.service"
   sed -i 's#%h/slipstream/target/release/slipstream-host#/usr/bin/slipstream-host#' \
     "$pkgdir/usr/lib/systemd/user/slipstream-host.service"
+  # Optional drop-in for a DESKTOP-LOGIN host: binds the host to graphical-session.target so a
+  # Plasma/GNOME restart restarts it instead of leaving it on a dead compositor connection. Shipped
+  # under /usr/share (NOT as an active drop-in) because it is wrong for the appliance route — the
+  # operator copies it into ~/.config/systemd/user/slipstream-host.service.d/ when they want it.
+  install -Dm0644 "$R/scripts/slipstream-host-desktop-session.conf" \
+    "$pkgdir/usr/share/slipstream/slipstream-host-desktop-session.conf"
   install -Dm0644 "$R/scripts/slipstream-kde-session.service" "$pkgdir/usr/lib/systemd/user/slipstream-kde-session.service"
   sed -i 's#%h/slipstream/scripts/headless/run-headless-kde.sh#/usr/share/slipstream/headless/run-headless-kde.sh#' \
     "$pkgdir/usr/lib/systemd/user/slipstream-kde-session.service"
