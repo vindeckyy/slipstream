@@ -152,8 +152,9 @@ These apply to the **Gaming Mode (gamescope)** path; the KDE Desktop path is una
   current gamescope is fine; this only bites if you've pinned an old one.
 - **The mouse cursor isn't included in the captured image** — a gamescope limitation for now. (The
   KDE Desktop path renders the cursor normally.)
-- **HDR isn't supported yet** on the gamescope path — gamescope's capture output is 8-bit. SDR streams
-  normally.
+- **HDR needs the slipstream gamescope build** (`slipstream-gamescope`, shipped in the sysext) plus
+  `SLIPSTREAM_GAMESCOPE_HDR=1`. Without it sessions stream SDR — correctly, including SDR versions
+  of HDR games.
 
 Canonical list: [gamescope → Known limits](/docs/gamescope#known-limits).
 
