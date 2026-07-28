@@ -3,6 +3,7 @@
 //! Hosts, pairing/trust, settings, and the desktop library page; every stream (and the
 //! console game library) runs in the spawned `slipstream-session` Vulkan binary — the
 //! shell never touches video (slipstream-planning `linux-client-rearchitecture.md`).
+#![forbid(unsafe_code)]
 
 // The UI-agnostic plumbing lives in `pf-client-core`, shared with the session binary.
 // Root re-exports keep every `crate::trust`-style path resolving unchanged.

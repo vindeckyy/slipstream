@@ -10,3 +10,6 @@ repository.workspace = true
 
 [dependencies]
 slipstream-core = { path = "../../crates/slipstream-core" }
+
+[lints]
+workspace = true
