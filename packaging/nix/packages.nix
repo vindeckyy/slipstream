@@ -224,7 +224,7 @@ in
       # so build the session without it. The GTK shell (slipstream-client-linux) is skia-free and full.
       # Re-adding the Skia OSD under Nix is tracked in packaging/nix/README.md.
       cargoExtraArgs =
-        "--locked -p slipstream-client-linux -p slipstream-client-session "
+        "--locked -p slipstream-client-linux -p slipstream-client-session -p slipstream-cli "
         + "--no-default-features --features slipstream-client-session/pyrowave";
 
       # pf-ffvk runs bindgen over libavutil/hwcontext_vulkan.h, which `#include <vulkan/vulkan.h>`.
