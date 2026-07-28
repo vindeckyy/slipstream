@@ -3281,6 +3281,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "slipstream-cli"
+version = "0.21.0"
+dependencies = [
+ "pf-client-core",
+ "slipstream-core",
+ "serde_json",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "slipstream-client-android"
 version = "0.21.0"
 dependencies = [
