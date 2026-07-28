@@ -400,30 +400,12 @@ fn commit_profile(
         o.fullscreen_on_stream = Some(values.fullscreen_on_stream);
     }
     // Resets last: a row the user reset may also have fired its change handler on the way
-    // (a ComboRow re-seeds), and "back to inheriting" is the later, explicit intent.
+    // (a ComboRow re-seeds), and "back to inheriting" is the later, explicit intent. The field
+    // names are the overlay's own, so the list of what can be cleared lives in ONE place —
+    // this used to be a second `match` here, which is exactly how the two drift.
     for key in cleared {
-        match *key {
-            "resolution" => {
-                o.match_window = None;
-                o.width = None;
-                o.height = None;
-            }
-            "refresh_hz" => o.refresh_hz = None,
-            "render_scale" => o.render_scale = None,
-            "bitrate_kbps" => o.bitrate_kbps = None,
-            "codec" => o.codec = None,
-            "hdr_enabled" => o.hdr_enabled = None,
-            "compositor" => o.compositor = None,
-            "audio_channels" => o.audio_channels = None,
-            "mic_enabled" => o.mic_enabled = None,
-            "touch_mode" => o.touch_mode = None,
-            "mouse_mode" => o.mouse_mode = None,
-            "invert_scroll" => o.invert_scroll = None,
-            "inhibit_shortcuts" => o.inhibit_shortcuts = None,
-            "gamepad" => o.gamepad = None,
-            "stats_verbosity" => o.stats_verbosity = None,
-            "fullscreen_on_stream" => o.fullscreen_on_stream = None,
-            other => tracing::warn!(field = other, "reset of an unknown overlay field"),
+        if !o.clear(key) {
+            tracing::warn!(field = key, "reset of an unknown overlay field");
         }
     }
     if let Err(e) = catalog.save() {
