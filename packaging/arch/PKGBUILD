@@ -253,6 +253,9 @@ package_slipstream-client() {
   install -Dm0755 "$T/slipstream-session" "$pkgdir/usr/bin/slipstream-session"
   # The headless CLI (design/client-architecture-split.md §4).
   install -Dm0755 "$T/slipstream" "$pkgdir/usr/bin/slipstream"
+  # The app icon the desktop entry (and the About dialog) name.
+  install -Dm0644 "$R/packaging/linux/icons/hicolor/scalable/apps/io.unom.Slipstream.svg" \
+    "$pkgdir/usr/share/icons/hicolor/scalable/apps/io.unom.Slipstream.svg"
   install -Dm0644 "$R/packaging/linux/io.unom.Slipstream.desktop" \
     "$pkgdir/usr/share/applications/io.unom.Slipstream.desktop"
   # DualSense hidraw access (full pad fidelity through SDL's HIDAPI driver).

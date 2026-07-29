@@ -707,6 +707,10 @@ const THIRD_PARTY_NOTICES: &str = include_str!("../../../THIRD-PARTY-NOTICES.txt
 pub fn show_about(parent: &impl IsA<gtk::Widget>) {
     let about = adw::AboutDialog::builder()
         .application_name("Slipstream")
+        // The app's own icon, by the id the desktop entry and the icon theme both use. It
+        // resolves from the installed hicolor icon; an uninstalled dev run simply shows the
+        // generic fallback rather than nothing.
+        .application_icon(crate::app::APP_ID)
         .developer_name("unom")
         .version(env!("CARGO_PKG_VERSION"))
         .website("https://github.com/vindeckyy/slipstream.git")

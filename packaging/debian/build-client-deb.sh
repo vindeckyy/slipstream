@@ -55,6 +55,10 @@ install -Dm0755 "$SESSION_BIN"                           "$STAGE/usr/bin/slipstr
 install -Dm0755 "$CLI_BIN"                               "$STAGE/usr/bin/slipstream"
 install -Dm0644 packaging/linux/io.unom.Slipstream.desktop \
                 "$STAGE/usr/share/applications/io.unom.Slipstream.desktop"
+# The app icon the desktop entry (and the About dialog) name. Without it the launcher falls
+# back to a generic monitor glyph, which is what shipped until now.
+install -Dm0644 packaging/linux/icons/hicolor/scalable/apps/io.unom.Slipstream.svg \
+                "$STAGE/usr/share/icons/hicolor/scalable/apps/io.unom.Slipstream.svg"
 # DualSense hidraw access (full pad fidelity through SDL's HIDAPI driver).
 install -Dm0644 scripts/70-slipstream-client.rules \
                 "$STAGE/usr/lib/udev/rules.d/70-slipstream-client.rules"
