@@ -72,6 +72,11 @@ requires `PACMAN_FULL_SYSUPGRADE=1` in `/etc/slipstream/update.conf`, because th
 pacman update is a full `pacman -Syu` — partial upgrades are how Arch boxes break, and we
 won't run one. After a successful update the host restarts itself and the page reconnects.
 
+The **Steam Deck on-device build** gets the button too, with no opt-in (it's your own user's
+install, no root involved): it runs the same `update.sh` rebuild the docs describe, which
+compiles on the Deck — expect it to take a while; the card keeps showing progress and the log
+lands in `~/.config/slipstream/logs/update-steamos.log`.
+
 ## Turning the check off
 
 The check contacts `github.com/vindeckyy/slipstream` (the slipstream forge) and nothing else, and sends nothing but a
