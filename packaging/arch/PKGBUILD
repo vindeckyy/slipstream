@@ -100,7 +100,8 @@ build() {
       -p slipstream-cli
   else
   cargo build --release --locked --features slipstream-host/nvenc,slipstream-host/vulkan-encode \
-    -p slipstream-host -p slipstream-client-linux -p slipstream-client-session -p slipstream-cli
+    -p slipstream-host -p slipstream-client-linux -p slipstream-client-session -p slipstream-cli \
+    -p pf-update
   # The status tray in its OWN cargo invocation — load-bearing, not tidiness. Cargo unifies features
   # across everything in one build, so co-building the tray with the host pulls the host's
   # ashpd -> zbus/tokio onto the tray's shared zbus; the tray (ksni async-io + blocking, no tokio
@@ -159,6 +160,17 @@ package_slipstream-host() {
     "$pkgdir/usr/share/polkit-1/actions/io.unom.slipstream.dm-helper.policy"
   sed -i 's#/usr/libexec/slipstream/pf-dm-helper#/usr/lib/slipstream/pf-dm-helper#' \
     "$pkgdir/usr/share/polkit-1/actions/io.unom.slipstream.dm-helper.policy"
+  # Web-console-triggered updates (host-update-from-web-console.md §7): root helper + oneshot
+  # unit + group-scoped polkit rule. Same no-libexec relocation as pf-dm-helper, with the
+  # unit's ExecStart rewritten to match. On pacman the helper additionally requires the
+  # explicit PACMAN_FULL_SYSUPGRADE opt-in (partial upgrades are against Arch doctrine).
+  install -Dm0755 "$R/target/release/pf-update"       "$pkgdir/usr/lib/slipstream/pf-update"
+  install -Dm0644 "$R/packaging/linux/slipstream-update.service" \
+    "$pkgdir/usr/lib/systemd/system/slipstream-update.service"
+  sed -i 's#/usr/libexec/slipstream/pf-update#/usr/lib/slipstream/pf-update#' \
+    "$pkgdir/usr/lib/systemd/system/slipstream-update.service"
+  install -Dm0644 "$R/packaging/linux/49-slipstream-update.rules" \
+    "$pkgdir/usr/share/polkit-1/rules.d/49-slipstream-update.rules"
   # vhci-hcd autoload — usbip transport for the virtual Steam Deck pad (Steam only adopts USB pads)
   install -Dm0644 "$R/scripts/slipstream-modules.conf" "$pkgdir/usr/lib/modules-load.d/slipstream.conf"
   # 32 MB UDP socket buffers (send-side headroom at high bitrate)
