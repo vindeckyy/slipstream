@@ -7,7 +7,7 @@
 .DESCRIPTION
   Sustained connect/disconnect churn (e.g. a client reconnect loop x the host's 8 pipeline-build
   retries - ~100 ADD/REMOVE cycles) exhausts the driver's IddCx monitor slots: the per-monitor
-  target_ids climb, ghost "Generic Monitor (slipstream)" device nodes pile up, and eventually
+  target_ids climb, ghost "Generic Monitor (Slipstream)" device nodes pile up, and eventually
   IOCTL_ADD returns 0x80070490 ERROR_NOT_FOUND ("Element nicht gefunden"). Every session then fails
   to create a virtual output -> the client gets a hard blackscreen. A host-service restart's
   IOCTL_CLEAR_ALL does NOT recover it; the driver instance itself must be reloaded.
@@ -16,16 +16,16 @@
     1. Stop the host service (it holds the driver's control device).
     2. pnputil /remove-device the GHOST (Status != OK = not-present) slipstream virtual-monitor nodes
        that accumulated - the root of the slot exhaustion.
-    3. Disable + Enable the pf-vdisplay adapter (ROOT\DISPLAY\*, "slipstream Virtual Display") to
+    3. Disable + Enable the pf-vdisplay adapter (ROOT\DISPLAY\*, "Slipstream Virtual Display") to
        reload the IddCx driver instance and reset its monitor list. (Restart-PnpDevice does NOT exist
        on this box's PowerShell, so we disable+enable explicitly.)
     4. Restart the host service.
   Avoids a reboot on purpose (this box boots to Proxmox).
 
 .PARAMETER Service     Host service name. Default SlipstreamHost.
-.PARAMETER AdapterName FriendlyName substring of the IddCx adapter to cycle. Default "slipstream
+.PARAMETER AdapterName FriendlyName substring of the IddCx adapter to cycle. Default "Slipstream
                        Virtual Display" (NOT SudoVDA's "SudoMaker Virtual Display Adapter").
-.PARAMETER GhostMatch  FriendlyName substring of the virtual monitors to reap. Default "slipstream".
+.PARAMETER GhostMatch  FriendlyName substring of the virtual monitors to reap. Default "Slipstream".
 .PARAMETER KeepGhosts  Skip the ghost-node cleanup; only cycle the adapter.
 .PARAMETER NoHost      Don't stop/start the host service (just reset the driver) - used by
                        redeploy-pf-vdisplay.ps1, which manages the service itself.
@@ -41,8 +41,8 @@
 [CmdletBinding()]
 param(
     [string]$Service     = 'SlipstreamHost',
-    [string]$AdapterName = 'slipstream Virtual Display',
-    [string]$GhostMatch  = 'slipstream',
+    [string]$AdapterName = 'Slipstream Virtual Display',
+    [string]$GhostMatch  = 'Slipstream',
     [switch]$KeepGhosts,
     [switch]$NoHost,
     [switch]$Verify,
