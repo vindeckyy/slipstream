@@ -79,6 +79,16 @@ sed -i 's#%h/slipstream/target/release/slipstream-host#/usr/bin/slipstream-host#
 # operator copies it into ~/.config/systemd/user/slipstream-host.service.d/ when they want it.
 install -Dm0644 scripts/slipstream-host-desktop-session.conf \
     "$STAGE/usr/share/slipstream-host/slipstream-host-desktop-session.conf"
+# Install-kind + channel marker, read by the host's update-check surface (planning:
+# host-update-from-web-console.md §4.1). ONE canonical path across all package formats —
+# /usr/share/slipstream/, not this package's slipstream-host/ data dir. A canary version
+# carries `~ciN`; anything else is stable.
+case "$VERSION" in
+  *~ci*) _pf_update_channel=canary ;;
+  *)     _pf_update_channel=stable ;;
+esac
+printf 'apt %s\n' "$_pf_update_channel" | \
+    install -Dm0644 /dev/stdin "$STAGE/usr/share/slipstream/install-kind"
 # Optional headless KWin session unit (the kwin --virtual appliance), as the RPM/Arch ship.
 # Repoint its ExecStart from the dev source tree to the packaged script. NOT enabled by default.
 install -Dm0644 scripts/slipstream-kde-session.service "$STAGE/usr/lib/systemd/user/slipstream-kde-session.service"
