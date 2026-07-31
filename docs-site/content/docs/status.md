@@ -40,7 +40,7 @@ host is newer than the Linux host.)
   mirror an HDR monitor over the GameStream desktop-capture source
   (`SLIPSTREAM_VIDEO_SOURCE=portal`): the portal negotiates the 10-bit PQ screencast formats GNOME
   50 added and encodes Main10 PQ. And a **gamescope** host can stream HDR off its virtual output
-  with the `slipstream-gamescope` build plus `SLIPSTREAM_GAMESCOPE_HDR=1` — games get real HDR
+  with the `slipstream-gamescope` build (on by default when installed) — games get real HDR
   surfaces and the composite is captured as 10-bit BT.2020 PQ. (Run `slipstream-host hdr-probe` to
   check either; both are pending on-glass validation.) The **other** Linux virtual displays —
   Mutter, KWin, wlroots — still stream 8-bit: their virtual-monitor screencasts are SDR-only

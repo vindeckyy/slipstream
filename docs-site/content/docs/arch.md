@@ -49,6 +49,7 @@ printf '\n[slipstream]\nServer = https://github.com/vindeckyy/slipstream/api/pac
 ```sh
 sudo pacman -Sy slipstream-host      # the streaming host
 sudo pacman -S  slipstream-web       # optional: the browser management console (pairing + status)
+sudo pacman -S  slipstream-gamescope # optional: HDR (10-bit BT.2020 PQ) off gamescope sessions
 sudo usermod -aG input "$USER"      # /dev/uinput access for virtual gamepads (re-login to apply)
 ```
 
@@ -155,5 +156,7 @@ sudo pacman -U slipstream-host-*.pkg.tar.zst
 
 NVENC/EGL come from the NVIDIA driver (`nvidia-utils`); on a GPU-less builder, symlink the CUDA
 stub into the link path first (the `PKGBUILD` header documents this). Full details, the
-Fedora→Arch dependency map, and the SteamOS systemd-sysext path are in
+Fedora→Arch dependency map, and the systemd-sysext mechanism are in
 [`packaging/arch/README.md`](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/arch/README.md).
+(For a **SteamOS host**, use the [on-device installer](/docs/steamos-host) instead — it builds
+the host and the HDR gamescope against the running OS.)
