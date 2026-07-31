@@ -132,14 +132,14 @@ See [The Web Console](/docs/web-console) for the console + pairing model shared 
 the Windows specifics follow.
 
 The installer also sets up the **web management console** (status, paired devices, the PIN pairing
-flow): it bundles the console plus its own runtime and runs it as the **`SlipstreamWeb`** task on
-**`https://<this-PC>:47992`**, starting at boot and at sign-in.
+flow): it bundles the console plus its own runtime, and the **`SlipstreamHost`** service runs it on
+**`https://<this-PC>:47992`** — started with the service and restarted automatically if it stops.
 
 #### Console login password
 
 You choose the console **login password** during setup — a secure random default is pre-filled and
 shown on the installer's final page. It's stored in `%ProgramData%\slipstream\web-password`, readable
-only by Administrators and SYSTEM. To read or change it (with the `schtasks` restart), see
+only by Administrators and SYSTEM. To read or change it (with the service restart), see
 [The Web Console → Login password](/docs/web-console#login-password); forgot it entirely?
 [Forgot your Password?](/docs/forgot-password).
 
@@ -223,8 +223,8 @@ Open **Settings → Apps → Installed apps → Slipstream Host → Uninstall**,
 - stops and removes the **`SlipstreamHost`** service and its firewall rules,
 - removes the `pf-vdisplay` and virtual-gamepad drivers — the device nodes *and* their driver-store
   packages — together with the `CN=slipstream-driver` certificate it had added,
-- removes the **`SlipstreamWeb`** and **`SlipstreamScripting`** scheduled tasks and the console
-  firewall rule,
+- removes the **`SlipstreamScripting`** scheduled task (and the legacy **`SlipstreamWeb`** task older
+  versions used for the console) and the console firewall rule,
 - unregisters the HDR Vulkan layer,
 - takes `C:\Program Files\slipstream` back off the machine `PATH`.
 

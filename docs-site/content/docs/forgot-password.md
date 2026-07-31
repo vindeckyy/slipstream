@@ -59,10 +59,11 @@ with the password you typed.
   ```
 
   ```powershell
-  schtasks /End /TN SlipstreamWeb; schtasks /Run /TN SlipstreamWeb
+  slipstream-host service restart
   ```
 
-  (The PowerShell one is Windows, from an **elevated** prompt.)
+  (The PowerShell one is Windows, from an **elevated** prompt — the console runs under the
+  Slipstream Host service there.)
 - **No password is configured at all.** If the file is missing or empty, or a line lost its
   `SLIPSTREAM_UI_PASSWORD=` prefix, the console fails closed and admits nobody — a page you open
   answers `auth not configured: set SLIPSTREAM_UI_PASSWORD`. Put the line back —
