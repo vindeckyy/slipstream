@@ -1,13 +1,16 @@
 ---
 title: Release Channels
-description: How slipstream ships — the canary (every main push) and stable (vX.Y.Z) tracks, how to subscribe to each, and how to cut a release.
+description: How Slipstream ships — the canary (main pushes) and stable (vX.Y.Z) tracks, how to subscribe to each, and how to cut a release.
 ---
 
-slipstream ships on **two tracks**. Every push to `main` publishes a **canary** build to the
-canary channels (fast iteration, possibly broken). A `vX.Y.Z` git tag cuts a **stable** release:
+Slipstream ships on **two tracks**. A push to `main` that touches a platform's sources publishes a
+new **canary** build for that platform (fast iteration, possibly broken) — each workflow only
+rebuilds from the paths its artifact is built from, so a docs-only push publishes nothing, and two
+channels can sit on different commits. A `vX.Y.Z` git tag cuts a **stable** release:
 every platform is built at that one version, published to the stable channels, and all the
-artifacts (`.deb`, `.rpm`, `.msix`, host installer, `.apk`/`.aab`, `.dmg`, flatpak, Decky zip)
-are attached to a single [GitHub Release](https://github.com/vindeckyy/slipstream.git/releases).
+artifacts (`.deb`, `.rpm`, `.msix`, host installer, `.apk`/`.aab`, `.dmg`, `.ipa`, flatpak, Decky
+zip, winget manifests) are attached to a single
+[GitHub Release](https://github.com/vindeckyy/slipstream.git/releases).
 
 The two tracks are **separate repos / tracks per platform**, never a shared version line — so a
 stable box never gets pulled onto a canary build, and a canary box always moves forward. Pick the
@@ -16,7 +19,7 @@ track per machine; switching is a one-line change.
 ## Which track should I be on?
 
 - **Canary** — dev boxes, your own test fleet, "I want the latest main build." Updates land minutes
-  after a merge.
+  after a merge that touched the parts you run; some merges won't move your channel at all.
 - **Stable** — anything you don't want to babysit. Only moves when a `vX.Y.Z` tag is cut.
 
 ## Subscribe — per platform
@@ -31,6 +34,7 @@ track per machine; switching is a one-line change.
 | **Decky** (Steam Deck) | install-from-URL `…/generic/slipstream-decky/canary/slipstream.zip` | `…/slipstream-decky/latest/slipstream.zip` |
 | **Windows client** (MSIX) | `…/generic/slipstream-client-windows/canary/slipstream-client-windows_x64.msix` | `…/latest/…` + the release page |
 | **Windows host** (installer) | `…/generic/slipstream-host-windows/canary/slipstream-host-setup.exe` | `…/latest/…` + the release page |
+| **Windows host** (winget) | — *(stable only)* | `winget install unom.SlipstreamHost` / `winget upgrade unom.SlipstreamHost`, after `winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest` |
 | **Android** | Play **Internal testing** + sideload `…/generic/slipstream-android/canary/slipstream-android.apk` | Play **closed (alpha)** track + the release page |
 | **Apple** (mac/iOS/tvOS) | **TestFlight** | TestFlight + a notarized `.dmg` on the release page |
 
@@ -41,6 +45,40 @@ one-line edit of `/etc/apt/sources.list.d/slipstream.list` (`stable` ↔ `canary
 
 > The OS-package channels (apt/rpm) are how Linux hosts get canary builds — they are **not**
 > attached to a canary release page. The GitHub Releases page is stable-only.
+
+**winget is stable-only by design.** A winget manifest pins one immutable artifact per version, so
+there is nothing a rolling canary alias could point at. A Windows host on the canary channel updates
+by running the canary installer again.
+
+## How a box learns about a new build
+
+You don't have to watch the release page. The host works out how it was installed and which channel
+that install follows — from the marker its package wrote (`/usr/share/slipstream/install-kind`), the
+sysext's own `/etc/slipstream-sysext.conf`, or, on Windows, from the installer having put it under
+`Program Files\slipstream` (with the version number itself saying which channel) — then checks a small
+signed manifest for **that** channel and shows the answer in the web console's **Host → Updates**
+card: the version you run, the channel you follow, and the exact command that updates this install
+(or a one-click **Update now** button on Windows). See [Updating the Host](/docs/updating).
+
+## Pin a version, or roll back
+
+A build broke something and you want the previous one? Every channel can serve an exact version.
+
+| How you installed | Pin / roll back |
+|---|---|
+| **apt** | `apt-cache madison slipstream-host` to list versions, then `sudo apt install slipstream-host=<version>`. Add `sudo apt-mark hold slipstream-host` to stay there (`apt-mark unhold` to resume). |
+| **dnf** | `sudo dnf --showduplicates list slipstream` to list versions, then `sudo dnf install slipstream-<version>` (or `sudo dnf downgrade slipstream`). |
+| **pacman** | Reinstall from the package cache: `sudo pacman -U /var/cache/pacman/pkg/slipstream-host-<version>-x86_64.pkg.tar.zst`, then add `IgnorePkg = slipstream-host` to `/etc/pacman.conf` so the next `-Syu` leaves it alone. |
+| **Bazzite sysext** | `slipstream-sysext status` prints your feed URL; download the `slipstream-<version>-x86-64.raw` you want from it, then `sudo slipstream-sysext install --from-file slipstream-<version>-x86-64.raw`. |
+| **Windows installer** | Run the older `slipstream-host-setup-<version>.exe` over the current install. |
+| **Windows / winget** | `winget install unom.SlipstreamHost --version <x.y.z>` — the source serves per-version manifests. |
+| **Decky plugin** | Install-from-URL with an exact version: `https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/<version>/slipstream.zip`. |
+| **SteamOS (on-device build)** | `git -C ~/slipstream checkout v<x.y.z>` then `bash ~/slipstream/scripts/steamdeck/update.sh` (no `--pull` — that would fetch `main` again). |
+| **NixOS** | `sudo nixos-rebuild switch --rollback` for the previous generation, or pin the flake input to a `v<x.y.z>` tag and rebuild. |
+
+Downgrading the host does **not** downgrade `~/.config/slipstream` (Linux/SteamOS) or
+`%ProgramData%\slipstream` (Windows), so your config, console password and paired devices carry
+across in both directions.
 
 ## Cut a stable release (maintainer)
 
