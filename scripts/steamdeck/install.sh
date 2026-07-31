@@ -319,7 +319,7 @@ Description=slipstream host (GameStream + slipstream/1)
 After=pipewire.service
 
 [Service]
-EnvironmentFile=%h/.config/slipstream/host.env
+EnvironmentFile=-%h/.config/slipstream/host.env
 Environment=XDG_RUNTIME_DIR=$XRD
 Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=$XRD/bus
 ExecStart=$BIN $SERVE_ARGS
