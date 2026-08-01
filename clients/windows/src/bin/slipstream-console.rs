@@ -17,7 +17,7 @@
 // stderr would otherwise evaporate — same reasoning as the shell's tee. This shim only
 // initializes + forwards; the module's subscriber-side surface stays unused here.
 #[cfg(windows)]
-#[path = "../logfile.rs"]
+#[path = "../shell/logfile.rs"]
 #[allow(dead_code)]
 mod logfile;
 

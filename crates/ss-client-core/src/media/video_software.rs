@@ -165,7 +165,7 @@ mod tests {
     /// (`tests/pq-frame.h265`, x265 with explicit VUI).
     #[test]
     fn software_decode_carries_pq_signaling() {
-        let au = include_bytes!("../tests/pq-frame.h265");
+        let au = include_bytes!("../../tests/pq-frame.h265");
         let mut dec = SoftwareDecoder::new(ffmpeg::codec::Id::HEVC).expect("hevc decoder");
         let mut got = dec.decode(au).expect("decode");
         if got.is_none() {
@@ -212,7 +212,7 @@ mod tests {
         let fixtures: [(&str, &[u8], ColorDesc); 3] = [
             (
                 "601-limited",
-                include_bytes!("../tests/bars-601-limited.h265"),
+                include_bytes!("../../tests/bars-601-limited.h265"),
                 ColorDesc {
                     primaries: 1,
                     transfer: 1,
@@ -222,7 +222,7 @@ mod tests {
             ),
             (
                 "709-limited",
-                include_bytes!("../tests/bars-709-limited.h265"),
+                include_bytes!("../../tests/bars-709-limited.h265"),
                 ColorDesc {
                     primaries: 1,
                     transfer: 1,
@@ -232,7 +232,7 @@ mod tests {
             ),
             (
                 "709-full",
-                include_bytes!("../tests/bars-709-full.h265"),
+                include_bytes!("../../tests/bars-709-full.h265"),
                 ColorDesc {
                     primaries: 1,
                     transfer: 1,

@@ -23,6 +23,9 @@
 
 #[cfg(windows)]
 mod app;
+#[cfg(windows)]
+mod shell;
+// Root shims: preserve `crate::deeplink` / `crate::spawn` / … paths used by `app/`.
 // `slipstream://` activation: single instance, hand-off, and the positional URL parse
 // (design/client-deep-links.md §4.2).
 #[cfg(windows)]

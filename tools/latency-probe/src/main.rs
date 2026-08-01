@@ -7,8 +7,8 @@
 //! Status: scaffold.
 #![forbid(unsafe_code)]
 
+mod scaffold;
+
 fn main() {
-    println!(
-        "latency-probe: scaffold (render timestamp/QR on host, read back on client; track p50/p99)"
-    );
+    scaffold::announce();
 }

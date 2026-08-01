@@ -9,27 +9,40 @@
 //! button glyphs, and a controller keyboard (suppressed on Steam Deck, where Steam's
 //! own keyboard types through SDL text input) — plus the in-stream chrome: stats OSD,
 //! capture hint, start banner.
+//!
+//! Layout: sources live under `ui/` (screens, shell, widgets, theme, anim, …).
+//! Crate-root module names stay stable via `#[path]` so `ss_console_ui::*` pubs do not
+//! move.
 
 // Unsafe-proof program: every `unsafe {}` in the Skia/Vulkan overlay carries a `// SAFETY:` proof.
 #![deny(clippy::undocumented_unsafe_blocks)]
 
 #[cfg(any(target_os = "linux", windows))]
+#[path = "ui/anim.rs"]
 mod anim;
 #[cfg(any(target_os = "linux", windows))]
+#[path = "ui/glyphs.rs"]
 mod glyphs;
 #[cfg(any(target_os = "linux", windows))]
+#[path = "ui/library.rs"]
 pub mod library;
 #[cfg(any(target_os = "linux", windows))]
+#[path = "ui/model.rs"]
 pub mod model;
 #[cfg(any(target_os = "linux", windows))]
+#[path = "ui/screens.rs"]
 mod screens;
 #[cfg(any(target_os = "linux", windows))]
+#[path = "ui/shell.rs"]
 mod shell;
 #[cfg(any(target_os = "linux", windows))]
+#[path = "ui/skia_overlay.rs"]
 mod skia_overlay;
 #[cfg(any(target_os = "linux", windows))]
+#[path = "ui/theme.rs"]
 mod theme;
 #[cfg(any(target_os = "linux", windows))]
+#[path = "ui/widgets.rs"]
 mod widgets;
 
 #[cfg(any(target_os = "linux", windows))]

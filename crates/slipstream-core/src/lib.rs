@@ -39,34 +39,56 @@
 #![deny(clippy::undocumented_unsafe_blocks)]
 #![forbid(unsafe_op_in_unsafe_fn)]
 
+// Wave 4: on-disk layout groups modules under `net/` and `runtime/`. `#[path]` keeps each
+// public module a true crate-root `pub mod` (same path identity for dependents and the same
+// cbindgen discovery order as the pre-move tree), so `include/slipstream_core.h` stays stable.
+
 pub mod abi;
 #[cfg(feature = "quic")]
+#[path = "runtime/abr.rs"]
 mod abr;
+#[path = "runtime/audio.rs"]
 pub mod audio;
 #[cfg(feature = "quic")]
+#[path = "runtime/client/mod.rs"]
 pub mod client;
 /// Client-side shared-clipboard transport: the per-session task that runs the fetch-stream accept
 /// loop, drives outbound fetches, and serves inbound ones — surfaced to the embedder as poll
 /// events. Wire codecs live in [`quic`]; the OS pasteboard integration lives in the native client.
 #[cfg(feature = "quic")]
+#[path = "runtime/clipboard.rs"]
 pub mod clipboard;
 pub mod config;
+#[path = "net/crypto.rs"]
 pub mod crypto;
 pub mod error;
+#[path = "net/fec/mod.rs"]
 pub mod fec;
+#[path = "runtime/input.rs"]
 pub mod input;
+#[path = "net/packet/mod.rs"]
 pub mod packet;
+#[path = "runtime/phase.rs"]
 pub mod phase;
 #[cfg(feature = "quic")]
+#[path = "net/quic/mod.rs"]
 pub mod quic;
+#[path = "runtime/reanchor.rs"]
 pub mod reanchor;
+#[path = "runtime/reject.rs"]
 pub mod reject;
+#[path = "runtime/render_scale.rs"]
 pub mod render_scale;
+#[path = "runtime/session/mod.rs"]
 pub mod session;
+#[path = "runtime/stats.rs"]
 pub mod stats;
 #[cfg(feature = "tls")]
+#[path = "net/tls.rs"]
 pub mod tls;
+#[path = "net/transport/mod.rs"]
 pub mod transport;
+#[path = "runtime/wol.rs"]
 pub mod wol;
 
 pub use config::{CompositorPref, Config, FecConfig, FecScheme, Mode, ProtocolPhase, Role};

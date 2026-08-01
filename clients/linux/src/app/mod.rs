@@ -5,9 +5,13 @@
 //! `update`. Every stream runs in the `slipstream-session` Vulkan binary — the shell
 //! never touches video.
 
-use crate::spawn::{self, SpawnOpts};
+pub(crate) mod cli;
+pub(crate) mod shortcuts;
+pub(crate) mod spawn;
+
+use crate::app::spawn::{self, SpawnOpts};
 use crate::trust::{self, Settings};
-use crate::ui_hosts::{ConnectRequest, HostsMsg, HostsOutput, HostsPage};
+use crate::ui::hosts::{ConnectRequest, HostsMsg, HostsOutput, HostsPage};
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
 use slipstream_core::client::NativeClient;
@@ -198,7 +202,7 @@ impl SimpleComponent for AppModel {
             let (tx, rx) = async_channel::bounded::<crate::ui_settings::DeviceProbes>(1);
             std::thread::spawn(move || {
                 let adapters: Vec<String> =
-                    std::process::Command::new(crate::spawn::session_binary())
+                    std::process::Command::new(crate::app::spawn::session_binary())
                         .arg("--list-adapters")
                         .output()
                         .ok()

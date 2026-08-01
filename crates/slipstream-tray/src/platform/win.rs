@@ -34,8 +34,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_CONTEXTMENU, WM_DESTROY, WM_ENDSESSION, WM_NULL, WM_SETTINGCHANGE, WNDCLASSW, WS_OVERLAPPED,
 };
 
+use crate::platform::win_theme;
 use crate::status::{Poller, TrayStatus};
-use crate::win_theme;
 
 /// Keyboard "select" on the icon (Enter/Space) — `NIN_SELECT | NINF_KEY`; the windows crate
 /// exports only NIN_SELECT.

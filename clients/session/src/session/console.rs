@@ -12,7 +12,7 @@
 //! models. `SLIPSTREAM_FAKE_LIBRARY=<file.json>` feeds canned entries with no host
 //! (portrait paths starting with `/` load from disk), the GPU-only dev path.
 
-use crate::session_main::{
+use super::{
     arg_flag, arg_value, fullscreen_mode, parse_host_port, session_params, window_pos,
 };
 use ss_client_core::gamepad::is_steam_deck;
@@ -43,7 +43,7 @@ pub fn run(target: Option<&str>) -> u8 {
         Ok(i) => i,
         Err(e) => {
             eprintln!("client identity: {e:#}");
-            return crate::session_main::EXIT_CONNECT_FAILED;
+            return super::EXIT_CONNECT_FAILED;
         }
     };
 
@@ -113,7 +113,7 @@ pub fn run(target: Option<&str>) -> u8 {
         Ok(v) => v,
         Err(e) => {
             eprintln!("console UI: {e:#}");
-            return crate::session_main::EXIT_PRESENTER_FAILED;
+            return super::EXIT_PRESENTER_FAILED;
         }
     };
     let ConsoleHandles {
@@ -182,12 +182,12 @@ pub fn run(target: Option<&str>) -> u8 {
             }
         })),
         overlay: Some(Box::new(overlay)),
-        window_size: crate::session_main::window_size(&settings_at_start),
+        window_size: super::window_size(&settings_at_start),
         // Latched at console start (like the stats tier above): toggling Match window in
         // the console's settings screen applies from the next console launch.
         // The console owns its own window across every launch, and no parent is listening to
         // its stdout, so it keeps persisting the size itself.
-        match_window: crate::session_main::match_window(&settings_at_start, true),
+        match_window: super::match_window(&settings_at_start, true),
         render_scale: settings_at_start.render_scale,
         render_scale_max_dim: slipstream_core::render_scale::max_dimension(&settings_at_start.codec),
     };
@@ -268,10 +268,10 @@ pub fn run(target: Option<&str>) -> u8 {
             // The shell contract's terminal line (a clean quit needs none — stdout EOF
             // already routes the shell back to its host list silently).
             if json_status {
-                crate::session_main::json_line("error", &format!("{e:#}"), Some(false));
+                super::json_line("error", &format!("{e:#}"), Some(false));
             }
             eprintln!("console: {e:#}");
-            crate::session_main::EXIT_PRESENTER_FAILED
+            super::EXIT_PRESENTER_FAILED
         }
     }
 }

@@ -36,7 +36,7 @@ impl CscPass {
             device,
             attachment_format,
             2,
-            include_bytes!("../shaders/nv12_csc.frag.spv"),
+            include_bytes!("../../shaders/nv12_csc.frag.spv"),
         )
     }
 
@@ -48,7 +48,7 @@ impl CscPass {
             device,
             attachment_format,
             3,
-            include_bytes!("../shaders/planar_csc.frag.spv"),
+            include_bytes!("../../shaders/planar_csc.frag.spv"),
         )
     }
 
@@ -274,7 +274,7 @@ pub(crate) fn build_fullscreen_pipeline(
     // Committed SPIR-V (shaders/build.sh) — include_bytes! alignment is unspecified, so
     // read_spv copies into aligned Vec<u32>s.
     let vert = ash::util::read_spv(&mut std::io::Cursor::new(
-        &include_bytes!("../shaders/fullscreen.vert.spv")[..],
+        &include_bytes!("../../shaders/fullscreen.vert.spv")[..],
     ))?;
     let frag = ash::util::read_spv(&mut std::io::Cursor::new(frag_spv))?;
     // SAFETY: per the Vulkan contract above - the Vulkan handles used here are owned by this type

@@ -14,14 +14,15 @@
 #![deny(clippy::undocumented_unsafe_blocks)]
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
-#[cfg(target_os = "linux")]
-mod linux;
+#[cfg(any(windows, target_os = "linux"))]
+mod platform;
 #[cfg(any(windows, target_os = "linux"))]
 mod status;
+
+#[cfg(target_os = "linux")]
+use platform::linux;
 #[cfg(windows)]
-mod win;
-#[cfg(windows)]
-mod win_theme;
+use platform::win;
 
 /// CLI configuration (hand-rolled parse, house style). The mgmt address/port default to the
 /// host's defaults; they are flags because the tray cannot read `host.env` on Windows (it is

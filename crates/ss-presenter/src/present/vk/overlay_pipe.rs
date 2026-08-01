@@ -108,7 +108,7 @@ impl OverlayPipe {
             device,
             render_pass,
             pipeline_layout,
-            include_bytes!("../../shaders/overlay.frag.spv"),
+            include_bytes!("../../../shaders/overlay.frag.spv"),
             true, // premultiplied blend over the video
         )?;
         Ok(OverlayPipe {

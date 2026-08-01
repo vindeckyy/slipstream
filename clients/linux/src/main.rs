@@ -13,6 +13,9 @@ pub use ss_client_core::{discovery, gamepad, library, os, trust, video, wol};
 #[cfg(target_os = "linux")]
 mod app;
 #[cfg(target_os = "linux")]
+mod ui;
+// Root shims: preserve `crate::cli` / `crate::ui_hosts` paths used across the shell.
+#[cfg(target_os = "linux")]
 mod cli;
 // "Create shortcut…" — the desktop-entry writer (design/client-deep-links.md §5).
 #[cfg(target_os = "linux")]

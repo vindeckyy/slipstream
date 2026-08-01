@@ -28,12 +28,9 @@ pub const OFFICIAL_UPDATE_KEYS: [&str; 2] = [
     "", // rotation slot
 ];
 
-pub mod detect;
-pub mod feed;
-pub mod manifest;
-pub mod sig;
-pub mod version;
+pub mod check;
 
+pub use check::{detect, feed, manifest, sig, version};
 pub use detect::{InstallKind, Product};
 pub use feed::FeedError;
 pub use manifest::{Manifest, MAX_MANIFEST_BYTES, SCHEMA};

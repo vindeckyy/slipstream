@@ -509,7 +509,7 @@ mod tests {
     /// too — this is what keeps three parsers from drifting into three security postures.
     #[test]
     fn shared_vectors() {
-        let raw = include_str!("../../../clients/shared/deeplink-vectors.json");
+        let raw = include_str!("../../../../clients/shared/deeplink-vectors.json");
         let file: serde_json::Value = serde_json::from_str(raw).expect("vector file parses");
         let cases = file["cases"].as_array().expect("cases array");
         assert!(

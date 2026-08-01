@@ -213,10 +213,10 @@ pub(crate) struct Fonts {
 /// The Geist faces ride in the binary — the console must look right on a bare gamescope
 /// session with no font packages to lean on (fontconfig still serves CJK fallback where
 /// it exists).
-const GEIST_REGULAR: &[u8] = include_bytes!("../assets/fonts/Geist-Regular.otf");
-const GEIST_MEDIUM: &[u8] = include_bytes!("../assets/fonts/Geist-Medium.otf");
-const GEIST_SEMIBOLD: &[u8] = include_bytes!("../assets/fonts/Geist-SemiBold.otf");
-const GEIST_BOLD: &[u8] = include_bytes!("../assets/fonts/Geist-Bold.otf");
+const GEIST_REGULAR: &[u8] = include_bytes!("../../assets/fonts/Geist-Regular.otf");
+const GEIST_MEDIUM: &[u8] = include_bytes!("../../assets/fonts/Geist-Medium.otf");
+const GEIST_SEMIBOLD: &[u8] = include_bytes!("../../assets/fonts/Geist-SemiBold.otf");
+const GEIST_BOLD: &[u8] = include_bytes!("../../assets/fonts/Geist-Bold.otf");
 
 pub(crate) fn build_fonts() -> Result<Fonts> {
     let mgr = FontMgr::new();
