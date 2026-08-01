@@ -1,5 +1,6 @@
 import Section from "@unom/ui/section";
 import type { FC, ReactNode } from "react";
+import { HelpTip, RecommendedMark } from "@/components/option-help";
 import { m } from "@/paraglide/messages";
 
 /**
@@ -16,9 +17,16 @@ export const PairingView: FC<{
 	<Section maxWidth={false}>
 		<div className="flex flex-col gap-card">
 			<div className="space-y-1">
-				<h1 className="text-2xl font-semibold tracking-tight">
-					{m.pairing_title()}
-				</h1>
+				<div className="flex items-center gap-1.5">
+					<h1 className="text-2xl font-semibold tracking-tight">
+						{m.pairing_title()}
+					</h1>
+					<HelpTip
+						label={m.pairing_title()}
+						text="Admit Slipstream apps and Moonlight clients to this host once. After pairing they reconnect without a PIN."
+					/>
+				</div>
+				<RecommendedMark value="Slipstream app: use Pair a device, then type the PIN on the client. Moonlight: start Pair on the client, then enter its PIN in the Moonlight card." />
 			</div>
 
 			{pending}

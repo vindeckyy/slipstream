@@ -70,6 +70,7 @@ export const JobProgressSection: FC<{
 						variant="ghost"
 						size="icon"
 						aria-label={m.store_job_dismiss()}
+						title="Dismiss this job card."
 						onClick={onDismiss}
 					>
 						<X className="size-4" />
@@ -130,6 +131,7 @@ export const JobProgressCard: FC<{
 							variant="ghost"
 							size="icon"
 							aria-label={m.store_job_dismiss()}
+							title="Dismiss this job card."
 							onClick={onDismiss}
 						>
 							<X className="size-4" />
@@ -154,7 +156,10 @@ export const JobProgressCard: FC<{
 
 				{log.length > 0 && (
 					<details className="group">
-						<summary className="cursor-pointer list-none text-xs text-muted-foreground transition-colors hover:text-foreground">
+						<summary
+							className="cursor-pointer list-none text-xs text-muted-foreground transition-colors hover:text-foreground"
+							title="Show the host's install/remove log tail for this job."
+						>
 							{m.store_job_log()}
 						</summary>
 						<pre className="mt-2 max-h-64 overflow-auto rounded-lg border border-border/60 bg-muted/50 p-3 text-left text-xs text-muted-foreground">

@@ -11,6 +11,7 @@ import {
 	useListNativeClients,
 	useUnpairNativeClient,
 } from "@/api/gen/native/native";
+import { HelpTip, RecommendedMark } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -124,9 +125,16 @@ export const PairedDevices: FC<{
 }> = ({ rows, isLoading, error, refetch, onUnpair, pendingFingerprint }) => (
 	<Card>
 		<CardHeader>
-			<CardTitle className="tracking-tight">
-				{m.pairing_native_devices()}
-			</CardTitle>
+			<div className="space-y-1">
+				<CardTitle className="flex items-center gap-1.5 tracking-tight">
+					{m.pairing_native_devices()}
+					<HelpTip
+						label={m.pairing_native_devices()}
+						text="Every device trusted by this host, across Slipstream (native) and Moonlight. After pairing, reconnects need no PIN. Unpair removes trust so the device must pair again to stream."
+					/>
+				</CardTitle>
+				<RecommendedMark value="Keep only devices you still use. Unpair lost, shared, or retired clients." />
+			</div>
 		</CardHeader>
 
 		<CardContent flush>
@@ -140,10 +148,36 @@ export const PairedDevices: FC<{
 						<Table>
 							<TableHeader>
 								<TableRow className="hover:bg-transparent">
-									<TableHead>{m.clients_name()}</TableHead>
-									<TableHead>{m.pairing_protocol()}</TableHead>
-									<TableHead>{m.clients_fingerprint()}</TableHead>
-									<TableHead className="w-12" />
+									<TableHead>
+										<span className="inline-flex items-center gap-1.5">
+											{m.clients_name()}
+											<HelpTip
+												label={m.clients_name()}
+												text="Friendly label for native devices, or the certificate subject for Moonlight clients. Empty means the client did not send a name."
+											/>
+										</span>
+									</TableHead>
+									<TableHead>
+										<span className="inline-flex items-center gap-1.5">
+											{m.pairing_protocol()}
+											<HelpTip
+												label={m.pairing_protocol()}
+												text="slipstream/1 is the native Slipstream client path (Pair a device or Approve). Moonlight is GameStream-compatible clients paired via the Moonlight PIN card."
+											/>
+										</span>
+									</TableHead>
+									<TableHead>
+										<span className="inline-flex items-center gap-1.5">
+											{m.clients_fingerprint()}
+											<HelpTip
+												label={m.clients_fingerprint()}
+												text="Short view of the client's cryptographic identity. The host pins this after pairing so reconnects are automatic."
+											/>
+										</span>
+									</TableHead>
+									<TableHead className="w-12">
+										<span className="sr-only">{m.action_unpair()}</span>
+									</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
@@ -167,15 +201,21 @@ export const PairedDevices: FC<{
 											{r.fingerprint.slice(0, 16)}…
 										</TableCell>
 										<TableCell>
-											<Button
-												variant="ghost"
-												size="icon"
-												aria-label={m.action_unpair()}
-												disabled={pendingFingerprint === r.fingerprint}
-												onClick={() => onUnpair(r.protocol, r.fingerprint)}
-											>
-												<Trash2 className="size-4 text-destructive" />
-											</Button>
+											<div className="flex items-center justify-end gap-1">
+												<Button
+													variant="ghost"
+													size="icon"
+													aria-label={m.action_unpair()}
+													disabled={pendingFingerprint === r.fingerprint}
+													onClick={() => onUnpair(r.protocol, r.fingerprint)}
+												>
+													<Trash2 className="size-4 text-destructive" />
+												</Button>
+												<HelpTip
+													label={m.action_unpair()}
+													text="Removes this device from the allow-list. It must complete pairing again before it can connect."
+												/>
+											</div>
 										</TableCell>
 									</TableRow>
 								))}

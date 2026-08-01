@@ -9,6 +9,7 @@ import {
 	useDisarmNativePairing,
 	useGetNativePairing,
 } from "@/api/gen/native/native";
+import { HelpTip, RecommendedMark } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Button } from "@/components/ui/button";
 import {
@@ -92,7 +93,13 @@ export const NativePairingCard: FC<{
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2 tracking-tight">
 						<Smartphone className="size-4 text-muted-foreground" />
-						{m.pairing_native_title()}
+						<span className="flex min-w-0 items-center gap-1.5">
+							{m.pairing_native_title()}
+							<HelpTip
+								label={m.pairing_native_title()}
+								text="Arms a 2-minute window and shows a one-time PIN here. Enter that PIN in your Slipstream app (or CLI) to finish pairing. Random devices cannot pair while this is disarmed."
+							/>
+						</span>
 					</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
@@ -102,7 +109,16 @@ export const NativePairingCard: FC<{
 						</p>
 					) : d.armed && d.pin ? (
 						<div className="space-y-4">
-							<p className="text-sm">{m.pairing_native_enter()}</p>
+							<div className="space-y-1">
+								<div className="flex items-center gap-1.5">
+									<p className="text-sm">{m.pairing_native_enter()}</p>
+									<HelpTip
+										label={m.pairing_native_enter()}
+										text="This PIN is shown only while pairing is armed. Type it on the Slipstream client (Pair with PIN, or Pair & Stream on Steam Deck). Wrong guesses fail the ceremony; arm again for a fresh PIN."
+									/>
+								</div>
+								<RecommendedMark value="Stay on this page until the client confirms, then check Paired devices below." />
+							</div>
 							<div className="rounded-xl border border-border/70 bg-muted/30 py-6 text-center font-mono text-4xl font-semibold tracking-[0.3em] tabular-nums">
 								{d.pin}
 							</div>
@@ -112,24 +128,37 @@ export const NativePairingCard: FC<{
 									{m.pairing_native_expires()} {fmtTime(d.expires_in_secs)}
 								</p>
 							)}
-							<Button
-								variant="outline"
-								className="w-full"
-								disabled={isDisarming}
-								onClick={onDisarm}
-							>
-								{m.pairing_native_cancel()}
-							</Button>
+							<div className="flex w-full items-center gap-1.5">
+								<Button
+									variant="outline"
+									className="min-w-0 flex-1"
+									disabled={isDisarming}
+									onClick={onDisarm}
+								>
+									{m.pairing_native_cancel()}
+								</Button>
+								<HelpTip
+									label={m.pairing_native_cancel()}
+									text="Ends the pairing window early and discards this PIN. Arm again when you are ready at the device."
+								/>
+							</div>
 						</div>
 					) : (
 						<>
 							<CardDescription className="text-sm leading-relaxed text-muted-foreground">
 								{m.pairing_native_desc()}
 							</CardDescription>
-							<Button disabled={isArming} onClick={onArm}>
-								<KeyRound className="size-4" />
-								{m.pairing_native_arm()}
-							</Button>
+							<RecommendedMark value="Arm when you are standing at the device ready to type the PIN. The window lasts 2 minutes." />
+							<div className="flex items-center gap-1.5">
+								<Button disabled={isArming} onClick={onArm}>
+									<KeyRound className="size-4" />
+									{m.pairing_native_arm()}
+								</Button>
+								<HelpTip
+									label={m.pairing_native_arm()}
+									text="Starts a 2-minute pairing window and displays a PIN on this card. Open your Slipstream app, select this host, and enter that PIN to trust it."
+								/>
+							</div>
 						</>
 					)}
 				</CardContent>

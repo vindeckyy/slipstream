@@ -1,6 +1,7 @@
 import { ArrowUpCircle, Ban, Circle, Package, Trash2 } from "lucide-react";
 import type { FC } from "react";
 import { type InstalledPlugin, useInstalledPlugins } from "@/api/store";
+import { HelpTip } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,8 +52,12 @@ export const InstalledList: FC<{
 		<Card>
 			<CardContent flush>
 				<CardHeader className="pb-3">
-					<CardTitle className="text-base tracking-tight">
+					<CardTitle className="inline-flex items-center gap-1.5 text-base tracking-tight">
 						{m.store_installed_title()}
+						<HelpTip
+							label={m.store_installed_title()}
+							text="Plugins already on this host. Tier badges stay permanent: a raw-spec install stays Unverified for as long as it is installed."
+						/>
 					</CardTitle>
 				</CardHeader>
 
@@ -123,6 +128,7 @@ export const InstalledList: FC<{
 														<Button
 															size="sm"
 															disabled={busyPkg === p.pkg}
+															title={`Update to v${p.update_available}. Opens the same confirm dialog a fresh install would.`}
 															onClick={() => onUpdate(p)}
 														>
 															<ArrowUpCircle className="size-4" />
@@ -135,6 +141,7 @@ export const InstalledList: FC<{
 														variant="ghost"
 														size="icon"
 														aria-label={m.store_uninstall()}
+														title="Remove this plugin from the host. You can install it again from Browse."
 														disabled={busyPkg === p.pkg}
 														onClick={() => onUninstall(p)}
 													>

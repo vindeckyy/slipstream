@@ -9,6 +9,7 @@ import {
 	useStatsRecordingDelete,
 	useStatsRecordingsList,
 } from "@/api/gen/stats/stats";
+import { HelpTip, RecommendedMark } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,17 @@ import { apiErrorMessage } from "@/lib/errors";
 import type { Loadable } from "@/lib/query";
 import { m } from "@/paraglide/messages";
 import { fmtDuration, fmtTimestamp, kindLabel } from "./helpers";
+
+const RECORDINGS_HELP =
+	"Saved captures from Stop & save. View opens graphs on this page; Download exports the full capture as JSON; Delete removes it from the host.";
+const RECORDINGS_RECOMMENDED =
+	"Keep a short capture of the problem window; delete old runs you no longer need.";
+const VIEW_HELP =
+	"Open latency, throughput, and health graphs for this recording. Click again to close.";
+const DOWNLOAD_HELP =
+	"Download the full capture as JSON for offline analysis or bug reports.";
+const DELETE_HELP =
+	"Permanently delete this recording from the host. This cannot be undone.";
 
 /**
  * Container: the saved recordings. Owns the list query, delete, and the JSON export. Selection is
@@ -109,9 +121,13 @@ export const RecordingsCard: FC<{
 	return (
 		<Card>
 			<CardHeader className="space-y-1">
-				<h2 className="text-base font-semibold tracking-tight">
-					{m.stats_recordings_title()}
-				</h2>
+				<div className="flex items-center gap-1.5">
+					<h2 className="text-base font-semibold tracking-tight">
+						{m.stats_recordings_title()}
+					</h2>
+					<HelpTip label={m.stats_recordings_title()} text={RECORDINGS_HELP} />
+				</div>
+				<RecommendedMark value={RECORDINGS_RECOMMENDED} />
 			</CardHeader>
 			<QueryState
 				isLoading={recordings.isLoading}
@@ -180,7 +196,7 @@ export const RecordingsCard: FC<{
 														variant="ghost"
 														size="icon"
 														aria-label={m.stats_view()}
-														title={m.stats_view()}
+														title={VIEW_HELP}
 														onClick={() =>
 															onSelect(selectedId === r.id ? null : r.id)
 														}
@@ -191,7 +207,7 @@ export const RecordingsCard: FC<{
 														variant="ghost"
 														size="icon"
 														aria-label={m.stats_download()}
-														title={m.stats_download()}
+														title={DOWNLOAD_HELP}
 														onClick={() => onDownload(r.id)}
 													>
 														<Download className="size-4" />
@@ -200,7 +216,7 @@ export const RecordingsCard: FC<{
 														variant="ghost"
 														size="icon"
 														aria-label={m.stats_delete()}
-														title={m.stats_delete()}
+														title={DELETE_HELP}
 														disabled={isDeleting}
 														onClick={() => onDelete(r.id)}
 													>

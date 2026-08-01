@@ -2,6 +2,7 @@ import { Gamepad2, XCircle } from "lucide-react";
 import type { FC } from "react";
 import type { ActiveGame } from "@/api/gen/model/activeGame";
 import type { GameEntry } from "@/api/gen/model/gameEntry";
+import { HelpTip } from "@/components/option-help";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +32,10 @@ export const RunningGames: FC<{
 				<CardTitle className="flex items-center gap-2">
 					<Gamepad2 className="size-4 shrink-0 text-muted-foreground" />
 					{m.games_title()}
+					<HelpTip
+						label={m.games_title()}
+						text="Games the host is launching, running, or holding in a grace countdown after a client disconnect. End now closes a grace title early, or stops the live session for an active title."
+					/>
 				</CardTitle>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-2">
@@ -52,6 +57,11 @@ export const RunningGames: FC<{
 	);
 };
 
+const endNowHelp = (waiting: boolean): string =>
+	waiting
+		? "Close this game now instead of waiting out the grace countdown. Unsaved progress in the game may be lost."
+		: "Stop this running game by ending its session. With multiple live sessions the console confirms first, because one stop ends all of them.";
+
 const GameRow: FC<{
 	game: ActiveGame;
 	art?: string;
@@ -63,9 +73,7 @@ const GameRow: FC<{
 		<div
 			className={cn(
 				"flex items-center gap-3 rounded-lg border border-transparent px-2 py-2 sm:px-3",
-				waiting
-					? "border-destructive/30 bg-destructive/10"
-					: "bg-muted/30",
+				waiting ? "border-destructive/30 bg-destructive/10" : "bg-muted/30",
 			)}
 		>
 			{/* Fixed slot so rows line up whether or not a title has a cover. Plenty won't: an
@@ -99,16 +107,19 @@ const GameRow: FC<{
 						: [game.client, planeLabel(game.plane)].filter(Boolean).join(" · ")}
 				</p>
 			</div>
-			<Button
-				variant={waiting ? "destructive" : "outline"}
-				size="sm"
-				disabled={isEnding}
-				onClick={onEnd}
-				className="shrink-0"
-			>
-				<XCircle className="size-3.5" />
-				{m.games_end_now()}
-			</Button>
+			<div className="flex shrink-0 items-center gap-1">
+				<Button
+					variant={waiting ? "destructive" : "outline"}
+					size="sm"
+					disabled={isEnding}
+					title={endNowHelp(waiting)}
+					onClick={onEnd}
+				>
+					<XCircle className="size-3.5" />
+					{m.games_end_now()}
+				</Button>
+				<HelpTip label={m.games_end_now()} text={endNowHelp(waiting)} />
+			</div>
 		</div>
 	);
 };

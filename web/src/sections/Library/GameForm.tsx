@@ -1,6 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
-import { type FC, type FormEvent, useState } from "react";
+import {
+	type FC,
+	type FormEvent,
+	type ReactNode,
+	useState,
+} from "react";
 import {
 	getGetLibraryQueryKey,
 	useCreateCustomGame,
@@ -8,10 +13,10 @@ import {
 } from "@/api/gen/library/library";
 import type { CustomInput } from "@/api/gen/model/customInput";
 import type { GameEntry } from "@/api/gen/model/gameEntry";
+import { OptionLabel } from "@/components/option-help";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { apiErrorMessage } from "@/lib/errors";
 import { m } from "@/paraglide/messages";
 import { customId } from "./helpers";
@@ -168,11 +173,17 @@ const Field: FC<{
 	value: string;
 	onChange: (value: string) => void;
 	help?: string;
+	recommended?: ReactNode;
 	type?: string;
 	required?: boolean;
-}> = ({ id, label, value, onChange, help, type, required }) => (
+}> = ({ id, label, value, onChange, help, recommended, type, required }) => (
 	<div className="space-y-2">
-		<Label htmlFor={`lib-${id}`}>{label}</Label>
+		<OptionLabel
+			label={label}
+			help={help}
+			recommended={recommended}
+			htmlFor={`lib-${id}`}
+		/>
 		<Input
 			id={`lib-${id}`}
 			type={type}
@@ -183,7 +194,6 @@ const Field: FC<{
 			value={value}
 			onChange={(e) => onChange(e.target.value)}
 		/>
-		{help && <p className="text-xs text-muted-foreground">{help}</p>}
 	</div>
 );
 
@@ -233,6 +243,7 @@ export const GameForm: FC<{
 						label={m.library_field_title()}
 						value={form.title}
 						onChange={set("title")}
+						help={m.library_field_title_help()}
 						required
 					/>
 					<Field
@@ -241,6 +252,8 @@ export const GameForm: FC<{
 						value={form.portrait}
 						onChange={set("portrait")}
 						type="url"
+						help={m.library_field_portrait_help()}
+						recommended={m.library_field_portrait_recommended()}
 					/>
 					<Field
 						id="hero"
@@ -248,6 +261,8 @@ export const GameForm: FC<{
 						value={form.hero}
 						onChange={set("hero")}
 						type="url"
+						help={m.library_field_hero_help()}
+						recommended={m.library_field_hero_recommended()}
 					/>
 					<Field
 						id="header"
@@ -255,6 +270,8 @@ export const GameForm: FC<{
 						value={form.header}
 						onChange={set("header")}
 						type="url"
+						help={m.library_field_header_help()}
+						recommended={m.library_field_header_recommended()}
 					/>
 					<Field
 						id="logo"
@@ -262,6 +279,8 @@ export const GameForm: FC<{
 						value={form.logo}
 						onChange={set("logo")}
 						type="url"
+						help={m.library_field_logo_help()}
+						recommended={m.library_field_logo_recommended()}
 					/>
 					<Field
 						id="command"
@@ -269,6 +288,7 @@ export const GameForm: FC<{
 						value={form.command}
 						onChange={set("command")}
 						help={m.library_field_command_help()}
+						recommended={m.library_field_command_recommended()}
 					/>
 					<fieldset className="space-y-4 rounded-lg border border-border/70 bg-muted/20 p-3 sm:p-4">
 						<legend className="sr-only">{m.library_details_legend()}</legend>
@@ -284,12 +304,15 @@ export const GameForm: FC<{
 							value={form.platform}
 							onChange={set("platform")}
 							help={m.library_field_platform_help()}
+							recommended={m.library_field_platform_recommended()}
 						/>
 						<Field
 							id="description"
 							label={m.library_field_description()}
 							value={form.description}
 							onChange={set("description")}
+							help={m.library_field_description_help()}
+							recommended={m.library_field_description_recommended()}
 						/>
 						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 							<Field
@@ -297,12 +320,14 @@ export const GameForm: FC<{
 								label={m.library_field_developer()}
 								value={form.developer}
 								onChange={set("developer")}
+								help={m.library_field_developer_help()}
 							/>
 							<Field
 								id="publisher"
 								label={m.library_field_publisher()}
 								value={form.publisher}
 								onChange={set("publisher")}
+								help={m.library_field_publisher_help()}
 							/>
 						</div>
 						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -312,6 +337,8 @@ export const GameForm: FC<{
 								value={form.releaseYear}
 								onChange={set("releaseYear")}
 								type="number"
+								help={m.library_field_release_year_help()}
+								recommended={m.library_field_release_year_recommended()}
 							/>
 							<Field
 								id="players"
@@ -319,6 +346,8 @@ export const GameForm: FC<{
 								value={form.players}
 								onChange={set("players")}
 								type="number"
+								help={m.library_field_players_help()}
+								recommended={m.library_field_players_recommended()}
 							/>
 						</div>
 						<Field
@@ -327,6 +356,7 @@ export const GameForm: FC<{
 							value={form.region}
 							onChange={set("region")}
 							help={m.library_field_region_help()}
+							recommended={m.library_field_region_recommended()}
 						/>
 						<Field
 							id="genres"
@@ -334,6 +364,7 @@ export const GameForm: FC<{
 							value={form.genres}
 							onChange={set("genres")}
 							help={m.library_field_genres_help()}
+							recommended={m.library_field_genres_recommended()}
 						/>
 						<Field
 							id="tags"
@@ -341,6 +372,7 @@ export const GameForm: FC<{
 							value={form.tags}
 							onChange={set("tags")}
 							help={m.library_field_tags_help()}
+							recommended={m.library_field_tags_recommended()}
 						/>
 					</fieldset>
 					{/* Data-loss warning, not a nicety.

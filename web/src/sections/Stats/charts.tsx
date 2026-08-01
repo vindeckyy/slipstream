@@ -18,8 +18,13 @@ import {
 	YAxis,
 } from "recharts";
 import type { StatsSample } from "@/api/gen/model/statsSample";
+import { HelpTip, RecommendedMark } from "@/components/option-help";
 import { Button } from "@/components/ui/button";
 import { m } from "@/paraglide/messages";
+
+const PERCENTILE_HELP =
+	"p50 is the median stage time in each sample window. p99 is the tail (rare spikes that feel like hitch). The stacked stages are the same either way.";
+const PERCENTILE_RECOMMENDED = "p50 for a first pass; switch to p99 when hunting hitch";
 
 const CHART_H = 240;
 
@@ -170,21 +175,33 @@ export function LatencyChart({
 				// The button used to be labelled with the percentile currently PLOTTED while looking
 				// like an action, so it read as "click to show p99" when p99 was already showing.
 				// Two explicit options, with the active one pressed, says which is which.
-				<div className="flex justify-end">
-					<div className="inline-flex rounded-lg border border-border/70 bg-background/60 p-0.5">
-						{([false, true] as const).map((wantP99) => (
-							<Button
-								key={String(wantP99)}
-								variant={p99 === wantP99 ? "secondary" : "ghost"}
-								size="sm"
-								className="h-7 px-2.5"
-								aria-pressed={p99 === wantP99}
-								onClick={() => setP99(wantP99)}
-							>
-								{wantP99 ? m.stats_p99() : m.stats_p50()}
-							</Button>
-						))}
+				<div className="flex flex-col items-end gap-1.5">
+					<div className="flex items-center gap-1.5">
+						<span className="text-xs font-medium text-muted-foreground">
+							Percentile
+						</span>
+						<HelpTip label="Percentile" text={PERCENTILE_HELP} />
+						<div className="inline-flex rounded-lg border border-border/70 bg-background/60 p-0.5">
+							{([false, true] as const).map((wantP99) => (
+								<Button
+									key={String(wantP99)}
+									variant={p99 === wantP99 ? "secondary" : "ghost"}
+									size="sm"
+									className="h-7 px-2.5"
+									aria-pressed={p99 === wantP99}
+									title={
+										wantP99
+											? "Show p99 (tail) stage latency per window."
+											: "Show p50 (median) stage latency per window."
+									}
+									onClick={() => setP99(wantP99)}
+								>
+									{wantP99 ? m.stats_p99() : m.stats_p50()}
+								</Button>
+							))}
+						</div>
 					</div>
+					<RecommendedMark value={PERCENTILE_RECOMMENDED} />
 				</div>
 			)}
 			<ChartFrame>

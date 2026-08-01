@@ -10,6 +10,7 @@ import {
 	useDenyPendingDevice,
 	useListPendingDevices,
 } from "@/api/gen/native/native";
+import { HelpTip, RecommendedMark } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import {
 	Card,
@@ -90,11 +91,18 @@ export const PendingDevices: FC<{
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2 tracking-tight">
 					<UserPlus className="size-4 text-primary" />
-					{m.pairing_pending_title()}
+					<span className="flex min-w-0 items-center gap-1.5">
+						{m.pairing_pending_title()}
+						<HelpTip
+							label={m.pairing_pending_title()}
+							text="A Slipstream device tried to connect while unpaired. Approve pairs it on the spot (no PIN). Deny dismisses the knock; the device can try again, and requests expire after about 10 minutes."
+						/>
+					</span>
 				</CardTitle>
 				<CardDescription className="leading-relaxed">
 					{m.pairing_pending_desc()}
 				</CardDescription>
+				<RecommendedMark value="Approve devices you recognize. Give them a clear name (for example Living Room TV)." />
 			</CardHeader>
 
 			<CardContent flush>
@@ -130,23 +138,35 @@ export const PendingDevices: FC<{
 											{fmtAge(p.age_secs)}
 										</TableCell>
 										<TableCell className="whitespace-nowrap text-right">
-											<div className="flex justify-end gap-2">
-												<Button
-													size="sm"
-													disabled={pendingId === p.id}
-													onClick={() => onApprove(p.id, p.name)}
-												>
-													{m.pairing_pending_approve()}
-												</Button>
-												<Button
-													size="sm"
-													variant="ghost"
-													aria-label={m.pairing_pending_deny()}
-													disabled={pendingId === p.id}
-													onClick={() => onDeny(p.id)}
-												>
-													<X className="size-4" />
-												</Button>
+											<div className="flex items-center justify-end gap-1.5">
+												<div className="flex items-center gap-1">
+													<Button
+														size="sm"
+														disabled={pendingId === p.id}
+														onClick={() => onApprove(p.id, p.name)}
+													>
+														{m.pairing_pending_approve()}
+													</Button>
+													<HelpTip
+														label={m.pairing_pending_approve()}
+														text="Pairs this device immediately without a PIN. You can set a friendly name in the prompt first. Use when you started the connect yourself."
+													/>
+												</div>
+												<div className="flex items-center gap-1">
+													<Button
+														size="sm"
+														variant="ghost"
+														aria-label={m.pairing_pending_deny()}
+														disabled={pendingId === p.id}
+														onClick={() => onDeny(p.id)}
+													>
+														<X className="size-4" />
+													</Button>
+													<HelpTip
+														label={m.pairing_pending_deny()}
+														text="Dismisses this pairing request. Not a permanent block; the device can knock again later. Prefer Deny for unknown knocks."
+													/>
+												</div>
 											</div>
 										</TableCell>
 									</TableRow>

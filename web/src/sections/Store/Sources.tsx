@@ -17,6 +17,7 @@ import {
 	useSetSource,
 	useStoreSources,
 } from "@/api/store";
+import { HelpTip, OptionLabel } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,6 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { fmtDateTimeSecs } from "@/lib/format";
 import { m } from "@/paraglide/messages";
 
@@ -144,14 +144,19 @@ export const SourceList: FC<{
 		<Card>
 			<CardHeader className="flex-row items-center justify-between space-y-0 pb-3">
 				<div className="space-y-1">
-					<CardTitle className="text-base tracking-tight">
+					<CardTitle className="inline-flex items-center gap-1.5 text-base tracking-tight">
 						{m.store_sources_title()}
+						<HelpTip
+							label={m.store_sources_title()}
+							text="Catalogs this host fetches for Browse. The built-in unom catalog stays; every other source is one you add and vouch for."
+						/>
 					</CardTitle>
 				</div>
 				<Button
 					variant="outline"
 					size="sm"
 					disabled={isRefreshing}
+					title="Re-fetch every catalog index now. Use this after adding a source or when listings look stale."
 					onClick={onRefresh}
 				>
 					<RefreshCw
@@ -229,6 +234,7 @@ export const SourceList: FC<{
 										size="icon"
 										className="self-end sm:self-start"
 										aria-label={m.store_source_remove()}
+										title="Remove this catalog. Plugins already installed from it stay installed."
 										disabled={busyName === s.name}
 										onClick={() => onRemove(s)}
 									>
@@ -267,47 +273,63 @@ export const AddSourceForm: FC<{
 	return (
 		<Card className="max-w-xl">
 			<CardHeader className="pb-3">
-				<CardTitle className="text-base tracking-tight">
+				<CardTitle className="inline-flex items-center gap-1.5 text-base tracking-tight">
 					{m.store_add_source_title()}
+					<HelpTip
+						label={m.store_add_source_title()}
+						text="Adds a third-party catalog. Entries from it show as External. Only add a catalog whose operator you trust."
+					/>
 				</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<form onSubmit={handleSubmit} className="space-y-4">
 					<div className="space-y-2">
-						<Label htmlFor="store-source-name">
-							{m.store_field_source_name()}
-						</Label>
+						<OptionLabel
+							label={m.store_field_source_name()}
+							htmlFor="store-source-name"
+							help="Short label shown in Browse filters and on external entries. Pick something you will recognize later."
+							recommended="A short unique name"
+						/>
 						<Input
 							id="store-source-name"
 							required
 							autoComplete="off"
 							spellCheck={false}
+							title="Short unique name for this catalog source."
 							value={name}
 							onChange={(e) => setName(e.target.value)}
 						/>
 					</div>
 					<div className="space-y-2">
-						<Label htmlFor="store-source-url">
-							{m.store_field_source_url()}
-						</Label>
+						<OptionLabel
+							label={m.store_field_source_url()}
+							htmlFor="store-source-url"
+							help="HTTPS index URL for this catalog. The host fetches plugin listings from here."
+							recommended="HTTPS catalog index URL"
+						/>
 						<Input
 							id="store-source-url"
 							required
 							type="url"
 							inputMode="url"
+							title="HTTPS URL of the catalog index."
 							value={url}
 							onChange={(e) => setUrl(e.target.value)}
 						/>
 					</div>
 					<div className="space-y-2">
-						<Label htmlFor="store-source-key">
-							{m.store_field_source_key()}
-						</Label>
+						<OptionLabel
+							label={m.store_field_source_key()}
+							htmlFor="store-source-key"
+							help="An ed25519:... key. With a key set, the host only accepts a signed index from this source."
+							recommended="Set when the source publishes an ed25519 key"
+						/>
 						<Input
 							id="store-source-key"
 							autoComplete="off"
 							spellCheck={false}
 							placeholder="ed25519:..."
+							title="Optional ed25519 public key for verifying this catalog's index."
 							value={publicKey}
 							onChange={(e) => setPublicKey(e.target.value)}
 						/>
@@ -318,6 +340,7 @@ export const AddSourceForm: FC<{
 					<Button
 						type="submit"
 						disabled={isSaving || !name.trim() || !url.trim()}
+						title="Continue to the trust confirmation. Nothing is saved until you confirm with the console password."
 					>
 						{m.store_add_source()}
 					</Button>
@@ -349,6 +372,10 @@ export const TrustSourceDialog: FC<{
 						<DialogTitle className="flex items-center gap-2">
 							<AlertTriangle className="size-5 shrink-0 text-amber-600 dark:text-amber-500" />
 							{m.store_source_trust_title()}
+							<HelpTip
+								label={m.store_source_trust_title()}
+								text="Adding a catalog is a trust-root change. Every future install from it rides on this decision."
+							/>
 						</DialogTitle>
 						<DialogDescription>
 							{m.store_source_trust_body({ name: draft.name })}
@@ -369,13 +396,17 @@ export const TrustSourceDialog: FC<{
 				    console password is re-entered here and verified at the BFF, exactly as for a
 				    host update. */}
 					<div className="space-y-2">
-						<Label htmlFor="store-source-password">
-							{m.store_source_password()}
-						</Label>
+						<OptionLabel
+							label={m.store_source_password()}
+							htmlFor="store-source-password"
+							help="The console password is verified before this source is written. A browser session alone cannot add a catalog."
+							recommended="Required"
+						/>
 						<Input
 							id="store-source-password"
 							type="password"
 							autoComplete="current-password"
+							title="Enter the console password to authorize adding this catalog."
 							value={password}
 							onChange={(e) => setPassword(e.target.value)}
 						/>
@@ -387,11 +418,17 @@ export const TrustSourceDialog: FC<{
 					</div>
 
 					<DialogFooter>
-						<Button variant="outline" onClick={onCancel} disabled={isSaving}>
+						<Button
+							variant="outline"
+							onClick={onCancel}
+							disabled={isSaving}
+							title="Close without adding this catalog."
+						>
 							{m.common_cancel()}
 						</Button>
 						<Button
 							disabled={isSaving || password.length === 0}
+							title="Trust this catalog and write it to the host."
 							onClick={() => onConfirm(password)}
 						>
 							{m.store_source_trust_confirm()}

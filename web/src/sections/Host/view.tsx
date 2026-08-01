@@ -2,6 +2,7 @@ import Section from "@unom/ui/section";
 import { Cpu, Globe2, Network, Radio, Server, ShieldCheck } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import type { HostInfo } from "@/api/gen/model/hostInfo";
+import { HelpTip } from "@/components/option-help";
 import { OsIcon } from "@/components/os-icon";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
@@ -93,6 +94,10 @@ export const HostView: FC<{
 									<CardTitle className="flex items-center gap-2 tracking-tight">
 										<Server className="size-4 text-primary" aria-hidden />
 										{m.host_identity()}
+										<HelpTip
+											label={m.host_identity()}
+											text="How this host identifies itself to clients: name, OS, local address, build, and unique ID used for pairing and deep links."
+										/>
 									</CardTitle>
 								</CardHeader>
 								<CardContent className="pt-4 sm:pt-5">
@@ -126,6 +131,10 @@ export const HostView: FC<{
 										<CardTitle className="flex items-center gap-2 tracking-tight">
 											<Radio className="size-4 text-primary" aria-hidden />
 											{m.host_codecs()}
+											<HelpTip
+												label={m.host_codecs()}
+												text="Video codecs this host can advertise to clients. The session still negotiates what the GPU and client both support."
+											/>
 										</CardTitle>
 									</CardHeader>
 									<CardContent className="flex flex-wrap gap-2 pt-4 sm:pt-5">
@@ -141,6 +150,10 @@ export const HostView: FC<{
 										<CardTitle className="flex items-center gap-2 tracking-tight">
 											<Network className="size-4 text-primary" aria-hidden />
 											{m.host_ports()}
+											<HelpTip
+												label={m.host_ports()}
+												text="Ports clients use to reach this host. Keep them reachable on your LAN or through port forwards when streaming remotely."
+											/>
 										</CardTitle>
 									</CardHeader>
 									<CardContent className="pt-4 sm:pt-5">

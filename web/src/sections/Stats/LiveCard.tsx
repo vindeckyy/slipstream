@@ -5,12 +5,23 @@ import {
 	useStatsCaptureLive,
 	useStatsCaptureStatus,
 } from "@/api/gen/stats/stats";
+import { HelpTip, RecommendedMark } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Loadable } from "@/lib/query";
 import { m } from "@/paraglide/messages";
 import { HealthChart, LatencyChart, ThroughputChart } from "./charts";
-import { ChartBlock } from "./helpers";
+import {
+	ChartBlock,
+	HEALTH_CHART_HELP,
+	LATENCY_CHART_HELP,
+	THROUGHPUT_CHART_HELP,
+} from "./helpers";
+
+const LIVE_HELP =
+	"Live graphs for the armed capture. Plots a bounded recent window; the saved recording keeps the full series.";
+const LIVE_RECOMMENDED =
+	"Watch while reproducing the problem, then Stop & save for the full timeline.";
 
 /**
  * Container: the live graphs. Self-gates on the capture being armed — it shares the status query
@@ -57,9 +68,13 @@ export const LiveCard: FC<{ live: Loadable<Capture> }> = ({ live }) => {
 	return (
 		<Card>
 			<CardHeader className="space-y-1">
-				<CardTitle className="text-base tracking-tight">
-					{m.stats_live_title()}
-				</CardTitle>
+				<div className="flex items-center gap-1.5">
+					<CardTitle className="text-base tracking-tight">
+						{m.stats_live_title()}
+					</CardTitle>
+					<HelpTip label={m.stats_live_title()} text={LIVE_HELP} />
+				</div>
+				<RecommendedMark value={LIVE_RECOMMENDED} />
 			</CardHeader>
 			<CardContent className="space-y-6">
 				<QueryState isLoading={false} error={error} refetch={live.refetch}>
@@ -72,17 +87,27 @@ export const LiveCard: FC<{ live: Loadable<Capture> }> = ({ live }) => {
 							<ChartBlock
 								title={m.stats_latency_title()}
 								desc={m.stats_latency_desc()}
+								help={LATENCY_CHART_HELP}
+								recommended="Median (p50) is enough while watching live"
 							>
 								<LatencyChart samples={samples} />
 							</ChartBlock>
-							<ChartBlock title={m.stats_throughput_title()}>
+							<ChartBlock
+								title={m.stats_throughput_title()}
+								help={THROUGHPUT_CHART_HELP}
+								recommended="Watch fps dips against target Mb/s"
+							>
 								<ThroughputChart samples={samples} />
 							</ChartBlock>
 							{/* Loss/recovery was only ever visible AFTER stopping and reopening the
 							    saved recording — which is backwards: dropped frames and FEC recovery
 							    are what you watch a live capture FOR. The `kind` note keeps the
 							    GameStream caveat (only `frames` is instrumented there). */}
-							<ChartBlock title={m.stats_health_title()}>
+							<ChartBlock
+								title={m.stats_health_title()}
+								help={HEALTH_CHART_HELP}
+								recommended="Zero drops is healthy; rising FEC means lossy link"
+							>
 								<HealthChart samples={samples} kind={live.data?.meta?.kind} />
 							</ChartBlock>
 							{(live.data?.samples?.length ?? 0) > LIVE_WINDOW && (

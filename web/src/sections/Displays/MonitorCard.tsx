@@ -10,6 +10,7 @@ import {
 	useSetDisplaySettings,
 } from "@/api/gen/display/display";
 import type { ApiMonitorInfo } from "@/api/gen/model";
+import { HelpTip, RecommendedMark } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -85,6 +86,8 @@ export const MonitorCard: FC = () => {
 		hint: string,
 		tags?: ReturnType<typeof Badge>[],
 		onSelect?: () => void,
+		rowTitle?: string,
+		recommended?: boolean,
 	) => (
 		<button
 			key={key}
@@ -92,6 +95,7 @@ export const MonitorCard: FC = () => {
 			disabled={busy || locked || !onSelect}
 			onClick={onSelect}
 			aria-pressed={selected}
+			title={rowTitle}
 			className={cn(
 				"flex w-full items-start justify-between gap-4 px-3 py-3 text-left transition-colors sm:px-4",
 				selected
@@ -109,6 +113,11 @@ export const MonitorCard: FC = () => {
 			<span className="flex flex-col gap-1">
 				<span className="flex flex-wrap items-center gap-2 font-medium">
 					{title}
+					{recommended ? (
+						<span className="text-xs font-normal text-muted-foreground">
+							(recommended)
+						</span>
+					) : null}
 					{tags}
 				</span>
 				<span className="text-sm text-muted-foreground">{hint}</span>
@@ -129,6 +138,7 @@ export const MonitorCard: FC = () => {
 				</Badge>
 			) : null,
 		].filter(Boolean) as ReturnType<typeof Badge>[];
+		const canPick = mon.enabled && !mon.managed;
 		return row(
 			mon.connector,
 			pinned?.toLowerCase() === mon.connector.toLowerCase(),
@@ -137,19 +147,34 @@ export const MonitorCard: FC = () => {
 			tags,
 			// A disabled head cannot be streamed (the host refuses with that reason), so don't
 			// offer it as a choice — it is listed so "why isn't it here?" has an answer.
-			mon.enabled && !mon.managed ? () => choose(mon.connector) : undefined,
+			canPick ? () => choose(mon.connector) : undefined,
+			canPick
+				? `Stream this physical monitor (${mon.connector}). Every client sees its contents at its resolution.`
+				: mon.managed
+					? "This is a Slipstream-managed virtual display and cannot be pinned as the capture source."
+					: "This monitor is disabled on the host and cannot be streamed.",
 		);
 	};
 
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle className="tracking-tight">
-					{m.display_monitor_title()}
-				</CardTitle>
+				<div className="flex items-center gap-1.5">
+					<CardTitle
+						className="tracking-tight"
+						title="Virtual screen per client, or mirror one physical monitor."
+					>
+						{m.display_monitor_title()}
+					</CardTitle>
+					<HelpTip
+						label={m.display_monitor_title()}
+						text={m.display_monitor_intro()}
+					/>
+				</div>
 				<CardDescription className="max-w-prose leading-relaxed">
-					{m.display_monitor_intro()}
+					Host-wide choice: every concurrent session shares this capture target.
 				</CardDescription>
+				<RecommendedMark value={m.display_monitor_virtual()} />
 			</CardHeader>
 			<CardContent className="space-y-4">
 				{!pinSupported && (
@@ -175,6 +200,8 @@ export const MonitorCard: FC = () => {
 							m.display_monitor_virtual_hint(),
 							undefined,
 							() => choose(null),
+							"Recommended: create a per-client virtual screen at each client's resolution.",
+							true,
 						)}
 						{rows.map(monitorRow)}
 					</div>

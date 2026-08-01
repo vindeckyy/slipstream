@@ -6,10 +6,15 @@ import {
 	useSetRuntime,
 	useStoreRuntime,
 } from "@/api/store";
+import { HelpTip, RecommendedMark } from "@/components/option-help";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { m } from "@/paraglide/messages";
+
+const RUNNER_HELP =
+	"The service every installed plugin runs inside. Disabling it stops all plugins without uninstalling them. Store installs do nothing useful while this is off.";
+const RUNNER_RECOMMENDED = "On if you use Store installs";
 
 // The plugin/script runner is the service every plugin actually executes inside. Installing a plugin
 // while it's switched off silently gets you nothing running, so Browse carries a banner and the
@@ -48,6 +53,7 @@ export const RunnerBanner: FC = () => {
 				size="sm"
 				className="self-start sm:self-auto"
 				disabled={isPending}
+				title="Turn the plugin runner on so Store installs can start."
 				onClick={() => toggle(true)}
 			>
 				<Play className="size-4" />
@@ -80,7 +86,10 @@ export const RunnerCard: FC<{
 	<Card>
 		<CardHeader className="pb-3">
 			<CardTitle className="flex flex-col gap-2 text-base tracking-tight sm:flex-row sm:items-center sm:justify-between">
-				<span>{m.store_runner_title()}</span>
+				<span className="inline-flex items-center gap-1.5">
+					{m.store_runner_title()}
+					<HelpTip label={m.store_runner_title()} text={RUNNER_HELP} />
+				</span>
 				{!status.installed ? (
 					<Badge variant="outline">{m.store_runner_state_missing()}</Badge>
 				) : status.running ? (
@@ -98,6 +107,9 @@ export const RunnerCard: FC<{
 					? m.store_runner_help()
 					: m.store_runner_not_installed()}
 			</p>
+			{status.installed && (
+				<RecommendedMark value={RUNNER_RECOMMENDED} />
+			)}
 			<dl className="flex flex-wrap gap-x-6 gap-y-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
 				<div className="flex gap-2">
 					<dt>{m.store_runner_unit()}</dt>
@@ -118,6 +130,11 @@ export const RunnerCard: FC<{
 					size="sm"
 					variant={status.enabled ? "outline" : "default"}
 					disabled={busy}
+					title={
+						status.enabled
+							? "Turn the plugin runner off. Installed plugins stop until you enable it again."
+							: "Turn the plugin runner on so Store installs can start."
+					}
 					onClick={() => onToggle(!status.enabled)}
 				>
 					{status.enabled ? (

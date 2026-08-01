@@ -6,6 +6,7 @@ import { ApiError } from "@/api/fetcher";
 import { useGetHooks } from "@/api/gen/hooks/hooks";
 import type { HookEntry } from "@/api/gen/model/hookEntry";
 import { hookAction, hookFilterSummary, useSaveHooks } from "@/api/hooks";
+import { HelpTip, OptionLabel } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,6 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useLocale } from "@/lib/i18n";
 import { m } from "@/paraglide/messages";
 import { HookForm } from "./HookForm";
@@ -105,12 +105,19 @@ export const SectionAutomation: FC = () => {
 
 				<Card>
 					<CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
-						<CardTitle className="text-base tracking-tight">
-							{m.automation_hooks_title()}
-						</CardTitle>
+						<div className="flex min-w-0 items-center gap-1.5">
+							<CardTitle className="text-base tracking-tight">
+								{m.automation_hooks_title()}
+							</CardTitle>
+							<HelpTip
+								label={m.automation_hooks_title()}
+								text="Each hook watches one event (or domain.*) and either runs a shell command or POSTs a webhook. Changes stay local until you save with the console password. Start with session.started + Run a command."
+							/>
+						</div>
 						<Button
 							size="sm"
 							variant="outline"
+							title="Add a hook. Defaults to session.started with a local run command."
 							onClick={() =>
 								setEditing({
 									index: -1,
@@ -236,9 +243,11 @@ export const SectionAutomation: FC = () => {
 						<DialogDescription>{m.automation_confirm_body()}</DialogDescription>
 					</DialogHeader>
 					<div className="space-y-2">
-						<Label htmlFor="automation-password">
-							{m.store_spec_password()}
-						</Label>
+						<OptionLabel
+							label={m.store_spec_password()}
+							htmlFor="automation-password"
+							help="The console password. Saving installs commands the host will run on its own, so confirmation matches an update or unreviewed install."
+						/>
 						<Input
 							id="automation-password"
 							type="password"

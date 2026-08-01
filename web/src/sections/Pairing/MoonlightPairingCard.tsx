@@ -8,6 +8,11 @@ import {
 	useGetPairingStatus,
 	useSubmitPairingPin,
 } from "@/api/gen/pairing/pairing";
+import {
+	HelpTip,
+	OptionLabel,
+	RecommendedMark,
+} from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +22,6 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import type { Loadable } from "@/lib/query";
 import { m } from "@/paraglide/messages";
 
@@ -102,14 +106,23 @@ export const MoonlightPairing: FC<{
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2 tracking-tight">
 						<KeyRound className="size-4 text-muted-foreground" />
-						{m.pairing_moonlight_title()}
+						<span className="flex min-w-0 items-center gap-1.5">
+							{m.pairing_moonlight_title()}
+							<HelpTip
+								label={m.pairing_moonlight_title()}
+								text="GameStream pairing runs the other way from native: Moonlight shows a PIN, and you type it here. This card only appears when the host runs with GameStream enabled. Arming is not used for Moonlight."
+							/>
+						</span>
 					</CardTitle>
 				</CardHeader>
 				<CardContent>
 					{!pending ? (
-						<p className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-							{m.pairing_idle()}
-						</p>
+						<div className="space-y-3">
+							<p className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+								{m.pairing_idle()}
+							</p>
+							<RecommendedMark value="On the Moonlight client, choose Pair. When a PIN appears there, this form unlocks so you can submit it." />
+						</div>
 					) : (
 						<form
 							onSubmit={(e) => {
@@ -118,9 +131,23 @@ export const MoonlightPairing: FC<{
 							}}
 							className="space-y-4"
 						>
-							<p className="text-sm font-medium">{m.pairing_waiting()}</p>
+							<div className="space-y-1">
+								<div className="flex items-center gap-1.5">
+									<p className="text-sm font-medium">{m.pairing_waiting()}</p>
+									<HelpTip
+										label={m.pairing_waiting()}
+										text="A Moonlight client is mid-handshake and waiting for you to confirm the PIN it displays. If the client gives up, this form returns to idle."
+									/>
+								</div>
+								<RecommendedMark value="Type the PIN from Moonlight now, then Submit PIN before the client times out." />
+							</div>
 							<div className="space-y-2">
-								<Label htmlFor="pin">{m.pairing_pin_label()}</Label>
+								<OptionLabel
+									label={m.pairing_pin_label()}
+									htmlFor="pin"
+									help="Digits only, usually 4. Copy them from the Moonlight pairing dialog on the client (not from this host)."
+									recommended="Enter the PIN exactly as Moonlight shows it."
+								/>
 								<Input
 									id="pin"
 									inputMode="numeric"
@@ -134,9 +161,15 @@ export const MoonlightPairing: FC<{
 									className="font-mono text-lg tracking-widest"
 								/>
 							</div>
-							<Button type="submit" disabled={pin.length < 4 || isSubmitting}>
-								{m.pairing_submit()}
-							</Button>
+							<div className="flex items-center gap-1.5">
+								<Button type="submit" disabled={pin.length < 4 || isSubmitting}>
+									{m.pairing_submit()}
+								</Button>
+								<HelpTip
+									label={m.pairing_submit()}
+									text="Delivers the PIN to the waiting handshake. A success note means it was sent, not that pairing finished. If the PIN matches, the client completes pairing and appears under Paired devices."
+								/>
+							</div>
 							{/* A 204 means the PIN was DELIVERED to the waiting handshake, not that pairing
 							    succeeded — the ceremony verifies it out-of-band. So report "sent", not
 							    "paired", and let the operator confirm via the Paired devices list. */}

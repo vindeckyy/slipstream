@@ -2,6 +2,7 @@ import { ease } from "@unom/style";
 import { motion } from "motion/react";
 import { type FC, useState } from "react";
 import Logo from "@/components/logo";
+import { OptionLabel } from "@/components/option-help";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -11,7 +12,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages";
 
@@ -26,120 +27,124 @@ export const LoginView: FC<{
 	const canSubmit = password.length > 0 && !busy;
 
 	return (
-		<div className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden bg-background px-4 py-10 sm:px-6 sm:py-16">
-			{/* Quiet ambient depth: cool slate with a soft brand wash. */}
-			<div
-				aria-hidden
-				className="pointer-events-none absolute inset-0"
-				style={{
-					background: `
+		<TooltipProvider>
+			<div className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden bg-background px-4 py-10 sm:px-6 sm:py-16">
+				{/* Quiet ambient depth: cool slate with a soft brand wash. */}
+				<div
+					aria-hidden
+					className="pointer-events-none absolute inset-0"
+					style={{
+						background: `
 						radial-gradient(ellipse 80% 50% at 50% -20%, color-mix(in oklab, var(--ss-brand) 18%, transparent), transparent 70%),
 						radial-gradient(ellipse 60% 40% at 50% 120%, color-mix(in oklab, var(--ss-brand-light) 8%, transparent), transparent 65%)
 					`,
-				}}
-			/>
-			<div
-				aria-hidden
-				className="pointer-events-none absolute inset-0 opacity-[0.35]"
-				style={{
-					backgroundImage:
-						"radial-gradient(color-mix(in oklab, var(--foreground) 6%, transparent) 1px, transparent 1px)",
-					backgroundSize: "24px 24px",
-					maskImage:
-						"radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 75%)",
-				}}
-			/>
+					}}
+				/>
+				<div
+					aria-hidden
+					className="pointer-events-none absolute inset-0 opacity-[0.35]"
+					style={{
+						backgroundImage:
+							"radial-gradient(color-mix(in oklab, var(--foreground) 6%, transparent) 1px, transparent 1px)",
+						backgroundSize: "24px 24px",
+						maskImage:
+							"radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 75%)",
+					}}
+				/>
 
-			<motion.div
-				initial="from"
-				animate="enter"
-				transition={ease.quint(0.7).out}
-				variants={{
-					enter: { opacity: 1, y: 0 },
-					from: { opacity: 0, y: 10 },
-				}}
-				className="relative z-10 flex w-full max-w-[22.5rem] flex-col items-center"
-			>
-				<div className="mb-8 w-[9.5rem] sm:mb-10 sm:w-[10.5rem]">
-					<Logo />
-				</div>
-
-				<Card
-					className={cn(
-						"w-full shadow-[0_18px_48px_-24px_rgba(0,0,0,0.65)]",
-						error ? "ring-destructive/50" : "ring-accent/30",
-					)}
+				<motion.div
+					initial="from"
+					animate="enter"
+					transition={ease.quint(0.7).out}
+					variants={{
+						enter: { opacity: 1, y: 0 },
+						from: { opacity: 0, y: 10 },
+					}}
+					className="relative z-10 flex w-full max-w-[22.5rem] flex-col items-center"
 				>
-					<CardHeader className="space-y-2 pb-4 sm:pb-5">
-						<CardTitle className="text-2xl tracking-tight">
-							{m.login_title()}
-						</CardTitle>
-						<CardDescription className="text-sm leading-relaxed text-muted-foreground">
-							{m.login_subtitle()}{" "}
-							<a
-								href="https://docs.slipstream.unom.io/docs/forgot-password"
-								target="_blank"
-								rel="noreferrer"
-								className="font-medium text-foreground/90 underline decoration-foreground/25 underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
-							>
-								{m.login_docs_link()}
-							</a>
-						</CardDescription>
-					</CardHeader>
+					<div className="mb-8 w-[9.5rem] sm:mb-10 sm:w-[10.5rem]">
+						<Logo />
+					</div>
 
-					<CardContent>
-						<form
-							onSubmit={(e) => {
-								e.preventDefault();
-								onSubmit(password);
-							}}
-							className="flex flex-col gap-5"
-							aria-busy={busy || undefined}
-						>
-							<div className="flex flex-col gap-2">
-								<Label htmlFor="pw" className="text-sm font-medium">
-									{m.login_password()}
-								</Label>
-								<Input
-									id="pw"
-									name="password"
-									type="password"
-									autoFocus
-									autoComplete="current-password"
-									value={password}
-									disabled={busy}
-									aria-invalid={error || undefined}
-									aria-describedby={error ? ERROR_ID : undefined}
-									onChange={(e) => setPassword(e.target.value)}
-									className={
-										error
-											? "border-destructive/70 focus-visible:ring-destructive/40"
-											: undefined
-									}
-								/>
-								{error && (
-									<p
-										id={ERROR_ID}
-										role="alert"
-										className="text-sm font-medium text-destructive"
-									>
-										{m.login_error()}
-									</p>
-								)}
-							</div>
+					<Card
+						className={cn(
+							"w-full shadow-[0_18px_48px_-24px_rgba(0,0,0,0.65)]",
+							error ? "ring-destructive/50" : "ring-accent/30",
+						)}
+					>
+						<CardHeader className="space-y-2 pb-4 sm:pb-5">
+							<CardTitle className="text-2xl tracking-tight">
+								{m.login_title()}
+							</CardTitle>
+							<CardDescription className="text-sm leading-relaxed text-muted-foreground">
+								{m.login_subtitle()}{" "}
+								<a
+									href="https://docs.slipstream.unom.io/docs/forgot-password"
+									target="_blank"
+									rel="noreferrer"
+									className="font-medium text-foreground/90 underline decoration-foreground/25 underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+								>
+									{m.login_docs_link()}
+								</a>
+							</CardDescription>
+						</CardHeader>
 
-							<Button
-								type="submit"
-								className="mt-1 w-full"
-								disabled={!canSubmit}
+						<CardContent>
+							<form
+								onSubmit={(e) => {
+									e.preventDefault();
+									onSubmit(password);
+								}}
+								className="flex flex-col gap-5"
 								aria-busy={busy || undefined}
 							>
-								{busy ? m.login_signing_in() : m.login_submit()}
-							</Button>
-						</form>
-					</CardContent>
-				</Card>
-			</motion.div>
-		</div>
+								<div className="flex flex-col gap-2">
+									<OptionLabel
+										htmlFor="pw"
+										label={m.login_password()}
+										help="The management password created during first-time setup. Signs you into this console only."
+									/>
+									<Input
+										id="pw"
+										name="password"
+										type="password"
+										autoFocus
+										autoComplete="current-password"
+										value={password}
+										disabled={busy}
+										aria-invalid={error || undefined}
+										aria-describedby={error ? ERROR_ID : undefined}
+										onChange={(e) => setPassword(e.target.value)}
+										className={
+											error
+												? "border-destructive/70 focus-visible:ring-destructive/40"
+												: undefined
+										}
+									/>
+									{error && (
+										<p
+											id={ERROR_ID}
+											role="alert"
+											className="text-sm font-medium text-destructive"
+										>
+											{m.login_error()}
+										</p>
+									)}
+								</div>
+
+								<Button
+									type="submit"
+									className="mt-1 w-full"
+									disabled={!canSubmit}
+									aria-busy={busy || undefined}
+								>
+									{busy ? m.login_signing_in() : m.login_submit()}
+								</Button>
+							</form>
+						</CardContent>
+					</Card>
+				</motion.div>
+			</div>
+		</TooltipProvider>
 	);
 };

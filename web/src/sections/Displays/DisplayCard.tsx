@@ -46,6 +46,7 @@ import type {
 	Preset,
 	Topology,
 } from "@/api/gen/model";
+import { HelpTip, RecommendedMark } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -444,13 +445,28 @@ const DisplayForm: FC<{
 		<div className="space-y-5">
 			{/* One-click presets stay in a compact grid so each has room to breathe. */}
 			<div className="space-y-4 rounded-xl border border-border/70 bg-muted/10 p-4 sm:p-5">
-				<div className="flex items-center gap-2">
-					<span className="flex size-7 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary">
+				<div className="flex items-start gap-2">
+					<span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary">
 						<SlidersHorizontal className="size-3.5" aria-hidden />
 					</span>
-					<Label className="block text-base font-semibold">
-						{m.display_preset()}
-					</Label>
+					<div className="min-w-0 space-y-1">
+						<div className="flex items-center gap-1.5">
+							<Label
+								className="block text-base font-semibold"
+								title="One-click display policy for the next client connect."
+							>
+								{m.display_preset()}
+							</Label>
+							<HelpTip
+								label={m.display_preset()}
+								text="Applies on the next connect. A live session keeps the display it opened on. Default is the safe baseline for most setups; pick Custom only when you need to tune each axis."
+							/>
+						</div>
+						<p className="text-xs leading-relaxed text-muted-foreground">
+							One-click policy for the next client connect.
+						</p>
+						<RecommendedMark value={m.display_preset_default()} />
+					</div>
 				</div>
 				<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
 					{PRESET_ORDER.map((id) => {
@@ -464,6 +480,7 @@ const DisplayForm: FC<{
 							preset === id && !(id === "custom" && anyCustomSelected);
 						const soon = DISABLED_PRESETS.has(id);
 						const disabled = busy || soon;
+						const isRecommended = id === "default";
 						const pick = () => {
 							if (!disabled) pickPreset(id);
 						};
@@ -475,6 +492,11 @@ const DisplayForm: FC<{
 								tabIndex={disabled ? -1 : 0}
 								aria-pressed={selected}
 								aria-disabled={disabled || undefined}
+								title={
+									isRecommended
+										? `Recommended: ${(PRESET_LABEL[id] ?? (() => id))()}`
+										: summary
+								}
 								onClick={pick}
 								onKeyDown={(e) => {
 									if (e.key === "Enter" || e.key === " ") {
@@ -493,6 +515,11 @@ const DisplayForm: FC<{
 								<div className="flex items-center justify-between gap-2">
 									<span className="text-base font-semibold">
 										{(PRESET_LABEL[id] ?? (() => id))()}
+										{isRecommended && (
+											<span className="ml-2 text-xs font-normal text-muted-foreground">
+												(recommended)
+											</span>
+										)}
 										{soon && (
 											<span className="ml-2 text-xs font-normal text-muted-foreground">
 												{m.display_preset_soon()}
@@ -535,19 +562,34 @@ const DisplayForm: FC<{
 			{/* Custom presets — the operator's saved field-bundles, rendered like the built-ins but
 			    editable/deletable, plus a "Save as preset" that captures the current effective behavior. */}
 			<div className="space-y-4 rounded-xl border border-border/70 bg-muted/10 p-4 sm:p-5">
-				<div className="flex flex-wrap items-center justify-between gap-2">
-					<div className="flex items-center gap-2">
-						<span className="flex size-7 items-center justify-center rounded-md border border-border/70 bg-muted/40 text-muted-foreground">
+				<div className="flex flex-wrap items-start justify-between gap-2">
+					<div className="flex items-start gap-2">
+						<span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-border/70 bg-muted/40 text-muted-foreground">
 							<Radio className="size-3.5" aria-hidden />
 						</span>
-						<Label className="text-base font-semibold">
-							{m.display_preset_custom_label()}
-						</Label>
+						<div className="min-w-0 space-y-1">
+							<div className="flex items-center gap-1.5">
+								<Label
+									className="text-base font-semibold"
+									title="Your saved display policies, applied as Custom."
+								>
+									{m.display_preset_custom_label()}
+								</Label>
+								<HelpTip
+									label={m.display_preset_custom_label()}
+									text="Save the current in-force behavior (built-in or hand-edited) as a named preset, then click a card to apply it. Rename, update, or delete from the icons on each card."
+								/>
+							</div>
+							<p className="text-xs leading-relaxed text-muted-foreground">
+								Save and reuse your own field bundles.
+							</p>
+						</div>
 					</div>
 					<Button
 						size="sm"
 						variant="outline"
 						disabled={busy || presetBusy}
+						title="Capture the current effective display behavior as a named preset."
 						onClick={saveAsPreset}
 					>
 						<Plus className="mr-1 size-4" />
@@ -585,20 +627,39 @@ const DisplayForm: FC<{
 					)}
 				>
 					<div className="flex flex-wrap items-center justify-between gap-2">
-						<div className="flex items-center gap-2">
-							<span className="flex size-7 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary">
+						<div className="flex min-w-0 items-start gap-2">
+							<span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary">
 								<LayoutDashboard className="size-3.5" aria-hidden />
 							</span>
-							<h3 className="text-base font-semibold">
-								{m.display_custom_title()}
-							</h3>
+							<div className="min-w-0 space-y-1">
+								<div className="flex items-center gap-1.5">
+									<h3
+										className="text-base font-semibold"
+										title="Hand-tune every display axis. Changes apply only after Save."
+									>
+										{m.display_custom_title()}
+									</h3>
+									<HelpTip
+										label={m.display_custom_title()}
+										text="Unlike presets and the game-session / experimental toggles, these fields do not auto-apply. Edit, then Save. Discard restores the last stored Custom policy."
+									/>
+								</div>
+								<p className="text-xs leading-relaxed text-muted-foreground">
+									Defaults match the Default preset until you change them.
+								</p>
+								<RecommendedMark
+									value={`${m.display_keep_alive_keep()} 10s, ${m.display_topology_auto()}, ${m.display_conflict_separate()}, ${m.display_identity_per_client()}`}
+								/>
+							</div>
 						</div>
 						{dirty && <Badge variant="warning">{m.display_unsaved()}</Badge>}
 					</div>
 
 					<Field
 						label={m.display_keep_alive()}
+						hint="How long the virtual display survives after disconnect."
 						help={m.display_keep_alive_help()}
+						recommended={`${m.display_keep_alive_keep()} 10 ${m.display_keep_alive_seconds()}`}
 						group
 					>
 						<div className="flex flex-wrap items-center gap-2">
@@ -607,6 +668,7 @@ const DisplayForm: FC<{
 								variant={ka.mode === "off" ? "default" : "outline"}
 								aria-pressed={ka.mode === "off"}
 								disabled={busy}
+								title="Tear the display down as soon as the client disconnects."
 								onClick={() =>
 									setDraft({ ...draft, keep_alive: { mode: "off" } })
 								}
@@ -618,6 +680,7 @@ const DisplayForm: FC<{
 								variant={ka.mode === "duration" ? "default" : "outline"}
 								aria-pressed={ka.mode === "duration"}
 								disabled={busy}
+								title="Recommended: keep the display for a short reconnect window (Default preset uses 10 seconds)."
 								onClick={() =>
 									setDraft({
 										...draft,
@@ -626,12 +689,14 @@ const DisplayForm: FC<{
 								}
 							>
 								{m.display_keep_alive_keep()}
+								<span className="ml-1 text-xs opacity-80">(recommended)</span>
 							</Button>
 							<Button
 								size="sm"
 								variant={ka.mode === "forever" ? "default" : "outline"}
 								aria-pressed={ka.mode === "forever"}
 								disabled={busy}
+								title="Pin the display until you Release it from Live displays (headless / gaming-rig style)."
 								onClick={() =>
 									setDraft({ ...draft, keep_alive: { mode: "forever" } })
 								}
@@ -643,6 +708,7 @@ const DisplayForm: FC<{
 									<Input
 										id="display-keep-alive-seconds"
 										aria-label={m.display_keep_alive_seconds()}
+										title="Linger window in seconds. Default preset uses 10."
 										type="number"
 										min={0}
 										className="w-24"
@@ -668,19 +734,27 @@ const DisplayForm: FC<{
 					<div className="grid gap-5 lg:grid-cols-2">
 						<Choice
 							label={m.display_topology()}
+							hint="How the streamed display fits the host desktop."
 							help={m.display_topology_help()}
+							recommended={m.display_topology_auto()}
+							recommendedValue="auto"
 							value={customFields.topology}
 							options={["auto", "extend", "primary", "exclusive"]}
 							labels={TOPOLOGY_LABEL}
+							optionTitles={TOPOLOGY_TITLE}
 							disabled={busy}
 							onPick={(v) => setDraft({ ...draft, topology: v as Topology })}
 						/>
 						<Choice
 							label={m.display_conflict()}
+							hint="When a second client asks for a different resolution."
 							help={m.display_conflict_help()}
+							recommended={m.display_conflict_separate()}
+							recommendedValue="separate"
 							value={customFields.mode_conflict}
 							options={["separate", "steal", "join", "reject"]}
 							labels={CONFLICT_LABEL}
+							optionTitles={CONFLICT_TITLE}
 							disabled={busy}
 							onPick={(v) =>
 								setDraft({ ...draft, mode_conflict: v as ModeConflict })
@@ -688,19 +762,27 @@ const DisplayForm: FC<{
 						/>
 						<Choice
 							label={m.display_identity()}
+							hint="Whether each client keeps its own monitor settings."
 							help={m.display_identity_help()}
+							recommended={m.display_identity_per_client()}
+							recommendedValue="per-client"
 							value={customFields.identity}
 							options={["shared", "per-client", "per-client-mode"]}
 							labels={IDENTITY_LABEL}
+							optionTitles={IDENTITY_TITLE}
 							disabled={busy}
 							onPick={(v) => setDraft({ ...draft, identity: v as Identity })}
 						/>
 						<Choice
 							label={m.display_layout_mode()}
+							hint="How multiple streamed displays are arranged."
 							help={m.display_layout_help()}
+							recommended={m.display_layout_auto_row()}
+							recommendedValue="auto-row"
 							value={customFields.layout.mode ?? "auto-row"}
 							options={["auto-row", "manual"]}
 							labels={LAYOUT_LABEL}
+							optionTitles={LAYOUT_TITLE}
 							disabled={busy}
 							onPick={(v) =>
 								setDraft({
@@ -713,13 +795,20 @@ const DisplayForm: FC<{
 							}
 						/>
 
-						<Field label={m.display_max()} htmlFor="display-max">
+						<Field
+							label={m.display_max()}
+							hint="Cap on concurrent virtual displays."
+							help="Limits how many virtual displays this host will create at once. Default preset uses 4. Range is 1 to 16."
+							recommended="4"
+							htmlFor="display-max"
+						>
 							<Input
 								id="display-max"
 								type="number"
 								min={1}
 								max={16}
 								className="w-24"
+								title="Maximum concurrent virtual displays (1-16). Recommended: 4."
 								value={draft.max_displays ?? 4}
 								disabled={busy}
 								onChange={(e) =>
@@ -754,11 +843,20 @@ const DisplayForm: FC<{
 							{dirty ? m.display_unsaved_hint() : m.display_all_saved()}
 						</span>
 						{dirty && (
-							<Button variant="ghost" onClick={revert} disabled={busy}>
+							<Button
+								variant="ghost"
+								onClick={revert}
+								disabled={busy}
+								title="Throw away unsaved Custom edits and restore the last stored policy."
+							>
 								{m.display_revert()}
 							</Button>
 						)}
-						<Button onClick={saveDraft} disabled={busy || !dirty}>
+						<Button
+							onClick={saveDraft}
+							disabled={busy || !dirty}
+							title="Apply the Custom block. Takes effect on the next connect."
+						>
 							{m.display_save()}
 						</Button>
 					</div>
@@ -771,10 +869,14 @@ const DisplayForm: FC<{
 				<div className="rounded-lg border border-border/70 bg-muted/10 p-4">
 					<Choice
 						label={m.display_game_session()}
+						hint="How library game launches are served."
 						help={m.display_game_session_help()}
+						recommended={m.display_game_session_auto()}
+						recommendedValue="auto"
 						value={draft.game_session ?? "auto"}
 						options={["auto", "dedicated"]}
 						labels={GAME_SESSION_LABEL}
+						optionTitles={GAME_SESSION_TITLE}
 						disabled={busy}
 						onPick={(v) => applyAxis({ game_session: v as GameSession })}
 					/>
@@ -784,7 +886,10 @@ const DisplayForm: FC<{
 				    immediately). Windows-only in effect, acted on at the Exclusive isolate. */}
 				<ExperimentalToggle
 					label={m.display_ddc()}
+					hint="Windows Exclusive only. Leave off unless monitors stutter while dark."
 					help={m.display_ddc_help()}
+					recommended={m.display_ddc_disabled()}
+					recommendedValue={false}
 					value={draft.ddc_power_off ?? false}
 					offLabel={m.display_ddc_disabled()}
 					onLabel={m.display_ddc_enabled()}
@@ -793,7 +898,10 @@ const DisplayForm: FC<{
 				/>
 				<ExperimentalToggle
 					label={m.display_pnp()}
+					hint="Windows Exclusive only. Leave off unless a standby TV wakes the link."
 					help={m.display_pnp_help()}
+					recommended={m.display_pnp_disabled()}
+					recommendedValue={false}
 					value={draft.pnp_disable_monitors ?? false}
 					offLabel={m.display_pnp_disabled()}
 					onLabel={m.display_pnp_enabled()}
@@ -846,45 +954,62 @@ const DisplayForm: FC<{
 	);
 };
 
-/** A labeled config field — label, then the control, then optional help. The single source of the
- * label→control→help spacing so every field (keep-alive, the button groups, max-displays) lines up. */
+/** A labeled config field — label + HelpTip, optional short hint, RecommendedMark, then control. */
 const Field: FC<{
 	label: string;
 	help?: string;
+	hint?: string;
+	recommended?: ReactNode;
 	children: ReactNode;
 	/** The id of the single control this labels, when there is one — see below. */
 	htmlFor?: string;
 	/** Set when the field wraps a GROUP of controls rather than one input. */
 	group?: boolean;
-}> = ({ label, help, children, htmlFor, group }) => {
-	const helpId = help && htmlFor ? `${htmlFor}-help` : undefined;
-	const helpText = help && (
-		<p id={helpId} className="max-w-prose text-xs text-muted-foreground">
-			{help}
-		</p>
+}> = ({ label, help, hint, recommended, children, htmlFor, group }) => {
+	const header = (
+		<div className="min-w-0 space-y-1">
+			<div className="flex items-center gap-1.5">
+				{group ? (
+					<span
+						className="text-sm font-medium leading-snug text-foreground"
+						title={hint ?? help}
+					>
+						{label}
+					</span>
+				) : (
+					<Label
+						className="text-sm font-medium leading-snug text-foreground"
+						htmlFor={htmlFor}
+						title={hint ?? help}
+					>
+						{label}
+					</Label>
+				)}
+				{help ? <HelpTip label={label} text={help} /> : null}
+			</div>
+			{hint ? (
+				<p className="max-w-prose text-xs leading-relaxed text-muted-foreground">
+					{hint}
+				</p>
+			) : null}
+			{recommended ? <RecommendedMark value={recommended} /> : null}
+		</div>
 	);
 	// A set of related buttons IS a fieldset, so say so with the element rather than an ARIA role.
 	// (The single-control case keeps a plain <label for>, which is the right pairing there.)
 	if (group) {
 		return (
 			<fieldset className="space-y-3">
-				<legend className="mb-3 block text-sm font-medium leading-none">
-					{label}
-				</legend>
+				<legend className="sr-only">{label}</legend>
+				{header}
 				{children}
-				{helpText}
 			</fieldset>
 		);
 	}
-	// A bare <Label> with no `htmlFor` next to an <input> with no `id` labels nothing at all: a
-	// screen reader announced these as unnamed spin buttons.
 	return (
 		<div className="space-y-3">
-			<Label className="block" htmlFor={htmlFor}>
-				{label}
-			</Label>
+			{header}
 			{children}
-			{helpText}
 		</div>
 	);
 };
@@ -896,21 +1021,53 @@ const Field: FC<{
 const ExperimentalToggle: FC<{
 	label: string;
 	help: string;
+	hint?: string;
+	recommended?: ReactNode;
+	recommendedValue?: boolean;
 	value: boolean;
 	offLabel: string;
 	onLabel: string;
 	busy: boolean;
 	onSet: (v: boolean) => void;
-}> = ({ label, help, value, offLabel, onLabel, busy, onSet }) => (
+}> = ({
+	label,
+	help,
+	hint,
+	recommended,
+	recommendedValue = false,
+	value,
+	offLabel,
+	onLabel,
+	busy,
+	onSet,
+}) => (
 	<div className="rounded-lg border border-border/70 bg-muted/10 p-4">
 		{/* A labelled group: the pair of buttons is one control, and the label belongs to both. */}
 		<fieldset className="space-y-3">
-			<legend className="mb-3 flex items-center gap-2 text-sm font-medium leading-none">
-				{label}
-				<Badge variant="outline" className="text-amber-600 dark:text-amber-500">
-					{m.display_experimental()}
-				</Badge>
-			</legend>
+			<legend className="sr-only">{label}</legend>
+			<div className="min-w-0 space-y-1">
+				<div className="mb-3 flex flex-wrap items-center gap-2">
+					<span
+						className="text-sm font-medium leading-none"
+						title={hint ?? help}
+					>
+						{label}
+					</span>
+					<Badge
+						variant="outline"
+						className="text-amber-600 dark:text-amber-500"
+					>
+						{m.display_experimental()}
+					</Badge>
+					<HelpTip label={label} text={help} />
+				</div>
+				{hint ? (
+					<p className="max-w-prose text-xs leading-relaxed text-muted-foreground">
+						{hint}
+					</p>
+				) : null}
+				{recommended ? <RecommendedMark value={recommended} /> : null}
+			</div>
 			<div className="flex flex-wrap gap-2">
 				{([false, true] as const).map((on) => (
 					<Button
@@ -919,13 +1076,22 @@ const ExperimentalToggle: FC<{
 						variant={value === on ? "default" : "outline"}
 						aria-pressed={value === on}
 						disabled={busy}
+						title={
+							recommendedValue === on
+								? `Recommended: ${on ? onLabel : offLabel}`
+								: on
+									? "Enable this experimental Windows Exclusive behavior."
+									: "Leave this experimental axis off (typical setups)."
+						}
 						onClick={() => onSet(on)}
 					>
 						{on ? onLabel : offLabel}
+						{recommendedValue === on ? (
+							<span className="ml-1 text-xs opacity-80">(recommended)</span>
+						) : null}
 					</Button>
 				))}
 			</div>
-			<p className="max-w-prose text-xs text-muted-foreground">{help}</p>
 		</fieldset>
 	</div>
 );
@@ -934,29 +1100,62 @@ const ExperimentalToggle: FC<{
 const Choice: FC<{
 	label: string;
 	help?: string;
+	hint?: string;
+	recommended?: ReactNode;
+	recommendedValue?: string;
 	value: string;
 	options: readonly string[];
 	labels: Record<string, () => string>;
+	optionTitles?: Record<string, string>;
 	disabled: boolean;
 	onPick: (v: string) => void;
-}> = ({ label, help, value, options, labels, disabled, onPick }) => (
-	<Field label={label} help={help} group>
+}> = ({
+	label,
+	help,
+	hint,
+	recommended,
+	recommendedValue,
+	value,
+	options,
+	labels,
+	optionTitles,
+	disabled,
+	onPick,
+}) => (
+	<Field
+		label={label}
+		help={help}
+		hint={hint}
+		recommended={recommended}
+		group
+	>
 		<div className="flex flex-wrap gap-2">
-			{options.map((o) => (
-				<Button
-					key={o}
-					size="sm"
-					variant={value === o ? "default" : "outline"}
-					// Which option is active was signalled by fill colour alone — invisible to a screen
-					// reader, and to anyone who can't separate the two variants. `aria-pressed` states it.
-					// (The sibling Choice in SessionGameCard already did this; these did not.)
-					aria-pressed={value === o}
-					disabled={disabled}
-					onClick={() => onPick(o)}
-				>
-					{(labels[o] ?? (() => o))()}
-				</Button>
-			))}
+			{options.map((o) => {
+				const text = (labels[o] ?? (() => o))();
+				const isRec = recommendedValue === o;
+				return (
+					<Button
+						key={o}
+						size="sm"
+						variant={value === o ? "default" : "outline"}
+						// Which option is active was signalled by fill colour alone — invisible to a screen
+						// reader, and to anyone who can't separate the two variants. `aria-pressed` states it.
+						// (The sibling Choice in SessionGameCard already did this; these did not.)
+						aria-pressed={value === o}
+						disabled={disabled}
+						title={
+							optionTitles?.[o] ??
+							(isRec ? `Recommended: ${text}` : undefined)
+						}
+						onClick={() => onPick(o)}
+					>
+						{text}
+						{isRec ? (
+							<span className="ml-1 text-xs opacity-80">(recommended)</span>
+						) : null}
+					</Button>
+				);
+			})}
 		</div>
 	</Field>
 );
@@ -1108,6 +1307,7 @@ const LiveDisplays: FC = () => {
 							size="sm"
 							variant="outline"
 							disabled={release.isPending}
+							title="Tear down every lingering or pinned virtual display that is not actively streaming."
 							onClick={() => doRelease()}
 						>
 							{m.display_release_all()}
@@ -1212,13 +1412,25 @@ const DisplayArrangement: FC<{ displays: ApiDisplayInfo[] }> = ({
 
 	return (
 		<div className="space-y-4 border-t border-border/60 pt-5">
-			<h4 className="flex items-center gap-2 text-sm font-medium tracking-tight">
-				<LayoutDashboard className="size-4 text-primary" aria-hidden />
-				{m.display_arrange()}
-			</h4>
-			<p className="text-xs leading-relaxed text-muted-foreground">
-				{m.display_arrange_help()}
-			</p>
+			<div className="min-w-0 space-y-1">
+				<div className="flex items-center gap-1.5">
+					<h4
+						className="flex items-center gap-2 text-sm font-medium tracking-tight"
+						title="Pixel offsets for each identity-stable streamed display."
+					>
+						<LayoutDashboard className="size-4 text-primary" aria-hidden />
+						{m.display_arrange()}
+					</h4>
+					<HelpTip
+						label={m.display_arrange()}
+						text={m.display_arrange_help()}
+					/>
+				</div>
+				<p className="text-xs leading-relaxed text-muted-foreground">
+					Shown when two or more identity-stable displays are live.
+				</p>
+				<RecommendedMark value={m.display_layout_auto_row()} />
+			</div>
 			<div className="overflow-hidden rounded-lg border border-border/70 bg-muted/15">
 				{arrangeable.map((d) => {
 					const slot = d.identity_slot as number;
@@ -1241,6 +1453,7 @@ const DisplayArrangement: FC<{ displays: ApiDisplayInfo[] }> = ({
 								id={`disp-x-${slot}`}
 								type="number"
 								className="w-24"
+								title="Horizontal desktop offset in pixels (top-left origin)."
 								value={p.x}
 								disabled={saveLayout.isPending}
 								onChange={(e) =>
@@ -1254,6 +1467,7 @@ const DisplayArrangement: FC<{ displays: ApiDisplayInfo[] }> = ({
 								id={`disp-y-${slot}`}
 								type="number"
 								className="w-24"
+								title="Vertical desktop offset in pixels (top-left origin)."
 								value={p.y}
 								disabled={saveLayout.isPending}
 								onChange={(e) =>
@@ -1269,7 +1483,12 @@ const DisplayArrangement: FC<{ displays: ApiDisplayInfo[] }> = ({
 					{apiErrorMessage(saveLayout.error)}
 				</p>
 			)}
-			<Button size="sm" onClick={onSave} disabled={saveLayout.isPending}>
+			<Button
+				size="sm"
+				onClick={onSave}
+				disabled={saveLayout.isPending}
+				title="Write these positions and switch the host layout to Manual from the next connect."
+			>
 				{m.display_arrange_save()}
 			</Button>
 		</div>
@@ -1329,6 +1548,7 @@ const DisplayRow: FC<{
 					variant="outline"
 					disabled={busy}
 					onClick={onRelease}
+					title="Tear this lingering or pinned display down now."
 					className="shrink-0 self-start sm:self-center"
 				>
 					{m.display_release_btn()}
@@ -1359,11 +1579,26 @@ const TOPOLOGY_LABEL: Record<string, () => string> = {
 	exclusive: m.display_topology_exclusive,
 };
 
+const TOPOLOGY_TITLE: Record<string, string> = {
+	auto: "Recommended: let the host pick Exclusive or Extend for this machine.",
+	extend: "Add the virtual display; leave physical monitors alone.",
+	primary: "Make the streamed display the OS primary; keep physical monitors on.",
+	exclusive:
+		"Streamed display is the only output; physical monitors are disabled while streaming.",
+};
+
 const CONFLICT_LABEL: Record<string, () => string> = {
 	separate: m.display_conflict_separate,
 	steal: m.display_conflict_steal,
 	join: m.display_conflict_join,
 	reject: m.display_conflict_reject,
+};
+
+const CONFLICT_TITLE: Record<string, string> = {
+	separate: "Recommended: give the new client its own virtual display.",
+	steal: "Stop the live session and reconfigure for the new client.",
+	join: "Admit the new client at the live display's mode.",
+	reject: "Refuse the new client with a busy error.",
 };
 
 const IDENTITY_LABEL: Record<string, () => string> = {
@@ -1372,14 +1607,33 @@ const IDENTITY_LABEL: Record<string, () => string> = {
 	"per-client-mode": m.display_identity_per_client_mode,
 };
 
+const IDENTITY_TITLE: Record<string, string> = {
+	shared: "One display identity for every client.",
+	"per-client":
+		"Recommended: each paired client keeps its own scaling and mode memory.",
+	"per-client-mode":
+		"Separate identity per client and resolution (uses more identity slots).",
+};
+
 const LAYOUT_LABEL: Record<string, () => string> = {
 	"auto-row": m.display_layout_auto_row,
 	manual: m.display_layout_manual,
 };
 
+const LAYOUT_TITLE: Record<string, string> = {
+	"auto-row": "Recommended: lay displays side by side, left to right.",
+	manual: "You set X/Y in Live displays once two or more are streaming.",
+};
+
 const GAME_SESSION_LABEL: Record<string, () => string> = {
 	auto: m.display_game_session_auto,
 	dedicated: m.display_game_session_dedicated,
+};
+
+const GAME_SESSION_TITLE: Record<string, string> = {
+	auto: "Recommended: use whatever session the box is already in.",
+	dedicated:
+		"Always spawn a headless gamescope at the client's resolution (needs gamescope).",
 };
 
 /** Structural equality for the value-match of a custom preset's fields against the effective policy

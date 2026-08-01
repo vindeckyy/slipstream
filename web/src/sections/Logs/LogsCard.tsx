@@ -3,6 +3,11 @@ import { Copy, Download, Pause, Play, Share2, Trash2 } from "lucide-react";
 import { type FC, useEffect, useMemo, useRef, useState } from "react";
 import { useLogsGet } from "@/api/gen/logs/logs";
 import type { LogEntry } from "@/api/gen/model/logEntry";
+import {
+	HelpTip,
+	OptionLabel,
+	RecommendedMark,
+} from "@/components/option-help";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -220,33 +225,65 @@ export const LogsCard: FC<{
 			    desktop, with the filter row touching the card's edge. (Same trap the `p-0` note in
 			    components/ui/card.tsx describes, in the other direction.) */}
 			<CardContent className="flex flex-col gap-3 pt-4 sm:pt-6">
-				<div className="flex flex-col gap-3 border-b border-border/60 pb-3 sm:flex-row sm:flex-wrap sm:items-center">
-					<div className="inline-flex w-fit flex-wrap rounded-lg border border-border/70 bg-muted/30 p-0.5">
-						{LEVELS.map((l) => (
-							<Button
-								key={l}
-								size="sm"
-								variant={minLevel === l ? "secondary" : "ghost"}
-								className="h-7 px-2.5 text-xs"
-								onClick={() => setMinLevel(l)}
-							>
-								{l}
-							</Button>
-						))}
+				<div className="flex flex-col gap-3 border-b border-border/60 pb-3">
+					<div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+						<div className="space-y-1.5">
+							<OptionLabel
+								label="Min level"
+								help="Hide lines below this severity. DEBUG includes almost everything; ERROR shows only failures."
+								recommended="INFO for day-to-day ops (less noise than DEBUG)."
+							/>
+							<div className="inline-flex w-fit flex-wrap rounded-lg border border-border/70 bg-muted/30 p-0.5">
+								{LEVELS.map((l) => (
+									<Button
+										key={l}
+										size="sm"
+										variant={minLevel === l ? "secondary" : "ghost"}
+										className="h-7 px-2.5 text-xs"
+										title={
+											l === "INFO"
+												? "Show INFO and above. Recommended for routine monitoring."
+												: l === "DEBUG"
+													? "Show DEBUG and above. Noisiest useful filter for deep troubleshooting."
+													: l === "WARN"
+														? "Show WARN and ERROR only."
+														: "Show ERROR lines only."
+										}
+										onClick={() => setMinLevel(l)}
+									>
+										{l}
+									</Button>
+								))}
+							</div>
+						</div>
+						<div className="min-w-0 flex-1 space-y-1.5">
+							<OptionLabel
+								label="Search"
+								help="Case-insensitive filter against the log message and target. Combines with the min-level filter; export uses the filtered set."
+							/>
+							<Input
+								value={search}
+								onChange={(e) => setSearch(e.target.value)}
+								placeholder={m.logs_search()}
+								title="Filter visible lines by message or target text."
+								className="w-full max-w-xs sm:max-w-none"
+							/>
+						</div>
 					</div>
-					<Input
-						value={search}
-						onChange={(e) => setSearch(e.target.value)}
-						placeholder={m.logs_search()}
-						className="w-full max-w-xs sm:flex-1"
-					/>
-					<div className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
-						{dropped && <Badge variant="secondary">{m.logs_dropped()}</Badge>}
+					<div className="flex flex-wrap items-center gap-1.5">
+						{dropped && (
+							<Badge
+								variant="secondary"
+								title="The host ring dropped older entries before this console fetched them."
+							>
+								{m.logs_dropped()}
+							</Badge>
+						)}
 						<Button
 							size="icon"
 							variant="ghost"
 							disabled={matched.length === 0}
-							title={m.logs_download()}
+							title="Download the filtered log lines as a text file (full filter match, not just the on-screen tail)."
 							aria-label={m.logs_download()}
 							onClick={() => onDownload(matched)}
 						>
@@ -257,7 +294,11 @@ export const LogsCard: FC<{
 								size="icon"
 								variant="ghost"
 								disabled={matched.length === 0}
-								title={shareLabel}
+								title={
+									shareMode === "share"
+										? "Share the filtered log lines through the system share sheet."
+										: "Copy the filtered log lines to the clipboard."
+								}
 								aria-label={shareLabel}
 								onClick={() => onShare(matched)}
 							>
@@ -271,6 +312,11 @@ export const LogsCard: FC<{
 						<Button
 							size="sm"
 							variant={follow ? "secondary" : "outline"}
+							title={
+								follow
+									? "Pause live polling and keep the current viewport. Focus/reconnect refetches stay off while paused."
+									: "Resume live polling and stick the viewport to the newest lines."
+							}
 							onClick={() => onFollow(!follow)}
 						>
 							{follow ? (
@@ -280,10 +326,24 @@ export const LogsCard: FC<{
 							)}
 							{follow ? m.logs_pause() : m.logs_follow()}
 						</Button>
-						<Button size="sm" variant="ghost" onClick={onClear}>
+						<HelpTip
+							label={follow ? m.logs_pause() : m.logs_follow()}
+							text="Follow keeps polling every couple of seconds and scrolls to new lines. Pause when you need to read without the view jumping."
+						/>
+						<RecommendedMark value="Follow on, unless you are reading a specific line." />
+						<Button
+							size="sm"
+							variant="ghost"
+							title="Clear the in-console buffer only. Does not wipe host-side logs."
+							onClick={onClear}
+						>
 							<Trash2 className="mr-1 size-3.5" />
 							{m.logs_clear()}
 						</Button>
+						<HelpTip
+							label={m.logs_clear()}
+							text="Drops accumulated lines in this browser view. The host ring is unchanged; new polls fill the list again."
+						/>
 					</div>
 				</div>
 
@@ -311,7 +371,12 @@ export const LogsCard: FC<{
 								<div className="space-y-2 font-sans">
 									<p className="text-destructive">{m.common_error()}</p>
 									{onRetry && (
-										<Button size="sm" variant="outline" onClick={onRetry}>
+										<Button
+											size="sm"
+											variant="outline"
+											title="Retry the /logs poll after a failed request."
+											onClick={onRetry}
+										>
 											{m.common_retry()}
 										</Button>
 									)}

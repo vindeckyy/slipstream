@@ -153,11 +153,24 @@ export const SectionStore: FC = () => {
 				<Tabs value={tab} onValueChange={(v) => setTab(v as StoreTab)}>
 					<div className="overflow-x-auto pb-1">
 						<TabsList className="w-max min-w-full sm:w-auto">
-							<TabsTrigger value="browse">{m.store_tab_browse()}</TabsTrigger>
-							<TabsTrigger value="installed">
+							<TabsTrigger
+								value="browse"
+								title="Browse trusted catalogs and install plugins."
+							>
+								{m.store_tab_browse()}
+							</TabsTrigger>
+							<TabsTrigger
+								value="installed"
+								title="Manage installed plugins and the plugin runner."
+							>
 								{m.store_tab_installed()}
 							</TabsTrigger>
-							<TabsTrigger value="sources">{m.store_tab_sources()}</TabsTrigger>
+							<TabsTrigger
+								value="sources"
+								title="Choose which catalogs this host trusts and refreshes."
+							>
+								{m.store_tab_sources()}
+							</TabsTrigger>
 						</TabsList>
 					</div>
 

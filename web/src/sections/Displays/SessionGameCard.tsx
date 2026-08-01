@@ -9,6 +9,7 @@ import {
 	useGetSessionSettings,
 	useSetSessionSettings,
 } from "@/api/gen/session/session";
+import { HelpTip, RecommendedMark } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,10 +72,25 @@ export const SessionGameCard: FC = () => {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle className="tracking-tight">{m.session_game_title()}</CardTitle>
+				<div className="flex items-center gap-1.5">
+					<CardTitle
+						className="tracking-tight"
+						title="How a launched game and its streaming session share a fate."
+					>
+						{m.session_game_title()}
+					</CardTitle>
+					<HelpTip
+						label={m.session_game_title()}
+						text={m.session_game_help()}
+					/>
+				</div>
 				<p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
-					{m.session_game_help()}
+					Separate from display keep-alive: this governs the launched game, that
+					governs the screen.
 				</p>
+				<RecommendedMark
+					value={`${m.session_game_on_exit_end()}, ${m.session_game_end_keep()}`}
+				/>
 			</CardHeader>
 			<CardContent className="space-y-4">
 				<QueryState isLoading={q.isLoading} error={q.error} refetch={q.refetch}>
@@ -82,20 +98,28 @@ export const SessionGameCard: FC = () => {
 						<div className="space-y-6">
 							<Field
 								label={m.session_game_on_exit()}
+								hint="Quitting the game can end the stream, or leave the desktop up."
 								help={m.session_game_on_exit_help()}
+								recommended={m.session_game_on_exit_end()}
 								group
 							>
 								<div className="flex flex-wrap gap-2">
 									<Choice
 										selected={server.session_on_game_exit === true}
 										disabled={busy || !acts("session_on_game_exit")}
+										recommended
+										title="Recommended: end the streaming session when the launched game exits."
 										onClick={() => apply({ session_on_game_exit: true })}
 									>
 										{m.session_game_on_exit_end()}
+										<span className="ml-1 text-xs opacity-80">
+											(recommended)
+										</span>
 									</Choice>
 									<Choice
 										selected={server.session_on_game_exit === false}
 										disabled={busy || !acts("session_on_game_exit")}
+										title="Keep streaming the desktop after the game exits."
 										onClick={() => apply({ session_on_game_exit: false })}
 									>
 										{m.session_game_on_exit_keep()}
@@ -105,20 +129,32 @@ export const SessionGameCard: FC = () => {
 
 							<Field
 								label={m.session_game_end_game()}
+								hint="Whether stopping or losing a session closes the launched game."
 								help={m.session_game_end_game_help()}
+								recommended={m.session_game_end_keep()}
 								group
 							>
 								<div className="flex flex-wrap gap-2">
-									{END_POLICIES.map((p) => (
-										<Choice
-											key={p}
-											selected={(server.game_on_session_end ?? "keep") === p}
-											disabled={busy || !acts("game_on_session_end")}
-											onClick={() => apply({ game_on_session_end: p })}
-										>
-											{END_POLICY_LABEL[p]()}
-										</Choice>
-									))}
+									{END_POLICIES.map((p) => {
+										const isRec = p === "keep";
+										return (
+											<Choice
+												key={p}
+												selected={(server.game_on_session_end ?? "keep") === p}
+												disabled={busy || !acts("game_on_session_end")}
+												recommended={isRec}
+												title={END_POLICY_TITLE[p]}
+												onClick={() => apply({ game_on_session_end: p })}
+											>
+												{END_POLICY_LABEL[p]()}
+												{isRec ? (
+													<span className="ml-1 text-xs opacity-80">
+														(recommended)
+													</span>
+												) : null}
+											</Choice>
+										);
+									})}
 								</div>
 								{(server.game_on_session_end ?? "keep") === "always" && (
 									<p className="max-w-prose text-xs text-muted-foreground">
@@ -138,7 +174,9 @@ export const SessionGameCard: FC = () => {
 							{(server.game_on_session_end ?? "keep") === "always" && (
 								<Field
 									label={m.session_game_grace()}
+									hint="How long a vanished client has to reconnect before Always closes the game."
 									help={m.session_game_grace_help()}
+									recommended={`300 ${m.display_keep_alive_seconds()}`}
 									htmlFor="session-grace-seconds"
 								>
 									<div className="flex items-center gap-2">
@@ -148,6 +186,7 @@ export const SessionGameCard: FC = () => {
 											min={10}
 											max={86400}
 											className="w-28"
+											title="Reconnect window in seconds (10-86400). Host default is 300."
 											value={grace}
 											disabled={busy || !acts("disconnect_grace_seconds")}
 											onChange={(e) => setGrace(e.target.value)}
@@ -194,6 +233,13 @@ const END_POLICY_LABEL: Record<GameOnSessionEnd, () => string> = {
 	always: () => m.session_game_end_always(),
 };
 
+const END_POLICY_TITLE: Record<GameOnSessionEnd, string> = {
+	keep: "Recommended: leave the launched game running when the session ends.",
+	on_quit: "Close the launched game only when someone presses Stop.",
+	always:
+		"Close the launched game on Stop or after the reconnect window on a drop.",
+};
+
 /**
  * A labelled block. `htmlFor` pairs the label with a single control; without one it is a group.
  *
@@ -204,33 +250,52 @@ const END_POLICY_LABEL: Record<GameOnSessionEnd, () => string> = {
 const Field: FC<{
 	label: string;
 	help?: string;
+	hint?: string;
+	recommended?: ReactNode;
 	children: ReactNode;
 	htmlFor?: string;
 	group?: boolean;
-}> = ({ label, help, children, htmlFor, group }) => {
-	const body = (
-		<>
-			<Label className="block" htmlFor={htmlFor}>
-				{label}
-			</Label>
-			{children}
-			{help && (
-				<p className="max-w-prose text-xs text-muted-foreground">{help}</p>
-			)}
-		</>
+}> = ({ label, help, hint, recommended, children, htmlFor, group }) => {
+	const header = (
+		<div className="min-w-0 space-y-1">
+			<div className="flex items-center gap-1.5">
+				{group ? (
+					<span
+						className="text-sm font-medium leading-snug text-foreground"
+						title={hint ?? help}
+					>
+						{label}
+					</span>
+				) : (
+					<Label
+						className="text-sm font-medium leading-snug text-foreground"
+						htmlFor={htmlFor}
+						title={hint ?? help}
+					>
+						{label}
+					</Label>
+				)}
+				{help ? <HelpTip label={label} text={help} /> : null}
+			</div>
+			{hint ? (
+				<p className="max-w-prose text-xs leading-relaxed text-muted-foreground">
+					{hint}
+				</p>
+			) : null}
+			{recommended ? <RecommendedMark value={recommended} /> : null}
+		</div>
 	);
 	return group ? (
 		<fieldset className="space-y-3">
-			<legend className="mb-3 block text-sm font-medium leading-none">
-				{label}
-			</legend>
+			<legend className="sr-only">{label}</legend>
+			{header}
 			{children}
-			{help && (
-				<p className="max-w-prose text-xs text-muted-foreground">{help}</p>
-			)}
 		</fieldset>
 	) : (
-		<div className="space-y-3">{body}</div>
+		<div className="space-y-3">
+			{header}
+			{children}
+		</div>
 	);
 };
 
@@ -239,13 +304,17 @@ const Choice: FC<{
 	disabled: boolean;
 	onClick: () => void;
 	children: ReactNode;
-}> = ({ selected, disabled, onClick, children }) => (
+	title?: string;
+	recommended?: boolean;
+}> = ({ selected, disabled, onClick, children, title, recommended }) => (
 	<Button
 		type="button"
 		variant={selected ? "default" : "outline"}
 		size="sm"
 		disabled={disabled}
 		aria-pressed={selected}
+		title={title}
+		data-recommended={recommended || undefined}
 		className={cn(disabled && "opacity-60")}
 		onClick={onClick}
 	>

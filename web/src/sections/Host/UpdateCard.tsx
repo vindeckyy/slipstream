@@ -9,6 +9,7 @@ import {
 	useForceUpdateCheck,
 	useGetUpdateStatus,
 } from "@/api/gen/update/update";
+import { HelpTip, OptionLabel, RecommendedMark } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,7 +22,6 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { apiErrorMessage } from "@/lib/errors";
 import { fmtDateTimeSecs } from "@/lib/format";
@@ -114,9 +114,20 @@ export const UpdateCard: FC<{
 	return (
 		<Card>
 			<CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-				<CardTitle className="tracking-tight">{m.update_title()}</CardTitle>
+				<div className="flex min-w-0 items-center gap-1.5">
+					<CardTitle className="tracking-tight">{m.update_title()}</CardTitle>
+					<HelpTip
+						label={m.update_title()}
+						text="Checks for a newer Slipstream host build and, when this install supports it, applies the update from here."
+					/>
+				</div>
 				{s?.available && !inFlight && (
-					<Badge className="shrink-0">{m.update_available_badge()}</Badge>
+					<Badge
+						className="shrink-0"
+						title="A newer host build is available for this channel"
+					>
+						{m.update_available_badge()}
+					</Badge>
 				)}
 			</CardHeader>
 			<CardContent className="space-y-4">
@@ -133,11 +144,20 @@ export const UpdateCard: FC<{
 							<dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 								<UpdateRow
 									label={m.update_current()}
+									help="The host build running right now, plus its release channel and how it was installed."
 									value={
 										<span className="flex flex-wrap items-center gap-2 font-medium">
 											{s.current_version}
-											<Badge variant="secondary">{s.channel}</Badge>
-											<Badge variant="outline" title={m.update_install_kind()}>
+											<Badge
+												variant="secondary"
+												title="Release channel this host checks for updates"
+											>
+												{s.channel}
+											</Badge>
+											<Badge
+												variant="outline"
+												title="How this host was installed (affects whether updates can apply from here)"
+											>
 												{s.install_kind}
 											</Badge>
 										</span>
@@ -145,6 +165,7 @@ export const UpdateCard: FC<{
 								/>
 								<UpdateRow
 									label={m.update_latest()}
+									help="Newest published build for this channel, when a check has succeeded."
 									value={
 										s.manifest ? (
 											<span className="flex flex-wrap items-center gap-2 font-medium">
@@ -155,6 +176,7 @@ export const UpdateCard: FC<{
 														target="_blank"
 														rel="noreferrer"
 														className="text-sm font-normal text-primary underline underline-offset-2"
+														title="Open release notes for this version in a new tab"
 													>
 														{m.update_notes()}
 													</a>
@@ -181,16 +203,32 @@ export const UpdateCard: FC<{
 								/>
 							) : s.available ? (
 								s.apply === "full" || s.apply === "staged" ? (
-									<ApplyPanel status={s} onApplied={onApplied} />
+									<>
+										<RecommendedMark value="Update from this page when one-click apply is available" />
+										<ApplyPanel status={s} onApplied={onApplied} />
+									</>
 								) : (
 									<div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-4">
-										<p className="text-sm">{m.update_how()}</p>
+										<div className="flex items-center gap-1.5">
+											<p className="text-sm">{m.update_how()}</p>
+											<HelpTip
+												label={m.update_how()}
+												text="This install cannot apply updates from the console. Run the command on the host machine instead."
+											/>
+										</div>
+										<RecommendedMark value="Copy the command and run it on the host" />
 										<CommandLine command={s.channel_hint} />
 										{s.opt_in_hint && (
 											<div className="space-y-1.5 border-t border-border/60 pt-3">
-												<p className="text-sm text-muted-foreground">
-													{m.update_opt_in()}
-												</p>
+												<div className="flex items-center gap-1.5">
+													<p className="text-sm text-muted-foreground">
+														{m.update_opt_in()}
+													</p>
+													<HelpTip
+														label={m.update_opt_in()}
+														text="One-time host setup that unlocks Update now in this console after you log out and back in."
+													/>
+												</div>
 												<CommandLine command={s.opt_in_hint} />
 											</div>
 										)}
@@ -235,15 +273,24 @@ export const UpdateCard: FC<{
 								</p>
 							) : (
 								!inFlight && (
-									<div className="flex items-center gap-3">
-										<Button
-											variant="outline"
-											size="sm"
-											onClick={onCheck}
-											disabled={checkBusy}
-										>
-											{checkBusy ? m.update_checking() : m.update_check_now()}
-										</Button>
+									<div className="flex flex-wrap items-center gap-3">
+										<div className="flex items-center gap-1.5">
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={onCheck}
+												disabled={checkBusy}
+												title="Ask this host to look for a newer release now"
+											>
+												{checkBusy
+													? m.update_checking()
+													: m.update_check_now()}
+											</Button>
+											<HelpTip
+												label={m.update_check_now()}
+												text="Asks this host to look for a newer release right now, without waiting for the next automatic check."
+											/>
+										</div>
 										{s.last_checked_unix != null && (
 											<span className="text-xs text-muted-foreground">
 												{m.update_last_checked()}{" "}
@@ -318,9 +365,19 @@ const ApplyPanel: FC<{
 				{m.update_apply_ready({ version: target })}
 			</p>
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-				<Button size="sm" onClick={() => setOpen(true)} className="shrink-0">
-					{m.update_apply_button()}
-				</Button>
+				<div className="flex shrink-0 items-center gap-1.5">
+					<Button
+						size="sm"
+						onClick={() => setOpen(true)}
+						title="Download, verify, and install this update, then restart the host"
+					>
+						{m.update_apply_button()}
+					</Button>
+					<HelpTip
+						label={m.update_apply_button()}
+						text="Downloads, verifies, and installs the update from here. The host restarts at the end; any live stream will drop."
+					/>
+				</div>
 				<CommandLine command={status.channel_hint} />
 			</div>
 			<Dialog
@@ -353,9 +410,12 @@ const ApplyPanel: FC<{
 						}}
 					>
 						<div className="space-y-1.5">
-							<Label htmlFor="update-apply-password">
-								{m.update_apply_password_label()}
-							</Label>
+							<OptionLabel
+								label={m.update_apply_password_label()}
+								htmlFor="update-apply-password"
+								help="Confirms you own this console before the host downloads and restarts itself."
+								recommended="Your current console password"
+							/>
 							<Input
 								id="update-apply-password"
 								type="password"
@@ -367,17 +427,36 @@ const ApplyPanel: FC<{
 						</div>
 						{error && <p className="text-sm text-destructive">{error}</p>}
 						<DialogFooter>
-							<Button
-								type="submit"
-								variant={needsForce ? "destructive" : "default"}
-								disabled={busy || password.length === 0}
-							>
-								{busy
-									? m.update_apply_working()
-									: needsForce
-										? m.update_apply_force_button()
-										: m.update_apply_button()}
-							</Button>
+							<div className="flex items-center gap-1.5">
+								<Button
+									type="submit"
+									variant={needsForce ? "destructive" : "default"}
+									disabled={busy || password.length === 0}
+									title={
+										needsForce
+											? "Install anyway and drop the live stream"
+											: "Start the update after password confirmation"
+									}
+								>
+									{busy
+										? m.update_apply_working()
+										: needsForce
+											? m.update_apply_force_button()
+											: m.update_apply_button()}
+								</Button>
+								<HelpTip
+									label={
+										needsForce
+											? m.update_apply_force_button()
+											: m.update_apply_button()
+									}
+									text={
+										needsForce
+											? "A stream is live. Confirming drops that session and continues the install."
+											: "Starts the install after password confirmation. The host restarts when finished."
+									}
+								/>
+							</div>
 						</DialogFooter>
 					</form>
 				</DialogContent>
@@ -442,9 +521,20 @@ const ApplyProgress: FC<{
 					<p>{m.update_apply_timeout()}</p>
 					{/* Without this the card sits in "applying" forever and the operator cannot even
 					    re-check — the state was only ever cleared by a status that never arrives. */}
-					<Button variant="outline" size="sm" onClick={onGiveUp}>
-						{m.update_apply_give_up()}
-					</Button>
+					<div className="flex items-center gap-1.5">
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={onGiveUp}
+							title="Leave the waiting state so you can check status again"
+						>
+							{m.update_apply_give_up()}
+						</Button>
+						<HelpTip
+							label={m.update_apply_give_up()}
+							text="Leaves this waiting screen so you can check again. It does not cancel an install that may still be running on the host."
+						/>
+					</div>
 				</div>
 			)}
 		</div>
@@ -477,12 +567,16 @@ const LastResult: FC<{
 		</div>
 	);
 
-const UpdateRow: FC<{ label: string; value: ReactNode }> = ({
+const UpdateRow: FC<{ label: string; value: ReactNode; help?: string }> = ({
 	label,
 	value,
+	help,
 }) => (
 	<div className="min-w-0">
-		<dt className="text-xs text-muted-foreground">{label}</dt>
+		<dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
+			{label}
+			{help ? <HelpTip label={label} text={help} /> : null}
+		</dt>
 		<dd className="mt-0.5">{value}</dd>
 	</div>
 );
@@ -506,9 +600,20 @@ const CommandLine: FC<{ command: string }> = ({ command }) => {
 			<code className="min-w-0 flex-1 overflow-x-auto rounded-md border border-border/60 bg-muted/50 px-2.5 py-1.5 text-xs">
 				{command}
 			</code>
-			<Button variant="ghost" size="sm" onClick={copy} className="shrink-0">
+			<Button
+				variant="ghost"
+				size="sm"
+				onClick={copy}
+				className="shrink-0"
+				aria-label={copied ? m.update_copied() : m.update_copy()}
+				title="Copy this update command to the clipboard"
+			>
 				{copied ? m.update_copied() : m.update_copy()}
 			</Button>
+			<HelpTip
+				label={m.update_copy()}
+				text="Copies the host update command so you can paste it into a terminal on this machine."
+			/>
 		</div>
 	);
 };

@@ -13,15 +13,11 @@ import type { ActiveGame } from "@/api/gen/model/activeGame";
 import type { GameEntry } from "@/api/gen/model/gameEntry";
 import type { RuntimeStatus } from "@/api/gen/model/runtimeStatus";
 import { PageHeader, StatusIndicator } from "@/components/observatory";
+import { HelpTip } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtNumber } from "@/lib/format";
 import type { Loadable } from "@/lib/query";
 import { m } from "@/paraglide/messages";
@@ -64,6 +60,7 @@ export const SessionsView: FC<SessionsViewProps> = ({
 					actions={
 						<Link
 							to="/"
+							title="Back to Live status overview on the Dashboard."
 							className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-border bg-background/70 px-3 py-2 text-sm font-medium shadow-none transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
 						>
 							<ArrowLeft className="size-3.5" />
@@ -85,9 +82,7 @@ export const SessionsView: FC<SessionsViewProps> = ({
 										<MonitorPlay className="size-4 shrink-0 text-muted-foreground" />
 										{m.status_session()}
 										<Badge
-											variant={
-												s.active_sessions > 0 ? "success" : "outline"
-											}
+											variant={s.active_sessions > 0 ? "success" : "outline"}
 										>
 											{s.active_sessions > 0
 												? m.status_sessions_active({
@@ -95,28 +90,42 @@ export const SessionsView: FC<SessionsViewProps> = ({
 													})
 												: m.status_no_session()}
 										</Badge>
+										<HelpTip
+											label={m.status_session()}
+											text="Live stream session for connected clients. Use the actions below to request a keyframe or stop every active session."
+										/>
 									</CardTitle>
 								</CardHeader>
 								<CardContent flush className="flex flex-col">
-									<div className="flex flex-wrap gap-2 border-y border-border bg-muted/40 px-4 py-3 sm:px-6">
+									<div className="flex flex-wrap items-center gap-2 border-y border-border bg-muted/40 px-4 py-3 sm:px-6">
 										<Button
 											variant="outline"
 											size="sm"
 											disabled={!s.video_streaming || isRequestingIdr}
+											title="Ask the encoder for a fresh keyframe (IDR). Use when the picture is corrupt or stuck after a network blip. Needs an active video stream."
 											onClick={onRequestIdr}
 										>
 											<RefreshCw className="size-3.5" />
 											{m.action_request_idr()}
 										</Button>
+										<HelpTip
+											label={m.action_request_idr()}
+											text="Forces an IDR / keyframe so the client can resync the bitstream. Disabled when video is idle."
+										/>
 										<Button
 											variant={s.session ? "destructive" : "secondary"}
 											size="sm"
 											disabled={!s.session || isStopping}
+											title="End the live streaming session. If several clients are connected, one stop ends all of them."
 											onClick={onStopSession}
 										>
 											<ZapOff className="size-3.5" />
 											{m.action_stop_session()}
 										</Button>
+										<HelpTip
+											label={m.action_stop_session()}
+											text="Stops the host session. With multiple active sessions the console confirms first, because the host has one stop for all of them."
+										/>
 									</div>
 									<div className="grid gap-4 border-b border-border/60 px-4 py-3 sm:grid-cols-2 sm:px-6">
 										<StatusIndicator

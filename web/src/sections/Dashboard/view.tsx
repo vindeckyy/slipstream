@@ -9,11 +9,12 @@ import {
 	Volume2,
 } from "lucide-react";
 import type { FC } from "react";
+import type { ActivityEntry } from "@/api/events";
 import type { ActiveGame } from "@/api/gen/model/activeGame";
 import type { GameEntry } from "@/api/gen/model/gameEntry";
 import type { RuntimeStatus } from "@/api/gen/model/runtimeStatus";
-import type { ActivityEntry } from "@/api/events";
 import { MetricCard, PageHeader } from "@/components/observatory";
+import { HelpTip } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -48,14 +49,21 @@ export const DashboardView: FC<{
 				<PageHeader
 					title={m.status_title()}
 					actions={
-						<Link
-							to="/sessions"
-							className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-border bg-background/70 px-3 py-2 text-sm font-medium shadow-none transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-						>
-							<MonitorPlay className="size-4" />
-							{m.status_session()}
-							<ArrowRight className="size-3.5" />
-						</Link>
+						<div className="flex items-center gap-1">
+							<Link
+								to="/sessions"
+								title="Open Sessions for keyframe requests, stop session, and full stream details."
+								className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-border bg-background/70 px-3 py-2 text-sm font-medium shadow-none transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+							>
+								<MonitorPlay className="size-4" />
+								{m.status_session()}
+								<ArrowRight className="size-3.5" />
+							</Link>
+							<HelpTip
+								label={m.status_session()}
+								text="Sessions has the live stream actions (request keyframe, stop session) and a fuller stream readout than this overview."
+							/>
+						</div>
 					}
 				/>
 
@@ -131,9 +139,7 @@ const SessionSummaryCard: FC<{ status: RuntimeStatus }> = ({ status }) => (
 			<CardTitle className="flex flex-wrap items-center gap-2">
 				<MonitorPlay className="size-4 shrink-0 text-muted-foreground" />
 				{m.status_session()}
-				<Badge
-					variant={status.active_sessions > 0 ? "success" : "outline"}
-				>
+				<Badge variant={status.active_sessions > 0 ? "success" : "outline"}>
 					{status.active_sessions > 0
 						? m.status_sessions_active({ count: status.active_sessions })
 						: m.status_no_session()}
@@ -151,10 +157,7 @@ const SessionSummaryCard: FC<{ status: RuntimeStatus }> = ({ status }) => (
 						label={m.stream_resolution()}
 						value={`${status.stream.width}×${status.stream.height}`}
 					/>
-					<Field
-						label={m.stream_fps()}
-						value={`${status.stream.fps} fps`}
-					/>
+					<Field label={m.stream_fps()} value={`${status.stream.fps} fps`} />
 					<Field
 						label={m.stream_bitrate()}
 						value={`${fmtNumber(status.stream.bitrate_kbps / 1000, 1)} Mbps`}
@@ -165,13 +168,20 @@ const SessionSummaryCard: FC<{ status: RuntimeStatus }> = ({ status }) => (
 			)}
 		</CardContent>
 		<CardFooter className="border-t border-border/60 pt-4">
-			<Link
-				to="/sessions"
-				className="inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-			>
-				{m.status_session()}
-				<ArrowRight className="size-3.5" />
-			</Link>
+			<div className="flex items-center gap-1">
+				<Link
+					to="/sessions"
+					title="Open Sessions for keyframe requests, stop session, and full stream details."
+					className="inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+				>
+					{m.status_session()}
+					<ArrowRight className="size-3.5" />
+				</Link>
+				<HelpTip
+					label={m.status_session()}
+					text="Jump to the Sessions page to act on the live stream (keyframe, stop) or read the full stream fields."
+				/>
+			</div>
 		</CardFooter>
 	</Card>
 );

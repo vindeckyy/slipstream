@@ -7,6 +7,7 @@ import {
 	useDeleteProviderEntries,
 } from "@/api/gen/library/library";
 import type { GameEntry } from "@/api/gen/model/gameEntry";
+import { HelpTip, RecommendedMark } from "@/components/option-help";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,7 +72,7 @@ export const ProvidersCard: FC<{
 				{[...counts.entries()].map(([provider, count]) => (
 					<div
 						key={provider}
-						className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/30 p-3 sm:flex-row sm:items-center"
+						className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/30 p-3 sm:flex-row sm:items-start"
 					>
 						<div className="flex min-w-0 flex-wrap items-center gap-2">
 							<span className="font-medium tracking-tight">{provider}</span>
@@ -79,26 +80,50 @@ export const ProvidersCard: FC<{
 								{m.library_provider_count({ count })}
 							</Badge>
 						</div>
-						<div className="flex flex-wrap gap-2 sm:ml-auto">
-							<Button
-								size="sm"
-								variant={active === provider ? "default" : "outline"}
-								aria-pressed={active === provider}
-								onClick={() => onFilter(active === provider ? null : provider)}
-							>
-								{active === provider
-									? m.library_provider_show_all()
-									: m.library_provider_filter()}
-							</Button>
-							<Button
-								size="sm"
-								variant="outline"
-								disabled={purge.isPending}
-								aria-label={m.library_provider_purge()}
-								onClick={() => onPurge(provider, count)}
-							>
-								<Trash2 className="size-4 text-destructive" />
-							</Button>
+						<div className="flex flex-wrap gap-3 sm:ml-auto">
+							<div className="inline-flex max-w-full flex-col gap-1">
+								<div className="flex items-center gap-1">
+									<Button
+										size="sm"
+										variant={active === provider ? "default" : "outline"}
+										aria-pressed={active === provider}
+										onClick={() =>
+											onFilter(active === provider ? null : provider)
+										}
+									>
+										{active === provider
+											? m.library_provider_show_all()
+											: m.library_provider_filter()}
+									</Button>
+									<HelpTip
+										label={m.library_provider_filter()}
+										text={m.library_provider_filter_help()}
+									/>
+								</div>
+								<RecommendedMark
+									value={m.library_provider_filter_recommended()}
+								/>
+							</div>
+							<div className="inline-flex max-w-full flex-col gap-1">
+								<div className="flex items-center gap-1">
+									<Button
+										size="sm"
+										variant="outline"
+										disabled={purge.isPending}
+										aria-label={m.library_provider_purge()}
+										onClick={() => onPurge(provider, count)}
+									>
+										<Trash2 className="size-4 text-destructive" />
+									</Button>
+									<HelpTip
+										label={m.library_provider_purge()}
+										text={m.library_provider_purge_help()}
+									/>
+								</div>
+								<RecommendedMark
+									value={m.library_provider_purge_recommended()}
+								/>
+							</div>
 						</div>
 					</div>
 				))}

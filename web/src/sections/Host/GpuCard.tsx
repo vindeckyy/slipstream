@@ -8,6 +8,7 @@ import {
 	useSetGpuPreference,
 } from "@/api/gen/gpu/gpu";
 import type { GpuState } from "@/api/gen/model";
+import { HelpTip, RecommendedMark } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -103,21 +104,34 @@ export const GpuCard: FC<{
 		<Card>
 			<CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
 				<div className="space-y-1.5">
-					<CardTitle className="tracking-tight">{m.host_gpus()}</CardTitle>
+					<div className="flex items-center gap-1.5">
+						<CardTitle className="tracking-tight">{m.host_gpus()}</CardTitle>
+						<HelpTip
+							label={m.host_gpus()}
+							text="Chooses which GPU capture and encode use. Changes apply to the next session, not one that is already streaming."
+						/>
+					</div>
 					<p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
 						{m.host_gpus_help()}
 					</p>
+					<RecommendedMark value="Automatic, unless this PC has multiple GPUs and the wrong one is selected" />
 				</div>
 				{s && (s.gpus?.length ?? 0) > 0 && (
-					<Button
-						size="sm"
-						variant={s.mode === "auto" ? "default" : "outline"}
-						disabled={busy || s.mode === "auto"}
-						onClick={() => onApply("auto")}
-						className="shrink-0 self-start"
-					>
-						{m.gpu_automatic()}
-					</Button>
+					<div className="flex shrink-0 items-center gap-1.5 self-start">
+						<Button
+							size="sm"
+							variant={s.mode === "auto" ? "default" : "outline"}
+							disabled={busy || s.mode === "auto"}
+							onClick={() => onApply("auto")}
+							title="Let Slipstream pick the best GPU for capture and encode on each new session"
+						>
+							{m.gpu_automatic()}
+						</Button>
+						<HelpTip
+							label={m.gpu_automatic()}
+							text="Clears any pinned GPU and lets the host pick the best adapter for the next session. Best default for single-GPU PCs."
+						/>
+					</div>
 				)}
 			</CardHeader>
 			<CardContent className="space-y-4">
@@ -171,15 +185,21 @@ export const GpuCard: FC<{
 													{` · ${g.id}`}
 												</code>
 											</div>
-											<Button
-												size="sm"
-												variant="outline"
-												disabled={busy || isPreferred}
-												onClick={() => onApply("manual", g.id)}
-												className="shrink-0 self-start sm:self-center"
-											>
-												{m.gpu_prefer()}
-											</Button>
+											<div className="flex shrink-0 items-center gap-1.5 self-start sm:self-center">
+												<Button
+													size="sm"
+													variant="outline"
+													disabled={busy || isPreferred}
+													onClick={() => onApply("manual", g.id)}
+													title={`Pin capture and encode to ${g.name} for the next session`}
+												>
+													{m.gpu_prefer()}
+												</Button>
+												<HelpTip
+													label={m.gpu_prefer()}
+													text={`Pins capture and encode to ${g.name}. Use this when Automatic lands on the wrong GPU (eGPU, iGPU vs discrete). Applies next session.`}
+												/>
+											</div>
 										</li>
 									);
 								})}

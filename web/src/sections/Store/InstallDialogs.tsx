@@ -2,6 +2,7 @@ import { Checkbox } from "@unom/ui/form/checkbox";
 import { BadgeCheck, ShieldAlert, ShieldQuestion } from "lucide-react";
 import { type FC, useEffect, useState } from "react";
 import type { StoreEntry } from "@/api/store";
+import { HelpTip, OptionLabel, RecommendedMark } from "@/components/option-help";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -12,7 +13,6 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { m } from "@/paraglide/messages";
 
 // Friction proportional to trust. The three install paths deliberately do NOT share a confirm
@@ -48,6 +48,14 @@ export const InstallDialog: FC<{
 							{external
 								? m.store_install_external_title({ title: entry.title })
 								: m.store_install_title({ title: entry.title })}
+							<HelpTip
+								label="Install confirm"
+								text={
+									external
+										? "Installs a pinned package from a catalog you added. Integrity is checked; unom has not reviewed the code."
+										: "Installs this exact package from the built-in unom catalog. Prefer this path over a raw package spec."
+								}
+							/>
 						</DialogTitle>
 						<DialogDescription>
 							{external
@@ -70,12 +78,25 @@ export const InstallDialog: FC<{
 					)}
 
 					<DialogFooter>
-						<Button variant="outline" onClick={onCancel} disabled={isPending}>
+						<Button
+							variant="outline"
+							onClick={onCancel}
+							disabled={isPending}
+							title="Close without installing."
+						>
 							{m.common_cancel()}
 						</Button>
 						{/* Red is reserved for the raw-spec install; an external one escalates through
 						    its copy and its amber panel, not by borrowing the danger colour. */}
-						<Button disabled={isPending} onClick={() => onConfirm(entry)}>
+						<Button
+							disabled={isPending}
+							title={
+								external
+									? "Install this external catalog entry anyway. Enable the plugin runner afterward if it is off."
+									: "Install this verified catalog entry. Enable the plugin runner afterward if it is off."
+							}
+							onClick={() => onConfirm(entry)}
+						>
 							{external
 								? m.store_install_external_confirm()
 								: m.store_install_confirm()}
@@ -136,6 +157,10 @@ export const SpecInstallDialog: FC<{
 					<DialogTitle className="flex items-center gap-2">
 						<ShieldAlert className="size-5 shrink-0 text-destructive" />
 						{m.store_spec_title()}
+						<HelpTip
+							label={m.store_spec_title()}
+							text="Installs code straight from a package registry with no catalog review. Prefer Browse for verified or external catalog entries."
+						/>
 					</DialogTitle>
 					<DialogDescription>{m.store_spec_lead()}</DialogDescription>
 				</DialogHeader>
@@ -145,12 +170,18 @@ export const SpecInstallDialog: FC<{
 				</p>
 
 				<div className="space-y-2">
-					<Label htmlFor="store-spec">{m.store_spec_field()}</Label>
+					<OptionLabel
+						label={m.store_spec_field()}
+						htmlFor="store-spec"
+						help="Exact package identifier to install, including version. Prefer a catalog install from Browse when the same plugin is listed there."
+						recommended="Pinned catalog install from Browse instead"
+					/>
 					<Input
 						id="store-spec"
 						autoComplete="off"
 						spellCheck={false}
 						placeholder="@scope/plugin-name@1.2.3"
+						title="Example: @scope/plugin-name@1.2.3"
 						value={spec}
 						onChange={(e) => setSpec(e.target.value)}
 					/>
@@ -160,33 +191,55 @@ export const SpecInstallDialog: FC<{
 				</div>
 
 				<div className="space-y-2">
-					<Label htmlFor="store-spec-echo">
-						{m.store_spec_confirm_field()}
-					</Label>
+					<OptionLabel
+						label={m.store_spec_confirm_field()}
+						htmlFor="store-spec-echo"
+						help="Must match the package spec above exactly. Stops accidental installs from a mistyped name or version."
+						recommended="Exact match of the package spec"
+					/>
 					<Input
 						id="store-spec-echo"
 						autoComplete="off"
 						spellCheck={false}
+						title="Retype the package spec exactly as above."
 						value={echo}
 						onChange={(e) => setEcho(e.target.value)}
 					/>
 				</div>
 
-				<Label className="flex items-start gap-3 text-sm font-normal">
-					<Checkbox
-						checked={accepted}
-						onCheckedChange={(next) => setAccepted(next === true)}
-						className="mt-0.5"
-					/>
-					<span>{m.store_spec_checkbox()}</span>
-				</Label>
+				<div className="space-y-2">
+					<label className="flex items-start gap-3 text-sm font-normal">
+						<Checkbox
+							checked={accepted}
+							onCheckedChange={(next) => setAccepted(next === true)}
+							className="mt-0.5"
+							title="Confirm you accept running unreviewed code with the plugin runner's privileges."
+						/>
+						<span className="min-w-0 space-y-1">
+							<span className="inline-flex items-center gap-1.5">
+								{m.store_spec_checkbox()}
+								<HelpTip
+									label="Accept risk"
+									text="Confirms you accept running unreviewed code with the plugin runner's privileges on this host."
+								/>
+							</span>
+							<RecommendedMark value="Checked only for intentional unverified installs" />
+						</span>
+					</label>
+				</div>
 
 				<div className="space-y-2">
-					<Label htmlFor="store-spec-password">{m.store_spec_password()}</Label>
+					<OptionLabel
+						label={m.store_spec_password()}
+						htmlFor="store-spec-password"
+						help="Running unreviewed code needs the console password again. A browser session alone cannot start this install."
+						recommended="Required"
+					/>
 					<Input
 						id="store-spec-password"
 						type="password"
 						autoComplete="current-password"
+						title="Enter the console password to authorize this unverified install."
 						value={password}
 						onChange={(e) => setPassword(e.target.value)}
 					/>
@@ -201,12 +254,18 @@ export const SpecInstallDialog: FC<{
 				</div>
 
 				<DialogFooter>
-					<Button variant="outline" onClick={onCancel} disabled={isPending}>
+					<Button
+						variant="outline"
+						onClick={onCancel}
+						disabled={isPending}
+						title="Close without installing."
+					>
 						{m.common_cancel()}
 					</Button>
 					<Button
 						variant="destructive"
 						disabled={!ready || isPending}
+						title="Install this unverified package. Enable the plugin runner afterward if it is off."
 						onClick={() => {
 							// Keep the dialog's state until the call settles: a rejected password must
 							// leave the operator's typed spec in place, not make them start over.

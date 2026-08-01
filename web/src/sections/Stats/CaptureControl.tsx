@@ -10,6 +10,7 @@ import {
 	useStatsCaptureStatus,
 	useStatsCaptureStop,
 } from "@/api/gen/stats/stats";
+import { HelpTip, RecommendedMark } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,15 @@ import { apiErrorMessage } from "@/lib/errors";
 import type { Loadable } from "@/lib/query";
 import { m } from "@/paraglide/messages";
 import { fmtDuration, kindLabel, Stat } from "./helpers";
+
+const CAPTURE_HELP =
+	"Arms host-side sampling of the stream pipeline. Samples land at the host's ~1-2 s aggregation boundary, not per frame. Stop & save writes a recording you can graph later.";
+const CAPTURE_RECOMMENDED =
+	"When chasing stutter, encode spikes, or bitrate shortfalls. Leave idle for normal play.";
+const START_HELP =
+	"Arm sampling for the current or next stream session. Start a client session after arming to collect samples.";
+const STOP_HELP =
+	"Stop sampling and save the capture as a recording. If stop fails, the capture may not be saved.";
 
 /**
  * Container: arm/disarm the capture. Owns the polled status query plus start/stop; stopping also
@@ -81,20 +91,32 @@ export const CaptureControlCard: FC<{
 			<Card>
 				<CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
 					<div className="min-w-0 space-y-1">
-						<CardTitle className="text-base tracking-tight">
-							{m.stats_capture_title()}
-						</CardTitle>
+						<div className="flex items-center gap-1.5">
+							<CardTitle className="text-base tracking-tight">
+								{m.stats_capture_title()}
+							</CardTitle>
+							<HelpTip label={m.stats_capture_title()} text={CAPTURE_HELP} />
+						</div>
 						<p className="text-sm text-muted-foreground">
 							{m.stats_capture_desc()}
 						</p>
+						<RecommendedMark value={CAPTURE_RECOMMENDED} />
 					</div>
 					{armed ? (
-						<Badge variant="destructive" className="shrink-0 gap-1.5">
+						<Badge
+							variant="destructive"
+							className="shrink-0 gap-1.5"
+							title="Capture is armed and collecting samples from the live stream."
+						>
 							<Circle className="size-2.5 animate-pulse fill-current" />
 							{m.stats_recording()}
 						</Badge>
 					) : (
-						<Badge variant="outline" className="shrink-0">
+						<Badge
+							variant="outline"
+							className="shrink-0"
+							title="No capture is running. Start capture to arm sampling."
+						>
 							{m.stats_idle()}
 						</Badge>
 					)}
@@ -109,22 +131,31 @@ export const CaptureControlCard: FC<{
 							)}
 						</dl>
 					)}
-					<div className="flex flex-wrap gap-2">
+					<div className="flex flex-wrap items-center gap-2">
 						{armed ? (
 							<Button
 								variant="destructive"
 								disabled={isStopping}
+								title={STOP_HELP}
 								onClick={onStop}
 							>
 								<Square className="size-4" />
 								{m.stats_stop()}
 							</Button>
 						) : (
-							<Button disabled={isStarting} onClick={onStart}>
+							<Button
+								disabled={isStarting}
+								title={START_HELP}
+								onClick={onStart}
+							>
 								<Circle className="size-4 fill-current" />
 								{m.stats_start()}
 							</Button>
 						)}
+						<HelpTip
+							label={armed ? m.stats_stop() : m.stats_start()}
+							text={armed ? STOP_HELP : START_HELP}
+						/>
 					</div>
 				</CardContent>
 			</Card>

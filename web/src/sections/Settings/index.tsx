@@ -2,8 +2,9 @@ import Section from "@unom/ui/section";
 import { toast } from "@unom/ui/toast";
 import { LogOut } from "lucide-react";
 import type { FC } from "react";
+import { OptionLabel } from "@/components/option-help";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { changeLocale, type Locale, locales, useLocale } from "@/lib/i18n";
 import { m } from "@/paraglide/messages";
 
@@ -37,9 +38,12 @@ export const SectionSettings: FC = () => {
 				<div className="grid max-w-2xl gap-card">
 					<Card>
 						<CardHeader className="space-y-1">
-							<CardTitle className="text-base tracking-tight">
-								{m.settings_language()}
-							</CardTitle>
+							<OptionLabel
+								label={m.settings_language()}
+								help="Chooses the language for labels and messages in this management console."
+								recommended="en"
+								labelClassName="text-base tracking-tight font-semibold"
+							/>
 						</CardHeader>
 						<CardContent>
 							<div className="inline-flex flex-wrap rounded-lg border border-border/70 bg-muted/30 p-0.5">
@@ -61,9 +65,11 @@ export const SectionSettings: FC = () => {
 
 					<Card>
 						<CardHeader className="space-y-1">
-							<CardTitle className="text-base tracking-tight">
-								{m.nav_settings()}
-							</CardTitle>
+							<OptionLabel
+								label={m.action_logout()}
+								help="Clears your signed-in session in this browser. You will need the console password to open Settings and other management pages again."
+								labelClassName="text-base tracking-tight font-semibold"
+							/>
 						</CardHeader>
 						<CardContent>
 							<Button variant="outline" onClick={onLogout}>

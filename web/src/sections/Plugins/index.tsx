@@ -14,6 +14,7 @@ import {
 import { type FC, useEffect, useMemo, useRef } from "react";
 import { pluginIcon, usePlugins } from "@/api/plugins";
 import { useInstalledPlugins } from "@/api/store";
+import { HelpTip } from "@/components/option-help";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/lib/i18n";
@@ -144,19 +145,25 @@ export const SectionPlugin: FC = () => {
 							)}
 						</div>
 					</div>
-					<a
-						href={initialSrc}
-						target="_blank"
-						rel="noopener noreferrer"
-						aria-label={`${m.plugin_open_new_tab()} ${title}`}
-						title={m.plugin_open_new_tab()}
-						className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border/70 bg-background/70 text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
-					>
-						<ExternalLink className="size-4" aria-hidden />
-						<span className="hidden text-sm font-medium sm:inline">
-							{m.plugin_open_new_tab()}
-						</span>
-					</a>
+					<div className="flex shrink-0 items-center gap-1">
+						<a
+							href={initialSrc}
+							target="_blank"
+							rel="noopener noreferrer"
+							aria-label={`${m.plugin_open_new_tab()} ${title}`}
+							title="Open this plugin UI in a separate browser tab (same /plugin-ui proxy, no console chrome)."
+							className="inline-flex size-9 items-center justify-center rounded-md border border-border/70 bg-background/70 text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
+						>
+							<ExternalLink className="size-4" aria-hidden />
+							<span className="hidden text-sm font-medium sm:inline">
+								{m.plugin_open_new_tab()}
+							</span>
+						</a>
+						<HelpTip
+							label={m.plugin_open_new_tab()}
+							text="Opens the same proxied plugin page in its own tab. Useful when you want the plugin full-window or side-by-side with the console."
+						/>
+					</div>
 				</div>
 			</header>
 
@@ -202,6 +209,14 @@ export const SectionPlugin: FC = () => {
 
 type PluginHealthState = "loading" | "running" | "offline";
 
+const healthHelp: Record<PluginHealthState, string> = {
+	loading:
+		"Probing /plugin-ui/.../__health. The iframe mounts only after a successful answer.",
+	running: "Health check succeeded. The plugin UI below is live.",
+	offline:
+		"Health check failed. Start the scripting runner (see commands below), then use Retry.",
+};
+
 const PluginHealthBadge: FC<{ state: PluginHealthState }> = ({ state }) => (
 	<Badge
 		variant={
@@ -217,6 +232,7 @@ const PluginHealthBadge: FC<{ state: PluginHealthState }> = ({ state }) => (
 		)}
 		role="status"
 		aria-live="polite"
+		title={healthHelp[state]}
 	>
 		{state === "running" ? (
 			<CheckCircle2 className="size-3.5" aria-hidden />
@@ -265,15 +281,22 @@ const OfflineCard: FC<{ title: string; onRetry: () => void }> = ({
 					Get-ScheduledTask SlipstreamScripting{"  # Windows"}
 				</code>
 			</pre>
-			<Button
-				variant="outline"
-				size="sm"
-				className="w-full sm:w-auto"
-				onClick={onRetry}
-			>
-				<RefreshCw className="size-4" aria-hidden />
-				{m.plugin_retry()}
-			</Button>
+			<div className="flex w-full flex-col items-center gap-1.5 sm:w-auto sm:flex-row">
+				<Button
+					variant="outline"
+					size="sm"
+					className="w-full sm:w-auto"
+					title="Probe the plugin health endpoint again after the scripting runner is up."
+					onClick={onRetry}
+				>
+					<RefreshCw className="size-4" aria-hidden />
+					{m.plugin_retry()}
+				</Button>
+				<HelpTip
+					label={m.plugin_retry()}
+					text="Re-runs the health probe. If the runner was just started, wait a second and retry; the console also polls every few seconds while offline."
+				/>
+			</div>
 		</div>
 	</div>
 );

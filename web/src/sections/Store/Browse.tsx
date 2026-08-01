@@ -9,6 +9,7 @@ import {
 import { type FC, useMemo, useState } from "react";
 import { pluginIcon } from "@/api/plugins";
 import { type StoreEntry, useStoreCatalog } from "@/api/store";
+import { HelpTip } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -61,27 +62,39 @@ export const BrowseTab: FC<{
 			<RunnerBanner />
 
 			<div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/30 p-3 sm:flex-row sm:items-center sm:p-3.5">
-				<div className="relative w-full sm:max-w-sm sm:flex-1">
-					<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-					<Input
-						type="search"
-						className="bg-background/60 pl-9"
-						aria-label={m.store_search_placeholder()}
-						placeholder={m.store_search_placeholder()}
-						value={query}
-						onChange={(e) => setQuery(e.target.value)}
+				<div className="flex w-full items-center gap-1.5 sm:max-w-sm sm:flex-1">
+					<div className="relative min-w-0 flex-1">
+						<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+						<Input
+							type="search"
+							className="bg-background/60 pl-9"
+							aria-label={m.store_search_placeholder()}
+							placeholder={m.store_search_placeholder()}
+							title="Filter catalog entries by title, description, package name, or author."
+							value={query}
+							onChange={(e) => setQuery(e.target.value)}
+						/>
+					</div>
+					<HelpTip
+						label="Search plugins"
+						text="Filters the catalog by title, description, package name, or author. Combine with a source chip to narrow further."
 					/>
 				</div>
 				{/* One chip per source, so an operator can see a third-party catalog's entries alone. */}
 				{sources.length > 1 && (
 					<fieldset
 						aria-label={m.store_tab_sources()}
-						className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0"
+						className="m-0 flex min-w-0 flex-wrap items-center gap-2 border-0 p-0"
 					>
+						<HelpTip
+							label="Source filter"
+							text="Limit Browse to one catalog, or show every trusted source. External entries still carry their source name."
+						/>
 						<Button
 							size="sm"
 							variant={source === null ? "default" : "outline"}
 							aria-pressed={source === null}
+							title="Show plugins from every trusted catalog."
 							onClick={() => setSource(null)}
 						>
 							{m.store_filter_all()}
@@ -92,6 +105,7 @@ export const BrowseTab: FC<{
 								size="sm"
 								variant={source === s.name ? "default" : "outline"}
 								aria-pressed={source === s.name}
+								title={`Show only plugins from the "${s.name}" catalog.`}
 								onClick={() => setSource(s.name)}
 							>
 								{s.name}
@@ -146,14 +160,19 @@ export const BrowseTab: FC<{
 
 			{/* The ONLY way to the raw-spec install. Deliberately a quiet footer link, not a button on
 			    a card: an unverified install should take a decision, never a stray click. */}
-			<div className="border-t border-border/60 pt-4 text-center">
+			<div className="flex items-center justify-center gap-1.5 border-t border-border/60 pt-4">
 				<button
 					type="button"
 					onClick={onInstallSpec}
+					title="Install a raw package spec with no catalog review. Prefer a catalog entry from Browse when one exists."
 					className="text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
 				>
 					{m.store_spec_open()}
 				</button>
+				<HelpTip
+					label={m.store_spec_open()}
+					text="Opens the unverified install dialog. Prefer Browse for verified or external catalog entries; use this only when you have a specific package spec."
+				/>
 			</div>
 		</div>
 	);
@@ -252,17 +271,40 @@ export const StoreCard: FC<{ entry: StoreEntry; onInstall: () => void }> = ({
 				{/* Footer pinned to the bottom so cards in a row line their actions up. */}
 				<div className="mt-auto flex flex-wrap items-center gap-3 border-t border-border/50 pt-3">
 					{entry.update_available ? (
-						<Button size="sm" disabled={!installable} onClick={onInstall}>
+						<Button
+							size="sm"
+							disabled={!installable}
+							title={
+								installable
+									? `Update to v${entry.version}. Opens a confirm dialog for this catalog entry.`
+									: "This entry cannot be updated on this host."
+							}
+							onClick={onInstall}
+						>
 							<Download className="size-4" />
 							{m.store_update_to({ version: entry.version })}
 						</Button>
 					) : installed ? (
-						<span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+						<span
+							className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"
+							title="Already installed at the catalog version shown above."
+						>
 							<Check className="size-4 text-[var(--success)]" />
 							{m.store_installed_label()}
 						</span>
 					) : (
-						<Button size="sm" disabled={!installable} onClick={onInstall}>
+						<Button
+							size="sm"
+							disabled={!installable}
+							title={
+								!installable
+									? "This entry cannot be installed on this host."
+									: entry.tier === "external"
+										? "Install from an external catalog. Opens a warning confirm; enable the plugin runner if it is off."
+										: "Install from the built-in catalog. Enable the plugin runner afterward if it is off."
+							}
+							onClick={onInstall}
+						>
 							<Download className="size-4" />
 							{m.store_install()}
 						</Button>
@@ -272,6 +314,7 @@ export const StoreCard: FC<{ entry: StoreEntry; onInstall: () => void }> = ({
 							href={entry.homepage}
 							target="_blank"
 							rel="noreferrer"
+							title="Open this plugin's homepage in a new tab."
 							className="ml-auto text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
 						>
 							{m.store_homepage()}

@@ -1,6 +1,12 @@
 import { Checkbox } from "@unom/ui/form/checkbox";
 import { type FC, useEffect, useState } from "react";
 import type { HookEntry } from "@/api/gen/model/hookEntry";
+import {
+	HelpOption,
+	HelpTip,
+	OptionLabel,
+	RecommendedMark,
+} from "@/components/option-help";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -11,7 +17,6 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { m } from "@/paraglide/messages";
 
 /** The event kinds the host publishes, plus the `domain.*` wildcards the hook filter accepts.
@@ -43,7 +48,62 @@ export const EVENT_KINDS = [
 	"host.stopping",
 ] as const;
 
-const EMPTY: HookEntry = { on: "session.started", run: "" };
+/** Hover text for each event kind: when it fires. */
+const EVENT_KIND_HELP: Record<(typeof EVENT_KINDS)[number], string> = {
+	"client.*":
+		"Matches every client event (connected and disconnected).",
+	"client.connected":
+		"Fires when a client session is admitted (device name, fingerprint, plane).",
+	"client.disconnected":
+		"Fires when a client session goes away (quit, timeout, or error).",
+	"session.*":
+		"Matches every A/V session event (started and ended).",
+	"session.started":
+		"Fires when an A/V session registers (session id, client, mode, HDR). A solid starter for most hooks.",
+	"session.ended":
+		"Fires when an A/V session ends.",
+	"stream.*":
+		"Matches every stream event (started and stopped).",
+	"stream.started":
+		"Fires when video actually starts (mode, HDR, client, launched app when present).",
+	"stream.stopped":
+		"Fires when video stops. A desktop stream has no game; a stream can outlive its game.",
+	"game.*":
+		"Matches every launched-game event (running and exited).",
+	"game.running":
+		"Fires when a launched game's own process is seen running (not merely its launcher).",
+	"game.exited":
+		"Fires when a launched game is gone (exited by the player, or terminated by the host).",
+	"pairing.*":
+		"Matches every pairing event (pending, completed, denied).",
+	"pairing.pending":
+		"Fires once when an unpaired device knocks (not on every retry).",
+	"pairing.completed":
+		"Fires when a pairing is approved and stored.",
+	"pairing.denied":
+		"Fires when a pairing request is denied.",
+	"display.*":
+		"Matches every virtual-display event (created and released).",
+	"display.created":
+		"Fires when a virtual display is minted (backend and mode).",
+	"display.released":
+		"Fires when kept virtual displays are released.",
+	"library.changed":
+		"Fires when the game library is mutated (manual edit or a provider reconcile).",
+	"update.available":
+		"Fires once per discovered newer release (not on every update check).",
+	"update.applied":
+		"Fires on the new binary's first start after a successful update.",
+	"host.started":
+		"Fires when the host's serve planes come up (version, GameStream enabled).",
+	"host.stopping":
+		"Fires when the host is winding down.",
+};
+
+/** Recommended starter event for a first hook. */
+const RECOMMENDED_EVENT = "session.started" as const;
+
+const EMPTY: HookEntry = { on: RECOMMENDED_EVENT, run: "" };
 
 /**
  * Add or edit one hook.
@@ -104,7 +164,12 @@ export const HookForm: FC<{
 
 				<div className="space-y-4">
 					<div className="space-y-2">
-						<Label htmlFor="hook-on">{m.automation_field_on()}</Label>
+						<OptionLabel
+							label={m.automation_field_on()}
+							htmlFor="hook-on"
+							help={m.automation_field_on_help()}
+							recommended={`${RECOMMENDED_EVENT} for a first hook (or client.connected for connect/disconnect scripts)`}
+						/>
 						<select
 							id="hook-on"
 							value={draft.on}
@@ -112,20 +177,24 @@ export const HookForm: FC<{
 							className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{EVENT_KINDS.map((k) => (
-								<option key={k} value={k}>
+								<HelpOption
+									key={k}
+									value={k}
+									title={EVENT_KIND_HELP[k]}
+									recommended={k === RECOMMENDED_EVENT}
+								>
 									{k}
-								</option>
+								</HelpOption>
 							))}
 						</select>
-						<p className="text-xs text-muted-foreground">
-							{m.automation_field_on_help()}
-						</p>
 					</div>
 
 					<fieldset className="space-y-2 rounded-lg border border-border/70 bg-muted/15 p-3">
-						<legend className="px-1 text-sm font-medium">
-							{m.automation_field_action()}
-						</legend>
+						<OptionLabel
+							label={m.automation_field_action()}
+							help="One action per hook: a local shell command, or a webhook POST. Use two hooks if you need both. Webhooks cannot target loopback; use Run for anything on this machine."
+							recommended="Run a command for local scripts"
+						/>
 						<div className="inline-flex rounded-lg border border-border/70 bg-background/60 p-0.5">
 							{(["run", "webhook"] as const).map((k) => (
 								<Button
@@ -135,6 +204,11 @@ export const HookForm: FC<{
 									variant={kind === k ? "secondary" : "ghost"}
 									className="h-7 px-2.5"
 									aria-pressed={kind === k}
+									title={
+										k === "run"
+											? `${m.automation_action_run_help()} Recommended for local scripts.`
+											: m.automation_action_webhook_help()
+									}
 									onClick={() => setKind(k)}
 								>
 									{k === "run"
@@ -169,35 +243,53 @@ export const HookForm: FC<{
 
 					{kind === "webhook" && (
 						<div className="space-y-2">
-							<Label htmlFor="hook-hmac">{m.automation_field_hmac()}</Label>
+							<OptionLabel
+								label={m.automation_field_hmac()}
+								htmlFor="hook-hmac"
+								help={m.automation_field_hmac_help()}
+								recommended="Leave blank unless the receiver verifies X-Slipstream-Signature"
+							/>
 							<Input
 								id="hook-hmac"
 								autoComplete="off"
 								spellCheck={false}
 								value={draft.hmac_secret_file ?? ""}
+								placeholder="/path/to/webhook-secret"
 								onChange={(e) => set({ hmac_secret_file: e.target.value })}
 							/>
-							<p className="text-xs text-muted-foreground">
-								{m.automation_field_hmac_help()}
-							</p>
 						</div>
 					)}
 
-					<Label className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/15 px-3 py-2.5 text-sm font-normal">
-						<Checkbox
-							checked={filtered}
-							onCheckedChange={(n) => setFiltered(n === true)}
-							className="mt-0.5"
-						/>
-						<span>{m.automation_field_filter()}</span>
-					</Label>
+					<div className="space-y-2 rounded-lg border border-border/70 bg-muted/15 px-3 py-2.5">
+						<label className="flex items-start gap-3 text-sm font-normal">
+							<Checkbox
+								checked={filtered}
+								onCheckedChange={(n) => setFiltered(n === true)}
+								className="mt-0.5"
+							/>
+							<span className="min-w-0 space-y-1">
+								<span className="flex items-center gap-1.5">
+									<span className="font-medium">
+										{m.automation_field_filter()}
+									</span>
+									<HelpTip
+										label={m.automation_field_filter()}
+										text="When enabled, the hook only fires if every filled filter field matches the event exactly. Leave off unless you need per-client or per-game targeting."
+									/>
+								</span>
+								<RecommendedMark value="Off, unless you need a specific client or game" />
+							</span>
+						</label>
+					</div>
 
 					{filtered && (
 						<div className="grid gap-3 rounded-lg border border-border/70 bg-muted/10 p-3 sm:grid-cols-2">
 							<div className="space-y-2">
-								<Label htmlFor="hook-client">
-									{m.automation_filter_client()}
-								</Label>
+								<OptionLabel
+									label={m.automation_filter_client()}
+									htmlFor="hook-client"
+									help="Exact client/device name from the event (e.g. Living Room TV). Blank means any client."
+								/>
 								<Input
 									id="hook-client"
 									value={draft.filter?.client ?? ""}
@@ -207,7 +299,11 @@ export const HookForm: FC<{
 								/>
 							</div>
 							<div className="space-y-2">
-								<Label htmlFor="hook-app">{m.automation_filter_app()}</Label>
+								<OptionLabel
+									label={m.automation_filter_app()}
+									htmlFor="hook-app"
+									help="Exact game/app id from the event (e.g. steam:570). Blank means any app."
+								/>
 								<Input
 									id="hook-app"
 									value={draft.filter?.app ?? ""}
@@ -221,9 +317,12 @@ export const HookForm: FC<{
 
 					<div className="grid gap-3 sm:grid-cols-2">
 						<div className="space-y-2">
-							<Label htmlFor="hook-debounce">
-								{m.automation_field_debounce()}
-							</Label>
+							<OptionLabel
+								label={m.automation_field_debounce()}
+								htmlFor="hook-debounce"
+								help="Minimum milliseconds between firings of this hook. 0 (blank) means every matching event fires."
+								recommended="0 / blank unless the event can spam"
+							/>
 							<Input
 								id="hook-debounce"
 								type="number"
@@ -236,9 +335,12 @@ export const HookForm: FC<{
 						</div>
 						{kind === "run" && (
 							<div className="space-y-2">
-								<Label htmlFor="hook-timeout">
-									{m.automation_field_timeout()}
-								</Label>
+								<OptionLabel
+									label={m.automation_field_timeout()}
+									htmlFor="hook-timeout"
+									help="Seconds before a run command's process group is killed (1-600). Leave unset for the host default of 30s."
+									recommended="Blank / host default (30s)"
+								/>
 								<Input
 									id="hook-timeout"
 									type="number"

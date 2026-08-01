@@ -20,29 +20,105 @@ import { useGetHostInfo, useGetStatus } from "@/api/gen/host/host";
 import { useHostEvents } from "@/api/events";
 import { pluginIcon, uiPlugins, usePlugins } from "@/api/plugins";
 import { CommandPalette } from "@/components/command-palette";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { changeLocale, type Locale, locales, useLocale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages";
 
 const MLink = motion(Link);
 
+type NavItem = {
+	to: string;
+	icon: typeof Home;
+	label: () => string;
+	help: () => string;
+};
+
 /** Compatibility route set shared by the desktop groups and mobile overflow. */
-const NAV = [
-	{ to: "/", icon: Home, label: () => m.nav_dashboard() },
-	{ to: "/pin", icon: KeyRound, label: () => m.nav_pairing() },
-	{ to: "/apps", icon: AppWindow, label: () => m.nav_library() },
-	{ to: "/config", icon: Settings, label: () => m.display_config_title() },
-	{ to: "/troubleshoot", icon: Wrench, label: () => m.nav_logs() },
+const NAV: readonly NavItem[] = [
+	{
+		to: "/",
+		icon: Home,
+		label: () => m.nav_dashboard(),
+		help: () =>
+			"Live host overview: session state, paired clients, and recent activity.",
+	},
+	{
+		to: "/pin",
+		icon: KeyRound,
+		label: () => m.nav_pairing(),
+		help: () =>
+			"Pair Moonlight or Slipstream clients with a PIN, and manage already-paired devices.",
+	},
+	{
+		to: "/apps",
+		icon: AppWindow,
+		label: () => m.nav_library(),
+		help: () =>
+			"Browse and manage the game library the host advertises to clients.",
+	},
+	{
+		to: "/config",
+		icon: Settings,
+		label: () => m.display_config_title(),
+		help: () =>
+			"Host capture, input, network, and encoder defaults. Changes usually need a host restart.",
+	},
+	{
+		to: "/troubleshoot",
+		icon: Wrench,
+		label: () => m.nav_logs(),
+		help: () => "Read live host logs and export them for troubleshooting.",
+	},
 ] as const;
 
 /** Additional console routes shared by desktop groups and mobile overflow. */
-const MORE_NAV = [
-	{ to: "/host", icon: Server, label: () => m.nav_host() },
-	{ to: "/displays", icon: MonitorPlay, label: () => m.nav_displays() },
-	{ to: "/stats", icon: GaugeCircle, label: () => m.nav_stats() },
-	{ to: "/automation", icon: Workflow, label: () => m.nav_automation() },
-	{ to: "/plugins", icon: Puzzle, label: () => m.nav_plugins() },
-	{ to: "/settings", icon: Settings, label: () => m.nav_settings() },
+const MORE_NAV: readonly NavItem[] = [
+	{
+		to: "/host",
+		icon: Server,
+		label: () => m.nav_host(),
+		help: () =>
+			"Host identity, GPU status, updates, and competing GameStream host warnings.",
+	},
+	{
+		to: "/displays",
+		icon: MonitorPlay,
+		label: () => m.nav_displays(),
+		help: () =>
+			"Virtual display policy, presets, keep-alive, and live monitor layout.",
+	},
+	{
+		to: "/stats",
+		icon: GaugeCircle,
+		label: () => m.nav_stats(),
+		help: () =>
+			"Capture performance graphs, recordings, and live stream health.",
+	},
+	{
+		to: "/automation",
+		icon: Workflow,
+		label: () => m.nav_automation(),
+		help: () =>
+			"Run shell commands or webhooks when host events fire (connect, stream, pair, and more).",
+	},
+	{
+		to: "/plugins",
+		icon: Puzzle,
+		label: () => m.nav_plugins(),
+		help: () => "Open installed plugin UIs embedded in the console.",
+	},
+	{
+		to: "/settings",
+		icon: Settings,
+		label: () => m.nav_settings(),
+		help: () => "Console language and sign-out for this management session.",
+	},
 ] as const;
 
 const EXACT: readonly string[] = ["/", "/plugins"];
@@ -105,95 +181,109 @@ export function AppShell({ children }: { children: ReactNode }) {
 	// polling intervals stay as a floor in case the stream is unavailable.
 	useHostEvents();
 	return (
-		<div className="flex min-h-screen bg-background">
-			{/* Desktop sidebar (≥ sm). Sticky at viewport height: the page (body) scrolls with
+		<TooltipProvider>
+			<div className="flex min-h-screen bg-background">
+				{/* Desktop sidebar (≥ sm). Sticky at viewport height: the page (body) scrolls with
 			    long content, but the sidebar stays pinned — the explicit h-dvh stops the flex
 			    stretch that would otherwise grow it (and push the language switcher) below the
 			    fold. overflow-y-auto lets the nav itself scroll on very short viewports. */}
-			<aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col overflow-y-auto border-r border-border/80 bg-card sm:flex">
-				<div className="flex flex-col gap-6 px-3 pb-4 pt-4">
-					<Link
-						to="/"
-						aria-label={m.app_name()}
-						className="flex items-center rounded-md px-1.5 py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1 focus-visible:ring-offset-card"
-					>
+				<aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col overflow-y-auto border-r border-border/80 bg-card sm:flex">
+					<div className="flex flex-col gap-6 px-3 pb-4 pt-4">
+						<Link
+							to="/"
+							aria-label={m.app_name()}
+							className="flex items-center rounded-md px-1.5 py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1 focus-visible:ring-offset-card"
+						>
+							<img
+								src="/slipstream-logo.png"
+								alt={m.app_name()}
+								className="h-12 w-auto max-w-full object-contain"
+								draggable={false}
+							/>
+						</Link>
+
+						<motion.nav
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							transition={{ duration: 0.18 }}
+							className="flex flex-col gap-4"
+							aria-label={m.app_name()}
+						>
+							{NAV_GROUPS.map(({ id, label, items }) => (
+								<div key={id} className="flex flex-col gap-0.5">
+									<p className={sectionLabelClass}>{label()}</p>
+									{items.map((item) => (
+										<NavTooltipLink key={item.to} item={item} />
+									))}
+								</div>
+							))}
+						</motion.nav>
+
+						<PluginNavSection />
+					</div>
+
+					<div className="mt-auto border-t border-border/70 px-3 py-3">
+						<LanguageSwitcher />
+					</div>
+				</aside>
+
+				<div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
+					{/* Mobile top bar (< sm): brand + language. The sidebar is hidden here. */}
+					<header className="flex items-center gap-2 border-b border-border/80 bg-card px-3 py-2.5 sm:hidden">
 						<img
 							src="/slipstream-logo.png"
 							alt={m.app_name()}
-							className="h-12 w-auto max-w-full object-contain"
+							className="h-7 w-auto max-w-[70%]"
 							draggable={false}
 						/>
-					</Link>
+						<div className="ml-auto shrink-0">
+							<LanguageSwitcher />
+						</div>
+					</header>
 
-					<motion.nav
-						initial={{ opacity: 0 }}
-						animate={{ opacity: 1 }}
-						transition={{ duration: 0.18 }}
-						className="flex flex-col gap-4"
-						aria-label={m.app_name()}
-					>
-						{NAV_GROUPS.map(({ id, label, items }) => (
-							<div key={id} className="flex flex-col gap-0.5">
-								<p className={sectionLabelClass}>{label()}</p>
-								{items.map(({ to, icon: Icon, label: itemLabel }) => (
-									<MLink
-										key={to}
-										whileTap={{ scale: 0.985 }}
-										to={to}
-										activeOptions={{ exact: EXACT.includes(to) }}
-										className={navItemClass}
-										activeProps={{ className: navItemActiveClass }}
-									>
-										{/* TanStack Link sets data-status="active" on the active route. */}
-										<span
-											aria-hidden
-											className="pointer-events-none absolute inset-y-1 left-0 w-0.5 rounded-full bg-primary opacity-0 [[data-status=active]_&]:opacity-100"
-										/>
-										<Icon className="relative size-4 shrink-0 opacity-80 [[data-status=active]_&]:opacity-100" />
-										<span className="relative min-w-0 flex-1 truncate">
-											{itemLabel()}
-										</span>
-									</MLink>
-								))}
-							</div>
-						))}
-					</motion.nav>
-
-					<PluginNavSection />
-				</div>
-
-				<div className="mt-auto border-t border-border/70 px-3 py-3">
-					<LanguageSwitcher />
-				</div>
-			</aside>
-
-			<div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
-				{/* Mobile top bar (< sm): brand + language. The sidebar is hidden here. */}
-				<header className="flex items-center gap-2 border-b border-border/80 bg-card px-3 py-2.5 sm:hidden">
-					<img
-						src="/slipstream-logo.png"
-						alt={m.app_name()}
-						className="h-7 w-auto max-w-[70%]"
-						draggable={false}
-					/>
-					<div className="ml-auto shrink-0">
-						<LanguageSwitcher />
-					</div>
-				</header>
-
-				<main className="flex-1 bg-muted/15">
-					{/* Mobile: side gutter so content isn't overly narrow; pb-24 leaves room for
+					<main className="flex-1 bg-muted/15">
+						{/* Mobile: side gutter so content isn't overly narrow; pb-24 leaves room for
 					    the fixed bottom nav. Desktop: denser console padding; muted wash vs the
 					    solid sidebar is the content frame. */}
-					<div className="mx-auto max-w-[1700px] px-4 py-5 pb-24 sm:px-6 sm:py-6 sm:pb-6 lg:px-8 lg:py-7">
-						<ConsoleStatusHeader />
-						{children}
-					</div>
-				</main>
-			</div>
+						<div className="mx-auto max-w-[1700px] px-4 py-5 pb-24 sm:px-6 sm:py-6 sm:pb-6 lg:px-8 lg:py-7">
+							<ConsoleStatusHeader />
+							{children}
+						</div>
+					</main>
+				</div>
 
-			<MobileNav />
-		</div>
+				<MobileNav />
+			</div>
+		</TooltipProvider>
+	);
+}
+
+function NavTooltipLink({ item }: { item: NavItem }) {
+	const { to, icon: Icon, label, help } = item;
+	return (
+		<Tooltip>
+			<TooltipTrigger asChild>
+				<MLink
+					whileTap={{ scale: 0.985 }}
+					to={to}
+					title={help()}
+					activeOptions={{ exact: EXACT.includes(to) }}
+					className={navItemClass}
+					activeProps={{ className: navItemActiveClass }}
+				>
+					{/* TanStack Link sets data-status="active" on the active route. */}
+					<span
+						aria-hidden
+						className="pointer-events-none absolute inset-y-1 left-0 w-0.5 rounded-full bg-primary opacity-0 [[data-status=active]_&]:opacity-100"
+					/>
+					<Icon className="relative size-4 shrink-0 opacity-80 [[data-status=active]_&]:opacity-100" />
+					<span className="relative min-w-0 flex-1 truncate">{label()}</span>
+				</MLink>
+			</TooltipTrigger>
+			<TooltipContent side="right" align="center">
+				{help()}
+			</TooltipContent>
+		</Tooltip>
 	);
 }
 
@@ -334,6 +424,7 @@ function PluginNavSection() {
 						<Link
 							to="/plugins/$pluginId/$"
 							params={{ pluginId: p.id, _splat: "" }}
+							title={`${p.title} plugin UI.`}
 							className={navItemClass}
 							activeProps={{ className: navItemActiveClass }}
 						>
@@ -475,10 +566,11 @@ function MobileNav() {
 									</button>
 								</div>
 								<div className="grid max-h-[min(68vh,34rem)] grid-cols-2 gap-2 overflow-y-auto px-3 pb-3">
-									{MOBILE_OVERFLOW.map(({ to, icon: Icon, label }) => (
+									{MOBILE_OVERFLOW.map(({ to, icon: Icon, label, help }) => (
 										<Link
 											key={to}
 											to={to}
+											title={help()}
 											onClick={() => setMoreOpen(false)}
 											activeOptions={{ exact: EXACT.includes(to) }}
 											className={menuItem}
@@ -499,11 +591,13 @@ function MobileNav() {
 									))}
 									{plugins.map((p) => {
 										const Icon = pluginIcon(p.ui?.icon);
+										const help = `${p.title} plugin UI.`;
 										return (
 											<Link
 												key={p.id}
 												to="/plugins/$pluginId/$"
 												params={{ pluginId: p.id, _splat: "" }}
+												title={help}
 												onClick={() => setMoreOpen(false)}
 												className={menuItem}
 												activeProps={{
@@ -528,10 +622,11 @@ function MobileNav() {
 					)}
 				</AnimatePresence>
 				<div className="grid grid-cols-5 border-t border-border/80 bg-card/95 backdrop-blur-md">
-					{MOBILE_PRIMARY.map(({ to, icon: Icon, label }) => (
+					{MOBILE_PRIMARY.map(({ to, icon: Icon, label, help }) => (
 						<Link
 							key={to}
 							to={to}
+							title={help()}
 							onClick={() => setMoreOpen(false)}
 							activeOptions={{ exact: EXACT.includes(to) }}
 							className={tab}
@@ -549,6 +644,7 @@ function MobileNav() {
 						type="button"
 						ref={moreTriggerRef}
 						onClick={() => setMoreOpen((o) => !o)}
+						title="Open the rest of the console pages."
 						aria-expanded={moreOpen}
 						aria-controls="mobile-nav-menu"
 						aria-haspopup="dialog"
@@ -573,6 +669,10 @@ function MobileNav() {
 
 function LanguageSwitcher() {
 	const current = useLocale();
+	const helps: Record<Locale, string> = {
+		en: "Switch the console language to English. Recommended for most users.",
+		de: "Switch the console language to German.",
+	};
 	return (
 		// biome-ignore lint/a11y/useSemanticElements: an aria-labelled role="group" is the right pattern for this small control cluster — no single semantic element fits.
 		<div
@@ -581,20 +681,28 @@ function LanguageSwitcher() {
 			aria-label={m.settings_language()}
 		>
 			{locales.map((l: Locale) => (
-				<button
-					key={l}
-					type="button"
-					onClick={() => changeLocale(l)}
-					aria-pressed={l === current}
-					className={cn(
-						"rounded px-2 py-1 text-[11px] uppercase tracking-wide outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50",
-						l === current
-							? "bg-card text-foreground font-medium shadow-sm"
-							: "text-muted-foreground hover:text-foreground",
-					)}
-				>
-					{l}
-				</button>
+				<Tooltip key={l}>
+					<TooltipTrigger asChild>
+						<button
+							type="button"
+							onClick={() => changeLocale(l)}
+							aria-pressed={l === current}
+							title={helps[l]}
+							className={cn(
+								"rounded px-2 py-1 text-[11px] uppercase tracking-wide outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50",
+								l === current
+									? "bg-card text-foreground font-medium shadow-sm"
+									: "text-muted-foreground hover:text-foreground",
+							)}
+						>
+							{l}
+						</button>
+					</TooltipTrigger>
+					<TooltipContent side="top">
+						{helps[l]}
+						{l === "en" ? " Recommended." : ""}
+					</TooltipContent>
+				</Tooltip>
 			))}
 		</div>
 	);
