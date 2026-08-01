@@ -255,7 +255,7 @@ pwsh -File packaging\windows\pack-host-installer.ps1 -Version 0.0.0-dev -TargetD
 ## Release
 
 Push a `vX.Y.Z` tag — one tag releases every platform (see
-[Release Channels](../../docs-site/content/docs/channels)). The workflow builds, signs, and
+[Release Channels](../../docs-site/content/docs/channels.md)). The workflow builds, signs, and
 publishes `slipstream-host-setup-X.Y.Z.exe` + the public `.cer`, refreshes the stable `latest/`
 alias, and attaches the installer to the unified GitHub Release when publishing is wired. Main pushes publish rolling
 `<next-minor>.<run>` **canary** builds (base derived from the latest stable tag by

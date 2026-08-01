@@ -95,7 +95,7 @@ lost 3 (2.4%)
   measured rate with `target N Mb/s` — what the host's encoder is currently *allowed* to
   produce — so a quiet desktop under a large grant (measured far below target) reads
   differently from an encoder pinned at its cap (measured hugging the target). `(auto)`
-  means the [Automatic bitrate](/docs/client-settings#bitrate) controller owns the target
+  means the [Automatic bitrate](/docs/client-settings#video) controller owns the target
   and moves it with network conditions; no target at all means an older host that doesn't
   report one. Then the decode path, an [HDR](/docs/hdr) tag (`HDR`, or `HDR→SDR` when a PQ
   stream is tone-mapped onto an SDR screen), and — when you asked for

@@ -4,7 +4,7 @@ Build RPMs locally with this tree (or attach them to a
 [GitHub Release](https://github.com/vindeckyy/slipstream/releases)). There is no public RPM
 registry. CI (`.github/workflows/rpm.yml`) can still produce canary/stable builds when you wire
 publishing to your own feed or to GitHub Releases — keep those channels separate (see
-[Release Channels](../../docs-site/content/docs/channels)). The RPM is built in the Fedora image
+[Release Channels](../../docs-site/content/docs/channels.md)). The RPM is built in the Fedora image
 (`ci/fedora-rpm.Dockerfile`) so its auto-generated library Requires (`libavcodec.so.NN`, …) match
 the target sonames; the NVIDIA driver lib (`libcuda.so.1`) is excluded — NVENC/EGL come from
 whatever NVIDIA stack the host runs (a weak Recommends).

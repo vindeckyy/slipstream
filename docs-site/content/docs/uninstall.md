@@ -134,6 +134,22 @@ And your config, if you want it gone: `rm -rf ~/.config/slipstream`. See
 
 ### Arch / CachyOS (pacman)
 
+Close any firewall services you opened during installation while their named profiles are still
+installed. Run only the lines that match your setup:
+
+```sh
+# ufw (CachyOS)
+sudo ufw delete allow slipstream-native
+sudo ufw delete allow slipstream-gamestream
+sudo ufw delete allow slipstream-web
+
+# firewalld (EndeavourOS and other Arch spins)
+sudo firewall-cmd --permanent --remove-service=slipstream-native
+sudo firewall-cmd --permanent --remove-service=slipstream-gamestream
+sudo firewall-cmd --permanent --remove-service=slipstream-web
+sudo firewall-cmd --reload
+```
+
 ```sh
 sudo pacman -Rns slipstream-host slipstream-web slipstream-gamescope \
   slipstream-client slipstream-scripting
@@ -142,17 +158,8 @@ sudo pacman -Rns slipstream-host slipstream-web slipstream-gamescope \
 Name only what you installed. `-Rns` also takes the dependencies nothing else needs and removes the
 packages' own configuration files.
 
-Then delete the `[slipstream]` section (or `[slipstream-canary]`) from `/etc/pacman.conf` — the two
-lines you appended when you [added the repo](/docs/arch#2-add-the-signed-repo). Optionally drop the
-repo's signing key from pacman's keyring:
-
-```sh
-sudo pacman-key --delete E0CA04465C99C936E0B0C6510A317015A34DDD69
-```
-
-**Left behind:** `~/.config/slipstream` and the `slipstream-update` group —
-`rm -rf ~/.config/slipstream` and `sudo groupdel slipstream-update` clear them. On CachyOS, close the
-ufw rules you opened: `sudo ufw delete allow slipstream-native`.
+**Left behind:** `~/.config/slipstream` and the `slipstream-update` group. Remove them with
+`rm -rf ~/.config/slipstream` and `sudo groupdel slipstream-update`.
 
 ### SteamOS / Steam Deck host (on-device build)
 

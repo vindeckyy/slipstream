@@ -5,7 +5,7 @@ tile, clean install/uninstall) instead of a loose exe. CI builds + publishes the
 [`.github/workflows/windows-msix.yml`](../../../.github/workflows/windows-msix.yml) to GitHub's
 local build / [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached, on every `main` push that
 touches the client (canary) and on `vX.Y.Z` release tags (stable) — see
-[Release Channels](../../docs-site/content/docs/channels).
+[Release Channels](../../../docs-site/content/docs/channels.md).
 
 **Two architectures, one x64 runner.** Both `x64` and `arm64` packages are produced off the single
 x64 Windows runner — `x86_64-pc-windows-msvc` builds natively, `aarch64-pc-windows-msvc` is

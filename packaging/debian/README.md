@@ -4,7 +4,7 @@ Build `.deb` packages locally with the scripts in this directory, or attach them
 [GitHub Release](https://github.com/vindeckyy/slipstream/releases). There is no public apt registry.
 CI (`.github/workflows/deb.yml`) can still produce canary/stable builds when you wire publishing to
 your own feed or to GitHub Releases — keep those channels separate so a stable box never jumps to a
-canary build. See [Release Channels](../../docs-site/content/docs/channels).
+canary build. See [Release Channels](../../docs-site/content/docs/channels.md).
 
 The same workflow also publishes **`slipstream-web`** (the browser management console — pairing +
 status) and **`slipstream-client`** (the native GTK4/libadwaita Linux client). `slipstream-host` **Recommends**
