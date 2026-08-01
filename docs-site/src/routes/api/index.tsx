@@ -184,6 +184,7 @@ function ApiReference() {
       url: '/openapi.json',
       darkMode: isDark,
       hideDarkModeToggle: true,
+      agent: { disabled: true },
       metaData: { title: 'Slipstream API reference' },
       hideDownloadButton: false,
       customCss: SCALAR_CSS,
