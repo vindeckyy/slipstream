@@ -64,17 +64,17 @@ pub(crate) fn emit_display_event(ev: DisplayEvent) {
 /// The virtual-display backend contract — [`DisplayOwnership`], [`VirtualOutput`], and the
 /// [`VirtualDisplay`] trait (plan §W3). Re-exported so `crate::VirtualDisplay` etc. stay
 /// stable for the ~30 external call sites.
-#[path = "vdisplay/backend.rs"]
+#[path = "display/backend.rs"]
 pub(crate) mod backend;
 pub use backend::{DisplayOwnership, VirtualDisplay, VirtualOutput};
 
 /// Time-bounded child-process helpers — every compositor query shells out, and an unbounded one
 /// can wedge the calling (session) thread forever.
-#[path = "vdisplay/proc.rs"]
+#[path = "display/proc.rs"]
 pub(crate) mod proc;
 
 /// Live-session detection + session-epoch + env retargeting (plan §W3).
-#[path = "vdisplay/session.rs"]
+#[path = "display/session.rs"]
 pub(crate) mod session;
 pub use session::{
     apply_session_env, compositor_for_kind, detect_active_session, observe_session_instance,
@@ -84,7 +84,7 @@ pub use session::{
 pub use session::{session_epoch, try_recover_session};
 
 /// Gamescope-session routing (plan §W3).
-#[path = "vdisplay/routing.rs"]
+#[path = "display/routing.rs"]
 pub(crate) mod routing;
 pub use routing::{
     apply_input_env, managed_session_available, resolve_gamescope_route, restore_managed_session,
@@ -470,14 +470,14 @@ pub fn probe(compositor: Compositor) -> Result<()> {
 // The user-configurable management policy (keep-alive / topology / conflict / identity / layout),
 // layered above the per-compositor backends — platform-neutral (the mgmt API + both host paths read
 // it), so no cfg gate. See `design/display-management.md`.
-#[path = "vdisplay/policy.rs"]
+#[path = "display/policy.rs"]
 pub mod policy;
 
 // Read-only physical-monitor enumeration (the heads the compositor ALREADY has — not ours), for
 // pinning capture at one of them + the console picker. Platform-neutral facade; the per-backend
 // reads live beside the code that already speaks each dialect. See
 // `design/per-monitor-portal-capture.md` §5.1.
-#[path = "vdisplay/monitors.rs"]
+#[path = "display/monitors.rs"]
 pub mod monitors;
 
 // The monitor-mirror backend: stream a head the compositor ALREADY has (the
@@ -485,22 +485,22 @@ pub mod monitors;
 // session machinery is unchanged, but reports `DisplayOwnership::External` so none of the
 // virtual-display lifecycle policy is applied to someone else's monitor.
 #[cfg(target_os = "linux")]
-#[path = "vdisplay/mirror.rs"]
+#[path = "display/mirror.rs"]
 mod mirror;
 
 // The pure per-display lifecycle state machine (refcount + linger + pin), platform-neutral and
 // property-tested; the registry executes the side effects its transitions dictate.
-#[path = "vdisplay/lifecycle.rs"]
+#[path = "display/lifecycle.rs"]
 pub(crate) mod lifecycle;
 
 // The neutral snapshot/release facade over the per-OS lifecycle owners (Windows manager; Linux pool
 // later), for the management API's /display/state + /display/release.
-#[path = "vdisplay/registry.rs"]
+#[path = "display/registry.rs"]
 pub mod registry;
 
 // The pure display-arrangement engine (auto-row / manual → per-member positions), platform-neutral
 // and unit-tested; the registry (state readout) and the KWin position apply consume it.
-#[path = "vdisplay/layout.rs"]
+#[path = "display/layout.rs"]
 pub(crate) mod layout;
 
 /// Resolve a [`policy::Topology`] to a concrete value (never [`policy::Topology::Auto`]). `Auto`
@@ -548,16 +548,16 @@ pub fn effective_topology() -> policy::Topology {
     }
 }
 
-// Goal-1 stage 6: per-compositor Linux backends under `vdisplay/linux/`, the Windows IddCx/SudoVDA
-// backends under `vdisplay/windows/`; `#[path]` keeps the `crate::*` module names flat.
+// Goal-1 stage 6: per-compositor Linux backends under `display/linux/`, the Windows IddCx/SudoVDA
+// backends under `display/windows/`; `#[path]` keeps the `crate::*` module names flat.
 #[cfg(target_os = "linux")]
-#[path = "vdisplay/linux/gamescope.rs"]
+#[path = "display/linux/gamescope.rs"]
 mod gamescope;
 
 /// Entry point for the hidden `gamescope-splash` host subcommand: the tiny X11 client every bare
 /// gamescope spawn backgrounds beside its nested app, so the fresh compositor composites — and its
 /// PipeWire node delivers frames — from the first second instead of starving the first-frame wait
-/// while the nested Steam bootstrap paints nothing (see `vdisplay/linux/gamescope/splash.rs`).
+/// while the nested Steam bootstrap paints nothing (see `display/linux/gamescope/splash.rs`).
 /// Blocks for the session's lifetime; gamescope's reaper tears it down with the session.
 #[cfg(target_os = "linux")]
 pub fn gamescope_splash_client() -> anyhow::Result<()> {
@@ -626,12 +626,12 @@ fn gamescope_ours_and(#[cfg(target_os = "linux")] probe: fn() -> bool) -> bool {
 // ConnectorIndex from the id; KWin names its output from it. `allow(dead_code)` because only Windows
 // consumes it in non-test code today — the KWin wiring is the next Stage-3 step.
 #[allow(dead_code)]
-#[path = "vdisplay/identity.rs"]
+#[path = "display/identity.rs"]
 pub(crate) mod identity;
 
 // Platform-neutral mode-conflict admission (Stage 4): the separate/join/steal/reject decision + the
 // live-session registry, wired into the slipstream/1 handshake.
-#[path = "vdisplay/admission.rs"]
+#[path = "display/admission.rs"]
 pub mod admission;
 
 /// Editing the user's xdg-desktop-portal configs in place — the wlr-family backends both need one
@@ -640,44 +640,44 @@ pub mod admission;
 /// Declared unconditionally although only the Linux backends call it: the merge is pure string
 /// handling, so its tests — which are what make a merge safe to run against a user's real config —
 /// should run on every platform's CI rather than only where the callers compile.
-#[path = "vdisplay/linux/portal_config.rs"]
+#[path = "display/linux/portal_config.rs"]
 mod portal_config;
 
 #[cfg(target_os = "linux")]
-#[path = "vdisplay/linux/hyprland.rs"]
+#[path = "display/linux/hyprland.rs"]
 mod hyprland;
 
 #[cfg(target_os = "linux")]
-#[path = "vdisplay/linux/kwin.rs"]
+#[path = "display/linux/kwin.rs"]
 mod kwin;
 
 // In-process KDE output management (kde_output_management_v2) — the topology path that used to shell
 // out to `kscreen-doctor`, driven over the compositor's own Wayland instead so it can't be wedged by
 // a stuck libkscreen/kscreen-KDED backend. Consumed by `kwin` (best-effort, with kscreen fallback).
 #[cfg(target_os = "linux")]
-#[path = "vdisplay/linux/kwin_output_mgmt.rs"]
+#[path = "display/linux/kwin_output_mgmt.rs"]
 mod kwin_output_mgmt;
 
 #[cfg(target_os = "windows")]
-#[path = "vdisplay/windows/manager.rs"]
+#[path = "display/windows/manager.rs"]
 pub mod manager;
 
 // DDC/CI panel power control (physical monitors), used only by the Windows manager to blank/wake the
 // box's real panels around a virtual-display session — moved in with the subsystem (plan §W6).
 #[cfg(target_os = "windows")]
-#[path = "vdisplay/ddc.rs"]
+#[path = "display/ddc.rs"]
 mod ddc;
 
 #[cfg(target_os = "linux")]
-#[path = "vdisplay/linux/mutter.rs"]
+#[path = "display/linux/mutter.rs"]
 mod mutter;
 
 #[cfg(target_os = "windows")]
-#[path = "vdisplay/windows/ss_vdisplay.rs"]
+#[path = "display/windows/ss_vdisplay.rs"]
 pub mod driver;
 
 #[cfg(target_os = "linux")]
-#[path = "vdisplay/linux/wlroots.rs"]
+#[path = "display/linux/wlroots.rs"]
 mod wlroots;
 
 /// Private headless compositor spawner (labwc / krfb-virtualmonitor / gamescope `--headless`).
@@ -685,7 +685,7 @@ mod wlroots;
 /// session for headless hosts (`SLIPSTREAM_HEADLESS_COMPOSITOR`). Dropping the session kills the
 /// child (or removes the krfb output).
 #[cfg(target_os = "linux")]
-#[path = "vdisplay/linux/headless.rs"]
+#[path = "display/linux/headless.rs"]
 pub mod headless;
 
 #[cfg(target_os = "linux")]

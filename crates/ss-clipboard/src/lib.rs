@@ -15,10 +15,16 @@ use std::sync::Arc;
 
 use slipstream_core::quic::ClipOffer;
 
+/// Implementation tree under `backend/`; public path remains [`host`].
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+mod backend;
+
 /// The per-OS backends (`ext-data-control-v1` / Mutter direct / Win32) behind one
 /// `HostClipboard`, plus the backend-agnostic [`host::session`] coordinator.
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-pub mod host;
+pub mod host {
+    pub use crate::backend::host::*;
+}
 
 /// Operator clipboard policy from `SLIPSTREAM_CLIPBOARD` (`design/clipboard-and-file-transfer.md`
 /// §4.2): `off` (default — the whole feature is dark), `on` / `1` (text + files), `text-only` /

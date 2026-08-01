@@ -47,18 +47,33 @@ mod encode {
     pub(crate) use ss_encode::*;
 }
 mod events;
-// The lifetime of a launched game: whether it is running, when it exits (which can end the session),
-// and how to end it (which a session ending can ask for) — design/session-game-lifetime.md.
-mod gamelease;
+// Session lifetime (lease / plan / status / settings) lives under `session/`.
+// The flat `mod` shims below keep every existing `crate::gamelease::*` /
+// `crate::session_plan::*` path valid during the structural divergence waves.
+mod session;
+mod gamelease {
+    pub(crate) use crate::session::gamelease::*;
+}
 // The Win32 half of ending a game: WM_CLOSE onto the interactive desktop, then TerminateProcess.
 #[cfg(target_os = "windows")]
 #[path = "windows/game_term.rs"]
 mod game_term;
-mod gamestream;
+/// Wire protocols (GameStream + slipstream/1). GameStream lives under `protocol::gamestream`;
+/// `mod gamestream` below is a compatibility re-export so existing `crate::gamestream::*` paths
+/// keep working during the structural divergence waves.
+mod protocol;
+mod gamestream {
+    pub(crate) use crate::protocol::gamestream::*;
+}
 #[cfg(target_os = "linux")]
 #[path = "linux/gpuclocks.rs"]
 mod gpuclocks;
-mod hooks;
+// Host operations (power / hooks / plugins / update / store) live under `ops/`.
+// Flat shims keep `crate::hooks::*`, `crate::power::*`, etc. working.
+mod ops;
+mod hooks {
+    pub(crate) use crate::ops::hooks::*;
+}
 // The input-injection backends live in the `ss-inject` subsystem crate (plan §W6); this shim keeps
 // every existing `crate::inject::*` path valid (the native/gamestream input planes + devtest consume
 // the trait, factory, and per-device backends through it).
@@ -75,12 +90,19 @@ mod library;
 mod log_capture;
 mod mgmt;
 mod mgmt_token;
-mod native;
+/// Compatibility shim: slipstream/1 host lives in `protocol::slipstream1`.
+mod native {
+    pub(crate) use crate::protocol::slipstream1::*;
+}
 mod native_pairing;
 mod osinfo;
 mod pipeline;
-mod plugins;
-mod power;
+mod plugins {
+    pub(crate) use crate::ops::plugins::*;
+}
+mod power {
+    pub(crate) use crate::ops::power::*;
+}
 // Finding a launched game's processes from its store's detect signals — the read side of the
 // session⇄game lifetime binding (design/session-game-lifetime.md §4). Per-OS matchers inside; on a
 // platform with neither (macOS, which has no launch path either) the module is an empty shell.
@@ -89,11 +111,17 @@ mod send_pacing;
 #[cfg(target_os = "windows")]
 #[path = "windows/service.rs"]
 mod service;
-mod session_plan;
+mod session_plan {
+    pub(crate) use crate::session::plan::*;
+}
 // Operator policy for the session⇄game lifetime binding (`session-settings.json`).
-mod session_settings;
+mod session_settings {
+    pub(crate) use crate::session::settings::*;
+}
 mod host_config_file;
-mod session_status;
+mod session_status {
+    pub(crate) use crate::session::status::*;
+}
 mod sleep_inhibit;
 mod spike;
 mod stats_recorder;
@@ -103,9 +131,13 @@ mod stats_recorder;
 mod tray;
 // The plugin store: signed catalogs, tiered trust, and install/uninstall jobs that run through the
 // same runner CLI the `plugins` subcommand uses (design/plugin-store.md).
-mod store;
+mod store {
+    pub(crate) use crate::ops::store::*;
+}
 mod stream_marker;
-mod update;
+mod update {
+    pub(crate) use crate::ops::update::*;
+}
 // `monitor_devnode::startup_recover()` (below) re-enables PnP monitor devnodes disabled by a prior
 // run; it lives in the `ss-win-display` leaf crate (plan §W6).
 #[cfg(target_os = "windows")]

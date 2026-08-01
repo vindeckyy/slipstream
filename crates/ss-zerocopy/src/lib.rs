@@ -21,6 +21,6 @@
 pub mod dmabuf_fence;
 
 #[cfg(target_os = "linux")]
-mod imp;
+mod bridge;
 #[cfg(target_os = "linux")]
-pub use imp::*;
+pub use bridge::*;

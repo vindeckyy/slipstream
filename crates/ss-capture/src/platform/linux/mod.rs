@@ -819,6 +819,10 @@ impl Drop for PortalCapturer {
     }
 }
 
+// One-time PipeWire library init (shared with host audio). Re-exported at crate root as
+// `ss_capture::pwinit` so existing `crate::pwinit` / host call sites keep resolving.
+pub mod pwinit;
+
 // The portal CONTROL PLANE (the ScreenCast/RemoteDesktop handshake + GNOME's colour-mode probe),
 // split out in sweep Phase 5.3 — async/tokio/zbus, none of it per-frame. `gnome_hdr_monitor_active`
 // is the host's HDR gate, re-exported from `lib.rs`.

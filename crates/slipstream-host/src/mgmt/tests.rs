@@ -1025,6 +1025,7 @@ fn openapi_document_is_complete_and_checked_in() {
     for p in [
         "/api/v1/health",
         "/api/v1/host",
+        "/api/v1/host/config",
         "/api/v1/host/restart",
         "/api/v1/host/shutdown",
         "/api/v1/status",
@@ -1034,6 +1035,13 @@ fn openapi_document_is_complete_and_checked_in() {
         "/api/v1/pair/pin",
         "/api/v1/session",
         "/api/v1/session/idr",
+        "/api/v1/session/settings",
+        "/api/v1/native/pair",
+        "/api/v1/plugins",
+        "/api/v1/hooks",
+        "/api/v1/update/status",
+        "/api/v1/update/check",
+        "/api/v1/store/catalog",
     ] {
         assert!(paths.contains_key(p), "spec is missing {p}");
     }
@@ -1043,6 +1051,23 @@ fn openapi_document_is_complete_and_checked_in() {
         .flat_map(|ops| ops.as_object().unwrap().values())
         .filter_map(|op| op["operationId"].as_str())
         .collect();
+    // Structural divergence waves may move modules; these operationIds are the console contract.
+    for id in [
+        "getHostInfo",
+        "getHostConfig",
+        "setHostConfig",
+        "restartHost",
+        "shutdownHost",
+        "getStatus",
+        "stopSession",
+        "getSessionSettings",
+        "setSessionSettings",
+    ] {
+        assert!(
+            op_ids.contains(&id),
+            "spec is missing operationId {id}"
+        );
+    }
     let total = op_ids.len();
     op_ids.sort_unstable();
     op_ids.dedup();
@@ -1069,6 +1094,26 @@ fn openapi_document_is_complete_and_checked_in() {
         generated, snapshot,
         "api/openapi.json is stale — regenerate with: \
          cargo run -p slipstream-host -- openapi > api/openapi.json"
+    );
+}
+
+/// Wave-1 structural moves may relocate modules; these crate paths must keep compiling so
+/// GameStream / slipstream/1 / power / lease entry points cannot silently vanish.
+#[test]
+fn structural_entry_points_remain_reachable() {
+    let _serve: fn(crate::native::Slipstream1Options) -> anyhow::Result<()> = crate::native::run;
+    let _opts: fn(&crate::native::NativeServe) -> crate::native::Slipstream1Options =
+        crate::native::native_serve_opts;
+    let _restart: fn() -> Result<(), String> = crate::power::schedule_restart;
+    let _shutdown: fn() = crate::power::schedule_shutdown;
+    let _lease: fn(crate::gamelease::LeaseRequest, crate::gamelease::OnExit) -> crate::gamelease::GameLease =
+        crate::gamelease::open;
+    let _ = (
+        std::any::type_name_of_val(&_serve),
+        std::any::type_name_of_val(&_opts),
+        std::any::type_name_of_val(&_restart),
+        std::any::type_name_of_val(&_shutdown),
+        std::any::type_name_of_val(&_lease),
     );
 }
 

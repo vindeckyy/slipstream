@@ -462,7 +462,7 @@ pub trait Encoder: Send {
     /// recover have nowhere to go — while flushing is the one call on this trait that can BLOCK on a
     /// wedged encoder, on precisely the teardown path a stopped session needs to complete promptly.
     /// The Linux direct-SDK NVENC backend makes that concrete: its retrieve-thread join is untimed
-    /// (see the note in `enc/linux/nvenc_cuda.rs`), so a flush there could hang a session that is
+    /// (see the note in `backend/linux/nvenc_cuda.rs`), so a flush there could hang a session that is
     /// already ending.
     ///
     /// It is kept rather than deleted because it does have real consumers: the `spike` dev

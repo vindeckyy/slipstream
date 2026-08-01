@@ -24,7 +24,7 @@
 use anyhow::Result;
 use slipstream_core::input::{InputEvent, InputKind};
 
-#[path = "inject/keymap.rs"]
+#[path = "input/keymap.rs"]
 mod keymap;
 #[cfg(target_os = "linux")]
 pub(crate) use keymap::gs_button_to_evdev;
@@ -37,7 +37,7 @@ pub use keymap::vk_to_evdev;
 /// Device-agnostic dedup for the rich HID-output feedback plane (0xCD), shared by the virtual-pad
 /// managers ([`uhid_manager`]).
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-#[path = "inject/hidout_dedup.rs"]
+#[path = "input/hidout_dedup.rs"]
 pub mod hidout_dedup;
 
 /// Injects input events into the host session. Not `Send`: an injector owns compositor
@@ -305,7 +305,7 @@ pub fn pen_supported() -> bool {
     false
 }
 
-#[path = "inject/service.rs"]
+#[path = "input/service.rs"]
 mod service;
 pub use service::InjectorService;
 
@@ -330,138 +330,138 @@ fn libei_ei_source() -> libei::EiSource {
     }
 }
 
-// Goal-1 stage 6: Linux UHID/uinput/libei/wlr backends under `inject/linux/`, the Windows UMDF/SendInput
-// backends under `inject/windows/`, and the transport-independent HID codecs under `inject/proto/`;
+// Goal-1 stage 6: Linux UHID/uinput/libei/wlr backends under `input/linux/`, the Windows UMDF/SendInput
+// backends under `input/windows/`, and the transport-independent HID codecs under `input/proto/`;
 // `#[path]` keeps every `crate::*` module name flat.
 /// Windows: asks a devnode which process is serving it (`ss_driver_proto::gamepad::ChannelProof`) —
 /// the unforgeable answer the sealed pad channel duplicates its DATA section into, replacing the
 /// LocalService-writable bootstrap mailbox as the source of that decision.
 #[cfg(target_os = "windows")]
-#[path = "inject/windows/channel_proof.rs"]
+#[path = "input/windows/channel_proof.rs"]
 pub mod channel_proof;
 #[cfg(target_os = "linux")]
-#[path = "inject/linux/dualsense.rs"]
+#[path = "input/linux/dualsense.rs"]
 pub mod dualsense;
 /// Windows: virtual DualSense **Edge** via the same UMDF minidriver + shared-memory channel
 /// (device-type 2) — the wire back grips land on the Edge's native back/Fn buttons.
 #[cfg(target_os = "windows")]
-#[path = "inject/windows/dualsense_edge_windows.rs"]
+#[path = "input/windows/dualsense_edge_windows.rs"]
 pub mod dualsense_edge_windows;
 /// Transport-independent DualSense HID contract, shared by the Linux UHID backend ([`dualsense`])
 /// and the Windows UMDF-driver backend ([`dualsense_windows`]).
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-#[path = "inject/proto/dualsense_proto.rs"]
+#[path = "input/proto/dualsense_proto.rs"]
 pub mod dualsense_proto;
 /// Windows: virtual DualSense via the UMDF minidriver + a shared-memory host channel.
 #[cfg(target_os = "windows")]
-#[path = "inject/windows/dualsense_windows.rs"]
+#[path = "input/windows/dualsense_windows.rs"]
 pub mod dualsense_windows;
 #[cfg(target_os = "linux")]
-#[path = "inject/linux/dualshock4.rs"]
+#[path = "input/linux/dualshock4.rs"]
 pub mod dualshock4;
 /// Transport-independent DualShock 4 HID codec, shared by the Linux UHID backend ([`dualshock4`])
 /// and the Windows UMDF-driver backend ([`dualshock4_windows`]).
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-#[path = "inject/proto/dualshock4_proto.rs"]
+#[path = "input/proto/dualshock4_proto.rs"]
 pub mod dualshock4_proto;
 /// Windows: virtual DualShock 4 via the same UMDF minidriver + shared-memory channel (device-type 1).
 #[cfg(target_os = "windows")]
-#[path = "inject/windows/dualshock4_windows.rs"]
+#[path = "input/windows/dualshock4_windows.rs"]
 pub mod dualshock4_windows;
 #[cfg(target_os = "linux")]
-#[path = "inject/linux/gamepad.rs"]
+#[path = "input/linux/gamepad.rs"]
 pub mod gamepad;
 /// Windows: virtual Xbox 360 pads via the in-tree XUSB companion UMDF driver (classic XInput).
 #[cfg(target_os = "windows")]
-#[path = "inject/windows/gamepad_windows.rs"]
+#[path = "input/windows/gamepad_windows.rs"]
 pub mod gamepad;
 /// Windows: small RAII wrappers (`Shm` section+view, `SwDevice` devnode) shared by the three gamepad
 /// backends (DualSense / DualShock 4 / XUSB), so each per-pad resource closes deterministically on drop.
 #[cfg(target_os = "windows")]
-#[path = "inject/windows/gamepad_raii.rs"]
+#[path = "input/windows/gamepad_raii.rs"]
 mod gamepad_raii;
 /// Windows: the RESIDENT virtual HID mouse via the ss-mouse UMDF minidriver — keeps
 /// `SM_MOUSEPRESENT` true on headless hosts so DWM composites a cursor into the IDD frame
 /// (`SendInput` alone moves an invisible pointer when no physical mouse is attached).
 #[cfg(target_os = "windows")]
-#[path = "inject/windows/mouse_windows.rs"]
+#[path = "input/windows/mouse_windows.rs"]
 pub mod mouse_windows;
 /// Shared virtual-pad creation-retry policy ([`pad_gate::PadGate`]), driven by [`pad_slots`] for
 /// every backend manager — replaces the per-backend permanent `broken` latch with capped-backoff
 /// retry.
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-#[path = "inject/pad_gate.rs"]
+#[path = "input/pad_gate.rs"]
 pub mod pad_gate;
 /// Shared virtual-pad slot table + creation lifecycle ([`pad_slots::PadSlots`]) — the
 /// `Vec<Option<Pad>>` table, `active_mask` unplug sweep, and gate-checked create every backend
 /// manager used to copy-paste (G12).
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-#[path = "inject/pad_slots.rs"]
+#[path = "input/pad_slots.rs"]
 pub mod pad_slots;
 /// Linux: virtual Steam Deck via UHID — the kernel `hid-steam` driver binds it as a real Deck.
 #[cfg(target_os = "linux")]
-#[path = "inject/linux/steam_controller.rs"]
+#[path = "input/linux/steam_controller.rs"]
 pub mod steam_controller;
 /// Linux: virtual Steam Controller 2 (Triton, `28DE:1302`) via UHID — as-is raw passthrough of a
 /// client-captured physical pad; Steam Input drives the hidraw node (no kernel driver binds it).
 #[cfg(target_os = "linux")]
-#[path = "inject/linux/steam_controller2.rs"]
+#[path = "input/linux/steam_controller2.rs"]
 pub mod steam_controller2;
 /// Windows: virtual Steam Deck via the same UMDF minidriver + shared-memory channel
 /// (device-type 3) — promoted by Steam Input thanks to the `&MI_02` hardware-id synthesis.
 #[cfg(target_os = "windows")]
-#[path = "inject/windows/steam_deck_windows.rs"]
+#[path = "input/windows/steam_deck_windows.rs"]
 pub mod steam_deck_windows;
 /// Linux: virtual Steam Deck via the USB gadget subsystem (`raw_gadget` + `dummy_hcd`) — the only
 /// virtual-Deck transport Steam Input promotes (presents the controller on USB interface 2).
 /// SteamOS-host only (needs `dummy_hcd` + `raw_gadget`).
 #[cfg(target_os = "linux")]
-#[path = "inject/linux/steam_gadget.rs"]
+#[path = "input/linux/steam_gadget.rs"]
 pub mod steam_gadget;
 /// Transport-independent Steam Controller / Steam Deck HID contract (descriptor, byte-exact Deck
 /// serializer, XInput/rich mappers, rumble parser), used by the Linux UHID backend
 /// ([`steam_controller`]) and the Windows UMDF backend ([`steam_deck_windows`]).
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-#[path = "inject/proto/steam_proto.rs"]
+#[path = "input/proto/steam_proto.rs"]
 pub mod steam_proto;
 /// Pure fallback-remap policy (Steam-only inputs onto a non-Steam backend) + the Deck motion rescale.
 /// Shared by the Linux and Windows DualSense/DS4 backends (the slot-less pads that must fold the
 /// Steam back grips); the Deck motion rescale is Linux-only but harmless to compile on Windows.
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-#[path = "inject/proto/steam_remap.rs"]
+#[path = "input/proto/steam_remap.rs"]
 pub mod steam_remap;
 /// Linux: virtual Steam Deck over **USB/IP** (`vhci_hcd`) — the shippable, Secure-Boot-clean,
 /// Steam-Input-promotable virtual-Deck transport on non-SteamOS hosts (Bazzite/generic), where
 /// `dummy_hcd`/`raw_gadget` aren't built. In-tree + signed; no module build, no MOK.
 #[cfg(target_os = "linux")]
-#[path = "inject/linux/steam_usbip.rs"]
+#[path = "input/linux/steam_usbip.rs"]
 pub mod steam_usbip;
 /// Linux: virtual Nintendo Switch Pro Controller via UHID (kernel `hid-nintendo`).
 #[cfg(target_os = "linux")]
-#[path = "inject/linux/switch_pro.rs"]
+#[path = "input/linux/switch_pro.rs"]
 pub mod switch_pro;
 /// Transport-independent Switch Pro Controller codec + the canned `hid-nintendo` handshake
 /// replies, used by the Linux UHID backend ([`switch_pro`]).
 #[cfg(target_os = "linux")]
-#[path = "inject/proto/switch_proto.rs"]
+#[path = "input/proto/switch_proto.rs"]
 pub mod switch_proto;
 /// Transport-independent Steam Controller 2 (Triton) contract: descriptor, SDL-documented report
 /// layout, the typed fallback serializer, and the rumble-output parser. Linux-only consumer today
 /// ([`steam_controller2`]).
 #[cfg(target_os = "linux")]
-#[path = "inject/proto/triton_proto.rs"]
+#[path = "input/proto/triton_proto.rs"]
 pub mod triton_proto;
 /// Linux: virtual Steam Controller 2 over **USB/IP** — a real USB device byte-matched to the
 /// physical wired pad's captured descriptors, so Steam lists it (the UHID leg is confirmed
 /// invisible to Steam). Preferred transport of [`steam_controller2`].
 #[cfg(target_os = "linux")]
-#[path = "inject/linux/triton_usbip.rs"]
+#[path = "input/linux/triton_usbip.rs"]
 pub mod triton_usbip;
 /// The generic stateful virtual-pad manager ([`uhid_manager::UhidManager`]) — event routing, frame
 /// merge, heartbeat, and feedback pump shared by the five UHID/UMDF backends; each supplies only
 /// its per-controller protocol via [`uhid_manager::PadProto`] (G12).
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-#[path = "inject/uhid_manager.rs"]
+#[path = "input/uhid_manager.rs"]
 pub mod uhid_manager;
 /// Stub — virtual gamepads need Linux uinput or the Windows UMDF drivers; events are dropped elsewhere.
 #[cfg(not(any(target_os = "linux", target_os = "windows")))]
@@ -479,13 +479,13 @@ pub mod gamepad {
 /// Linux: the "Slipstream Pen" uinput virtual tablet (design/pen-tablet-input.md §5) — the
 /// per-session stylus device the native pen plane injects through.
 #[cfg(target_os = "linux")]
-#[path = "inject/linux/pen.rs"]
+#[path = "input/linux/pen.rs"]
 pub mod pen;
 /// Windows: PT_PEN/PT_TOUCH synthetic pointer devices (design/pen-tablet-input.md §6).
 /// `pen::VirtualPen` here is the PT_PEN device; `pen::SyntheticTouch` backs the SendInput
 /// injector's wire-touch path.
 #[cfg(target_os = "windows")]
-#[path = "inject/windows/pointer_windows.rs"]
+#[path = "input/windows/pointer_windows.rs"]
 pub mod pen;
 /// Windows: the streamed output's desktop rect that every absolute coordinate (pen, touch,
 /// absolute mouse) maps into — published by the host at capture bring-up, resolved through the
@@ -493,7 +493,7 @@ pub mod pen;
 /// over the whole virtual desktop instead is the Extend-topology offset bug the pen exposed
 /// (design/pen-tablet-input.md).
 #[cfg(target_os = "windows")]
-#[path = "inject/windows/stream_target.rs"]
+#[path = "input/windows/stream_target.rs"]
 pub mod stream_target;
 #[cfg(target_os = "windows")]
 pub use stream_target::set_stream_target;
@@ -511,14 +511,14 @@ pub mod pen {
     }
 }
 #[cfg(target_os = "linux")]
-#[path = "inject/linux/kwin_fake_input.rs"]
+#[path = "input/linux/kwin_fake_input.rs"]
 mod kwin_fake_input;
 #[cfg(target_os = "linux")]
-#[path = "inject/linux/libei.rs"]
+#[path = "input/linux/libei.rs"]
 mod libei;
 #[cfg(target_os = "windows")]
-#[path = "inject/windows/sendinput.rs"]
+#[path = "input/windows/sendinput.rs"]
 mod sendinput;
 #[cfg(target_os = "linux")]
-#[path = "inject/linux/wlr.rs"]
+#[path = "input/linux/wlr.rs"]
 mod wlr;

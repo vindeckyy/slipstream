@@ -1,6 +1,6 @@
 //! PyroWave host encoder (Windows) — **separate-plane zero-copy D3D11→Vulkan** via pyrowave's own
 //! compat device (design/pyrowave-windows-host-zerocopy.md). The opt-in wired-LAN intra-only wavelet
-//! codec, the Windows twin of `enc/linux/pyrowave.rs`.
+//! codec, the Windows twin of `backend/linux/pyrowave.rs`.
 //!
 //! Shape (deliberately minimal — no `ash`, no hand-rolled external-memory import): pyrowave owns its
 //! OWN Vulkan device, selected by the render GPU's vendor/device-id
@@ -200,7 +200,7 @@ impl PyroWaveEncoder {
             bail!("pyrowave 4:2:0 needs even dimensions (got {width}x{height})");
         }
         // Checked against the chroma actually being opened, NOT hardcoded 4:4:4 — see the Linux
-        // twin (`enc/linux/pyrowave.rs`) for the full rationale: the negotiator's 4:4:4 → 4:2:0
+        // twin (`backend/linux/pyrowave.rs`) for the full rationale: the negotiator's 4:4:4 → 4:2:0
         // downgrade hands oversized modes to this open AS 4:2:0, so the old `chroma444`-gated
         // check was skipped exactly when it was needed.
         if !crate::pyrowave_mode_fits_rdo(width, height, chroma444) {
@@ -563,7 +563,7 @@ impl PyroWaveEncoder {
             )?
         };
 
-        // Plane views built BY HAND exactly like the Linux encoder (`enc/linux/pyrowave.rs`): Y from
+        // Plane views built BY HAND exactly like the Linux encoder (`backend/linux/pyrowave.rs`): Y from
         // the R8 image (full-res, IDENTITY), Cb/Cr from the R8G8 image (half-res) with R/G swizzle to
         // synthesize the two chroma planes from the interleaved CbCr — the documented NV12-style
         // hand-off. All GENERAL layout (pyrowave's GPU-buffer contract accepts it without transitions).

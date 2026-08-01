@@ -1048,7 +1048,7 @@ impl VirtualDisplayManager {
         }
     }
 
-    /// Arrange the live slots' desktop origins (design §6.2: the pure `vdisplay/layout.rs` engine —
+    /// Arrange the live slots' desktop origins (design §6.2: the pure `display/layout.rs` engine —
     /// `auto-row` default, console `manual` pins win) and commit them in one CCD apply. No-ops for a
     /// single member (it sits at the origin), so the single-display path issues no positioning at
     /// all. Records each monitor's applied position for the `/display/state` readout.

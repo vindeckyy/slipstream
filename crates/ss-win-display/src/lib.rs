@@ -15,18 +15,17 @@
 #![deny(clippy::undocumented_unsafe_blocks)]
 #![deny(unsafe_op_in_unsafe_fn)]
 
+mod platform;
+
 #[cfg(target_os = "windows")]
-pub mod display_events;
-/// Bind display-config writes to the input desktop so a UAC / lock screen can't refuse them.
+pub use platform::display_events;
 #[cfg(target_os = "windows")]
-mod input_desktop;
+pub(crate) use platform::input_desktop;
 #[cfg(target_os = "windows")]
-pub mod monitor_devnode;
-/// Cross-crate "topology churn in flight" latch (pure std — no Windows surface, so unconditionally
-/// compiled and unit-tested on every platform).
-pub mod topology_churn;
+pub use platform::monitor_devnode;
+pub use platform::topology_churn;
 #[cfg(target_os = "windows")]
-pub mod win_display;
+pub use platform::win_display;
 
 /// `Some((own_session, console_session))` when this process is NOT in the active console session —
 /// the state where every `SetDisplayConfig`/CDS write fails `ERROR_ACCESS_DENIED`, GDI reads

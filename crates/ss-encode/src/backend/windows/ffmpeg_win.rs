@@ -1664,7 +1664,7 @@ mod tests {
     /// device per session.
     ///
     /// Nothing else reaches it. `zerocopy_enabled` defaults QSV **off**, so the normal encode path
-    /// never builds one on Intel, and the native VPL backend (`enc/windows/qsv.rs`) supersedes this
+    /// never builds one on Intel, and the native VPL backend (`backend/windows/qsv.rs`) supersedes this
     /// whole file unless `SLIPSTREAM_QSV_FFMPEG=1`. Calling `open` directly sidesteps both gates so
     /// the ownership itself is what gets exercised.
     ///

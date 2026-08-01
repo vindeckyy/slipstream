@@ -552,32 +552,28 @@ pub type CursorChannelSender = std::sync::Arc<
 #[cfg(target_os = "windows")]
 pub type CursorForwardSender = std::sync::Arc<dyn Fn(bool) -> Result<()> + Send + Sync>;
 
+// Platform backends live under `platform/{linux,windows}/`. Crate-root shims below keep every
+// existing `ss_capture::*` path stable (dxgi, synthetic_nv12, pwinit, gnome_hdr_monitor_active).
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+mod platform;
+
 // One-time PipeWire library init, shared by the video (portal) and audio capture threads.
 #[cfg(target_os = "linux")]
-pub mod pwinit;
+pub use platform::linux::pwinit;
 
-// The Windows backend lives under `windows/`, the Linux one under `linux/`. Windows capture is IDD
-// direct-push only (DXGI Desktop Duplication + the WGC relay were removed).
+// Windows capture is IDD direct-push only (DXGI Desktop Duplication + the WGC relay were removed).
 #[cfg(target_os = "windows")]
-#[path = "windows/dxgi.rs"]
-pub mod dxgi;
+pub use platform::windows::dxgi;
 #[cfg(target_os = "windows")]
-#[path = "windows/idd_push.rs"]
-mod idd_push;
+pub use platform::windows::synthetic_nv12;
 // The WUDFHost-identity check the IDD-push broker uses is reused by the host's gamepad-channel
 // bootstrap (`inject::windows::gamepad_raii`); re-export it so that reach stays a leaf dependency.
 #[cfg(target_os = "windows")]
-pub use idd_push::verify_is_wudfhost;
-#[cfg(target_os = "linux")]
-#[path = "linux/mod.rs"]
-mod linux;
+pub use platform::windows::verify_is_wudfhost;
 // The GNOME BT.2100 colour-mode probe — the host's capture-side gate for offering HDR on the
 // portal monitor path (see `open_portal_monitor`'s `want_hdr`).
 #[cfg(target_os = "linux")]
-pub use linux::gnome_hdr_monitor_active;
-#[cfg(target_os = "windows")]
-#[path = "windows/synthetic_nv12.rs"]
-pub mod synthetic_nv12;
+pub use platform::linux::gnome_hdr_monitor_active;
 
 /// Open the Linux xdg-ScreenCast portal capturer for a client-sized monitor. `anchored` drives
 /// ScreenCast off a RemoteDesktop session (KWin/GNOME) so it inherits that grant headlessly.
@@ -596,7 +592,7 @@ pub fn open_portal_monitor(
     want_metadata_cursor: bool,
     policy: ZeroCopyPolicy,
 ) -> Result<Box<dyn Capturer>> {
-    linux::PortalCapturer::open(
+    platform::linux::PortalCapturer::open(
         anchored,
         want_hdr && !hdr_capture_failed(HdrSource::PortalMonitor),
         want_metadata_cursor,
@@ -626,7 +622,7 @@ pub fn open_virtual_output(
     policy: ZeroCopyPolicy,
     expect_exact_dims: bool,
 ) -> Result<Box<dyn Capturer>> {
-    linux::PortalCapturer::from_virtual_output(
+    platform::linux::PortalCapturer::from_virtual_output(
         remote_fd,
         node_id,
         preferred_mode,
@@ -651,33 +647,33 @@ pub fn open_virtual_output(
 /// ordinary LSB-first 32-bpp TrueColor case.
 #[cfg(target_os = "linux")]
 pub fn open_x11_desktop() -> Result<Box<dyn Capturer>> {
-    linux::X11Capturer::open().map(|c| Box::new(c) as Box<dyn Capturer>)
+    platform::linux::X11Capturer::open().map(|c| Box::new(c) as Box<dyn Capturer>)
 }
 
 /// Open a DRM/KMS desktop capturer (Phase 2 stub). Always returns
 /// `"KMS capture not yet implemented (Phase 2)"`.
 #[cfg(target_os = "linux")]
 pub fn open_kms_desktop() -> Result<Box<dyn Capturer>> {
-    linux::kms::open_kms_desktop()
+    platform::linux::kms::open_kms_desktop()
 }
 
 /// Open an NvFBC desktop capturer (Phase 2 stub). Always returns
 /// `"NvFBC capture not yet implemented (Phase 2)"`.
 #[cfg(target_os = "linux")]
 pub fn open_nvfbc_desktop() -> Result<Box<dyn Capturer>> {
-    linux::nvfbc::open_nvfbc_desktop()
+    platform::linux::nvfbc::open_nvfbc_desktop()
 }
 
 /// True when `/dev/dri/card0` exists (DRM card present). Does not open the device.
 #[cfg(target_os = "linux")]
 pub fn probe_kms() -> bool {
-    linux::kms::probe_kms()
+    platform::linux::kms::probe_kms()
 }
 
 /// True when `libnvidia-fbc.so*` is findable via dlopen. Does not call NvFBC capture APIs.
 #[cfg(target_os = "linux")]
 pub fn probe_nvfbc() -> bool {
-    linux::nvfbc::probe_nvfbc()
+    platform::linux::nvfbc::probe_nvfbc()
 }
 
 /// Open the wlroots `zwlr_screencopy_manager_v1` desktop capturer (SHM path). CPU frames only
@@ -688,7 +684,7 @@ pub fn probe_nvfbc() -> bool {
 /// composites the cursor into each frame.
 #[cfg(target_os = "linux")]
 pub fn open_wlr_desktop() -> Result<Box<dyn Capturer>> {
-    linux::WlrCapturer::open().map(|c| Box::new(c) as Box<dyn Capturer>)
+    platform::linux::WlrCapturer::open().map(|c| Box::new(c) as Box<dyn Capturer>)
 }
 
 /// Open the Windows IDD direct-push capturer on a ss-vdisplay target. `sender` delivers the sealed
@@ -707,7 +703,7 @@ pub fn open_idd_push(
     cursor_sender: Option<CursorChannelSender>,
     cursor_forward: Option<CursorForwardSender>,
 ) -> std::result::Result<Box<dyn Capturer>, (anyhow::Error, Box<dyn Send>)> {
-    idd_push::IddPushCapturer::open(
+    platform::windows::idd_push::IddPushCapturer::open(
         target,
         preferred,
         client_10bit,
