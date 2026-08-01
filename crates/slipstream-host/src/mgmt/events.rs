@@ -124,7 +124,7 @@ struct StreamState {
     params(
         ("since" = Option<u64>, Query, description = "Resume cursor: only events with `seq` greater than this are sent (the ring keeps the newest ~1024). `Last-Event-ID` takes precedence."),
         ("kinds" = Option<String>, Query, description = "Comma-separated server-side kind filter: exact kinds (`pairing.pending`) or `domain.*` prefixes (`stream.*`)."),
-        ("Last-Event-ID" = Option<u64>, Header, description = "SSE auto-reconnect cursor — the `id:` of the last received frame."),
+        ("Last-Event-ID" = Option<String>, Header, description = "SSE auto-reconnect cursor — the decimal `id:` of the last received frame."),
     ),
     responses(
         (status = OK, description = "SSE stream; each frame's `data:` is one HostEvent", body = crate::events::HostEvent, content_type = "text/event-stream"),

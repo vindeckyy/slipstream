@@ -721,15 +721,13 @@
           {
             "name": "Last-Event-ID",
             "in": "header",
-            "description": "SSE auto-reconnect cursor — the `id:` of the last received frame.",
+            "description": "SSE auto-reconnect cursor — the decimal `id:` of the last received frame.",
             "required": false,
             "schema": {
               "type": [
-                "integer",
+                "string",
                 "null"
-              ],
-              "format": "int64",
-              "minimum": 0
+              ]
             }
           }
         ],
