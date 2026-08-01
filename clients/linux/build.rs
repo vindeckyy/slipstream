@@ -8,7 +8,7 @@ fn main() {
     // on deb, `0.23.0-0.ci10250.g…` on rpm, …), a plain `cargo build` falls back to the crate
     // version. This is what `--version` prints and what `--check-update` compares against the
     // signed manifest — and the canary suffix is load-bearing there, because canary channels
-    // compare CI run numbers rather than patch fields (pf_update_check::version).
+    // compare CI run numbers rather than patch fields (ss_update_check::version).
     let version = std::env::var("SLIPSTREAM_BUILD_VERSION")
         .ok()
         .filter(|v| !v.trim().is_empty())

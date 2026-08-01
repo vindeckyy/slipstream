@@ -38,10 +38,18 @@ export const RunnerBanner: FC = () => {
 	if (!s?.installed || s.enabled) return null;
 
 	return (
-		<div className="flex flex-col gap-3 rounded-lg border border-amber-600/40 bg-amber-500/10 p-4 text-sm text-amber-600 sm:flex-row sm:items-center dark:border-amber-500/40 dark:text-amber-500">
-			<PowerOff className="size-5 shrink-0" />
+		<div
+			role="status"
+			className="flex flex-col gap-3 rounded-lg border border-amber-600/40 bg-amber-500/10 p-4 text-sm text-amber-700 sm:flex-row sm:items-center dark:border-amber-500/40 dark:text-amber-400"
+		>
+			<PowerOff className="size-5 shrink-0" aria-hidden />
 			<p className="flex-1">{m.store_runner_banner()}</p>
-			<Button size="sm" disabled={isPending} onClick={() => toggle(true)}>
+			<Button
+				size="sm"
+				className="self-start sm:self-auto"
+				disabled={isPending}
+				onClick={() => toggle(true)}
+			>
 				<Play className="size-4" />
 				{m.store_runner_enable()}
 			</Button>
@@ -71,7 +79,7 @@ export const RunnerCard: FC<{
 }> = ({ status, busy, onToggle }) => (
 	<Card>
 		<CardHeader className="pb-3">
-			<CardTitle className="flex items-center justify-between gap-3 text-base">
+			<CardTitle className="flex flex-col gap-2 text-base tracking-tight sm:flex-row sm:items-center sm:justify-between">
 				<span>{m.store_runner_title()}</span>
 				{!status.installed ? (
 					<Badge variant="outline">{m.store_runner_state_missing()}</Badge>
@@ -90,7 +98,7 @@ export const RunnerCard: FC<{
 					? m.store_runner_help()
 					: m.store_runner_not_installed()}
 			</p>
-			<dl className="flex flex-wrap gap-x-8 gap-y-1 text-xs text-muted-foreground">
+			<dl className="flex flex-wrap gap-x-6 gap-y-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
 				<div className="flex gap-2">
 					<dt>{m.store_runner_unit()}</dt>
 					<dd className="font-mono text-foreground">{status.unit}</dd>

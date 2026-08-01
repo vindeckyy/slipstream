@@ -71,7 +71,7 @@ function errorCopy(res: LibraryResult): string {
     case "timeout":
       return "Timed out talking to the host — try again.";
     case "flatpak-not-found":
-      return "The Slipstream client isn't installed (flatpak io.unom.Slipstream).";
+      return "The Slipstream client isn't installed (flatpak io.slipstream).";
     case "client-outdated":
       return "The installed client is too old for library browsing — update it from the About tab.";
     default:

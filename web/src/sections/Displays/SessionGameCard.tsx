@@ -71,12 +71,12 @@ export const SessionGameCard: FC = () => {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>{m.session_game_title()}</CardTitle>
-			</CardHeader>
-			<CardContent className="space-y-4">
-				<p className="max-w-prose text-sm text-muted-foreground">
+				<CardTitle className="tracking-tight">{m.session_game_title()}</CardTitle>
+				<p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
 					{m.session_game_help()}
 				</p>
+			</CardHeader>
+			<CardContent className="space-y-4">
 				<QueryState isLoading={q.isLoading} error={q.error} refetch={q.refetch}>
 					{server && (
 						<div className="space-y-6">

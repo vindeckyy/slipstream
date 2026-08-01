@@ -190,5 +190,5 @@ slipstream open 'slipstream://connect/Desk?profile=Work'
 ```
 
 It ships in the Linux client packages and in the Windows MSIX. The Flatpak build has it too, but
-inside the sandbox — reach it with `flatpak run --command=slipstream io.unom.Slipstream`. See
+inside the sandbox — reach it with `flatpak run --command=slipstream io.slipstream`. See
 [Clients](/docs/clients) for the rest of its verbs.

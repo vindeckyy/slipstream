@@ -13,27 +13,23 @@ export const Route = createFileRoute('/api/')({
   component: ApiReference,
   head: () => ({
     meta: [
-      { title: 'slipstream — Management API reference' },
+      { title: 'Slipstream API reference' },
       {
         name: 'description',
-        content:
-          'Interactive reference for the slipstream host management REST API (OpenAPI).',
+        content: 'Interactive OpenAPI reference for the Slipstream host API.',
       },
     ],
     links: [{ rel: 'stylesheet', href: scalarCss }],
   }),
 })
 
-// The full slipstream theme rolled out onto Scalar — the same dark-violet (and
-// light-lavender) product chrome as the docs/management console.
+// Keep Scalar on the browser console's cool-slate surfaces and cyan accent.
 //
-// IMPORTANT: Scalar toggles `.light-mode` / `.dark-mode` on `document.body`,
-// and it renders our `customCss` *before* its own built-in theme preset in the
-// SAME <style> tag. A bare `.dark-mode { … }` therefore has equal specificity
-// to the preset that comes after it and LOSES (you get Scalar's stock #0f0f0f
-// gray). Scoping to `body.dark-mode` / `body.light-mode` (specificity 0,1,1)
-// beats both the linked base sheet and the in-component preset, so our palette
-// wins regardless of source order. Scalar ignores unknown custom-property
+// Scalar toggles `.light-mode` / `.dark-mode` on `document.body`, and it renders
+// our `customCss` before its built-in theme preset in the same style tag. A bare
+// `.dark-mode` rule has equal specificity to the later preset and loses. Scoping
+// these rules to `body.dark-mode` / `body.light-mode` wins over both the linked
+// base sheet and the in-component preset. Scalar ignores unknown custom-property
 // names, so this stays forward-safe.
 const SCALAR_CSS = `
 body.light-mode,
@@ -45,104 +41,104 @@ body.dark-mode {
   --scalar-radius-xl: 0.875rem;
 }
 
-/* ── Dark — the violet-tinted app-icon chrome (bg #141019 / cards #1c1530). ── */
+/* Dark console surfaces. */
 body.dark-mode {
-  --scalar-background-1: #141019;
-  --scalar-background-2: #1c1530;
-  --scalar-background-3: #221a36;
-  --scalar-background-accent: #6c5bf32e;
-  --scalar-border-color: #2a2148;
+  --scalar-background-1: #060a0f;
+  --scalar-background-2: #0d141c;
+  --scalar-background-3: #121a24;
+  --scalar-background-accent: #22d3ee1f;
+  --scalar-border-color: #526472;
 
-  --scalar-color-1: #f4f2fb;
-  --scalar-color-2: #b7b1c9;
-  --scalar-color-3: #8a85a0;
-  --scalar-color-accent: #a79ff8;
+  --scalar-color-1: #e8eef2;
+  --scalar-color-2: #93a7b5;
+  --scalar-color-3: #6f8592;
+  --scalar-color-accent: #22d3ee;
 
-  --scalar-link-color: #a79ff8;
-  --scalar-link-color-hover: #c8c0fb;
+  --scalar-link-color: #22d3ee;
+  --scalar-link-color-hover: #a5f3fc;
 
-  --scalar-button-1: #6c5bf3;
-  --scalar-button-1-color: #ffffff;
-  --scalar-button-1-hover: #5d4ee0;
+  --scalar-button-1: #22d3ee;
+  --scalar-button-1-color: #060a0f;
+  --scalar-button-1-hover: #22d3ee;
 
-  --scalar-sidebar-background-1: #17121f;
-  --scalar-sidebar-color-1: #e9e6f4;
-  --scalar-sidebar-color-2: #9a94ad;
-  --scalar-sidebar-color-active: #c8c0fb;
-  --scalar-sidebar-item-hover-background: #6c5bf31f;
-  --scalar-sidebar-item-hover-color: #f4f2fb;
-  --scalar-sidebar-item-active-background: #6c5bf333;
-  --scalar-sidebar-border-color: #241c3d;
-  --scalar-sidebar-search-background: #1c1530;
-  --scalar-sidebar-search-border-color: #2a2148;
-  --scalar-sidebar-search-color: #9a94ad;
-  --scalar-sidebar-indent-border: #2a2148;
-  --scalar-sidebar-indent-border-active: #6c5bf3;
-  --scalar-sidebar-indent-border-hover: #463a78;
+  --scalar-sidebar-background-1: #0d141c;
+  --scalar-sidebar-color-1: #e8eef2;
+  --scalar-sidebar-color-2: #93a7b5;
+  --scalar-sidebar-color-active: #22d3ee;
+  --scalar-sidebar-item-hover-background: #22d3ee1f;
+  --scalar-sidebar-item-hover-color: #e8eef2;
+  --scalar-sidebar-item-active-background: #22d3ee2e;
+  --scalar-sidebar-border-color: #526472;
+  --scalar-sidebar-search-background: #111820;
+  --scalar-sidebar-search-border-color: #526472;
+  --scalar-sidebar-search-color: #93a7b5;
+  --scalar-sidebar-indent-border: #526472;
+  --scalar-sidebar-indent-border-active: #22d3ee;
+  --scalar-sidebar-indent-border-hover: #93a7b5;
 
-  --scalar-header-background-1: #141019;
-  --scalar-header-color-1: #f4f2fb;
-  --scalar-header-border-color: #2a2148;
+  --scalar-header-background-1: #060a0f;
+  --scalar-header-color-1: #e8eef2;
+  --scalar-header-border-color: #526472;
 
-  --scalar-scrollbar-color: #2a2148;
-  --scalar-scrollbar-color-active: #463a78;
+  --scalar-scrollbar-color: #526472;
+  --scalar-scrollbar-color-active: #93a7b5;
 
   --scalar-color-green: #4ade80;
   --scalar-color-red: #f87171;
   --scalar-color-yellow: #fbbf24;
   --scalar-color-blue: #60a5fa;
   --scalar-color-orange: #fb923c;
-  --scalar-color-purple: #a79ff8;
+  --scalar-color-purple: #22d3ee;
 }
 
-/* ── Light — the lavender docs surface (bg #f0ebff / white content). ── */
+/* Light console surfaces. */
 body.light-mode {
-  --scalar-background-1: #ffffff;
-  --scalar-background-2: #f6f2ff;
-  --scalar-background-3: #ece6fb;
-  --scalar-background-accent: #6c5bf31a;
-  --scalar-border-color: #e4dcf7;
+  --scalar-background-1: #eef3f6;
+  --scalar-background-2: #ffffff;
+  --scalar-background-3: #e2ebf0;
+  --scalar-background-accent: #0891b21a;
+  --scalar-border-color: #849098;
 
-  --scalar-color-1: #1b1430;
-  --scalar-color-2: #4a4368;
-  --scalar-color-3: #6f6a86;
-  --scalar-color-accent: #6c5bf3;
+  --scalar-color-1: #0a1620;
+  --scalar-color-2: #4d6672;
+  --scalar-color-3: #647b87;
+  --scalar-color-accent: #0891b2;
 
-  --scalar-link-color: #6c5bf3;
-  --scalar-link-color-hover: #5d4ee0;
+  --scalar-link-color: #0891b2;
+  --scalar-link-color-hover: #0e7490;
 
-  --scalar-button-1: #6c5bf3;
+  --scalar-button-1: #0891b2;
   --scalar-button-1-color: #ffffff;
-  --scalar-button-1-hover: #5d4ee0;
+  --scalar-button-1-hover: #0e7490;
 
-  --scalar-sidebar-background-1: #f6f2ff;
-  --scalar-sidebar-color-1: #1b1430;
-  --scalar-sidebar-color-2: #6f6a86;
-  --scalar-sidebar-color-active: #5d4ee0;
-  --scalar-sidebar-item-hover-background: #6c5bf314;
-  --scalar-sidebar-item-hover-color: #1b1430;
-  --scalar-sidebar-item-active-background: #6c5bf322;
-  --scalar-sidebar-border-color: #e4dcf7;
+  --scalar-sidebar-background-1: #ffffff;
+  --scalar-sidebar-color-1: #0a1620;
+  --scalar-sidebar-color-2: #4d6672;
+  --scalar-sidebar-color-active: #0e7490;
+  --scalar-sidebar-item-hover-background: #0891b214;
+  --scalar-sidebar-item-hover-color: #0a1620;
+  --scalar-sidebar-item-active-background: #0891b222;
+  --scalar-sidebar-border-color: #849098;
   --scalar-sidebar-search-background: #ffffff;
-  --scalar-sidebar-search-border-color: #e4dcf7;
-  --scalar-sidebar-search-color: #6f6a86;
-  --scalar-sidebar-indent-border: #e4dcf7;
-  --scalar-sidebar-indent-border-active: #6c5bf3;
-  --scalar-sidebar-indent-border-hover: #c9bdf0;
+  --scalar-sidebar-search-border-color: #849098;
+  --scalar-sidebar-search-color: #4d6672;
+  --scalar-sidebar-indent-border: #849098;
+  --scalar-sidebar-indent-border-active: #0891b2;
+  --scalar-sidebar-indent-border-hover: #4d6672;
 
   --scalar-header-background-1: #ffffff;
-  --scalar-header-color-1: #1b1430;
-  --scalar-header-border-color: #e4dcf7;
+  --scalar-header-color-1: #0a1620;
+  --scalar-header-border-color: #849098;
 
-  --scalar-scrollbar-color: #d9d0f2;
-  --scalar-scrollbar-color-active: #bcb0ec;
+  --scalar-scrollbar-color: #849098;
+  --scalar-scrollbar-color-active: #4d6672;
 
   --scalar-color-green: #16a34a;
   --scalar-color-red: #dc2626;
   --scalar-color-yellow: #d97706;
   --scalar-color-blue: #2563eb;
   --scalar-color-orange: #ea580c;
-  --scalar-color-purple: #6c5bf3;
+  --scalar-color-purple: #0891b2;
 }
 `
 
@@ -150,12 +146,11 @@ function ApiReference() {
   // Follow the docs' own light/dark switch and hide Scalar's own toggle, so the
   // Fumadocs toggle stays the single source of truth. Fumadocs drives next-themes
   // with `attribute: "class"`, which writes the resolved theme as a class on
-  // <html> — we read THAT class directly rather than next-themes' useTheme().
-  // The class is the authoritative, already-resolved signal (system → light/dark
-  // included) and, unlike the React context, can't be desynced when bridging into
-  // Scalar's separate Vue app. Default to dark (the docs default) so SSR and the
-  // first client render agree — no hydration flash; the observer then syncs to the
-  // live class, tracking the docs toggle AND OS changes while in system mode.
+  // <html>. Read that class directly rather than next-themes' useTheme(). The
+  // class includes system resolution and cannot desync from the docs toggle when
+  // bridging into Scalar's separate Vue app. Default to dark (the docs default)
+  // so SSR and the first client render agree. The observer then tracks the live
+  // class, including OS changes while system mode is active.
   const [isDark, setIsDark] = useState(true)
   useEffect(() => {
     const root = document.documentElement
@@ -169,11 +164,9 @@ function ApiReference() {
   // Scalar pollutes global scope and never cleans up: it appends a persistent
   // <style id="scalar-style"> to <head> that includes a *global*
   // `body { background-color: var(--scalar-background-1) }`, adds its #scalar-refs
-  // teleport target, and toggles .dark-mode/.light-mode on <body>. After a
-  // client-side route change (no reload) that residue bleeds into the next page —
-  // the docs body kept painting Scalar's bg instead of --color-fd-background, so
-  // the docs looked gray until a hard reload. Strip it when /api unmounts so
-  // leaving the page restores the same DOM a fresh load has; Scalar re-injects a
+  // teleport target, and toggles .dark-mode/.light-mode on <body>. After client
+  // navigation, that residue bleeds into the next page. Strip it when /api
+  // unmounts so leaving the page restores a fresh-load DOM; Scalar re-injects a
   // fresh instance on re-entry.
   useEffect(
     () => () => {
@@ -191,7 +184,7 @@ function ApiReference() {
       url: '/openapi.json',
       darkMode: isDark,
       hideDarkModeToggle: true,
-      metaData: { title: 'slipstream Management API' },
+      metaData: { title: 'Slipstream API reference' },
       hideDownloadButton: false,
       customCss: SCALAR_CSS,
     }),
@@ -200,43 +193,51 @@ function ApiReference() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Slim branded bar so the reference stays inside the slipstream identity
-          and links back into the docs. */}
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-fd-border px-4 md:px-6">
-        <Link
-          to="/docs/$"
-          params={{ _splat: '' }}
-          aria-label="slipstream documentation"
-          className="flex items-center gap-2 no-underline"
+        <h1
+          aria-label="Slipstream API reference"
+          className="flex min-w-0 items-center text-sm font-medium"
         >
-          <BrandMark className="size-6" />
-          <Wordmark className="h-4" />
+          <Link
+            to="/docs/$"
+            params={{ _splat: '' }}
+            aria-label="Slipstream documentation"
+            className="flex items-center gap-2 no-underline"
+          >
+            <BrandMark className="size-6" />
+            <Wordmark className="h-4" />
+          </Link>
           <span className="ml-2 hidden text-sm text-fd-muted-foreground sm:inline">
-            Management API
+            API reference
           </span>
-        </Link>
-        <nav className="flex items-center gap-4 text-sm">
+        </h1>
+        <nav
+          aria-label="API reference navigation"
+          className="flex items-center gap-4 text-sm"
+        >
           <Link
             to="/docs/$"
             params={{ _splat: '' }}
             className="text-fd-muted-foreground transition-colors hover:text-fd-foreground"
           >
-            ← Docs
+            Docs
           </Link>
           <a
             href="/openapi.json"
             className="text-fd-muted-foreground transition-colors hover:text-fd-foreground"
           >
-            openapi.json
+            OpenAPI JSON
           </a>
         </nav>
       </header>
 
-      {/* Scalar mounts a Vue app client-side in a useEffect (SSR-safe: the
-          server renders an empty container, the browser hydrates the reference). */}
-      <div className="min-h-0 flex-1">
-        <ApiReferenceReact configuration={configuration} />
-      </div>
+      <main className="min-h-0 flex flex-1 flex-col" aria-label="API reference">
+        {/* Scalar mounts a Vue app client-side in a useEffect. The server keeps
+            this container empty, and the browser mounts the reference into it. */}
+        <div className="min-h-0 flex-1">
+          <ApiReferenceReact configuration={configuration} />
+        </div>
+      </main>
     </div>
   )
 }

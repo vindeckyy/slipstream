@@ -5,6 +5,7 @@
   "description": "slipstream documentation site — Fumadocs on TanStack Start (Vite + Nitro/bun)",
   "scripts": {
     "dev": "vite dev --port 3001",
+    "prebuild": "node tools/sync-openapi.mjs",
     "build": "vite build",
     "start": "bun run .output/server/index.mjs",
     "lint": "tsc --noEmit"

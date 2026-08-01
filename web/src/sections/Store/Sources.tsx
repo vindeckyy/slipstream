@@ -142,8 +142,12 @@ export const SourceList: FC<{
 	const rows = sources.data ?? [];
 	return (
 		<Card>
-			<CardHeader className="flex-row items-center justify-between space-y-0">
-				<CardTitle>{m.store_sources_title()}</CardTitle>
+			<CardHeader className="flex-row items-center justify-between space-y-0 pb-3">
+				<div className="space-y-1">
+					<CardTitle className="text-base tracking-tight">
+						{m.store_sources_title()}
+					</CardTitle>
+				</div>
 				<Button
 					variant="outline"
 					size="sm"
@@ -166,15 +170,15 @@ export const SourceList: FC<{
 					error={sources.error}
 					refetch={sources.refetch}
 				>
-					<div className="flex flex-col gap-3">
+					<div className="flex flex-col gap-2">
 						{rows.map((s) => (
 							<div
 								key={s.name}
-								className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-start"
+								className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/30 p-3 sm:flex-row sm:items-start"
 							>
-								<div className="min-w-0 flex-1 space-y-1">
+								<div className="min-w-0 flex-1 space-y-1.5">
 									<div className="flex flex-wrap items-center gap-2">
-										<span className="font-medium">{s.name}</span>
+										<span className="font-medium tracking-tight">{s.name}</span>
 										{s.builtin && (
 											<Badge variant="secondary" className="gap-1">
 												<Lock className="size-3" />
@@ -189,7 +193,7 @@ export const SourceList: FC<{
 										) : (
 											<Badge
 												variant="outline"
-												className="gap-1 border-amber-600/40 text-amber-600 dark:border-amber-500/40 dark:text-amber-500"
+												className="gap-1 border-amber-600/40 text-amber-700 dark:border-amber-500/40 dark:text-amber-400"
 											>
 												<ShieldOff className="size-3" />
 												{m.store_source_unsigned()}
@@ -198,7 +202,7 @@ export const SourceList: FC<{
 										{s.stale && (
 											<Badge
 												variant="outline"
-												className="gap-1 border-amber-600/40 text-amber-600 dark:border-amber-500/40 dark:text-amber-500"
+												className="gap-1 border-amber-600/40 text-amber-700 dark:border-amber-500/40 dark:text-amber-400"
 											>
 												<AlertTriangle className="size-3" />
 												{m.store_source_stale()}
@@ -213,7 +217,9 @@ export const SourceList: FC<{
 										{m.store_source_fetched({ when: fmtFetched(s.fetched_at) })}
 									</p>
 									{s.error && (
-										<p className="text-xs text-destructive">{s.error}</p>
+										<p className="rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1 text-xs text-destructive">
+											{s.error}
+										</p>
 									)}
 								</div>
 								{/* The built-in catalog gets no delete button at all — not a disabled one. */}
@@ -221,6 +227,7 @@ export const SourceList: FC<{
 									<Button
 										variant="ghost"
 										size="icon"
+										className="self-end sm:self-start"
 										aria-label={m.store_source_remove()}
 										disabled={busyName === s.name}
 										onClick={() => onRemove(s)}
@@ -259,8 +266,10 @@ export const AddSourceForm: FC<{
 
 	return (
 		<Card className="max-w-xl">
-			<CardHeader>
-				<CardTitle>{m.store_add_source_title()}</CardTitle>
+			<CardHeader className="pb-3">
+				<CardTitle className="text-base tracking-tight">
+					{m.store_add_source_title()}
+				</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<form onSubmit={handleSubmit} className="space-y-4">
@@ -298,7 +307,7 @@ export const AddSourceForm: FC<{
 							id="store-source-key"
 							autoComplete="off"
 							spellCheck={false}
-							placeholder="ed25519:…"
+							placeholder="ed25519:..."
 							value={publicKey}
 							onChange={(e) => setPublicKey(e.target.value)}
 						/>
@@ -346,12 +355,12 @@ export const TrustSourceDialog: FC<{
 						</DialogDescription>
 					</DialogHeader>
 
-					<p className="rounded-md bg-muted px-3 py-2 font-mono text-xs break-all text-muted-foreground">
+					<p className="rounded-lg bg-muted/60 px-3 py-2.5 font-mono text-xs break-all text-muted-foreground">
 						{draft.url}
 					</p>
 
 					{!draft.public_key && (
-						<p className="rounded-md border border-amber-600/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-600 dark:border-amber-500/40 dark:text-amber-500">
+						<p className="rounded-lg border border-amber-600/40 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-700 dark:border-amber-500/40 dark:text-amber-400">
 							{m.store_source_trust_unsigned()}
 						</p>
 					)}

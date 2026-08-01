@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@unom/ui/toast";
+import { Library } from "lucide-react";
 import { motion, stagger } from "motion/react";
 import { type FC, useEffect, useMemo } from "react";
 import {
@@ -96,17 +97,22 @@ export const LibraryGrid: FC<{
 					    inset at ≥640px — see the CardContent doc comment. */}
 					<CardContent
 						flush
-						className="p-8 text-center text-sm text-muted-foreground"
+						className="flex flex-col items-center gap-3 p-10 text-center sm:p-12"
 					>
-						{m.library_empty()}
+						<span className="flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
+							<Library className="size-5" aria-hidden />
+						</span>
+						<p className="max-w-sm text-sm text-muted-foreground">
+							{m.library_empty()}
+						</p>
 					</CardContent>
 				</Card>
 			) : (
 				<div className="@container">
 					<motion.div
-						transition={{ delayChildren: stagger(0.1) }}
+						transition={{ delayChildren: stagger(0.06) }}
 						variants={{ enter: {}, from: {} }}
-						className="grid grid-cols-1 gap-card @sm:grid-cols-2 @md:grid-cols-2 @lg:grid-cols-3 @2xl:grid-cols-4 @4xl:grid-cols-5"
+						className="grid grid-cols-2 gap-3 @md:grid-cols-3 @lg:grid-cols-4 @2xl:grid-cols-5 @4xl:grid-cols-6"
 					>
 						{games.map((game) => (
 							<GameCard

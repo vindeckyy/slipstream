@@ -35,7 +35,7 @@ pub(super) struct DisplayTracker {
     /// loaded per callback so mid-stream re-syncs apply. Holding the handle (not the client)
     /// keeps the leaked render-callback refcount from pinning the whole session alive.
     clock_offset: Arc<AtomicI64>,
-    /// Always-on latch/display accumulator for the presenter's 1 Hz `pf-present` line —
+    /// Always-on latch/display accumulator for the presenter's 1 Hz `ss-present` line —
     /// independent of the HUD gate, so a HUD-off A/B stays measurable from logcat.
     meter: Arc<super::presenter::PresentMeter>,
     /// `(pts_us, decoded_real_ns, released_real_ns)` of frames released with `render = true`, in
@@ -184,7 +184,7 @@ unsafe extern "C" fn on_frame_rendered(
     let clamp = |v: i128| (v > 0 && v < 10_000_000_000).then_some((v / 1000) as u64);
     let display_us = paired.and_then(|(d, _)| clamp(displayed_ns - d));
     let latch_us = paired.and_then(|(_, r)| clamp(displayed_ns - r));
-    // Always-on half: the presenter's pf-present line reads these with the HUD off.
+    // Always-on half: the presenter's ss-present line reads these with the HUD off.
     t.meter.note_latch(latch_us);
     if !t.stats.enabled() {
         return; // HUD hidden — skip the skew math + the stats lock

@@ -9,11 +9,11 @@ generic package registry (`slipstream-host-windows`) by `.github/workflows/windo
 
 The installer refuses anything below **Windows 11 22H2 (build 22621)** — `MinVersion=10.0.22621` in
 `slipstream-host.iss`, with a `[Messages]` override naming the requirement. The floor comes from the
-**pf-vdisplay** driver: it is built against the **IddCx 1.10** class extension (the HDR `*2` DDIs +
+**ss-vdisplay** driver: it is built against the **IddCx 1.10** class extension (the HDR `*2` DDIs +
 the FP16 adapter cap, linked via the 1.10 `IddCxStub`, no runtime `IddCxGetVersion` downgrade), and
 IddCx 1.10 first shipped in Windows 11 22H2. On older Windows — **all of Windows 10 including LTSC,
 and Windows 11 21H2** — the driver *package* installs fine, but the device then fails to start with
-**Code 10 `STATUS_DEVICE_POWER_FAILURE`** in Device Manager and every session dies with "pf-vdisplay
+**Code 10 `STATUS_DEVICE_POWER_FAILURE`** in Device Manager and every session dies with "ss-vdisplay
 driver interface not found". Gating the installer turns that late, confusing failure into an upfront
 message. (Down-level SDR-only support would need a runtime IddCx version check in the driver —
 tracked as a possible future feature, not planned.)
@@ -21,7 +21,7 @@ tracked as a possible future feature, not planned.)
 ## x64 only (no ARM64)
 
 Unlike the client (which ships x64 + ARM64 MSIX), the host is **x64-only by design**. It is coupled to
-an NVIDIA GPU (NVENC, via `nvEncodeAPI64.dll` from the driver) and the **pf-vdisplay** virtual-display
+an NVIDIA GPU (NVENC, via `nvEncodeAPI64.dll` from the driver) and the **ss-vdisplay** virtual-display
 driver — neither exists on Windows ARM64 (no ARM64 NVIDIA driver; the driver builds x64-only). An
 ARM64 host would install but couldn't encode or create a virtual display, so we don't build one.
 Revisit if NVIDIA-ARM Windows PCs ever ship.
@@ -30,7 +30,7 @@ Revisit if NVIDIA-ARM Windows PCs ever ship.
 
 The host installs a **`LocalSystem` SCM service** that `CreateProcessAsUserW`'s from Session 0 into the
 interactive session for secure-desktop (UAC / lock screen) capture, adds firewall rules, and depends
-on the **pf-vdisplay** UMDF/IDD virtual-display driver. MSIX's sandbox can install **neither** a SYSTEM
+on the **ss-vdisplay** UMDF/IDD virtual-display driver. MSIX's sandbox can install **neither** a SYSTEM
 service of this kind **nor** a driver. So the host ships as a classic elevated installer.
 
 The installer is deliberately thin: the real install logic lives in `slipstream-host` subcommands, not
@@ -44,9 +44,9 @@ parse breakage that silently failed installs on non-English boxes.
 ## What the installer does
 
 - Installs `slipstream-host.exe` (+ `host.env.example`, this README) to `{app}` (`C:\Program Files\slipstream`).
-- **Optional task** *Install the pf-vdisplay virtual display driver* — `slipstream-host.exe driver install`
+- **Optional task** *Install the ss-vdisplay virtual display driver* — `slipstream-host.exe driver install`
   imports the driver's self-signed cert (machine `Root` + `TrustedPublisher`), creates the
-  `root\pf_vdisplay` device node (only if absent, via nefconc — never devgen), and stages the driver with
+  `root\ss_vdisplay` device node (only if absent, via nefconc — never devgen), and stages the driver with
   `pnputil /add-driver /install`.
   Best-effort: a driver failure warns but never aborts the install (the host degrades to a physical
   display without it).
@@ -80,8 +80,8 @@ parse breakage that silently failed installs on non-English boxes.
   the existing console password is kept (the wizard page is skipped).
 - **Uninstall** (Add/Remove Programs): runs `service uninstall` (stop + delete service + remove
   firewall rules), removes the `SlipstreamWeb` task + its firewall rule, then `driver uninstall` (+
-  `--gamepad`) removes the slipstream virtual-device drivers — the pf-vdisplay device node(s) and the
-  pf-vdisplay / pf-gamepad / pf-xusb driver-store packages (the field report was that they survived
+  `--gamepad`) removes the slipstream virtual-device drivers — the ss-vdisplay device node(s) and the
+  ss-vdisplay / ss-gamepad / ss-xusb driver-store packages (the field report was that they survived
   uninstall). **VB-CABLE is intentionally NOT removed** (a third-party shared component the user may
   use elsewhere — its own uninstaller is `VBCABLE_Setup_x64.exe -u -h`); the `%ProgramData%\slipstream`
   config (incl. `web-password`) is also left in place.
@@ -123,32 +123,32 @@ fresh install uses the generated random console password — read it from
 | `slipstream-host.iss` | Inno Setup script (the installer definition). |
 | `branding/` | Wizard branding: `gen-branding.ps1` renders the brand mark into the committed `wizard-image-*.bmp` / `wizard-small-*.bmp` (100–200% DPI) + `slipstream.ico`. Re-run only on a brand change. |
 | `pack-host-installer.ps1` | Orchestrator: cert + sign exe, **build + sign the drivers from source**, stage them + FFmpeg + VB-CABLE + the **web console** (`.output` + bun) + the HDR layer + branding, run ISCC, sign setup.exe. |
-| `build-pf-vdisplay.ps1` | Build pf-vdisplay from source (the `drivers/` workspace) + clear FORCE_INTEGRITY + sign `.dll`/`.cat` + export `.cer`. |
-| `build-gamepad-drivers.ps1` | Sign + catalog the gamepad drivers (`pf-gamepad` + `pf-xusb`) from the same workspace build (`-SkipBuild`), one shared cert. |
+| `build-ss-vdisplay.ps1` | Build ss-vdisplay from source (the `drivers/` workspace) + clear FORCE_INTEGRITY + sign `.dll`/`.cat` + export `.cer`. |
+| `build-gamepad-drivers.ps1` | Sign + catalog the gamepad drivers (`ss-gamepad` + `ss-xusb`) from the same workspace build (`-SkipBuild`), one shared cert. |
 | `install-vbcable.ps1` | On-target: seed VB-Audio's cert into `TrustedPublisher`, silently install the bundled VB-CABLE (`-i -h`). Run by the installer's *Install VB-CABLE virtual audio* task; idempotent + always exits 0 (non-fatal). |
 | `make-driver-cert.ps1` | Generate the stable `CN=slipstream-driver` code-signing cert (the `DRIVER_CERT_PFX_B64` / `DRIVER_CERT_PASSWORD` secrets). No key container, so it works over SSH; self-tests with signtool where it can. See *Driver signing* above. |
 | `clear-force-integrity.ps1` | Clear the `/INTEGRITYCHECK` PE bit so a self-signed driver loads (reused by every driver build). |
-| `stage-pf-vdisplay.ps1` | Stage the just-built pf-vdisplay bundle + fetch/verify the **pinned** nefcon release. |
-| `drivers/` | The all-Rust IddCx **driver source** workspace: the `pf-vdisplay` crate on `wdk-sys` / windows-drivers-rs + the owned `pf-driver-proto` ABI + `wdk-iddcx` / `wdk-probe`, plus `deploy-dev.ps1` (build/sign/install for dev). |
-| `reset-pf-vdisplay.ps1` | **Dev:** recover a wedged driver — stop host → reap ghost monitor nodes → reload the adapter → start host (no reboot). See *Dev iteration* below. |
-| `redeploy-pf-vdisplay.ps1` | **Dev:** one-shot redeploy — (optional) build → stop host → `deploy-dev.ps1 -Install` → reload adapter → start host. |
-| `pf-vkhdr-layer/` | **HDR Vulkan layer** (standalone `cdylib`): lets Vulkan games (Doom: The Dark Ages, etc.) enable HDR over the virtual display by advertising the HDR surface formats the NVIDIA/AMD ICDs hide on an indirect display. Built by the packer, laid into `{app}\vklayer`, registered under `HKLM64\…\Khronos\Vulkan\ImplicitLayers` (opt-out *Install the HDR Vulkan layer* task). Self-gated on the display's HDR state. See its README. |
+| `stage-ss-vdisplay.ps1` | Stage the just-built ss-vdisplay bundle + fetch/verify the **pinned** nefcon release. |
+| `drivers/` | The all-Rust IddCx **driver source** workspace: the `ss-vdisplay` crate on `wdk-sys` / windows-drivers-rs + the owned `ss-driver-proto` ABI + `wdk-iddcx` / `wdk-probe`, plus `deploy-dev.ps1` (build/sign/install for dev). |
+| `reset-ss-vdisplay.ps1` | **Dev:** recover a wedged driver — stop host → reap ghost monitor nodes → reload the adapter → start host (no reboot). See *Dev iteration* below. |
+| `redeploy-ss-vdisplay.ps1` | **Dev:** one-shot redeploy — (optional) build → stop host → `deploy-dev.ps1 -Install` → reload adapter → start host. |
+| `ss-vkhdr-layer/` | **HDR Vulkan layer** (standalone `cdylib`): lets Vulkan games (Doom: The Dark Ages, etc.) enable HDR over the virtual display by advertising the HDR surface formats the NVIDIA/AMD ICDs hide on an indirect display. Built by the packer, laid into `{app}\vklayer`, registered under `HKLM64\…\Khronos\Vulkan\ImplicitLayers` (opt-out *Install the HDR Vulkan layer* task). Self-gated on the display's HDR state. See its README. |
 
-> **Drivers are built from source, not vendored.** All three (pf-vdisplay + the gamepad pf-gamepad /
-> pf-xusb) are members of the all-Rust `drivers/` workspace (windows-drivers-rs / IddCx) and are
-> **rebuilt + signed every release** by `build-pf-vdisplay.ps1` + `build-gamepad-drivers.ps1` - the
+> **Drivers are built from source, not vendored.** All three (ss-vdisplay + the gamepad ss-gamepad /
+> ss-xusb) are members of the all-Rust `drivers/` workspace (windows-drivers-rs / IddCx) and are
+> **rebuilt + signed every release** by `build-ss-vdisplay.ps1` + `build-gamepad-drivers.ps1` - the
 > checked-in prebuilt binaries were deleted (a stale `.cat` once stopped covering its `.inf` →
 > `SPAPI_E_FILE_HASH_NOT_IN_CATALOG` on every box, and a frozen binary predated a driver IOCTL the host
 > needed). Building from source keeps `.dll`/`.inf`/`.cat` in lockstep. nefcon (the device-node tool -
-> the install creates the `root\pf_vdisplay` node with it, **never** `devgen`, which leaves persistent
-> phantom devices) is fetched + SHA-256-verified from its pinned release in `stage-pf-vdisplay.ps1`. See
+> the install creates the `root\ss_vdisplay` node with it, **never** `devgen`, which leaves persistent
+> phantom devices) is fetched + SHA-256-verified from its pinned release in `stage-ss-vdisplay.ps1`. See
 > slipstream-planning: `windows-build-and-packaging.md` (internal planning repo) for the toolchain
 > + signing details.
 
 ## Driver signing (`DRIVER_CERT_PFX_B64`)
 
 Our three UMDF drivers are signed with a **stable self-signed code-signing cert**, subject
-`CN=slipstream-driver`, supplied to `build-pf-vdisplay.ps1` / `build-gamepad-drivers.ps1` as the
+`CN=slipstream-driver`, supplied to `build-ss-vdisplay.ps1` / `build-gamepad-drivers.ps1` as the
 `DRIVER_CERT_PFX_B64` + `DRIVER_CERT_PASSWORD` Actions secrets. On a `v*` tag build a missing cert
 is a **hard failure** (`-RequireSignedCert`, default `auto` off `GITHUB_REF`); canary and local
 builds still fall back to a per-build throwaway.
@@ -158,7 +158,7 @@ builds still fall back to a per-build throwaway.
 Verify a shipped driver against it:
 
 ```powershell
-$dll = Get-ChildItem C:\Windows\System32\DriverStore\FileRepository\pf_vdisplay*\pf_vdisplay.dll |
+$dll = Get-ChildItem C:\Windows\System32\DriverStore\FileRepository\ss_vdisplay*\ss_vdisplay.dll |
          Select-Object -First 1 -Expand FullName
 (Get-AuthenticodeSignature $dll).SignerCertificate.Thumbprint
 ```
@@ -216,28 +216,28 @@ root — recoverable, but only by re-running the install.
 
 ## Dev iteration on the test box (driver)
 
-Two helpers wrap the painful manual steps of iterating on the pf-vdisplay driver against a live host
+Two helpers wrap the painful manual steps of iterating on the ss-vdisplay driver against a live host
 service. Run **elevated**; both default to the `SlipstreamHost` service. (The `C:\t-goal1\...` probe
 path below is the maintainer's test box — substitute your own `slipstream-probe.exe` build.)
 
 ```powershell
 # Recover a WEDGED driver. Symptom: every session fails with
-#   create virtual output: pf-vdisplay ADD ...: DeviceIoControl(0x222400): Element nicht gefunden (0x80070490)
+#   create virtual output: ss-vdisplay ADD ...: DeviceIoControl(0x222400): Element nicht gefunden (0x80070490)
 # i.e. ERROR_NOT_FOUND — sustained ADD/REMOVE churn exhausted the IddCx monitor slots (ghost
 # "Generic Monitor (slipstream)" nodes pile up, target_ids climb). A host restart's CLEAR_ALL does NOT
 # fix it; the driver instance must be reloaded. This clears the ghosts + cycles the adapter (no reboot —
 # this box boots to Proxmox).
-powershell -ExecutionPolicy Bypass -File reset-pf-vdisplay.ps1 -Verify -Probe C:\t-goal1\debug\slipstream-probe.exe
+powershell -ExecutionPolicy Bypass -File reset-ss-vdisplay.ps1 -Verify -Probe C:\t-goal1\debug\slipstream-probe.exe
 
 # Redeploy a driver build cleanly (stop host → install with a strictly-increasing DriverVer → reload
 # adapter → start host). -Build runs `cargo build` first, but ONLY from an MSVC dev shell
 # (LIBCLANG_PATH + Version_Number=10.0.26100.0); otherwise build separately and omit -Build.
-powershell -ExecutionPolicy Bypass -File redeploy-pf-vdisplay.ps1 -Build -Verify -Probe C:\t-goal1\debug\slipstream-probe.exe
+powershell -ExecutionPolicy Bypass -File redeploy-ss-vdisplay.ps1 -Build -Verify -Probe C:\t-goal1\debug\slipstream-probe.exe
 ```
 
 The driver should reclaim monitor slots on REMOVE so churn can't wedge it; until it does, `reset` is
 the recovery. From a Linux box drive either over SSH, e.g.
-`ssh user@box 'powershell -ExecutionPolicy Bypass -File C:\...\reset-pf-vdisplay.ps1'`.
+`ssh user@box 'powershell -ExecutionPolicy Bypass -File C:\...\reset-ss-vdisplay.ps1'`.
 
 ## Build locally (Windows, MSVC + Windows SDK + Inno Setup)
 
@@ -246,7 +246,7 @@ the recovery. From a Linux box drive either over SSH, e.g.
 #    statically links the vendored VPL dispatcher — needs cmake + a libclang, no FFmpeg)
 cargo build --release -p slipstream-host --features nvenc,qsv
 
-# 2. pack (self-signed unless MSIX_CERT_PFX_B64/MSIX_CERT_PASSWORD are set; -NoDriver to skip pf-vdisplay)
+# 2. pack (self-signed unless MSIX_CERT_PFX_B64/MSIX_CERT_PASSWORD are set; -NoDriver to skip ss-vdisplay)
 pwsh -File packaging\windows\pack-host-installer.ps1 -Version 0.0.0-dev -TargetDir C:\t\release -OutDir C:\t\out
 ```
 
@@ -257,4 +257,4 @@ Push a `vX.Y.Z` tag — one tag releases every platform (see
 publishes `slipstream-host-setup-X.Y.Z.exe` + the public `.cer`, refreshes the stable `latest/`
 alias, and attaches the installer to the unified GitHub Release. Main pushes publish rolling
 `<next-minor>.<run>` **canary** builds (base derived from the latest stable tag by
-`scripts/ci/pf-version.ps1`) to the `canary/` alias.
+`scripts/ci/ss-version.ps1`) to the `canary/` alias.

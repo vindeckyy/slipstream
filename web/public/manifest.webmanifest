@@ -7,12 +7,12 @@
 	"display": "standalone",
 	"orientation": "any",
 	"background_color": "#0a0a0f",
-	"theme_color": "#6c5bf3",
+	"theme_color": "#0891b2",
 	"icons": [
 		{
-			"src": "/favicon.svg",
-			"type": "image/svg+xml",
-			"sizes": "any",
+			"src": "/slipstream-mark.png",
+			"type": "image/png",
+			"sizes": "128x128",
 			"purpose": "any"
 		}
 	]

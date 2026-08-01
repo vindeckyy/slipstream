@@ -1,0 +1,93 @@
+;/*++
+; ss-vdisplay - slipstream virtual display, UMDF2 IddCx driver INF (template; stampinf -> .inf).
+;
+; For the all-Rust wdk-sys / windows-drivers-rs driver in THIS tree
+; (packaging/windows/drivers/ss-vdisplay/). The driver registers the OWNED ss_driver_proto
+; control-interface GUID in CODE (WdfDeviceCreateDeviceInterface), so this INF is GUID-agnostic and
+; is byte-identical to the superseded oracle's (packaging/windows/vdisplay-driver/.../ss_vdisplay.inx,
+; itself adapted from MolotovCherry/virtual-display-rs (MIT) + SudoVDA's control-device security DACL).
+; HWID Root\ss_vdisplay + IddCx0102 + the DACL match the host backend (crates/slipstream-host/src/
+; vdisplay/ss_vdisplay.rs) and install-ss-vdisplay.ps1's Test-PfVdisplayPresent / nefconc node-create.
+;--*/
+[Version]
+PnpLockdown=1
+Signature="$Windows NT$"
+ClassGUID={4D36E968-E325-11CE-BFC1-08002BE10318}
+Class=Display
+ClassVer=2.0
+Provider=%ManufacturerName%
+CatalogFile=ss_vdisplay.cat
+DriverVer=
+
+[Manufacturer]
+%ManufacturerName%=Standard,NT$ARCH$
+
+[Standard.NT$ARCH$]
+%DeviceName%=ss_vdisplay_Install, Root\ss_vdisplay
+
+[SourceDisksFiles]
+ss_vdisplay.dll=1
+
+[SourceDisksNames]
+1=%DiskName%
+
+; =================== UMDF IddCx device ====================
+
+[ss_vdisplay_Install.NT]
+CopyFiles=UMDriverCopy
+
+[ss_vdisplay_Install.NT.hw]
+AddReg=ss_vdisplay_HardwareDeviceSettings
+
+[ss_vdisplay_HardwareDeviceSettings]
+HKR, , "UpperFilters", %REG_MULTI_SZ%, "IndirectKmd"
+; (no "WUDF"/DeviceGroupId value: it only means anything under ProcessSharingEnabled, and this
+; driver sets UmdfHostProcessSharing=ProcessSharingDisabled below — code in monitor.rs/control.rs
+; reasons from the dedicated-WUDFHost guarantee, so the group id was dead weight.)
+; Only the host (LocalSystem service) + admins may open the control device. Deliberately NO Everyone
+; ACE (SudoVDA ships one for its user-mode host): the control plane creates/removes monitors and
+; bootstraps the sealed frame channel (IOCTL_SET_FRAME_CHANNEL), so it is not for unprivileged callers.
+HKR, , "Security", , "D:P(A;;GA;;;SY)(A;;GA;;;BA)"
+
+[ss_vdisplay_Install.NT.Services]
+AddService=WUDFRd,0x000001fa,WUDFRD_ServiceInstall
+
+[ss_vdisplay_Install.NT.Wdf]
+UmdfService=ss_vdisplay, ss_vdisplay_Install
+UmdfServiceOrder=ss_vdisplay
+UmdfKernelModeClientPolicy=AllowKernelModeClients
+UmdfHostProcessSharing=ProcessSharingDisabled
+UmdfFileObjectPolicy=AllowNullAndUnknownFileObjects
+
+[ss_vdisplay_Install]
+UmdfLibraryVersion=$UMDFVERSION$
+ServiceBinary=%12%\UMDF\ss_vdisplay.dll
+; "IddCx0102" is the extension's REGISTERED IDENTITY string (every IddCx release keeps it — the
+; sample drivers ship it unchanged at IddCx 1.10); the real version floor is the binary's exported
+; IddMinimumVersionRequired=10 (src/lib.rs). Do not "fix" this to IddCx0110 — that identity does
+; not exist and the install would fail.
+UmdfExtensions=IddCx0102
+
+[WUDFRD_ServiceInstall]
+DisplayName=%WudfRdDisplayName%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%12%\WUDFRd.sys
+
+[DestinationDirs]
+UMDriverCopy=12,UMDF
+
+[UMDriverCopy]
+ss_vdisplay.dll
+
+[Strings]
+ManufacturerName="Slipstream"
+DiskName="Slipstream Virtual Display Installation Disk"
+WudfRdDisplayName="Windows Driver Foundation - User-mode Driver Framework Reflector"
+DeviceName="Slipstream Virtual Display"
+
+REG_MULTI_SZ=0x00010000
+REG_SZ=0x00000000
+REG_EXPAND_SZ=0x00020000
+REG_DWORD=0x00010001

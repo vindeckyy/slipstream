@@ -38,7 +38,7 @@ const ws = import.meta._websocket
 // `server.requestIP(req)` is the only place the real peer is knowable, so we stamp it here.
 // Any inbound copy is deleted first, so a client cannot forge it.
 // Read back by `peerAddress()` in server/util/auth.ts — keep the two names in sync.
-const PEER_IP_HEADER = "x-pf-peer-ip";
+const PEER_IP_HEADER = "x-ss-peer-ip";
 
 // TLS from the host's identity cert (file PATHS → Bun.file, not PEM-in-env). Absent ⇒ plain HTTP.
 const certPath = process.env.SLIPSTREAM_UI_TLS_CERT;

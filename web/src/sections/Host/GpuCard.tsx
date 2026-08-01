@@ -74,7 +74,7 @@ const EncoderPinNote: FC<{ state: GpuState; pin: string }> = ({
 	const conflicting =
 		vendor && state.selected && state.selected.vendor !== vendor.toLowerCase();
 	return conflicting && state.selected ? (
-		<p className="text-sm text-amber-600 dark:text-amber-500">
+		<p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-[var(--warning)]">
 			{m.gpu_encoder_pin_warning({
 				value: pin,
 				vendor,
@@ -101,34 +101,39 @@ export const GpuCard: FC<{
 	const s = state.data;
 	return (
 		<Card>
-			<CardHeader>
-				<CardTitle className="flex items-center justify-between gap-4">
-					<span>{m.host_gpus()}</span>
-					{s && s.gpus.length > 0 && (
-						<Button
-							size="sm"
-							variant={s.mode === "auto" ? "default" : "outline"}
-							disabled={busy || s.mode === "auto"}
-							onClick={() => onApply("auto")}
-						>
-							{m.gpu_automatic()}
-						</Button>
-					)}
-				</CardTitle>
+			<CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
+				<div className="space-y-1.5">
+					<CardTitle className="tracking-tight">{m.host_gpus()}</CardTitle>
+					<p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+						{m.host_gpus_help()}
+					</p>
+				</div>
+				{s && (s.gpus?.length ?? 0) > 0 && (
+					<Button
+						size="sm"
+						variant={s.mode === "auto" ? "default" : "outline"}
+						disabled={busy || s.mode === "auto"}
+						onClick={() => onApply("auto")}
+						className="shrink-0 self-start"
+					>
+						{m.gpu_automatic()}
+					</Button>
+				)}
 			</CardHeader>
 			<CardContent className="space-y-4">
-				<p className="text-sm text-muted-foreground">{m.host_gpus_help()}</p>
 				<QueryState
 					isLoading={state.isLoading}
 					error={state.error}
 					refetch={state.refetch}
 				>
 					{s &&
-						(s.gpus.length === 0 ? (
-							<p className="text-sm text-muted-foreground">{m.gpu_none()}</p>
+						((s.gpus?.length ?? 0) === 0 ? (
+							<p className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+								{m.gpu_none()}
+							</p>
 						) : (
-							<ul className="divide-y rounded-md border">
-								{s.gpus.map((g) => {
+							<ul className="overflow-hidden rounded-lg border border-border/70 bg-muted/15 divide-y divide-border/60">
+								{(s.gpus ?? []).map((g) => {
 									const isActive = s.active?.id === g.id;
 									const isSelected = s.selected?.id === g.id;
 									const isPreferred =
@@ -136,7 +141,7 @@ export const GpuCard: FC<{
 									return (
 										<li
 											key={g.id}
-											className="flex items-center justify-between gap-4 px-4 py-3"
+											className="flex flex-col gap-3 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4"
 										>
 											<div className="min-w-0">
 												<div className="flex flex-wrap items-center gap-2">
@@ -171,6 +176,7 @@ export const GpuCard: FC<{
 												variant="outline"
 												disabled={busy || isPreferred}
 												onClick={() => onApply("manual", g.id)}
+												className="shrink-0 self-start sm:self-center"
 											>
 												{m.gpu_prefer()}
 											</Button>
@@ -180,7 +186,7 @@ export const GpuCard: FC<{
 							</ul>
 						))}
 					{s?.selected?.source === "preference_missing" && (
-						<p className="text-sm text-amber-600 dark:text-amber-500">
+						<p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-[var(--warning)]">
 							{m.gpu_missing_warning({ name: s.preferred_name ?? "?" })}
 						</p>
 					)}

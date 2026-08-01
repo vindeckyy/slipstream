@@ -138,8 +138,12 @@ export const SectionStore: FC = () => {
 		<Section maxWidth={false}>
 			<div className="flex flex-col gap-card">
 				<div className="space-y-1">
-					<h1 className="text-2xl font-semibold">{m.store_title()}</h1>
-					<p className="text-sm text-muted-foreground">{m.store_subtitle()}</p>
+					<h1 className="text-2xl font-semibold tracking-tight">
+						{m.store_title()}
+					</h1>
+					<p className="max-w-prose text-sm text-muted-foreground">
+						{m.store_subtitle()}
+					</p>
 				</div>
 
 				{jobId && (
@@ -147,21 +151,23 @@ export const SectionStore: FC = () => {
 				)}
 
 				<Tabs value={tab} onValueChange={(v) => setTab(v as StoreTab)}>
-					<TabsList>
-						<TabsTrigger value="browse">{m.store_tab_browse()}</TabsTrigger>
-						<TabsTrigger value="installed">
-							{m.store_tab_installed()}
-						</TabsTrigger>
-						<TabsTrigger value="sources">{m.store_tab_sources()}</TabsTrigger>
-					</TabsList>
+					<div className="overflow-x-auto pb-1">
+						<TabsList className="w-max min-w-full sm:w-auto">
+							<TabsTrigger value="browse">{m.store_tab_browse()}</TabsTrigger>
+							<TabsTrigger value="installed">
+								{m.store_tab_installed()}
+							</TabsTrigger>
+							<TabsTrigger value="sources">{m.store_tab_sources()}</TabsTrigger>
+						</TabsList>
+					</div>
 
-					<TabsContent value="browse">
+					<TabsContent value="browse" className="mt-4">
 						<BrowseTab
 							onInstall={setTarget}
 							onInstallSpec={() => setSpecOpen(true)}
 						/>
 					</TabsContent>
-					<TabsContent value="installed">
+					<TabsContent value="installed" className="mt-4">
 						<InstalledTab
 							onUpdate={onUpdate}
 							onUninstall={onUninstall}
@@ -170,7 +176,7 @@ export const SectionStore: FC = () => {
 							}
 						/>
 					</TabsContent>
-					<TabsContent value="sources">
+					<TabsContent value="sources" className="mt-4">
 						<SourcesTab />
 					</TabsContent>
 				</Tabs>

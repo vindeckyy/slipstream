@@ -1,5 +1,5 @@
 //! The game library page (mouse/keyboard): the target host's library as a responsive
-//! poster grid over `pf-client-core::library` — the WinUI counterpart of the GTK shell's
+//! poster grid over `ss-client-core::library` — the WinUI counterpart of the GTK shell's
 //! `ui_library.rs`, sharing its service layer (mTLS fetch against the host's management
 //! API, pre-classified errors, the 3-worker art pipeline) and its four states
 //! (loading / error+retry / empty / grid). Reached from a paired host's "…" menu
@@ -19,7 +19,7 @@
 use super::connect::initiate_launch;
 use super::style::*;
 use super::{AppCtx, Screen, Svc};
-use pf_client_core::library;
+use ss_client_core::library;
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
@@ -85,7 +85,7 @@ pub(crate) fn start_fetch(ctx: &Arc<AppCtx>, set_library: &AsyncSetState<Library
         set_library.clone(),
     );
     std::thread::Builder::new()
-        .name("pf-library".into())
+        .name("ss-library".into())
         .spawn(move || {
             let pin = target.fp_hex.as_deref().and_then(crate::trust::parse_hex32);
             let publish = |state: &LibraryState| {

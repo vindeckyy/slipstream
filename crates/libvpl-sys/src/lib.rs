@@ -2,7 +2,7 @@
 //! statically linked MIT dispatcher.
 //!
 //! Empty on targets other than Windows — see build.rs. The safe wrapper lives
-//! with its consumer (`pf-encode`'s `enc/windows/qsv.rs`); this crate is
+//! with its consumer (`ss-encode`'s `enc/windows/qsv.rs`); this crate is
 //! bindings only.
 
 #![allow(non_upper_case_globals)]
@@ -11,7 +11,7 @@
 // Bindgen output for a C API: u128 layout warnings and the like are upstream's concern.
 #![allow(improper_ctypes)]
 // Generated code — clippy findings in it (missing safety docs on generated unsafe fns, style
-// nits across 14k lines) are bindgen's shape, not ours; the safe wrapper in pf-encode is the
+// nits across 14k lines) are bindgen's shape, not ours; the safe wrapper in ss-encode is the
 // linted surface.
 #![allow(clippy::all)]
 

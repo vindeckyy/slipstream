@@ -7,13 +7,13 @@
 //! `trust_rejected` routed to the re-pair PIN ceremony.
 //!
 //! Spawning, the argv, the stdout contract and the child handle live in
-//! `pf_client_core::orchestrate` (design/client-architecture-split.md §3) — the WinUI shell
+//! `ss_client_core::orchestrate` (design/client-architecture-split.md §3) — the WinUI shell
 //! and the coming CLI spawn through the same code, so "what flags does a stream get" and
 //! "what does ready mean" have exactly one answer.
 
 use crate::app::AppMsg;
 use crate::ui_hosts::ConnectRequest;
-use pf_client_core::orchestrate::{self, ConnectPlan, HostTarget, SessionEvent};
+use ss_client_core::orchestrate::{self, ConnectPlan, HostTarget, SessionEvent};
 
 /// Spawn tunables beyond a plain connect.
 #[derive(Debug, Default)]
@@ -129,10 +129,10 @@ mod tests {
     /// deliberately does not split into several that would race over the same env var.
     #[test]
     fn the_plan_carries_resolved_settings_not_defaults() {
-        use pf_client_core::profiles::{ProfilesFile, SettingsOverlay, StreamProfile};
-        use pf_client_core::trust::{KnownHost, KnownHosts, Settings};
+        use ss_client_core::profiles::{ProfilesFile, SettingsOverlay, StreamProfile};
+        use ss_client_core::trust::{KnownHost, KnownHosts, Settings};
 
-        let home = std::env::temp_dir().join(format!("pf-spawn-test-{}", std::process::id()));
+        let home = std::env::temp_dir().join(format!("ss-spawn-test-{}", std::process::id()));
         let cfg = home.join(".config/slipstream");
         std::fs::create_dir_all(&cfg).unwrap();
         std::env::set_var("HOME", &home);

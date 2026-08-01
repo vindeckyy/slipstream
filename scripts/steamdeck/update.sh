@@ -91,8 +91,8 @@ if [ -f "$HOST_ENV" ] && ! grep -q '^RADV_PERFTEST=' "$HOST_ENV"; then
     ok "host.env: added RADV_PERFTEST=video_encode"
 fi
 mkdir -p "$HOME/.local/share/applications"
-sed "s|^Exec=.*|Exec=$TARGET_DIR/release/slipstream-host|" "$SRC/packaging/linux/io.unom.Slipstream.Host.desktop" \
-    > "$HOME/.local/share/applications/io.unom.Slipstream.Host.desktop"
+sed "s|^Exec=.*|Exec=$TARGET_DIR/release/slipstream-host|" "$SRC/packaging/linux/io.slipstream.Host.desktop" \
+    > "$HOME/.local/share/applications/io.slipstream.Host.desktop"
 ok "KWin desktop-capture authorization refreshed"
 
 # Retrofit the system bits install.sh now sets up but older installs predate (idempotent). vhci-hcd =

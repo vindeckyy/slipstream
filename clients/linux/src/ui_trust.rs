@@ -9,7 +9,7 @@ use crate::trust;
 use crate::ui_hosts::ConnectRequest;
 use adw::prelude::*;
 use gtk::glib;
-use pf_client_core::orchestrate::{WakeOutcome, WakeWait};
+use ss_client_core::orchestrate::{WakeOutcome, WakeWait};
 use relm4::prelude::*;
 
 /// Wake-and-wait: the FALLBACK after a failed dial to a non-advertising saved host with a

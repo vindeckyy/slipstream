@@ -38,7 +38,7 @@ machine, trust logic) instead of re-porting it into Kotlin.
 | **Rust** (`native/` → `libslipstream_android.so`) | the JNI seam, `NativeClient` (QUIC control + UDP data plane), AnnexB → `AMediaCodec` decode (incl. HDR10), Opus + AAudio audio + mic, controller feedback, latency math, trust/pairing, `mdns-sd` discovery |
 | **Kotlin** (`app/`, `kit/`) | Compose UI, `SurfaceView` lifecycle, input capture, the Wi-Fi `MulticastLock` + permission UX, Keystore identity |
 
-The single seam is `io.unom.slipstream.kit.NativeBridge` ⇄ `Java_io_unom_slipstream_kit_NativeBridge_*`.
+The single seam is `io.slipstream.kit.NativeBridge` ⇄ `Java_io_unom_slipstream_kit_NativeBridge_*`.
 
 ```
 native/           Rust cdylib (workspace member) — links slipstream-core directly
@@ -70,7 +70,7 @@ export JAVA_HOME="$(/usr/libexec/java_home -v 21)"   # or your Temurin 21 path
 cd clients/android
 ./gradlew :app:assembleDebug     # cargo-ndk cross-compiles libslipstream_android.so first
 ./gradlew :app:installDebug      # onto a running emulator/device
-# emulators from env setup:  emulator -avd pf_phone   |   emulator -avd pf_tv
+# emulators from env setup:  emulator -avd ss_phone   |   emulator -avd ss_tv
 ```
 
 The debug APK lands in `app/build/outputs/apk/debug/`. Launch it, pick a host, pair, and stream.

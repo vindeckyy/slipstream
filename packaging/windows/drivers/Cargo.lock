@@ -395,47 +395,47 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
-name = "pf-driver-proto"
+name = "ss-driver-proto"
 version = "0.0.1"
 dependencies = [
  "bytemuck",
 ]
 
 [[package]]
-name = "pf-gamepad"
+name = "ss-gamepad"
 version = "0.0.1"
 dependencies = [
- "pf-driver-proto",
- "pf-umdf-util",
+ "ss-driver-proto",
+ "ss-umdf-util",
  "wdk",
  "wdk-build",
  "wdk-sys",
 ]
 
 [[package]]
-name = "pf-mouse"
+name = "ss-mouse"
 version = "0.0.1"
 dependencies = [
- "pf-driver-proto",
- "pf-umdf-util",
+ "ss-driver-proto",
+ "ss-umdf-util",
  "wdk",
  "wdk-build",
  "wdk-sys",
 ]
 
 [[package]]
-name = "pf-umdf-util"
+name = "ss-umdf-util"
 version = "0.0.1"
 dependencies = [
- "pf-driver-proto",
+ "ss-driver-proto",
  "wdk-sys",
 ]
 
 [[package]]
-name = "pf-vdisplay"
+name = "ss-vdisplay"
 version = "0.0.1"
 dependencies = [
- "pf-driver-proto",
+ "ss-driver-proto",
  "thiserror",
  "wdk",
  "wdk-build",
@@ -445,11 +445,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "pf-xusb"
+name = "ss-xusb"
 version = "0.0.1"
 dependencies = [
- "pf-driver-proto",
- "pf-umdf-util",
+ "ss-driver-proto",
+ "ss-umdf-util",
  "wdk",
  "wdk-build",
  "wdk-sys",
@@ -817,7 +817,7 @@ dependencies = [
 name = "wdk-probe"
 version = "0.0.1"
 dependencies = [
- "pf-driver-proto",
+ "ss-driver-proto",
  "wdk",
  "wdk-build",
  "wdk-sys",

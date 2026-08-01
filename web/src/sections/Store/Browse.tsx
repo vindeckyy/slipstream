@@ -1,4 +1,11 @@
-import { AlertTriangle, Ban, Check, Download, Search } from "lucide-react";
+import {
+	AlertTriangle,
+	Ban,
+	Check,
+	Download,
+	PackageSearch,
+	Search,
+} from "lucide-react";
 import { type FC, useMemo, useState } from "react";
 import { pluginIcon } from "@/api/plugins";
 import { type StoreEntry, useStoreCatalog } from "@/api/store";
@@ -53,12 +60,12 @@ export const BrowseTab: FC<{
 		<div className="flex flex-col gap-card">
 			<RunnerBanner />
 
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-				<div className="relative sm:max-w-xs sm:flex-1">
+			<div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/30 p-3 sm:flex-row sm:items-center sm:p-3.5">
+				<div className="relative w-full sm:max-w-sm sm:flex-1">
 					<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 					<Input
 						type="search"
-						className="pl-9"
+						className="bg-background/60 pl-9"
 						aria-label={m.store_search_placeholder()}
 						placeholder={m.store_search_placeholder()}
 						value={query}
@@ -67,7 +74,10 @@ export const BrowseTab: FC<{
 				</div>
 				{/* One chip per source, so an operator can see a third-party catalog's entries alone. */}
 				{sources.length > 1 && (
-					<div className="flex flex-wrap gap-2">
+					<fieldset
+						aria-label={m.store_tab_sources()}
+						className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0"
+					>
 						<Button
 							size="sm"
 							variant={source === null ? "default" : "outline"}
@@ -87,7 +97,7 @@ export const BrowseTab: FC<{
 								{s.name}
 							</Button>
 						))}
-					</div>
+					</fieldset>
 				)}
 			</div>
 
@@ -100,23 +110,28 @@ export const BrowseTab: FC<{
 					<Card>
 						<CardContent
 							flush
-							className="p-8 text-center text-sm text-muted-foreground"
+							className="flex flex-col items-center gap-3 p-10 text-center sm:p-12"
 						>
-							{entries.length > 0
-								? m.store_no_match()
-								: failedSources.length > 0
-									? // An all-sources-failed catalog is a SUCCESSFUL request that happens to
-										// carry nothing, so "no plugins available" was the console reporting a
-										// broken fetch as an empty store. Name the sources that failed.
-										m.store_all_sources_failed({
-											sources: failedSources.map((f) => f.name).join(", "),
-										})
-									: m.store_empty()}
+							<span className="flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
+								<PackageSearch className="size-5" aria-hidden />
+							</span>
+							<p className="max-w-md text-sm text-muted-foreground">
+								{entries.length > 0
+									? m.store_no_match()
+									: failedSources.length > 0
+										? // An all-sources-failed catalog is a SUCCESSFUL request that happens to
+											// carry nothing, so "no plugins available" was the console reporting a
+											// broken fetch as an empty store. Name the sources that failed.
+											m.store_all_sources_failed({
+												sources: failedSources.map((f) => f.name).join(", "),
+											})
+										: m.store_empty()}
+							</p>
 						</CardContent>
 					</Card>
 				) : (
 					<div className="@container">
-						<div className="grid grid-cols-1 gap-card @xl:grid-cols-2 @4xl:grid-cols-3">
+						<div className="grid grid-cols-1 gap-3 @xl:grid-cols-2 @4xl:grid-cols-3">
 							{shown.map((entry) => (
 								<StoreCard
 									key={`${entry.source}/${entry.id}`}
@@ -131,7 +146,7 @@ export const BrowseTab: FC<{
 
 			{/* The ONLY way to the raw-spec install. Deliberately a quiet footer link, not a button on
 			    a card: an unverified install should take a decision, never a stray click. */}
-			<div className="text-center">
+			<div className="border-t border-border/60 pt-4 text-center">
 				<button
 					type="button"
 					onClick={onInstallSpec}
@@ -177,8 +192,8 @@ export const StoreCard: FC<{ entry: StoreEntry; onInstall: () => void }> = ({
 	return (
 		<Card
 			className={cn(
-				"flex flex-col",
-				blocked && "ring-2 ring-destructive/60",
+				"flex flex-col transition-[box-shadow] duration-200 hover:ring-accent/70",
+				blocked && "ring-2 ring-destructive/60 hover:ring-destructive/60",
 				!entry.compatible && !blocked && "opacity-60",
 			)}
 		>
@@ -186,11 +201,14 @@ export const StoreCard: FC<{ entry: StoreEntry; onInstall: () => void }> = ({
 				className={cn("flex flex-1 flex-col gap-3", HEADERLESS_CARD_PADDING)}
 			>
 				<div className="flex items-start gap-3">
-					<span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary/15">
+					<span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/12 ring-1 ring-primary/20">
 						<Icon className="size-5 text-foreground" />
 					</span>
 					<div className="min-w-0 flex-1">
-						<h3 className="truncate font-medium" title={entry.title}>
+						<h3
+							className="truncate font-medium tracking-tight"
+							title={entry.title}
+						>
 							{entry.title}
 						</h3>
 						<p className="truncate text-xs text-muted-foreground">
@@ -205,7 +223,7 @@ export const StoreCard: FC<{ entry: StoreEntry; onInstall: () => void }> = ({
 					{entry.tier === "external" && <SourceChip source={entry.source} />}
 				</div>
 
-				<p className="line-clamp-3 text-sm text-muted-foreground">
+				<p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">
 					{entry.description}
 				</p>
 
@@ -218,21 +236,21 @@ export const StoreCard: FC<{ entry: StoreEntry; onInstall: () => void }> = ({
 				</div>
 
 				{blocked && (
-					<p className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+					<p className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
 						<Ban className="mt-0.5 size-4 shrink-0" />
 						<span>{m.store_blocked({ reason: entry.blocked ?? "" })}</span>
 					</p>
 				)}
 
 				{!entry.compatible && !blocked && (
-					<p className="flex items-start gap-2 text-xs text-amber-600 dark:text-amber-500">
+					<p className="flex items-start gap-2 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-700 dark:text-amber-400">
 						<AlertTriangle className="mt-px size-3.5 shrink-0" />
 						<span>{entry.incompatible_reason ?? m.store_incompatible()}</span>
 					</p>
 				)}
 
 				{/* Footer pinned to the bottom so cards in a row line their actions up. */}
-				<div className="mt-auto flex items-center gap-3 pt-1">
+				<div className="mt-auto flex flex-wrap items-center gap-3 border-t border-border/50 pt-3">
 					{entry.update_available ? (
 						<Button size="sm" disabled={!installable} onClick={onInstall}>
 							<Download className="size-4" />
@@ -240,7 +258,7 @@ export const StoreCard: FC<{ entry: StoreEntry; onInstall: () => void }> = ({
 						</Button>
 					) : installed ? (
 						<span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-							<Check className="size-4" />
+							<Check className="size-4 text-[var(--success)]" />
 							{m.store_installed_label()}
 						</span>
 					) : (

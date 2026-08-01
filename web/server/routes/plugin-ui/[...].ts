@@ -89,7 +89,7 @@ const BODY_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
  * An ALLOWLIST, not a denylist. A plugin UI is proxied same-origin by design, so any header it
  * returns is asserted for the console itself — and the first version of this dropped four names it
  * had thought of. `Clear-Site-Data: "*"` from a plugin's error page was not one of them: the
- * browser would honour it for this origin and wipe `pf_session`, signing the operator out of the
+ * browser would honour it for this origin and wipe `ss_session`, signing the operator out of the
  * console because a plugin 500'd. Same shape for a plugin-supplied `Content-Security-Policy`,
  * `X-Frame-Options` or `Access-Control-Allow-Origin` — all of which would speak for us.
  *

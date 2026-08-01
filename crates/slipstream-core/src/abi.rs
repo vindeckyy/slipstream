@@ -1,0 +1,4410 @@
+//! The stable `extern "C"` surface. `cbindgen` turns this module into
+//! `include/slipstream_core.h` (see `build.rs`).
+//!
+//! ## Principles (plan §5)
+//! - Opaque handles only: C sees `SlipstreamSession*`, never a Rust type's fields.
+//! - All cross-boundary structs are `#[repr(C)]`; buffers are pointer + length.
+//! - Explicit ownership: every handle from `*_new` / `*_pair` must be passed to
+//!   [`slipstream_session_free`]. A [`SlipstreamFrame`]'s `data` is borrowed until the next
+//!   `poll`/`free` on that session — copy it out before then.
+//! - Versioned: [`slipstream_abi_version`] + `SlipstreamConfig::struct_size` for forward-compat.
+//! - Panics never cross the boundary. Status-returning entry points use [`guard`], which reports a
+//!   panic as `SlipstreamStatus::Panic`; the teardown/mutator ones that return nothing use
+//!   [`guard_void`], which swallows and logs. The remaining bare ones are bare ON PURPOSE and only
+//!   because they cannot panic: [`slipstream_abi_version`] returns a constant, and the
+//!   `slipstream_connect*` shims forward every argument unchanged into a guarded implementation.
+
+// THE ABI CONTRACT, stated once - most `// SAFETY:` proofs below are an instance of it.
+//
+// Every pointer crossing this boundary is C memory the CALLER owns, and the header
+// (`include/slipstream_core.h`) is where that contract is published. Three shapes recur:
+//
+//  * HANDLES (`SlipstreamSession*`, `SlipstreamConnection*`, ...) come from a `*_new`/`*_pair` and
+//    stay valid until the matching `*_free`. They are only ever reached through `as_mut()`/
+//    `as_ref()`, which turn null into `None` - so a null handle is a `NullPointer` status, never a
+//    dereference. Using one after `*_free` is the caller's error and the one thing this layer
+//    cannot defend against.
+//  * OUT-PARAMS are caller-owned writable slots of the matching `#[repr(C)]` type. Where the header
+//    documents one as optional it is null-checked here before it is written; where it does not, a
+//    null is rejected by the entry point's own guard before any store.
+//  * C STRINGS are NUL-terminated or null, and are read through `opt_cstr`, which handles both and
+//    borrows for the call only.
+//
+// Two properties hold everywhere and are not repeated per site: no pointer is retained past the
+// call that received it (a `SlipstreamFrame`'s `data` is borrowed until the next `poll`/`free` on
+// that session, as the module header says), and every entry point runs inside `guard`'s
+// `catch_unwind`, so a panic becomes a status code rather than unwinding into C.
+
+use crate::config::{Config, FecConfig, FecScheme, ProtocolPhase, Role};
+use crate::crypto::SessionKey;
+use crate::error::SlipstreamStatus;
+use crate::input::InputEvent;
+use crate::reanchor::{GateVerdict, ReanchorGate};
+use crate::session::Session;
+use crate::stats::Stats;
+use crate::transport::{loopback_pair, Transport, UdpTransport};
+use std::ffi::{c_void, CStr};
+use std::os::raw::c_char;
+use std::panic::AssertUnwindSafe;
+use std::ptr;
+
+/// Opaque session handle. Pointer-only from C.
+pub struct SlipstreamSession {
+    inner: Session,
+    /// Keeps the most recently polled frame alive so [`SlipstreamFrame::data`] stays valid
+    /// until the next poll or free.
+    last_frame: Option<crate::session::Frame>,
+    input_cb: Option<(SlipstreamInputCb, *mut c_void)>,
+}
+
+/// Forward-compatible session configuration. The caller MUST set `struct_size` to
+/// `sizeof(SlipstreamConfig)`; the core uses it to detect ABI skew.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SlipstreamConfig {
+    pub struct_size: u32,
+    /// 0 = host, 1 = client.
+    pub role: u32,
+    /// 1 = P1 (GameStream-compatible), 2 = P2 (`slipstream/1`).
+    pub phase: u32,
+    /// 0 = GF(2⁸), 1 = GF(2¹⁶).
+    pub fec_scheme: u32,
+    pub fec_percent: u32,
+    pub max_data_per_block: u32,
+    pub shard_payload: u32,
+    /// Non-zero enables AES-128-GCM.
+    pub encrypt: u32,
+    pub key: [u8; 16],
+    pub salt: [u8; 4],
+    /// Test hook for the loopback transport; 0 in production.
+    pub loopback_drop_period: u32,
+    /// Largest encoded access unit the receiver will accept (bounds reassembler memory).
+    pub max_frame_bytes: u64,
+}
+
+impl SlipstreamConfig {
+    fn to_config(self) -> Result<Config, SlipstreamStatus> {
+        let role = match self.role {
+            0 => Role::Host,
+            1 => Role::Client,
+            _ => return Err(SlipstreamStatus::InvalidArg),
+        };
+        let phase = match self.phase {
+            1 => ProtocolPhase::P1GameStream,
+            2 => ProtocolPhase::P2Slipstream,
+            _ => return Err(SlipstreamStatus::InvalidArg),
+        };
+        // Range-check before narrowing: a `300` fec_percent or `65600` block size must be
+        // rejected, not silently truncated to a valid-looking value.
+        let scheme = u8::try_from(self.fec_scheme)
+            .ok()
+            .and_then(FecScheme::from_u8)
+            .ok_or(SlipstreamStatus::InvalidArg)?;
+        let fec_percent =
+            u8::try_from(self.fec_percent).map_err(|_| SlipstreamStatus::InvalidArg)?;
+        let max_data_per_block =
+            u16::try_from(self.max_data_per_block).map_err(|_| SlipstreamStatus::InvalidArg)?;
+        // The one narrowing here that differs by target width: on 32-bit (armeabi-v7a) an
+        // `as usize` silently truncates a >4 GiB value to a plausible-looking residue that
+        // passes validate() — reject it instead, like every narrowing above.
+        let max_frame_bytes =
+            usize::try_from(self.max_frame_bytes).map_err(|_| SlipstreamStatus::InvalidArg)?;
+        let cfg = Config {
+            role,
+            phase,
+            fec: FecConfig {
+                scheme,
+                fec_percent,
+                max_data_per_block,
+            },
+            shard_payload: self.shard_payload as usize,
+            max_frame_bytes,
+            encrypt: self.encrypt != 0,
+            // The C ABI keeps its fixed 16-byte key and always selects AES-128-GCM — no
+            // ABI_VERSION bump. Raw-`Config` C embedders can't negotiate ChaCha; the Swift/
+            // Kotlin clients are aarch64 with AES CE and never want it.
+            key: SessionKey::Aes128Gcm(self.key),
+            salt: self.salt,
+            loopback_drop_period: self.loopback_drop_period,
+        };
+        cfg.validate().map_err(|e| e.status())?;
+        Ok(cfg)
+    }
+}
+
+/// Read a `SlipstreamConfig` from a caller pointer, enforcing the `struct_size` ABI-skew
+/// guard *before* reading the whole struct: a caller compiled against a smaller (older)
+/// layout is rejected rather than causing an out-of-bounds read.
+///
+/// # Safety
+/// `cfg` must either be null or point to at least its own declared `struct_size` bytes.
+unsafe fn config_from_ptr(cfg: *const SlipstreamConfig) -> Result<Config, SlipstreamStatus> {
+    if cfg.is_null() {
+        return Err(SlipstreamStatus::NullPointer);
+    }
+    // Read only the 4-byte size prefix first to bound the subsequent full read.
+    // SAFETY: `addr_of!` forms a raw pointer WITHOUT creating a reference, which is the point: the
+    // caller's struct may be an older, smaller version, so the field is read by offset rather than
+    // through a `&`.
+    let declared = unsafe { std::ptr::addr_of!((*cfg).struct_size).read_unaligned() } as usize;
+    if declared < std::mem::size_of::<SlipstreamConfig>() {
+        return Err(SlipstreamStatus::InvalidArg);
+    }
+    // SAFETY: per the ABI contract - the pointer operands in this block are caller-supplied and
+    // are null-checked or handle-validated on this path before they are read.
+    unsafe { *cfg }.to_config()
+}
+
+/// A reassembled access unit. `data`/`len` borrow session-owned memory valid until the
+/// next `slipstream_client_poll_frame`/`slipstream_session_free` on the same session.
+#[repr(C)]
+pub struct SlipstreamFrame {
+    pub data: *const u8,
+    pub len: usize,
+    pub frame_index: u32,
+    pub pts_ns: u64,
+    pub flags: u32,
+    /// Wall-clock reassembly-completion instant (ns since the Unix epoch, CLOCK_REALTIME — the
+    /// clock `pts_ns` and the skew handshake use). THIS is the receipt stamp for latency math:
+    /// a stamp the embedder takes itself at the poll return additionally contains the
+    /// pre-decode hand-off queue wait, so a client-side standing backlog would masquerade as
+    /// network latency (ABI v9 — the 2026-07 two-pair standing-latency investigation).
+    pub received_ns: u64,
+}
+
+/// Snapshot of session counters.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct SlipstreamStats {
+    pub frames_submitted: u64,
+    pub frames_completed: u64,
+    pub frames_dropped: u64,
+    pub packets_sent: u64,
+    pub packets_received: u64,
+    pub packets_dropped: u64,
+    /// Packets dropped on the host send path because the kernel buffer was full (WouldBlock) — the
+    /// dominant loss mode at very high bitrate; distinct from `packets_dropped` (recv-side).
+    pub packets_send_dropped: u64,
+    pub fec_recovered_shards: u64,
+    pub bytes_sent: u64,
+    pub bytes_received: u64,
+}
+
+impl From<Stats> for SlipstreamStats {
+    fn from(s: Stats) -> Self {
+        SlipstreamStats {
+            frames_submitted: s.frames_submitted,
+            frames_completed: s.frames_completed,
+            frames_dropped: s.frames_dropped,
+            packets_sent: s.packets_sent,
+            packets_received: s.packets_received,
+            packets_dropped: s.packets_dropped,
+            packets_send_dropped: s.packets_send_dropped,
+            fec_recovered_shards: s.fec_recovered_shards,
+            bytes_sent: s.bytes_sent,
+            bytes_received: s.bytes_received,
+        }
+    }
+}
+
+/// Host-side callback invoked for each input event drained by `slipstream_host_poll_input`.
+pub type SlipstreamInputCb = extern "C" fn(event: *const InputEvent, user: *mut c_void);
+
+#[inline]
+fn guard<F: FnOnce() -> SlipstreamStatus>(f: F) -> SlipstreamStatus {
+    std::panic::catch_unwind(AssertUnwindSafe(f)).unwrap_or(SlipstreamStatus::Panic)
+}
+
+/// `guard` for the entry points that return nothing — the teardown/mutator calls, which have no
+/// status to report a panic through. They still must not let one unwind into C: since Rust 1.81
+/// that is a hard abort rather than undefined behaviour, but aborting the CALLER'S process because
+/// one of our `Drop` impls hit a poisoned mutex is not an acceptable failure mode for a library.
+/// Swallowing is right here — the object is being torn down either way.
+fn guard_void<F: FnOnce()>(f: F) {
+    if std::panic::catch_unwind(AssertUnwindSafe(f)).is_err() {
+        tracing::error!("panic escaped a slipstream_* teardown entry point; swallowed at the C ABI");
+    }
+}
+
+fn new_handle(session: Session) -> *mut SlipstreamSession {
+    Box::into_raw(Box::new(SlipstreamSession {
+        inner: session,
+        last_frame: None,
+        input_cb: None,
+    }))
+}
+
+/// Current ABI version. Mismatch with [`crate::ABI_VERSION`] means incompatible core.
+#[no_mangle]
+pub extern "C" fn slipstream_abi_version() -> u32 {
+    crate::ABI_VERSION
+}
+
+/// Send a Wake-on-LAN magic packet to wake sleeping host NIC(s).
+///
+/// `macs` points to `mac_count` contiguous 6-byte MAC addresses (`mac_count * 6` bytes total) —
+/// a host may report several NICs; all are woken. `last_known_ip`, if non-NULL, is an IPv4
+/// dotted-quad string additionally targeted by unicast (pass NULL to skip). The packet is
+/// broadcast to every local interface's subnet-directed broadcast and to `255.255.255.255` on
+/// ports 9 and 7. This does NOT require an open connection and is not part of the QUIC surface.
+///
+/// Returns `Ok` if at least one datagram was sent. Call off the UI thread.
+///
+/// # Safety
+/// `macs` must point to at least `mac_count * 6` readable bytes. `last_known_ip`, if non-NULL,
+/// must be a NUL-terminated string.
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_wake_on_lan(
+    macs: *const u8,
+    mac_count: usize,
+    last_known_ip: *const c_char,
+) -> SlipstreamStatus {
+    guard(|| {
+        if macs.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        if mac_count == 0 {
+            return SlipstreamStatus::InvalidArg;
+        }
+        // SAFETY: per the ABI contract - a caller-supplied pointer/length pair describing one
+        // readable region, borrowed only for this call.
+        let bytes = unsafe { std::slice::from_raw_parts(macs, mac_count * 6) };
+        let mac_vec: Vec<crate::wol::Mac> = bytes
+            .chunks_exact(6)
+            .map(|c| {
+                let mut m = [0u8; 6];
+                m.copy_from_slice(c);
+                m
+            })
+            .collect();
+        let ip = if last_known_ip.is_null() {
+            None
+        } else {
+            // SAFETY: per the ABI contract - a caller-supplied C string, NUL-terminated or null,
+            // borrowed only for this call.
+            match unsafe { CStr::from_ptr(last_known_ip) }
+                .to_str()
+                .ok()
+                .and_then(|s| s.parse::<std::net::Ipv4Addr>().ok())
+            {
+                Some(ip) => Some(ip),
+                None => return SlipstreamStatus::InvalidArg,
+            }
+        };
+        match crate::wol::send_magic_packet(&mac_vec, ip) {
+            Ok(()) => SlipstreamStatus::Ok,
+            Err(_) => SlipstreamStatus::Io,
+        }
+    })
+}
+
+/// Create a session over a real UDP transport (`local`/`peer` are `host:port` strings).
+/// Returns NULL on error.
+///
+/// # Safety
+/// `cfg`, `local`, `peer` must be valid pointers; the strings must be NUL-terminated.
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_session_new(
+    cfg: *const SlipstreamConfig,
+    local: *const c_char,
+    peer: *const c_char,
+) -> *mut SlipstreamSession {
+    let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
+        if cfg.is_null() || local.is_null() || peer.is_null() {
+            return ptr::null_mut();
+        }
+        // SAFETY: per the ABI contract - the pointer operands in this block are caller-supplied
+        // and are null-checked or handle-validated on this path before they are read.
+        let config = match unsafe { config_from_ptr(cfg) } {
+            Ok(c) => c,
+            Err(_) => return ptr::null_mut(),
+        };
+        // SAFETY: per the ABI contract - a caller-supplied C string, NUL-terminated or null,
+        // borrowed only for this call.
+        let local = match unsafe { CStr::from_ptr(local) }.to_str() {
+            Ok(s) => s,
+            Err(_) => return ptr::null_mut(),
+        };
+        // SAFETY: per the ABI contract - a caller-supplied C string, NUL-terminated or null,
+        // borrowed only for this call.
+        let peer = match unsafe { CStr::from_ptr(peer) }.to_str() {
+            Ok(s) => s,
+            Err(_) => return ptr::null_mut(),
+        };
+        let transport: Box<dyn Transport> = match UdpTransport::connect(local, peer) {
+            Ok(t) => Box::new(t),
+            Err(_) => return ptr::null_mut(),
+        };
+        match Session::new(config, transport) {
+            Ok(s) => new_handle(s),
+            Err(_) => ptr::null_mut(),
+        }
+    }));
+    result.unwrap_or(ptr::null_mut())
+}
+
+/// Create a connected host+client session pair sharing an in-process loopback
+/// transport. Test/dev only — exercises the full FEC + framing path without a network.
+///
+/// # Safety
+/// All four pointers must be valid; the two out-params receive owned handles.
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_test_loopback_pair(
+    host_cfg: *const SlipstreamConfig,
+    client_cfg: *const SlipstreamConfig,
+    out_host: *mut *mut SlipstreamSession,
+    out_client: *mut *mut SlipstreamSession,
+) -> SlipstreamStatus {
+    guard(|| {
+        if host_cfg.is_null() || client_cfg.is_null() || out_host.is_null() || out_client.is_null()
+        {
+            return SlipstreamStatus::NullPointer;
+        }
+        // SAFETY: per the ABI contract - the pointer operands in this block are caller-supplied
+        // and are null-checked or handle-validated on this path before they are read.
+        let hconf = match unsafe { config_from_ptr(host_cfg) } {
+            Ok(c) => c,
+            Err(s) => return s,
+        };
+        // SAFETY: per the ABI contract - the pointer operands in this block are caller-supplied
+        // and are null-checked or handle-validated on this path before they are read.
+        let cconf = match unsafe { config_from_ptr(client_cfg) } {
+            Ok(c) => c,
+            Err(s) => return s,
+        };
+        let (ht, ct) = loopback_pair(hconf.loopback_drop_period, cconf.loopback_drop_period);
+        let hs = match Session::new(hconf, Box::new(ht)) {
+            Ok(s) => s,
+            Err(e) => return e.status(),
+        };
+        let cs = match Session::new(cconf, Box::new(ct)) {
+            Ok(s) => s,
+            Err(e) => return e.status(),
+        };
+        // SAFETY: per the ABI contract - `out` is a caller-owned writable slot of the matching
+        // `#[repr(C)]` type, written once by value.
+        unsafe {
+            *out_host = new_handle(hs);
+            *out_client = new_handle(cs);
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Free a session handle. Safe to call with NULL.
+///
+/// # Safety
+/// `s` must be a handle from `slipstream_session_new`/`slipstream_test_loopback_pair`, freed once.
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_session_free(s: *mut SlipstreamSession) {
+    guard_void(|| {
+        if !s.is_null() {
+            // SAFETY: per the ABI contract - the pointer operands in this block are caller-supplied
+            // and are null-checked or handle-validated on this path before they are read.
+            drop(unsafe { Box::from_raw(s) });
+        }
+    });
+}
+
+/// Host: FEC-protect, packetize, seal and send one encoded access unit.
+///
+/// # Safety
+/// `s` is a valid host handle; `data` points to `len` readable bytes (or `len == 0`).
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_host_submit_frame(
+    s: *mut SlipstreamSession,
+    data: *const u8,
+    len: usize,
+    pts_ns: u64,
+    flags: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let s = match unsafe { s.as_mut() } {
+            Some(s) => s,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if data.is_null() && len != 0 {
+            return SlipstreamStatus::NullPointer;
+        }
+        let slice = if len == 0 {
+            &[][..]
+        } else {
+            // SAFETY: per the ABI contract - a caller-supplied pointer/length pair describing one
+            // readable region, borrowed only for this call.
+            unsafe { std::slice::from_raw_parts(data, len) }
+        };
+        match s.inner.submit_frame(slice, pts_ns, flags) {
+            Ok(()) => SlipstreamStatus::Ok,
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Client: poll for the next reassembled access unit. Returns [`SlipstreamStatus::NoFrame`]
+/// when nothing is ready yet. On `Ok`, `*out` borrows session memory until the next poll.
+///
+/// # Safety
+/// `s` is a valid client handle; `out` points to a writable `SlipstreamFrame`.
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_client_poll_frame(
+    s: *mut SlipstreamSession,
+    out: *mut SlipstreamFrame,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let s = match unsafe { s.as_mut() } {
+            Some(s) => s,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if out.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        match s.inner.poll_frame() {
+            Ok(frame) => {
+                s.last_frame = Some(frame);
+                let f = s.last_frame.as_ref().unwrap();
+                // SAFETY: per the ABI contract - `out` is a caller-owned writable slot of the
+                // matching `#[repr(C)]` type, written once by value.
+                unsafe {
+                    *out = SlipstreamFrame {
+                        data: f.data.as_ptr(),
+                        len: f.data.len(),
+                        frame_index: f.frame_index,
+                        pts_ns: f.pts_ns,
+                        flags: f.flags,
+                        received_ns: f.received_ns,
+                    };
+                }
+                SlipstreamStatus::Ok
+            }
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Client: serialize and send one input event to the host.
+///
+/// # Safety
+/// `s` is a valid client handle; `ev` points to a valid [`InputEvent`].
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_send_input(
+    s: *mut SlipstreamSession,
+    ev: *const InputEvent,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let s = match unsafe { s.as_mut() } {
+            Some(s) => s,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let ev = match unsafe { ev.as_ref() } {
+            Some(e) => e,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        match s.inner.send_input(ev) {
+            Ok(()) => SlipstreamStatus::Ok,
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Register the host-side input callback (pass a NULL fn pointer to clear). The callback
+/// fires from within [`slipstream_host_poll_input`], on the calling thread.
+///
+/// # Safety
+/// `s` is a valid host handle; `user` is passed back verbatim to `cb`.
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_set_input_callback(
+    s: *mut SlipstreamSession,
+    // Written as an explicit `Option<fn>` (not the `SlipstreamInputCb` alias) so cbindgen
+    // emits a nullable C function pointer rather than an opaque wrapper struct.
+    cb: Option<extern "C" fn(event: *const InputEvent, user: *mut c_void)>,
+    user: *mut c_void,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let s = match unsafe { s.as_mut() } {
+            Some(s) => s,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        s.input_cb = cb.map(|c| (c, user));
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Host: drain all pending input events, invoking the registered callback for each.
+/// Returns the count dispatched (≥ 0), or a negative [`SlipstreamStatus`] on error.
+///
+/// # Safety
+/// `s` is a valid host handle.
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_host_poll_input(s: *mut SlipstreamSession) -> i32 {
+    let r = std::panic::catch_unwind(AssertUnwindSafe(|| {
+        let mut count = 0i32;
+        loop {
+            // Narrow scope: re-derive the handle and pull ONE event, then drop the borrow
+            // before dispatching. The callback may legally re-enter `slipstream_*` on this
+            // handle (get_stats, send_input, clearing the callback) — with a `&mut` held
+            // across the call that re-entry aliased it (UB under noalias). Re-reading
+            // `input_cb` per iteration also makes a mid-drain
+            // `slipstream_set_input_callback(s, NULL, NULL)` take effect immediately instead
+            // of firing the cleared callback for the queued remainder. (Freeing the session
+            // from inside the callback remains forbidden, as on every entry point.)
+            let (ev, cb) = {
+                // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the
+                // caller has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and
+                // the `match` here handles.
+                let s = match unsafe { s.as_mut() } {
+                    Some(s) => s,
+                    None => return SlipstreamStatus::NullPointer as i32,
+                };
+                match s.inner.poll_input() {
+                    Ok(Some(ev)) => (ev, s.input_cb),
+                    Ok(None) => break,
+                    Err(e) => return e.status() as i32,
+                }
+            };
+            if let Some((cb, user)) = cb {
+                cb(&ev as *const InputEvent, user);
+            }
+            count += 1;
+        }
+        count
+    }));
+    r.unwrap_or(SlipstreamStatus::Panic as i32)
+}
+
+/// Copy session counters into `*out`.
+///
+/// # Safety
+/// `s` is a valid handle; `out` points to a writable `SlipstreamStats`.
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_get_stats(
+    s: *mut SlipstreamSession,
+    out: *mut SlipstreamStats,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let s = match unsafe { s.as_ref() } {
+            Some(s) => s,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if out.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        let stats = s.inner.stats();
+        // SAFETY: per the ABI contract - a caller-owned out-param, non-null on this path, written
+        // once by value.
+        unsafe { *out = SlipstreamStats::from(stats) };
+        SlipstreamStatus::Ok
+    })
+}
+
+// ---------------------------------------------------------------------------------------------
+// slipstream/1 connection API (`quic` feature) — the embeddable client connector platform clients
+// link (SwiftUI/VideoToolbox, Android, …). In the generated header these are guarded by
+// `SLIPSTREAM_FEATURE_QUIC`; define it when linking a slipstream-core built with `--features quic`.
+// ---------------------------------------------------------------------------------------------
+
+/// Opaque handle to a live `slipstream/1` connection (QUIC control plane + UDP data plane, all
+/// pumped on internal threads).
+///
+/// Thread contract: each plane (video `next_au`, audio `next_audio`, rumble `next_rumble`)
+/// may be pulled from its own thread, at most one thread per plane. The accessors only
+/// take shared references internally (per-plane mutexed borrow slots), so cross-plane
+/// concurrency is sound — never two threads on the *same* plane.
+#[cfg(feature = "quic")]
+pub struct SlipstreamConnection {
+    inner: crate::client::NativeClient,
+    /// Backs the pointer returned by the last `slipstream_connection_next_au` (borrow-until-next-call).
+    last: std::sync::Mutex<Option<crate::session::Frame>>,
+    /// Same, for `slipstream_connection_next_audio` (independent of the video slot).
+    last_audio: std::sync::Mutex<Option<crate::client::AudioPacket>>,
+    /// Decode-in-core state for `slipstream_connection_next_audio_pcm` (Apple / any embedder
+    /// without a multistream Opus decoder). The decoder is built lazily from the negotiated
+    /// `inner.audio_channels`; `pcm` is a fixed-capacity reusable buffer the returned pointer
+    /// borrows until the next PCM call (same contract as `last_audio`).
+    audio_pcm: std::sync::Mutex<AudioPcmState>,
+    /// Backs the `data`/`len` pointer of the last `slipstream_connection_next_clipboard` event
+    /// (a fetched payload, an offer's format list, or a fetch-request's MIME) —
+    /// borrow-until-next-call, same contract as `last`.
+    last_clip: std::sync::Mutex<Option<Vec<u8>>>,
+    /// The last cursor shape handed out — `next_cursor_shape`'s `rgba` pointer borrows it
+    /// until the next cursor-shape call (the `last_audio` contract).
+    last_cursor_shape: std::sync::Mutex<Option<crate::quic::CursorShape>>,
+}
+
+/// Lazily-initialized in-core Opus decode state. A coupled-1-stream multistream decoder is
+/// equivalent to a plain stereo decoder, so one [`opus::MSDecoder`] handles 2/6/8 channels.
+#[cfg(feature = "quic")]
+#[derive(Default)]
+struct AudioPcmState {
+    decoder: Option<opus::MSDecoder>,
+    /// Interleaved f32 PCM, wire channel order. Pre-sized to the largest legal Opus frame
+    /// (120 ms @ 48 kHz = 5760 samples/ch) × 8 channels so decode never reallocates (which would
+    /// dangle the pointer handed to the embedder).
+    pcm: Vec<f32>,
+}
+
+/// `SlipstreamHidOutput::kind` — lightbar RGB (`r`/`g`/`b` valid).
+pub const SLIPSTREAM_HIDOUT_LED: u8 = 1;
+/// `SlipstreamHidOutput::kind` — player-indicator LEDs (`player_bits` valid, low 5 bits).
+pub const SLIPSTREAM_HIDOUT_PLAYER_LEDS: u8 = 2;
+/// `SlipstreamHidOutput::kind` — one adaptive-trigger effect (`which` + `effect`/`effect_len` valid).
+pub const SLIPSTREAM_HIDOUT_TRIGGER: u8 = 3;
+/// `SlipstreamHidOutput::kind` — a trackpad haptic pulse (Steam Controller voice-coils). `which` =
+/// side (0 = right pad, 1 = left pad); `effect[0..6]` packs `amplitude` / `period` / `count` as
+/// little-endian `u16`s with `effect_len = 6`. Clients without trackpad coils drop it.
+pub const SLIPSTREAM_HIDOUT_TRACKPAD_HAPTIC: u8 = 4;
+/// Capacity of `SlipstreamHidOutput::effect` (the DualSense trigger parameter block).
+pub const SLIPSTREAM_HID_EFFECT_MAX: u8 = 11;
+
+/// One DualSense HID-output feedback event a game wrote to the host's virtual pad
+/// ([`slipstream_connection_next_hidout`]). `kind` selects which fields are meaningful — replay it
+/// on a real DualSense (lightbar color, player LEDs, or an adaptive-trigger effect via the
+/// platform's `GCDualSenseAdaptiveTrigger`-style API).
+#[cfg(feature = "quic")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SlipstreamHidOutput {
+    /// One of `SLIPSTREAM_HIDOUT_*`.
+    pub kind: u8,
+    /// Gamepad index.
+    pub pad: u8,
+    /// LED: lightbar red.
+    pub r: u8,
+    /// LED: lightbar green.
+    pub g: u8,
+    /// LED: lightbar blue.
+    pub b: u8,
+    /// PlayerLeds: lit player indicators (low 5 bits).
+    pub player_bits: u8,
+    /// Trigger: 0 = L2, 1 = R2.
+    pub which: u8,
+    /// Trigger: number of valid bytes in `effect` (≤ `SLIPSTREAM_HID_EFFECT_MAX`).
+    pub effect_len: u8,
+    /// Trigger: the raw DualSense trigger parameter block (mode + params).
+    pub effect: [u8; 11],
+}
+
+#[cfg(feature = "quic")]
+impl SlipstreamHidOutput {
+    /// `None` for a [`HidOutput::HidRaw`](crate::quic::HidOutput) — a raw passthrough report
+    /// (up to 64 bytes) doesn't fit this struct's 11-byte `effect` buffer, and no C-ABI embedder
+    /// declares the as-is SC2 kind that would receive one; the pull site skips it rather than
+    /// truncating it into an unreplayable stub.
+    fn from_hid(h: &crate::quic::HidOutput) -> Option<SlipstreamHidOutput> {
+        use crate::quic::HidOutput;
+        let mut out = SlipstreamHidOutput {
+            kind: 0,
+            pad: 0,
+            r: 0,
+            g: 0,
+            b: 0,
+            player_bits: 0,
+            which: 0,
+            effect_len: 0,
+            effect: [0u8; 11],
+        };
+        match h {
+            HidOutput::Led { pad, r, g, b } => {
+                out.kind = SLIPSTREAM_HIDOUT_LED;
+                out.pad = *pad;
+                out.r = *r;
+                out.g = *g;
+                out.b = *b;
+            }
+            HidOutput::PlayerLeds { pad, bits } => {
+                out.kind = SLIPSTREAM_HIDOUT_PLAYER_LEDS;
+                out.pad = *pad;
+                out.player_bits = *bits;
+            }
+            HidOutput::Trigger { pad, which, effect } => {
+                out.kind = SLIPSTREAM_HIDOUT_TRIGGER;
+                out.pad = *pad;
+                out.which = *which;
+                let n = effect.len().min(out.effect.len());
+                out.effect[..n].copy_from_slice(&effect[..n]);
+                out.effect_len = n as u8;
+            }
+            HidOutput::TrackpadHaptic {
+                pad,
+                side,
+                amplitude,
+                period,
+                count,
+            } => {
+                // No new struct (SlipstreamHidOutput has no size guard): pack into the existing
+                // `which` (side) + `effect[0..6]` (amplitude/period/count LE), `effect_len = 6`.
+                out.kind = SLIPSTREAM_HIDOUT_TRACKPAD_HAPTIC;
+                out.pad = *pad;
+                out.which = *side;
+                out.effect[0..2].copy_from_slice(&amplitude.to_le_bytes());
+                out.effect[2..4].copy_from_slice(&period.to_le_bytes());
+                out.effect[4..6].copy_from_slice(&count.to_le_bytes());
+                out.effect_len = 6;
+            }
+            HidOutput::HidRaw { .. } => return None,
+        }
+        Some(out)
+    }
+}
+
+/// Static HDR metadata for an HDR session ([`slipstream_connection_next_hdr_meta`]): SMPTE ST.2086
+/// mastering display colour volume + CEA-861.3 content light level. All fields are in the standard
+/// HDR10 SEI fixed-point units (primaries/white in 1/50000, luminance in 0.0001 cd/m²), ready for
+/// DXGI `DXGI_HDR_METADATA_HDR10` / Apple `CAEDRMetadata` / Android `KEY_HDR_STATIC_INFO`.
+#[cfg(feature = "quic")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SlipstreamHdrMeta {
+    /// Display-primaries x-chromaticities in 1/50000 units, ST.2086 order [green, blue, red].
+    pub display_primaries_x: [u16; 3],
+    /// Display-primaries y-chromaticities in 1/50000 units, ST.2086 order [green, blue, red].
+    pub display_primaries_y: [u16; 3],
+    /// White-point x-chromaticity, 1/50000 units.
+    pub white_point_x: u16,
+    /// White-point y-chromaticity, 1/50000 units.
+    pub white_point_y: u16,
+    /// Max display mastering luminance, 0.0001 cd/m² units.
+    pub max_display_mastering_luminance: u32,
+    /// Min display mastering luminance, 0.0001 cd/m² units.
+    pub min_display_mastering_luminance: u32,
+    /// Maximum content light level (MaxCLL), nits. 0 = unknown.
+    pub max_cll: u16,
+    /// Maximum frame-average light level (MaxFALL), nits. 0 = unknown.
+    pub max_fall: u16,
+}
+
+#[cfg(feature = "quic")]
+impl SlipstreamHdrMeta {
+    fn from_meta(m: &crate::quic::HdrMeta) -> SlipstreamHdrMeta {
+        SlipstreamHdrMeta {
+            display_primaries_x: [
+                m.display_primaries[0][0],
+                m.display_primaries[1][0],
+                m.display_primaries[2][0],
+            ],
+            display_primaries_y: [
+                m.display_primaries[0][1],
+                m.display_primaries[1][1],
+                m.display_primaries[2][1],
+            ],
+            white_point_x: m.white_point[0],
+            white_point_y: m.white_point[1],
+            max_display_mastering_luminance: m.max_display_mastering_luminance,
+            min_display_mastering_luminance: m.min_display_mastering_luminance,
+            max_cll: m.max_cll,
+            max_fall: m.max_fall,
+        }
+    }
+}
+
+/// One access unit's host-side processing time ([`slipstream_connection_next_host_timing`]):
+/// capture → fully sent, i.e. the whole host pipeline (capture read/convert, encode, FEC+seal,
+/// paced send). Correlate to the AU whose `SlipstreamFrame::pts_ns` equals `pts_ns`, then
+/// `network = (received_instant + clock_offset − pts_ns) − host_us` — the unified stats HUD's
+/// `host` / `network` split (design/stats-unification.md Phase 2). Best-effort: a lost datagram
+/// means that frame simply contributes no sample.
+#[cfg(feature = "quic")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SlipstreamHostTiming {
+    /// The AU's capture stamp (host capture clock — matches `SlipstreamFrame::pts_ns` exactly).
+    pub pts_ns: u64,
+    /// Host capture→sent duration, µs.
+    pub host_us: u32,
+}
+
+/// `SlipstreamRichInput::kind` — a touchpad contact (`finger`/`active`/`x`/`y` valid).
+pub const SLIPSTREAM_RICH_TOUCHPAD: u8 = 1;
+/// `SlipstreamRichInput::kind` — a motion sample (`gyro`/`accel` valid).
+pub const SLIPSTREAM_RICH_MOTION: u8 = 2;
+/// `RichInput::TouchpadEx` kind on the wire — an extended trackpad contact that identifies the
+/// surface (0 single / 1 Steam-left / 2 Steam-right) and carries click + pressure. The host decodes
+/// it today; *sending* it from a C client needs the size-prefixed `SlipstreamRichInputEx` +
+/// `slipstream_connection_send_rich_input2` (added with client capture).
+pub const SLIPSTREAM_RICH_TOUCHPAD_EX: u8 = 3;
+
+/// One rich client→host input for the host's virtual DualSense
+/// ([`slipstream_connection_send_rich_input`]): a touchpad contact or a motion sample. Set `kind`
+/// and the matching fields; the others are ignored.
+#[cfg(feature = "quic")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SlipstreamRichInput {
+    /// One of `SLIPSTREAM_RICH_*`.
+    pub kind: u8,
+    /// Gamepad index.
+    pub pad: u8,
+    /// Touchpad: contact id (0 or 1).
+    pub finger: u8,
+    /// Touchpad: 1 = finger down, 0 = lifted.
+    pub active: u8,
+    /// Touchpad: normalized x, 0..=65535 across the touchpad.
+    pub x: u16,
+    /// Touchpad: normalized y, 0..=65535 across the touchpad.
+    pub y: u16,
+    /// Motion: gyro (pitch, yaw, roll), raw signed-16.
+    pub gyro: [i16; 3],
+    /// Motion: accelerometer (x, y, z), raw signed-16.
+    pub accel: [i16; 3],
+}
+
+#[cfg(feature = "quic")]
+impl SlipstreamRichInput {
+    fn to_rich(self) -> Option<crate::quic::RichInput> {
+        use crate::quic::RichInput;
+        match self.kind {
+            SLIPSTREAM_RICH_TOUCHPAD => Some(RichInput::Touchpad {
+                pad: self.pad,
+                finger: self.finger,
+                active: self.active != 0,
+                x: self.x,
+                y: self.y,
+            }),
+            SLIPSTREAM_RICH_MOTION => Some(RichInput::Motion {
+                pad: self.pad,
+                gyro: self.gyro,
+                accel: self.accel,
+            }),
+            _ => None,
+        }
+    }
+}
+
+/// Forward-compatible superset of [`SlipstreamRichInput`] that can also express the rich Steam
+/// surfaces: a *second* trackpad (`surface`), a distinct `click` vs touch, signed coordinates, and
+/// pressure. Sent via [`slipstream_connection_send_rich_input2`] — the only way a C client can emit a
+/// `TouchpadEx`. The caller MUST set `struct_size = sizeof(SlipstreamRichInputEx)` (the ABI-skew
+/// guard, like [`SlipstreamConfig`]); the legacy [`SlipstreamRichInput`] +
+/// [`slipstream_connection_send_rich_input`] stay byte-for-byte for existing callers.
+#[cfg(feature = "quic")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SlipstreamRichInputEx {
+    /// MUST equal `sizeof(SlipstreamRichInputEx)`.
+    pub struct_size: u32,
+    /// One of `SLIPSTREAM_RICH_*` (`TOUCHPAD` / `MOTION` / `TOUCHPAD_EX`).
+    pub kind: u8,
+    /// Gamepad index.
+    pub pad: u8,
+    /// Touchpad/TouchpadEx: contact id.
+    pub finger: u8,
+    /// Touchpad/TouchpadEx: 1 = finger down / touching, 0 = lifted.
+    pub active: u8,
+    /// TouchpadEx: which surface — 0 = single/DualSense, 1 = Steam left pad, 2 = Steam right pad.
+    pub surface: u8,
+    /// TouchpadEx: 1 = the pad is physically clicked (depressed), distinct from a touch contact.
+    pub click: u8,
+    /// Reserved for alignment; set to 0.
+    pub _reserved: [u8; 2],
+    /// TouchpadEx: x coordinate — **signed**, centred at 0 (the real Steam report convention). For a
+    /// legacy `TOUCHPAD` kind sent through this struct, store the unsigned `0..=65535` value's bits.
+    pub x: i16,
+    /// TouchpadEx: y coordinate — signed, centred at 0.
+    pub y: i16,
+    /// TouchpadEx: contact pressure (`0` if the surface has no force sensor).
+    pub pressure: u16,
+    /// Motion: gyro (pitch, yaw, roll), raw signed-16.
+    pub gyro: [i16; 3],
+    /// Motion: accelerometer (x, y, z), raw signed-16.
+    pub accel: [i16; 3],
+}
+
+#[cfg(feature = "quic")]
+impl SlipstreamRichInputEx {
+    fn to_rich(self) -> Option<crate::quic::RichInput> {
+        use crate::quic::RichInput;
+        match self.kind {
+            SLIPSTREAM_RICH_TOUCHPAD_EX => Some(RichInput::TouchpadEx {
+                pad: self.pad,
+                surface: self.surface,
+                finger: self.finger,
+                touch: self.active != 0,
+                click: self.click != 0,
+                x: self.x,
+                y: self.y,
+                pressure: self.pressure,
+            }),
+            SLIPSTREAM_RICH_MOTION => Some(RichInput::Motion {
+                pad: self.pad,
+                gyro: self.gyro,
+                accel: self.accel,
+            }),
+            SLIPSTREAM_RICH_TOUCHPAD => Some(RichInput::Touchpad {
+                pad: self.pad,
+                finger: self.finger,
+                active: self.active != 0,
+                x: self.x as u16,
+                y: self.y as u16,
+            }),
+            _ => None,
+        }
+    }
+}
+
+/// [`SlipstreamPenSample::state`] bit: the pen hovers in range (implied by `TOUCHING`).
+pub const SLIPSTREAM_PEN_IN_RANGE: u8 = 0x01;
+/// [`SlipstreamPenSample::state`] bit: the tip is in contact.
+pub const SLIPSTREAM_PEN_TOUCHING: u8 = 0x02;
+/// [`SlipstreamPenSample::state`] bit: primary barrel button (or squeeze mapping) held.
+pub const SLIPSTREAM_PEN_BARREL1: u8 = 0x04;
+/// [`SlipstreamPenSample::state`] bit: secondary barrel button (or double-tap mapping) held.
+pub const SLIPSTREAM_PEN_BARREL2: u8 = 0x08;
+/// [`SlipstreamPenSample::tool`]: the pen tip.
+pub const SLIPSTREAM_PEN_TOOL_PEN: u8 = 0;
+/// [`SlipstreamPenSample::tool`]: the eraser (a client-side mode — Apple Pencil has no
+/// hardware eraser end; the squeeze/double-tap mapping usually drives this).
+pub const SLIPSTREAM_PEN_TOOL_ERASER: u8 = 1;
+/// Most samples one [`slipstream_connection_send_pen`] call accepts (one wire batch).
+pub const SLIPSTREAM_PEN_BATCH_MAX: u32 = 8;
+/// [`SlipstreamPenSample::tilt_deg`] sentinel: no tilt reading.
+pub const SLIPSTREAM_PEN_TILT_UNKNOWN: u8 = 0xFF;
+/// [`SlipstreamPenSample::azimuth_deg`] / `roll_deg` sentinel: no reading.
+pub const SLIPSTREAM_PEN_ANGLE_UNKNOWN: u16 = 0xFFFF;
+/// [`SlipstreamPenSample::distance`] sentinel: no hover-distance reading.
+pub const SLIPSTREAM_PEN_DISTANCE_UNKNOWN: u16 = 0xFFFF;
+
+/// One complete stylus state at one instant ([`slipstream_connection_send_pen`];
+/// design/pen-tablet-input.md). STATE-FULL, never an edge event: fill every field on every
+/// sample (unknown axes take their `*_UNKNOWN` sentinel) — the host diffs consecutive samples
+/// and synthesizes down/up/button transitions itself, which is what makes a lost datagram
+/// self-heal. `x`/`y` are normalized `0.0..=1.0` in VIDEO-FRAME space (map your letterbox
+/// before filling, exactly like wire touches).
+#[cfg(feature = "quic")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SlipstreamPenSample {
+    /// Normalized `0.0..=1.0` across the video frame. Must be finite.
+    pub x: f32,
+    /// Normalized `0.0..=1.0` across the video frame. Must be finite.
+    pub y: f32,
+    /// Tip force, `0..=65535` full scale (`0` while hovering).
+    pub pressure: u16,
+    /// Hover distance `0..=65534` (0 = at the hover floor), or `SLIPSTREAM_PEN_DISTANCE_UNKNOWN`.
+    pub distance: u16,
+    /// Tilt azimuth, degrees `0..=359` clockwise from north, or `SLIPSTREAM_PEN_ANGLE_UNKNOWN`.
+    pub azimuth_deg: u16,
+    /// Barrel roll (Apple Pencil Pro `rollAngle`), degrees `0..=359`, or
+    /// `SLIPSTREAM_PEN_ANGLE_UNKNOWN`.
+    pub roll_deg: u16,
+    /// µs since the previous sample in the same call (`0` for the first) — the coalesced
+    /// capture spacing.
+    pub dt_us: u16,
+    /// Bitfield of `SLIPSTREAM_PEN_*` state bits. Unknown bits are rejected (`InvalidArg`).
+    pub state: u8,
+    /// `SLIPSTREAM_PEN_TOOL_PEN` or `SLIPSTREAM_PEN_TOOL_ERASER`.
+    pub tool: u8,
+    /// Tilt from the surface normal, degrees `0..=90`, or `SLIPSTREAM_PEN_TILT_UNKNOWN`.
+    pub tilt_deg: u8,
+    /// Set to 0.
+    pub _reserved: [u8; 3],
+}
+
+#[cfg(feature = "quic")]
+impl SlipstreamPenSample {
+    /// `None` = invalid field (non-finite coordinate, unknown state bit, unknown tool) —
+    /// embedder input is validated strictly, unlike the loss-tolerant wire decode.
+    fn to_sample(self) -> Option<crate::quic::PenSample> {
+        use crate::quic as q;
+        let known = q::PEN_IN_RANGE | q::PEN_TOUCHING | q::PEN_BARREL1 | q::PEN_BARREL2;
+        if !self.x.is_finite() || !self.y.is_finite() || self.state & !known != 0 {
+            return None;
+        }
+        let tool = match self.tool {
+            SLIPSTREAM_PEN_TOOL_PEN => q::PenTool::Pen,
+            SLIPSTREAM_PEN_TOOL_ERASER => q::PenTool::Eraser,
+            _ => return None,
+        };
+        Some(q::PenSample {
+            state: self.state,
+            tool,
+            x: self.x,
+            y: self.y,
+            pressure: self.pressure,
+            distance: self.distance,
+            tilt_deg: self.tilt_deg,
+            azimuth_deg: self.azimuth_deg,
+            roll_deg: self.roll_deg,
+            dt_us: self.dt_us,
+        })
+    }
+}
+
+/// Read an optional NUL-terminated UTF-8 string parameter; `Err` = invalid pointer/UTF-8.
+#[cfg(feature = "quic")]
+unsafe fn opt_cstr<'a>(p: *const std::os::raw::c_char) -> std::result::Result<Option<&'a str>, ()> {
+    if p.is_null() {
+        return Ok(None);
+    }
+    // SAFETY: per the ABI contract - a caller-supplied C string, NUL-terminated or null, borrowed
+    // only for this call.
+    unsafe { std::ffi::CStr::from_ptr(p) }
+        .to_str()
+        .map(Some)
+        .map_err(|_| ())
+}
+
+/// Compositor preference for [`slipstream_connect_ex`] (`compositor` arg). `AUTO` lets the host
+/// pick (auto-detect from its running desktop); a concrete value is honored only if that backend
+/// is available on the host right now, else the host falls back to auto-detect. The resolved
+/// choice is reported back over the protocol (see `slipstream/1` `Welcome`).
+pub const SLIPSTREAM_COMPOSITOR_AUTO: u32 = 0;
+/// KWin / KDE Plasma.
+pub const SLIPSTREAM_COMPOSITOR_KWIN: u32 = 1;
+/// wlroots (Sway / Hyprland).
+pub const SLIPSTREAM_COMPOSITOR_WLROOTS: u32 = 2;
+/// Mutter / GNOME.
+pub const SLIPSTREAM_COMPOSITOR_MUTTER: u32 = 3;
+/// gamescope (spawned nested).
+pub const SLIPSTREAM_COMPOSITOR_GAMESCOPE: u32 = 4;
+
+/// Gamepad-backend preference for [`slipstream_connect_ex2`] (`gamepad` arg): which virtual pad
+/// the host creates for this session's controllers. Precedence host-side: an explicit client
+/// choice > the host's `SLIPSTREAM_GAMEPAD` env var > X-Box 360. `AUTO` (or any unrecognized
+/// value) = host decides. The resolved choice is echoed over the protocol (`Welcome`) and
+/// readable via [`slipstream_connection_gamepad`].
+pub const SLIPSTREAM_GAMEPAD_AUTO: u32 = 0;
+/// uinput X-Box 360 pad (the universal default — every game speaks XInput).
+pub const SLIPSTREAM_GAMEPAD_XBOX360: u32 = 1;
+/// UHID DualSense (kernel `hid-playstation`): adaptive triggers, lightbar, touchpad, motion —
+/// feedback arrives on the HID-output plane ([`slipstream_connection_next_hidout`]). Honored on
+/// Linux (UHID) and Windows (UMDF minidriver) hosts; otherwise the host falls back to X-Box 360.
+pub const SLIPSTREAM_GAMEPAD_DUALSENSE: u32 = 2;
+/// uinput X-Box One / Series pad — the X-Box 360 backend with the One/Series USB identity, so
+/// games show One/Series glyphs. XInput-identical to `XBOX360` otherwise (no game-visible gain;
+/// impulse-trigger rumble is unreachable through a virtual pad). Useful for glyph-matching a
+/// physical X-Box One/Series controller on the client.
+pub const SLIPSTREAM_GAMEPAD_XBOXONE: u32 = 3;
+/// UHID DualShock 4 (kernel `hid-playstation` ≥ 6.2): lightbar, touchpad, motion, rumble — the
+/// touchpad/motion arrive over the rich-input plane and lightbar over the HID-output plane, like
+/// DualSense (minus adaptive triggers / player LEDs / mute). Honored on Linux (UHID) and Windows
+/// (UMDF minidriver) hosts; otherwise the host falls back to X-Box 360.
+pub const SLIPSTREAM_GAMEPAD_DUALSHOCK4: u32 = 4;
+/// UHID classic Steam Controller (Valve `28DE:1102`, kernel `hid-steam`): one stick + dual
+/// trackpads + two grip paddles. Honored only where available (Linux hosts); else Xbox 360.
+pub const SLIPSTREAM_GAMEPAD_STEAMCONTROLLER: u32 = 5;
+/// Steam Deck controller (Valve `28DE:1205`): full Deck gamepad incl. the four back grips, both
+/// trackpads, and the IMU; re-grabbed by Steam Input with native glyphs when Steam runs on the
+/// host. Honored on Linux AND Windows hosts; else folds to X-Box 360.
+pub const SLIPSTREAM_GAMEPAD_STEAMDECK: u32 = 6;
+/// DualSense Edge (Sony `054C:0DF2`): the DualSense plus two back buttons + two Fn buttons, so a
+/// client's back paddles land on native slots. Honored on Linux (UHID `hid-playstation`) and
+/// Windows (UMDF) hosts; otherwise the host falls back to X-Box 360.
+pub const SLIPSTREAM_GAMEPAD_DUALSENSEEDGE: u32 = 7;
+/// Nintendo Switch Pro Controller (Nintendo `057E:2009`, kernel `hid-nintendo`): Nintendo glyphs +
+/// positional layout, gyro/accel, HD rumble. Honored only where available (Linux hosts, UHID
+/// `hid-nintendo`); otherwise the host falls back to X-Box 360.
+pub const SLIPSTREAM_GAMEPAD_SWITCHPRO: u32 = 8;
+/// New Steam Controller (2026, Valve `28DE:1302`) passed through AS-IS: the host mirrors the
+/// client's raw Triton input reports out of a virtual SC2 with the real identity, and Steam's
+/// hidraw writes (lizard mode, IMU enable, rumble/haptics) come back raw for the physical pad.
+/// Steam Input is the consumer (no kernel driver binds the PID). Honored on Linux (UHID);
+/// else folds to X-Box 360.
+pub const SLIPSTREAM_GAMEPAD_STEAMCONTROLLER2: u32 = 9;
+/// Steam Controller Puck dongle (`28DE:1304`) passed through with its native seven-interface
+/// topology and four controller slots. Used by capture clients that own the physical Puck;
+/// ordinary wired/BLE SC2 capture remains `STEAMCONTROLLER2`.
+pub const SLIPSTREAM_GAMEPAD_STEAMCONTROLLER2_PUCK: u32 = 10;
+
+/// Extended `InputEvent` gamepad button bits for embedders building raw events: the four back grips
+/// (Steam L4/L5/R4/R5 ≙ Xbox-Elite P1–P4) + the misc/capture button, in Moonlight's
+/// `buttonFlags2 << 16` namespace. Mirror `input::gamepad::BTN_PADDLE1..4` / `BTN_MISC1`.
+pub const SLIPSTREAM_GAMEPAD_BTN_PADDLE1: u32 = 0x0001_0000;
+pub const SLIPSTREAM_GAMEPAD_BTN_PADDLE2: u32 = 0x0002_0000;
+pub const SLIPSTREAM_GAMEPAD_BTN_PADDLE3: u32 = 0x0004_0000;
+pub const SLIPSTREAM_GAMEPAD_BTN_PADDLE4: u32 = 0x0008_0000;
+pub const SLIPSTREAM_GAMEPAD_BTN_MISC1: u32 = 0x0020_0000;
+
+/// Connect to a `slipstream/1` host and start a session at `width`x`height`@`refresh_hz`.
+/// Blocks up to `timeout_ms` for the handshake. Returns NULL on failure. Equivalent to
+/// [`slipstream_connect_ex`] with `compositor = SLIPSTREAM_COMPOSITOR_AUTO`.
+///
+/// Video-capability bit for [`slipstream_connect_ex5`] (`video_caps`): the client can decode a
+/// 10-bit (Main10) HEVC stream. (Mirrors `quic::VIDEO_CAP_10BIT`.)
+pub const SLIPSTREAM_VIDEO_CAP_10BIT: u8 = 0x01;
+/// Video-capability bit for [`slipstream_connect_ex5`] (`video_caps`): the client can present
+/// BT.2020 PQ HDR10 (implies 10-bit). (Mirrors `quic::VIDEO_CAP_HDR`.)
+pub const SLIPSTREAM_VIDEO_CAP_HDR: u8 = 0x02;
+/// Video-capability bit for [`slipstream_connect_ex5`] (`video_caps`): the client can decode a
+/// full-chroma 4:4:4 HEVC stream (Range Extensions). The host emits 4:4:4 only when this is set,
+/// the host opted in, the codec is HEVC, and the GPU supports it — else the stream stays 4:2:0 and
+/// [`slipstream_connection_chroma_format`] reports the real value. (Mirrors `quic::VIDEO_CAP_444`.)
+pub const SLIPSTREAM_VIDEO_CAP_444: u8 = 0x04;
+
+/// Codec bit for [`slipstream_connect_ex7`] (`video_codecs` / `preferred_codec`) and the value
+/// [`slipstream_connection_codec`] returns: H.264 / AVC. (Mirrors `quic::CODEC_H264`.)
+pub const SLIPSTREAM_CODEC_H264: u8 = 0x01;
+/// Codec bit: H.265 / HEVC — the default codec. (Mirrors `quic::CODEC_HEVC`.)
+pub const SLIPSTREAM_CODEC_HEVC: u8 = 0x02;
+/// Codec bit: AV1. (Mirrors `quic::CODEC_AV1`.)
+pub const SLIPSTREAM_CODEC_AV1: u8 = 0x04;
+/// Codec bit: PyroWave — the opt-in wired-LAN intra-only wavelet codec. Never auto-selected:
+/// the host picks it ONLY when the client also passes it as `preferred_codec`
+/// (design/pyrowave-codec-plan.md §3). (Mirrors `quic::CODEC_PYROWAVE`.)
+pub const SLIPSTREAM_CODEC_PYROWAVE: u8 = 0x08;
+
+/// Host-capability bit in [`slipstream_connection_host_caps`]: the host applies gamepad-state
+/// snapshots (a capable client sends full-state snapshots instead of per-transition events).
+/// (Mirrors `quic::HOST_CAP_GAMEPAD_STATE`.)
+pub const SLIPSTREAM_HOST_CAP_GAMEPAD_STATE: u8 = 0x01;
+/// Host-capability bit in [`slipstream_connection_host_caps`]: the host supports the shared
+/// clipboard, so a client may offer the toggle. (Mirrors `quic::HOST_CAP_CLIPBOARD`.)
+pub const SLIPSTREAM_HOST_CAP_CLIPBOARD: u8 = 0x02;
+/// Host-capability bit in [`slipstream_connection_host_caps`]: the host injects full-fidelity
+/// stylus input, so a capable client splits pen contacts out of its touch path and sends them
+/// via [`slipstream_connection_send_pen`]; without the bit that call returns `Unsupported` and
+/// the client keeps its pen-as-touch fallback. (Mirrors `quic::HOST_CAP_PEN`;
+/// design/pen-tablet-input.md.)
+pub const SLIPSTREAM_HOST_CAP_PEN: u8 = 0x10;
+
+// Keep the ABI cap bits in lockstep with the wire constants (compile-time guard against drift).
+#[cfg(feature = "quic")]
+const _: () = {
+    assert!(SLIPSTREAM_VIDEO_CAP_10BIT == crate::quic::VIDEO_CAP_10BIT);
+    assert!(SLIPSTREAM_VIDEO_CAP_HDR == crate::quic::VIDEO_CAP_HDR);
+    assert!(SLIPSTREAM_VIDEO_CAP_444 == crate::quic::VIDEO_CAP_444);
+    assert!(SLIPSTREAM_CODEC_H264 == crate::quic::CODEC_H264);
+    assert!(SLIPSTREAM_CODEC_HEVC == crate::quic::CODEC_HEVC);
+    assert!(SLIPSTREAM_CODEC_AV1 == crate::quic::CODEC_AV1);
+    assert!(SLIPSTREAM_CODEC_PYROWAVE == crate::quic::CODEC_PYROWAVE);
+    assert!(SLIPSTREAM_HOST_CAP_GAMEPAD_STATE == crate::quic::HOST_CAP_GAMEPAD_STATE);
+    assert!(SLIPSTREAM_HOST_CAP_CLIPBOARD == crate::quic::HOST_CAP_CLIPBOARD);
+    assert!(SLIPSTREAM_HOST_CAP_PEN == crate::quic::HOST_CAP_PEN);
+    assert!(SLIPSTREAM_PEN_IN_RANGE == crate::quic::PEN_IN_RANGE);
+    assert!(SLIPSTREAM_PEN_TOUCHING == crate::quic::PEN_TOUCHING);
+    assert!(SLIPSTREAM_PEN_BARREL1 == crate::quic::PEN_BARREL1);
+    assert!(SLIPSTREAM_PEN_BARREL2 == crate::quic::PEN_BARREL2);
+    assert!(SLIPSTREAM_PEN_BATCH_MAX as usize == crate::quic::PEN_BATCH_MAX);
+    assert!(SLIPSTREAM_PEN_TILT_UNKNOWN == crate::quic::PEN_TILT_UNKNOWN);
+    assert!(SLIPSTREAM_PEN_ANGLE_UNKNOWN == crate::quic::PEN_ANGLE_UNKNOWN);
+    assert!(SLIPSTREAM_PEN_DISTANCE_UNKNOWN == crate::quic::PEN_DISTANCE_UNKNOWN);
+};
+
+// Keep the ABI gamepad constants in lockstep with the wire enum (compile-time guard against drift).
+const _: () = {
+    use crate::config::GamepadPref;
+    use crate::input::gamepad as g;
+    assert!(SLIPSTREAM_GAMEPAD_AUTO == GamepadPref::Auto.to_u8() as u32);
+    assert!(SLIPSTREAM_GAMEPAD_XBOX360 == GamepadPref::Xbox360.to_u8() as u32);
+    assert!(SLIPSTREAM_GAMEPAD_DUALSENSE == GamepadPref::DualSense.to_u8() as u32);
+    assert!(SLIPSTREAM_GAMEPAD_XBOXONE == GamepadPref::XboxOne.to_u8() as u32);
+    assert!(SLIPSTREAM_GAMEPAD_DUALSHOCK4 == GamepadPref::DualShock4.to_u8() as u32);
+    assert!(SLIPSTREAM_GAMEPAD_STEAMCONTROLLER == GamepadPref::SteamController.to_u8() as u32);
+    assert!(SLIPSTREAM_GAMEPAD_STEAMDECK == GamepadPref::SteamDeck.to_u8() as u32);
+    assert!(SLIPSTREAM_GAMEPAD_DUALSENSEEDGE == GamepadPref::DualSenseEdge.to_u8() as u32);
+    assert!(SLIPSTREAM_GAMEPAD_SWITCHPRO == GamepadPref::SwitchPro.to_u8() as u32);
+    assert!(SLIPSTREAM_GAMEPAD_STEAMCONTROLLER2 == GamepadPref::SteamController2.to_u8() as u32);
+    assert!(
+        SLIPSTREAM_GAMEPAD_STEAMCONTROLLER2_PUCK == GamepadPref::SteamController2Puck.to_u8() as u32
+    );
+    // Extended button bits mirror the wire `input::gamepad` constants.
+    assert!(SLIPSTREAM_GAMEPAD_BTN_PADDLE1 == g::BTN_PADDLE1);
+    assert!(SLIPSTREAM_GAMEPAD_BTN_PADDLE2 == g::BTN_PADDLE2);
+    assert!(SLIPSTREAM_GAMEPAD_BTN_PADDLE3 == g::BTN_PADDLE3);
+    assert!(SLIPSTREAM_GAMEPAD_BTN_PADDLE4 == g::BTN_PADDLE4);
+    assert!(SLIPSTREAM_GAMEPAD_BTN_MISC1 == g::BTN_MISC1);
+};
+
+// The additive M3 kinds (TouchpadEx / TrackpadHaptic) must never grow the legacy ABI structs —
+// they have no `struct_size` guard, so a layout change would corrupt old-built callers' buffers.
+#[cfg(feature = "quic")]
+const _: () = {
+    assert!(core::mem::size_of::<SlipstreamRichInput>() == 20);
+    assert!(core::mem::size_of::<SlipstreamHidOutput>() == 19);
+};
+
+/// Trust: `pin_sha256` (NULL or 32 bytes) is the expected SHA-256 fingerprint of the host's
+/// certificate — a mismatching host is rejected. NULL = trust on first use; persist the
+/// fingerprint written to `observed_sha256_out` (NULL or 32 bytes, filled on success) and
+/// pass it as the pin on every later connect.
+///
+/// Identity: `client_cert_pem`/`client_key_pem` (both NULL, or both NUL-terminated PEM
+/// strings — see [`slipstream_generate_identity`]) are presented via TLS client auth so a
+/// host can recognize this client once paired ([`slipstream_pair`]). NULL = anonymous;
+/// hosts running `--require-pairing` reject anonymous sessions.
+///
+/// # Safety
+/// `host` is a NUL-terminated UTF-8 string (IP or hostname resolvable by the platform);
+/// `pin_sha256`/`observed_sha256_out` are each NULL or valid for 32 bytes;
+/// `client_cert_pem`/`client_key_pem` are each NULL or NUL-terminated UTF-8.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connect(
+    host: *const std::os::raw::c_char,
+    port: u16,
+    width: u32,
+    height: u32,
+    refresh_hz: u32,
+    pin_sha256: *const u8,
+    observed_sha256_out: *mut u8,
+    client_cert_pem: *const std::os::raw::c_char,
+    client_key_pem: *const std::os::raw::c_char,
+    timeout_ms: u32,
+) -> *mut SlipstreamConnection {
+    // SAFETY: the pointer arguments are forwarded UNCHANGED to the versioned entry point, which
+    // applies the same ABI contract to them; this shim dereferences nothing itself.
+    unsafe {
+        slipstream_connect_ex(
+            host,
+            port,
+            width,
+            height,
+            refresh_hz,
+            SLIPSTREAM_COMPOSITOR_AUTO,
+            pin_sha256,
+            observed_sha256_out,
+            client_cert_pem,
+            client_key_pem,
+            timeout_ms,
+        )
+    }
+}
+
+/// Like [`slipstream_connect`], but requests a specific `compositor` backend on the host (one of
+/// the `SLIPSTREAM_COMPOSITOR_*` values). `SLIPSTREAM_COMPOSITOR_AUTO` (or any unrecognized value)
+/// lets the host decide; a concrete value is honored only if available, else the host falls back
+/// to auto-detect. The resolved choice is logged host-side and returned over the protocol.
+/// Equivalent to [`slipstream_connect_ex2`] with `gamepad = SLIPSTREAM_GAMEPAD_AUTO`.
+///
+/// # Safety
+/// Same as [`slipstream_connect`].
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connect_ex(
+    host: *const std::os::raw::c_char,
+    port: u16,
+    width: u32,
+    height: u32,
+    refresh_hz: u32,
+    compositor: u32,
+    pin_sha256: *const u8,
+    observed_sha256_out: *mut u8,
+    client_cert_pem: *const std::os::raw::c_char,
+    client_key_pem: *const std::os::raw::c_char,
+    timeout_ms: u32,
+) -> *mut SlipstreamConnection {
+    // SAFETY: the pointer arguments are forwarded UNCHANGED to the versioned entry point, which
+    // applies the same ABI contract to them; this shim dereferences nothing itself.
+    unsafe {
+        slipstream_connect_ex2(
+            host,
+            port,
+            width,
+            height,
+            refresh_hz,
+            compositor,
+            SLIPSTREAM_GAMEPAD_AUTO,
+            pin_sha256,
+            observed_sha256_out,
+            client_cert_pem,
+            client_key_pem,
+            timeout_ms,
+        )
+    }
+}
+
+/// Like [`slipstream_connect_ex`], but additionally requests which virtual `gamepad` backend the
+/// host creates for this session's pads (one of the `SLIPSTREAM_GAMEPAD_*` values).
+/// `SLIPSTREAM_GAMEPAD_AUTO` (or any unrecognized value) lets the host decide (its
+/// `SLIPSTREAM_GAMEPAD` env var, else X-Box 360); a concrete value is honored only if that
+/// backend is available on the host. The resolved choice is readable via
+/// [`slipstream_connection_gamepad`] — only a DualSense session emits HID-output feedback.
+///
+/// # Safety
+/// Same as [`slipstream_connect`].
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connect_ex2(
+    host: *const std::os::raw::c_char,
+    port: u16,
+    width: u32,
+    height: u32,
+    refresh_hz: u32,
+    compositor: u32,
+    gamepad: u32,
+    pin_sha256: *const u8,
+    observed_sha256_out: *mut u8,
+    client_cert_pem: *const std::os::raw::c_char,
+    client_key_pem: *const std::os::raw::c_char,
+    timeout_ms: u32,
+) -> *mut SlipstreamConnection {
+    // SAFETY: the pointer arguments are forwarded UNCHANGED to the versioned entry point, which
+    // applies the same ABI contract to them; this shim dereferences nothing itself.
+    unsafe {
+        slipstream_connect_ex3(
+            host,
+            port,
+            width,
+            height,
+            refresh_hz,
+            compositor,
+            gamepad,
+            0, // bitrate_kbps = 0: let the host pick its default
+            pin_sha256,
+            observed_sha256_out,
+            client_cert_pem,
+            client_key_pem,
+            timeout_ms,
+        )
+    }
+}
+
+/// Like [`slipstream_connect_ex2`], but additionally requests the video encoder `bitrate_kbps`
+/// (kilobits per second). `0` lets the host pick its default; any other value is clamped to the
+/// host's supported range. After a speed test ([`slipstream_connection_speed_test`]) a client can
+/// reconnect (or pick at connect time) with the measured rate. The value the host actually
+/// configured is readable via [`slipstream_connection_bitrate`].
+///
+/// # Safety
+/// Same as [`slipstream_connect`].
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connect_ex3(
+    host: *const std::os::raw::c_char,
+    port: u16,
+    width: u32,
+    height: u32,
+    refresh_hz: u32,
+    compositor: u32,
+    gamepad: u32,
+    bitrate_kbps: u32,
+    pin_sha256: *const u8,
+    observed_sha256_out: *mut u8,
+    client_cert_pem: *const std::os::raw::c_char,
+    client_key_pem: *const std::os::raw::c_char,
+    timeout_ms: u32,
+) -> *mut SlipstreamConnection {
+    // Delegate to the launch-aware variant with no game requested (the host's default session).
+    // SAFETY: the pointer arguments are forwarded UNCHANGED to the versioned entry point, which
+    // applies the same ABI contract to them; this shim dereferences nothing itself.
+    unsafe {
+        slipstream_connect_ex4(
+            host,
+            port,
+            width,
+            height,
+            refresh_hz,
+            compositor,
+            gamepad,
+            bitrate_kbps,
+            std::ptr::null(),
+            pin_sha256,
+            observed_sha256_out,
+            client_cert_pem,
+            client_key_pem,
+            timeout_ms,
+        )
+    }
+}
+
+/// Like [`slipstream_connect_ex3`], but additionally asks the host to launch a library title in
+/// this session. `launch_id` is a store-qualified [`crate::library`-style] id as returned by the
+/// host's `GET /api/v1/library` (`steam:<appid>` / `custom:<id>`); the host resolves it against
+/// its OWN library and runs the matching recipe — the client never sends a raw command. `NULL`
+/// (or an empty / unknown id) ⇒ the host's default session, no game launched.
+///
+/// # Safety
+/// Same as [`slipstream_connect`]; `launch_id`, when non-NULL, must be a NUL-terminated C string.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connect_ex4(
+    host: *const std::os::raw::c_char,
+    port: u16,
+    width: u32,
+    height: u32,
+    refresh_hz: u32,
+    compositor: u32,
+    gamepad: u32,
+    bitrate_kbps: u32,
+    launch_id: *const std::os::raw::c_char,
+    pin_sha256: *const u8,
+    observed_sha256_out: *mut u8,
+    client_cert_pem: *const std::os::raw::c_char,
+    client_key_pem: *const std::os::raw::c_char,
+    timeout_ms: u32,
+) -> *mut SlipstreamConnection {
+    // Back-compat: ex4 advertises no video caps (8-bit BT.709 SDR). HDR-capable embedders call
+    // `slipstream_connect_ex5` with the cap bits.
+    // SAFETY: the pointer arguments are forwarded UNCHANGED to the versioned entry point, which
+    // applies the same ABI contract to them; this shim dereferences nothing itself.
+    unsafe {
+        slipstream_connect_ex5(
+            host,
+            port,
+            width,
+            height,
+            refresh_hz,
+            compositor,
+            gamepad,
+            bitrate_kbps,
+            0,
+            launch_id,
+            pin_sha256,
+            observed_sha256_out,
+            client_cert_pem,
+            client_key_pem,
+            timeout_ms,
+        )
+    }
+}
+
+/// Like [`slipstream_connect_ex4`], but additionally advertises the embedder's video decode/present
+/// capabilities as `video_caps` — a bitfield of `SLIPSTREAM_VIDEO_CAP_10BIT` (can decode 10-bit
+/// Main10) and `SLIPSTREAM_VIDEO_CAP_HDR` (can present BT.2020 PQ HDR10). The host upgrades to a
+/// 10-bit / HDR encode ONLY when the matching bit is set (and the host opted in); `0` keeps the
+/// 8-bit BT.709 SDR stream. After connecting, read the resolved colour via
+/// [`slipstream_connection_color_info`] and drain the mastering metadata via
+/// [`slipstream_connection_next_hdr_meta`].
+///
+/// # Safety
+/// Same as [`slipstream_connect`]; `launch_id`, when non-NULL, must be a NUL-terminated C string.
+#[cfg(feature = "quic")]
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn slipstream_connect_ex5(
+    host: *const std::os::raw::c_char,
+    port: u16,
+    width: u32,
+    height: u32,
+    refresh_hz: u32,
+    compositor: u32,
+    gamepad: u32,
+    bitrate_kbps: u32,
+    video_caps: u8,
+    launch_id: *const std::os::raw::c_char,
+    pin_sha256: *const u8,
+    observed_sha256_out: *mut u8,
+    client_cert_pem: *const std::os::raw::c_char,
+    client_key_pem: *const std::os::raw::c_char,
+    timeout_ms: u32,
+) -> *mut SlipstreamConnection {
+    // Delegate to the surround-aware variant requesting stereo (the pre-surround behaviour).
+    // SAFETY: the pointer arguments are forwarded UNCHANGED to the versioned entry point, which
+    // applies the same ABI contract to them; this shim dereferences nothing itself.
+    unsafe {
+        slipstream_connect_ex6(
+            host,
+            port,
+            width,
+            height,
+            refresh_hz,
+            compositor,
+            gamepad,
+            bitrate_kbps,
+            video_caps,
+            2, // audio_channels = stereo
+            launch_id,
+            pin_sha256,
+            observed_sha256_out,
+            client_cert_pem,
+            client_key_pem,
+            timeout_ms,
+        )
+    }
+}
+
+/// Like [`slipstream_connect_ex5`], but additionally requests the audio channel count:
+/// `2` (stereo, the default behaviour of every earlier variant), `6` (5.1) or `8` (7.1). The host
+/// clamps the request to what it can actually capture and echoes the resolved count via
+/// [`slipstream_connection_audio_channels`]. Advertises HEVC-only with no codec preference (call
+/// [`slipstream_connect_ex7`] to negotiate the codec).
+///
+/// # Safety
+/// Same as [`slipstream_connect`].
+#[cfg(feature = "quic")]
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn slipstream_connect_ex6(
+    host: *const std::os::raw::c_char,
+    port: u16,
+    width: u32,
+    height: u32,
+    refresh_hz: u32,
+    compositor: u32,
+    gamepad: u32,
+    bitrate_kbps: u32,
+    video_caps: u8,
+    audio_channels: u8,
+    launch_id: *const std::os::raw::c_char,
+    pin_sha256: *const u8,
+    observed_sha256_out: *mut u8,
+    client_cert_pem: *const std::os::raw::c_char,
+    client_key_pem: *const std::os::raw::c_char,
+    timeout_ms: u32,
+) -> *mut SlipstreamConnection {
+    // SAFETY: the pointer arguments are forwarded UNCHANGED to the versioned entry point, which
+    // applies the same ABI contract to them; this shim dereferences nothing itself.
+    unsafe {
+        slipstream_connect_ex7(
+            host,
+            port,
+            width,
+            height,
+            refresh_hz,
+            compositor,
+            gamepad,
+            bitrate_kbps,
+            video_caps,
+            audio_channels,
+            SLIPSTREAM_CODEC_HEVC, // pre-negotiation default: HEVC-only, no preference
+            0,
+            launch_id,
+            pin_sha256,
+            observed_sha256_out,
+            client_cert_pem,
+            client_key_pem,
+            timeout_ms,
+        )
+    }
+}
+
+/// Like [`slipstream_connect_ex6`], but additionally advertises the codecs the client can decode
+/// (`video_codecs` — a bitfield of [`SLIPSTREAM_CODEC_H264`] / [`SLIPSTREAM_CODEC_HEVC`] /
+/// [`SLIPSTREAM_CODEC_AV1`]) and a soft `preferred_codec` (a single codec bit, `0` = no preference).
+/// The host resolves the codec it emits from these (preference honored when it can also produce it,
+/// else best shared codec) and reports it via [`slipstream_connection_codec`]. A client that omits
+/// this (calls `ex6`) advertises HEVC-only, no preference — the pre-negotiation behaviour.
+///
+/// # Safety
+/// Same as [`slipstream_connect`].
+#[cfg(feature = "quic")]
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn slipstream_connect_ex7(
+    host: *const std::os::raw::c_char,
+    port: u16,
+    width: u32,
+    height: u32,
+    refresh_hz: u32,
+    compositor: u32,
+    gamepad: u32,
+    bitrate_kbps: u32,
+    video_caps: u8,
+    audio_channels: u8,
+    video_codecs: u8,
+    preferred_codec: u8,
+    launch_id: *const std::os::raw::c_char,
+    pin_sha256: *const u8,
+    observed_sha256_out: *mut u8,
+    client_cert_pem: *const std::os::raw::c_char,
+    client_key_pem: *const std::os::raw::c_char,
+    timeout_ms: u32,
+) -> *mut SlipstreamConnection {
+    // SAFETY: the pointer arguments are forwarded UNCHANGED to the versioned entry point, which
+    // applies the same ABI contract to them; this shim dereferences nothing itself.
+    unsafe {
+        connect_ex_impl(
+            host,
+            port,
+            0, // pre-v11 variant: no client caps
+            width,
+            height,
+            refresh_hz,
+            compositor,
+            gamepad,
+            bitrate_kbps,
+            video_caps,
+            audio_channels,
+            video_codecs,
+            preferred_codec,
+            launch_id,
+            pin_sha256,
+            observed_sha256_out,
+            client_cert_pem,
+            client_key_pem,
+            timeout_ms,
+            std::ptr::null_mut(),
+        )
+    }
+}
+
+/// Like [`slipstream_connect_ex7`], but additionally reports WHY a failed connect failed:
+/// `status_out` (nullable — null is exactly `ex7`) receives a [`SlipstreamStatus`] as `i32` —
+/// `Ok` on success, the mapped error otherwise, including the typed host-rejection block
+/// (`SLIPSTREAM_STATUS_REJECTED_NOT_ARMED` … `SLIPSTREAM_STATUS_REJECTED_BUSY`) decoded from the
+/// host's application close. That lets an embedder tell "denied in the console" / "nobody
+/// approved in time" / "host busy" / "versions don't match" apart from plain unreachability
+/// (`Io`/`Timeout`) — a NULL return alone can't say which.
+///
+/// # Safety
+/// Same as [`slipstream_connect`]; `status_out`, when non-null, must point to a writable `i32`.
+#[cfg(feature = "quic")]
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn slipstream_connect_ex8(
+    host: *const std::os::raw::c_char,
+    port: u16,
+    width: u32,
+    height: u32,
+    refresh_hz: u32,
+    compositor: u32,
+    gamepad: u32,
+    bitrate_kbps: u32,
+    video_caps: u8,
+    audio_channels: u8,
+    video_codecs: u8,
+    preferred_codec: u8,
+    launch_id: *const std::os::raw::c_char,
+    pin_sha256: *const u8,
+    observed_sha256_out: *mut u8,
+    client_cert_pem: *const std::os::raw::c_char,
+    client_key_pem: *const std::os::raw::c_char,
+    timeout_ms: u32,
+    status_out: *mut i32,
+) -> *mut SlipstreamConnection {
+    // SAFETY: the pointer arguments are forwarded UNCHANGED to the versioned entry point, which
+    // applies the same ABI contract to them; this shim dereferences nothing itself.
+    unsafe {
+        connect_ex_impl(
+            host,
+            port,
+            0, // pre-v11 variant: no client caps
+            width,
+            height,
+            refresh_hz,
+            compositor,
+            gamepad,
+            bitrate_kbps,
+            video_caps,
+            audio_channels,
+            video_codecs,
+            preferred_codec,
+            launch_id,
+            pin_sha256,
+            observed_sha256_out,
+            client_cert_pem,
+            client_key_pem,
+            timeout_ms,
+            status_out,
+        )
+    }
+}
+
+/// Like [`slipstream_connect_ex8`], plus `client_caps` (ABI v11): a bitfield of
+/// `SLIPSTREAM_CLIENT_CAP_CURSOR` (0x01). Setting the cursor bit asks the host to STOP
+/// compositing the pointer into the video and forward it out-of-band instead — the embedder
+/// MUST then drain [`slipstream_connection_next_cursor_shape`] /
+/// [`slipstream_connection_next_cursor_state`] and draw the pointer itself, or the session has
+/// no visible cursor at all. Pass 0 for the composited behavior of every earlier variant.
+///
+/// # Safety
+/// Same as [`slipstream_connect_ex8`].
+#[cfg(feature = "quic")]
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn slipstream_connect_ex9(
+    host: *const std::os::raw::c_char,
+    port: u16,
+    width: u32,
+    height: u32,
+    refresh_hz: u32,
+    compositor: u32,
+    gamepad: u32,
+    bitrate_kbps: u32,
+    video_caps: u8,
+    audio_channels: u8,
+    video_codecs: u8,
+    preferred_codec: u8,
+    client_caps: u8,
+    launch_id: *const std::os::raw::c_char,
+    pin_sha256: *const u8,
+    observed_sha256_out: *mut u8,
+    client_cert_pem: *const std::os::raw::c_char,
+    client_key_pem: *const std::os::raw::c_char,
+    timeout_ms: u32,
+    status_out: *mut i32,
+) -> *mut SlipstreamConnection {
+    // SAFETY: the pointer arguments are forwarded UNCHANGED to the versioned entry point, which
+    // applies the same ABI contract to them; this shim dereferences nothing itself.
+    unsafe {
+        connect_ex_impl(
+            host,
+            port,
+            client_caps,
+            width,
+            height,
+            refresh_hz,
+            compositor,
+            gamepad,
+            bitrate_kbps,
+            video_caps,
+            audio_channels,
+            video_codecs,
+            preferred_codec,
+            launch_id,
+            pin_sha256,
+            observed_sha256_out,
+            client_cert_pem,
+            client_key_pem,
+            timeout_ms,
+            status_out,
+        )
+    }
+}
+
+/// [`slipstream_connect_ex9`] `client_caps` bit: render the host cursor locally (the cursor
+/// channel, `design/remote-desktop-sweep.md` M2).
+pub const SLIPSTREAM_CLIENT_CAP_CURSOR: u8 = 0x01;
+
+/// [`slipstream_connect_ex9`] `client_caps` bit: this client's presenter is vsync-aware and
+/// feeds [`slipstream_connection_report_phase`] (design/phase-locked-capture.md). Advisory in
+/// v1 — the host arms on report receipt — but honest advertisement keeps the negotiation
+/// forward-compatible.
+pub const SLIPSTREAM_CLIENT_CAP_PHASE_LOCK: u8 = 0x02;
+
+/// Shared body of [`slipstream_connect_ex7`] / [`slipstream_connect_ex8`]: `status_out`
+/// (nullable) is written on EVERY path — `Ok`, the mapped [`SlipstreamError`],
+/// `InvalidArg` for bad arguments, `Panic` if the connect panicked.
+#[cfg(feature = "quic")]
+#[allow(clippy::too_many_arguments)]
+unsafe fn connect_ex_impl(
+    host: *const std::os::raw::c_char,
+    port: u16,
+    client_caps: u8,
+    width: u32,
+    height: u32,
+    refresh_hz: u32,
+    compositor: u32,
+    gamepad: u32,
+    bitrate_kbps: u32,
+    video_caps: u8,
+    audio_channels: u8,
+    video_codecs: u8,
+    preferred_codec: u8,
+    launch_id: *const std::os::raw::c_char,
+    pin_sha256: *const u8,
+    observed_sha256_out: *mut u8,
+    client_cert_pem: *const std::os::raw::c_char,
+    client_key_pem: *const std::os::raw::c_char,
+    timeout_ms: u32,
+    status_out: *mut i32,
+) -> *mut SlipstreamConnection {
+    let set_status = |s: crate::error::SlipstreamStatus| {
+        if !status_out.is_null() {
+            // SAFETY: per the ABI contract - a caller-owned out-param, non-null on this path,
+            // written once by value.
+            unsafe { *status_out = s as i32 };
+        }
+    };
+    let r = std::panic::catch_unwind(AssertUnwindSafe(|| {
+        if host.is_null() {
+            set_status(crate::error::SlipstreamStatus::InvalidArg);
+            return std::ptr::null_mut();
+        }
+        // SAFETY: per the ABI contract - a caller-supplied C string, NUL-terminated or null,
+        // borrowed only for this call.
+        let host = match unsafe { std::ffi::CStr::from_ptr(host) }.to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                set_status(crate::error::SlipstreamStatus::InvalidArg);
+                return std::ptr::null_mut();
+            }
+        };
+        // A bad-UTF-8 launch id is non-fatal — treat it as "no game" rather than failing connect.
+        // SAFETY: per the ABI contract - the pointer operands in this block are caller-supplied
+        // and are null-checked or handle-validated on this path before they are read.
+        let launch = match unsafe { opt_cstr(launch_id) } {
+            Ok(Some(s)) if !s.is_empty() => Some(s.to_string()),
+            _ => None,
+        };
+        let mode = crate::config::Mode {
+            width,
+            height,
+            refresh_hz,
+        };
+        // "Any unrecognized value = Auto" must hold for the FULL u32 domain — `as u8`
+        // would wrap 0x101 into a concrete choice before from_u8's fallback could apply.
+        let pref = u8::try_from(compositor)
+            .map(crate::config::CompositorPref::from_u8)
+            .unwrap_or_default();
+        let gamepad = u8::try_from(gamepad)
+            .map(crate::config::GamepadPref::from_u8)
+            .unwrap_or_default();
+        let pin = if pin_sha256.is_null() {
+            None
+        } else {
+            let mut p = [0u8; 32];
+            // SAFETY: per the ABI contract - a caller-supplied pointer/length pair describing one
+            // readable region, borrowed only for this call.
+            p.copy_from_slice(unsafe { std::slice::from_raw_parts(pin_sha256, 32) });
+            Some(p)
+        };
+        // SAFETY: per the ABI contract - the pointer operands in this block are caller-supplied
+        // and are null-checked or handle-validated on this path before they are read.
+        let identity = match (unsafe { opt_cstr(client_cert_pem) }, unsafe {
+            opt_cstr(client_key_pem)
+        }) {
+            (Ok(Some(c)), Ok(Some(k))) => Some((c.to_string(), k.to_string())),
+            (Ok(None), Ok(None)) => None,
+            _ => {
+                // Half an identity / bad UTF-8: fail closed.
+                set_status(crate::error::SlipstreamStatus::InvalidArg);
+                return std::ptr::null_mut();
+            }
+        };
+        match crate::client::NativeClient::connect(
+            host,
+            port,
+            mode,
+            pref,
+            gamepad,
+            bitrate_kbps,
+            video_caps,
+            crate::audio::normalize_channels(audio_channels),
+            video_codecs,
+            preferred_codec,
+            // No display-HDR-volume parameter in the C ABI yet: Apple/Android clients tone-map
+            // themselves (EDR / MediaCodec), so the host's EDID defaults are fine there. An `ex8`
+            // variant can carry it if a passthrough embedder ever needs it.
+            None,
+            // ABI v11 ([`slipstream_connect_ex9`]): CLIENT_CAP_CURSOR here asks the host to STOP
+            // compositing the pointer — only an embedder that renders the cursor planes
+            // ([`slipstream_connection_next_cursor_shape`]/`_state`) may set it. ex7/ex8 pass 0.
+            client_caps,
+            // The C ABI cannot carry slice-progressive parts yet — `SlipstreamFrame` has no
+            // part/completeness fields, so a part would be indistinguishable from a whole AU.
+            // An `ex10` variant adds the opt-in together with those fields when an ABI embedder
+            // (Apple) grows a partial-feed decode path.
+            false,
+            launch,
+            // The C ABI has no device-name parameter (only `slipstream_pair` takes one), so every
+            // embedder gets the OS hostname default — this is what the host's pending-approval
+            // list shows when an unpaired embedder knocks. An `ex10` variant can make it explicit
+            // if an embedder ever wants a custom label (e.g. the platform's marketing name).
+            Some(crate::client::device_name()),
+            pin,
+            identity,
+            std::time::Duration::from_millis(timeout_ms as u64),
+        ) {
+            Ok(c) => {
+                if !observed_sha256_out.is_null() {
+                    // SAFETY: per the ABI contract - a caller-owned output buffer of exactly the
+                    // documented fixed length, non-null on this path and written once.
+                    unsafe {
+                        std::slice::from_raw_parts_mut(observed_sha256_out, 32)
+                            .copy_from_slice(&c.host_fingerprint);
+                    }
+                }
+                set_status(crate::error::SlipstreamStatus::Ok);
+                Box::into_raw(Box::new(SlipstreamConnection {
+                    inner: c,
+                    last: std::sync::Mutex::new(None),
+                    last_audio: std::sync::Mutex::new(None),
+                    audio_pcm: std::sync::Mutex::new(AudioPcmState::default()),
+                    last_clip: std::sync::Mutex::new(None),
+                    last_cursor_shape: std::sync::Mutex::new(None),
+                }))
+            }
+            Err(e) => {
+                set_status(e.status());
+                std::ptr::null_mut()
+            }
+        }
+    }));
+    r.unwrap_or_else(|_| {
+        set_status(crate::error::SlipstreamStatus::Panic);
+        std::ptr::null_mut()
+    })
+}
+
+/// Generate a persistent client identity: a self-signed certificate + private key, both
+/// PEM, NUL-terminated, written into the caller's buffers. Generate ONCE, store both
+/// strings (Keychain etc.), pass them to [`slipstream_pair`] and every
+/// [`slipstream_connect`] — the certificate's fingerprint is how hosts recognize this
+/// client. 4096-byte buffers are ample.
+///
+/// # Safety
+/// `cert_pem_out` is writable for `cert_cap` bytes; `key_pem_out` for `key_cap`.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_generate_identity(
+    cert_pem_out: *mut std::os::raw::c_char,
+    cert_cap: usize,
+    key_pem_out: *mut std::os::raw::c_char,
+    key_cap: usize,
+) -> SlipstreamStatus {
+    guard(|| {
+        if cert_pem_out.is_null() || key_pem_out.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        let (cert, key) = match crate::quic::endpoint::generate_identity() {
+            Ok(t) => t,
+            Err(_) => return SlipstreamStatus::Io,
+        };
+        if cert.len() + 1 > cert_cap || key.len() + 1 > key_cap {
+            return SlipstreamStatus::InvalidArg;
+        }
+        // SAFETY: per the ABI contract - the pointer operands in this block are caller-supplied
+        // and are null-checked or handle-validated on this path before they are read.
+        unsafe {
+            // `.cast()`, not `as *mut u8`: `c_char` is i8 on x86_64 but u8 on aarch64, so the
+            // `as` form is a REQUIRED conversion on one and a no-op clippy rejects on the other.
+            std::ptr::copy_nonoverlapping(cert.as_ptr(), cert_pem_out.cast::<u8>(), cert.len());
+            *cert_pem_out.add(cert.len()) = 0;
+            std::ptr::copy_nonoverlapping(key.as_ptr(), key_pem_out.cast::<u8>(), key.len());
+            *key_pem_out.add(key.len()) = 0;
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Reachability probe: attempt the QUIC handshake to `host:port` and report whether the host
+/// answered — trust-agnostic and mDNS-INDEPENDENT. A host reached over a routed network
+/// (Tailscale/VPN/another subnet) answers here even though it never advertises on mDNS, so the
+/// clients' saved-host "online" pips can reflect real reachability instead of LAN presence (the
+/// display-side companion to the dial-first connect fix). Returns [`SlipstreamStatus::Ok`] when
+/// reachable, [`SlipstreamStatus::Timeout`] when not (or on any connect error). Blocks up to
+/// `timeout_ms`; call off the UI thread.
+///
+/// # Safety
+/// `host` must be a NUL-terminated UTF-8 string.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_probe(
+    host: *const std::os::raw::c_char,
+    port: u16,
+    timeout_ms: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - the pointer operands in this block are caller-supplied
+        // and are null-checked or handle-validated on this path before they are read.
+        let Ok(Some(host)) = (unsafe { opt_cstr(host) }) else {
+            return SlipstreamStatus::NullPointer;
+        };
+        if crate::client::NativeClient::probe(
+            host,
+            port,
+            std::time::Duration::from_millis(timeout_ms as u64),
+        ) {
+            SlipstreamStatus::Ok
+        } else {
+            SlipstreamStatus::Timeout
+        }
+    })
+}
+
+/// Run the PIN pairing ceremony against a host (see the protocol docs in slipstream-core):
+/// the host displays a short PIN; the user types it into the client app, which passes it
+/// here. On success the host has stored this client's identity, the now-verified host
+/// fingerprint is written to `host_sha256_out` (32 bytes) — persist it and pass it as
+/// `pin_sha256` to [`slipstream_connect`] from then on. Returns
+/// [`SlipstreamStatus::Crypto`] for a wrong PIN.
+///
+/// # Safety
+/// `host`/`client_cert_pem`/`client_key_pem`/`pin`/`name` are NUL-terminated UTF-8;
+/// `host_sha256_out` is writable for 32 bytes.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_pair(
+    host: *const std::os::raw::c_char,
+    port: u16,
+    client_cert_pem: *const std::os::raw::c_char,
+    client_key_pem: *const std::os::raw::c_char,
+    pin: *const std::os::raw::c_char,
+    name: *const std::os::raw::c_char,
+    host_sha256_out: *mut u8,
+    timeout_ms: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        let (Ok(Some(host)), Ok(Some(cert)), Ok(Some(key)), Ok(Some(pin)), Ok(Some(name))) = (
+            // SAFETY: per the ABI contract - the pointer operands in this block are caller-
+            // supplied and are null-checked or handle-validated on this path before they are read.
+            unsafe { opt_cstr(host) },
+            // SAFETY: per the ABI contract - the pointer operands in this block are caller-
+            // supplied and are null-checked or handle-validated on this path before they are read.
+            unsafe { opt_cstr(client_cert_pem) },
+            // SAFETY: per the ABI contract - the pointer operands in this block are caller-
+            // supplied and are null-checked or handle-validated on this path before they are read.
+            unsafe { opt_cstr(client_key_pem) },
+            // SAFETY: per the ABI contract - the pointer operands in this block are caller-
+            // supplied and are null-checked or handle-validated on this path before they are read.
+            unsafe { opt_cstr(pin) },
+            // SAFETY: per the ABI contract - the pointer operands in this block are caller-
+            // supplied and are null-checked or handle-validated on this path before they are read.
+            unsafe { opt_cstr(name) },
+        ) else {
+            return SlipstreamStatus::NullPointer;
+        };
+        if host_sha256_out.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        match crate::client::NativeClient::pair(
+            host,
+            port,
+            (cert, key),
+            pin,
+            name,
+            std::time::Duration::from_millis(timeout_ms as u64),
+        ) {
+            Ok(fp) => {
+                // SAFETY: per the ABI contract - a caller-owned output buffer of exactly the
+                // documented fixed length, non-null on this path and written once.
+                unsafe {
+                    std::slice::from_raw_parts_mut(host_sha256_out, 32).copy_from_slice(&fp);
+                }
+                SlipstreamStatus::Ok
+            }
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Pull the next reassembled access unit, waiting up to `timeout_ms`. Returns
+/// [`SlipstreamStatus::NoFrame`] on timeout and [`SlipstreamStatus::Closed`] once the session ended.
+/// On `Ok`, `*out` borrows connection memory **until the next `next_au` call** on this
+/// handle (the audio/rumble planes do not invalidate it).
+///
+/// # Safety
+/// `c` is a valid connection handle; `out` is writable. At most one thread pulls video —
+/// it may run concurrently with one audio-pulling and one rumble-pulling thread.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_next_au(
+    c: *mut SlipstreamConnection,
+    out: *mut SlipstreamFrame,
+    timeout_ms: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // Shared reference only: video and audio threads must never alias a `&mut`.
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if out.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        match c
+            .inner
+            .next_frame(std::time::Duration::from_millis(timeout_ms as u64))
+        {
+            Ok(frame) => {
+                let mut slot = c.last.lock().unwrap();
+                *slot = Some(frame);
+                let f = slot.as_ref().unwrap();
+                // SAFETY: per the ABI contract - `out` is a caller-owned writable slot of the
+                // matching `#[repr(C)]` type, written once by value.
+                unsafe {
+                    *out = SlipstreamFrame {
+                        data: f.data.as_ptr(),
+                        len: f.data.len(),
+                        frame_index: f.frame_index,
+                        pts_ns: f.pts_ns,
+                        flags: f.flags,
+                        received_ns: f.received_ns,
+                    };
+                }
+                SlipstreamStatus::Ok
+            }
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// One Opus audio packet pulled off a `slipstream/1` connection (48 kHz stereo, 5 ms frames).
+/// `data` borrows connection memory until the next `slipstream_connection_next_audio` call.
+#[cfg(feature = "quic")]
+#[repr(C)]
+pub struct SlipstreamAudioPacket {
+    pub data: *const u8,
+    pub len: usize,
+    pub seq: u32,
+    pub pts_ns: u64,
+}
+
+/// Pull the next Opus audio packet, waiting up to `timeout_ms`. Returns
+/// [`SlipstreamStatus::NoFrame`] on timeout and [`SlipstreamStatus::Closed`] once the session ended.
+/// On `Ok`, `out->data` borrows connection memory **until the next audio call** on this
+/// handle (independent of the video slot). Drain from a dedicated audio thread — packets
+/// arrive every 5 ms and the internal queue holds 320 ms.
+///
+/// # Safety
+/// `c` is a valid connection handle; `out` is writable. At most one thread pulls audio —
+/// it may run concurrently with the video/rumble pullers.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_next_audio(
+    c: *mut SlipstreamConnection,
+    out: *mut SlipstreamAudioPacket,
+    timeout_ms: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if out.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        match c
+            .inner
+            .next_audio(std::time::Duration::from_millis(timeout_ms as u64))
+        {
+            Ok(pkt) => {
+                let mut slot = c.last_audio.lock().unwrap();
+                *slot = Some(pkt);
+                let p = slot.as_ref().unwrap();
+                // SAFETY: per the ABI contract - `out` is a caller-owned writable slot of the
+                // matching `#[repr(C)]` type, written once by value.
+                unsafe {
+                    *out = SlipstreamAudioPacket {
+                        data: p.data.as_ptr(),
+                        len: p.data.len(),
+                        seq: p.seq,
+                        pts_ns: p.pts_ns,
+                    };
+                }
+                SlipstreamStatus::Ok
+            }
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Read the audio channel count the host resolved for this session (from its Welcome): `2`
+/// (stereo), `6` (5.1) or `8` (7.1). `*out` is filled when non-NULL. The `0xC9` Opus frames are
+/// (multistream-)encoded for this layout; an embedder decoding raw frames itself must build its
+/// decoder from THIS value (see [`crate::audio::layout_for`]) — or use
+/// [`slipstream_connection_next_audio_pcm`], which decodes in-core. Available immediately after a
+/// successful connect (it doesn't change without a reconfigure).
+///
+/// # Safety
+/// `c` is a valid connection handle; `out` is NULL or writable for one `u8`.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_audio_channels(
+    c: *mut SlipstreamConnection,
+    out: *mut u8,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if !out.is_null() {
+            // SAFETY: `out` is non-null and the caller guarantees it is writable for one `u8`.
+            unsafe { *out = c.inner.audio_channels };
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// One decoded audio frame from [`slipstream_connection_next_audio_pcm`]: interleaved 32-bit
+/// float PCM at 48 kHz, in the canonical wire channel order `FL FR FC LFE RL RR SL SR` (the
+/// first `channels` of it). `samples` points at `frame_count * channels` floats and borrows
+/// connection memory **until the next PCM call** on this handle.
+#[cfg(feature = "quic")]
+#[repr(C)]
+pub struct SlipstreamAudioPcm {
+    /// Interleaved f32 samples (wire channel order), `frame_count * channels` long.
+    pub samples: *const f32,
+    /// Samples per channel in this frame.
+    pub frame_count: u32,
+    /// Channel count (2/6/8) — the negotiated [`slipstream_connection_audio_channels`].
+    pub channels: u8,
+    /// Source packet sequence number.
+    pub seq: u32,
+    /// Capture presentation timestamp (ns).
+    pub pts_ns: u64,
+}
+
+/// Pull the next audio frame and **decode it in-core** to interleaved f32 PCM — for embedders
+/// without a multistream-capable Opus decoder (e.g. Apple, whose AudioToolbox Opus path is
+/// stereo-only). The decoder is built once from the negotiated channel count and handles 2/6/8
+/// channels (a 1-coupled-stream multistream decoder is exactly a stereo decoder). Same
+/// timeout/closed semantics as [`slipstream_connection_next_audio`]; `out->samples` borrows
+/// connection memory until the next PCM call on this handle. Use EITHER this or
+/// [`slipstream_connection_next_audio`] on a given connection, from one dedicated audio thread —
+/// not both (they share the underlying queue).
+///
+/// # Safety
+/// `c` is a valid connection handle; `out` is writable. At most one thread pulls audio.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_next_audio_pcm(
+    c: *mut SlipstreamConnection,
+    out: *mut SlipstreamAudioPcm,
+    timeout_ms: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if out.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        let channels = crate::audio::normalize_channels(c.inner.audio_channels);
+        let pkt = match c
+            .inner
+            .next_audio(std::time::Duration::from_millis(timeout_ms as u64))
+        {
+            Ok(pkt) => pkt,
+            Err(e) => return e.status(),
+        };
+        let mut state = c.audio_pcm.lock().unwrap();
+        if state.decoder.is_none() {
+            let layout = crate::audio::layout_for(channels, false);
+            match opus::MSDecoder::new(48_000, layout.streams, layout.coupled, layout.mapping) {
+                Ok(d) => {
+                    // Largest legal Opus frame is 120 ms = 5760 samples/ch.
+                    state.pcm = vec![0f32; 5760 * channels as usize];
+                    state.decoder = Some(d);
+                }
+                Err(_) => return SlipstreamStatus::Unsupported,
+            }
+        }
+        let AudioPcmState { decoder, pcm } = &mut *state;
+        let dec = decoder.as_mut().unwrap();
+        // A header-only datagram (DTX silence — a legal wire form) must be SKIPPED, not
+        // decoded: `decode_float` treats an empty payload as a loss and synthesizes a full
+        // 120 ms of concealment for a ~5 ms slot, growing the playout ring without bound.
+        // Mirrors the host mic pump's guard; the sink underruns to silence on its own.
+        if pkt.data.is_empty() {
+            return SlipstreamStatus::NoFrame;
+        }
+        // `decode_float` divides the output buffer length by the channel count to get the
+        // per-channel capacity; an empty payload requests packet-loss concealment.
+        match dec.decode_float(&pkt.data, pcm, false) {
+            Ok(frame_count) => {
+                // SAFETY: per the ABI contract - `out` is a caller-owned writable slot of the
+                // matching `#[repr(C)]` type, written once by value.
+                unsafe {
+                    *out = SlipstreamAudioPcm {
+                        samples: pcm.as_ptr(),
+                        frame_count: frame_count as u32,
+                        channels,
+                        seq: pkt.seq,
+                        pts_ns: pkt.pts_ns,
+                    };
+                }
+                SlipstreamStatus::Ok
+            }
+            Err(_) => SlipstreamStatus::BadPacket,
+        }
+    })
+}
+
+/// Pull the next rumble (force-feedback) update, waiting up to `timeout_ms`. Amplitudes
+/// are 0..0xFFFF (`low` = low-frequency motor, `high` = high-frequency), `(0, 0)` = stop.
+/// Same timeout/closed semantics as [`slipstream_connection_next_audio`].
+///
+/// This drops the self-terminating TTL of a v2 rumble envelope — an embedder that only calls this
+/// keeps its own staleness policy, exactly as before. Use [`slipstream_connection_next_rumble2`] to
+/// honor the host-supplied lease and delete the client-side timeout heuristics.
+///
+/// # Safety
+/// `c` is a valid connection handle; out pointers are writable (NULLs are skipped). At
+/// most one thread pulls rumble — it may run concurrently with the video/audio pullers.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_next_rumble(
+    c: *mut SlipstreamConnection,
+    pad: *mut u16,
+    low: *mut u16,
+    high: *mut u16,
+    timeout_ms: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        match c
+            .inner
+            .next_rumble(std::time::Duration::from_millis(timeout_ms as u64))
+        {
+            Ok((p, l, h)) => {
+                // SAFETY: per the ABI contract - each out-param below is OPTIONAL, so it is null-
+                // checked before it is written; a non-null one is a caller-owned writable slot.
+                unsafe {
+                    if !pad.is_null() {
+                        *pad = p;
+                    }
+                    if !low.is_null() {
+                        *low = l;
+                    }
+                    if !high.is_null() {
+                        *high = h;
+                    }
+                }
+                SlipstreamStatus::Ok
+            }
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// `*ttl_ms` sentinel written by [`slipstream_connection_next_rumble2`] for a legacy (v1) rumble
+/// datagram — an old host that sent no self-termination lease. The client then falls back to its
+/// own staleness heuristic for that update instead of a host-supplied deadline.
+pub const SLIPSTREAM_RUMBLE_NO_TTL: u32 = 0xFFFF_FFFF;
+
+/// Pull the next rumble update *including its self-termination TTL* (v2 envelopes), waiting up to
+/// `timeout_ms`. Same `pad`/`low`/`high` semantics as [`slipstream_connection_next_rumble`], plus
+/// `*ttl_ms`: how long (milliseconds) to render this level before silencing unless the host renews
+/// it. [`SLIPSTREAM_RUMBLE_NO_TTL`] means "no lease" — a legacy host; fall back to a client-side
+/// timeout. The reorder gate (seq) is applied inside the core before the update surfaces here, so a
+/// stale/reordered envelope never reaches the caller.
+///
+/// # Safety
+/// `c` is a valid connection handle; out pointers are writable (NULLs are skipped). At most one
+/// thread pulls rumble — it may run concurrently with the video/audio pullers.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_next_rumble2(
+    c: *mut SlipstreamConnection,
+    pad: *mut u16,
+    low: *mut u16,
+    high: *mut u16,
+    ttl_ms: *mut u32,
+    timeout_ms: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        match c
+            .inner
+            .next_rumble_ttl(std::time::Duration::from_millis(timeout_ms as u64))
+        {
+            Ok((p, l, h, ttl)) => {
+                // SAFETY: per the ABI contract - each out-param below is OPTIONAL, so it is null-
+                // checked before it is written; a non-null one is a caller-owned writable slot.
+                unsafe {
+                    if !pad.is_null() {
+                        *pad = p;
+                    }
+                    if !low.is_null() {
+                        *low = l;
+                    }
+                    if !high.is_null() {
+                        *high = h;
+                    }
+                    if !ttl_ms.is_null() {
+                        *ttl_ms = ttl.map_or(SLIPSTREAM_RUMBLE_NO_TTL, u32::from);
+                    }
+                }
+                SlipstreamStatus::Ok
+            }
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// `flags` bit for [`slipstream_connection_set_rumble_quirks`]: alternate the low motor's LSB on
+/// keepalive re-emits (imperceptible) so an SDL-class layer that no-ops identical values still
+/// writes the device — the Steam Deck's dedupe-defeat.
+pub const SLIPSTREAM_RUMBLE_QUIRK_DEDUP_JITTER: u32 = 1;
+
+/// Pull the next EFFECTIVE rumble command from the shared policy engine — the uniform replacement
+/// for per-platform rumble policy. Unlike [`slipstream_connection_next_rumble2`], the caller never
+/// sees a TTL and never owns a deadline: the engine emits the level on every wire update (renewals
+/// re-arm duration-parameterized APIs), an explicit zero at lease expiry / legacy-host staleness
+/// (a uniform 1 s) / connection close, and any keepalives declared via
+/// [`slipstream_connection_set_rumble_quirks`]. Apply commands verbatim: `(0, 0)` = stop now;
+/// non-zero = run at this level, with `*backstop_ms` as the safety-net duration for platform APIs
+/// that take one (explicit-stop APIs ignore it; it is `0` on stop commands).
+/// [`SlipstreamStatus::NoFrame`] on timeout; [`SlipstreamStatus::Closed`] once the session ended AND
+/// every close-drain stop was delivered — silence all actuators on it.
+///
+/// An embedder uses EITHER this or `next_rumble`/`next_rumble2` for a connection's lifetime,
+/// never both (they consume the same wire plane).
+///
+/// # Safety
+/// `c` is a valid connection handle; out pointers are writable (NULLs are skipped). At most one
+/// thread pulls rumble — it may run concurrently with the video/audio pullers.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_next_rumble_cmd(
+    c: *mut SlipstreamConnection,
+    pad: *mut u16,
+    low: *mut u16,
+    high: *mut u16,
+    backstop_ms: *mut u32,
+    timeout_ms: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        match c
+            .inner
+            .next_rumble_command(std::time::Duration::from_millis(timeout_ms as u64))
+        {
+            Ok(cmd) => {
+                // SAFETY: per the ABI contract - each out-param below is OPTIONAL, so it is null-
+                // checked before it is written; a non-null one is a caller-owned writable slot.
+                unsafe {
+                    if !pad.is_null() {
+                        *pad = cmd.pad;
+                    }
+                    if !low.is_null() {
+                        *low = cmd.low;
+                    }
+                    if !high.is_null() {
+                        *high = cmd.high;
+                    }
+                    if !backstop_ms.is_null() {
+                        *backstop_ms = cmd.backstop_ms;
+                    }
+                }
+                SlipstreamStatus::Ok
+            }
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Declare a physical actuator's quirks for wire pad `pad` — how a platform parameterizes the
+/// shared rumble policy engine instead of forking it (typically called at controller attach).
+/// `keepalive_ms`: re-emit an unchanged non-zero level at this cadence for actuators whose
+/// hardware output decays between wire renewals (Steam Deck ≈ 40, DualSense-over-BT raw HID
+/// ≈ 900); `0` = none. `min_pulse_ms`: floor for `backstop_ms` on non-zero commands. `flags`:
+/// [`SLIPSTREAM_RUMBLE_QUIRK_DEDUP_JITTER`]. All-zero (the initial state) describes a well-behaved
+/// actuator.
+///
+/// # Safety
+/// `c` is a valid connection handle. Callable from any thread.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_set_rumble_quirks(
+    c: *mut SlipstreamConnection,
+    pad: u16,
+    keepalive_ms: u16,
+    min_pulse_ms: u16,
+    flags: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        c.inner.set_rumble_quirks(
+            pad,
+            crate::client::ActuatorQuirks {
+                keepalive_ms,
+                min_pulse_ms,
+                dedup_jitter: flags & SLIPSTREAM_RUMBLE_QUIRK_DEDUP_JITTER != 0,
+            },
+        );
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Pull the next DualSense HID-output feedback event (lightbar / player LEDs / adaptive trigger)
+/// the host's virtual pad received from a game, into `*out`. [`SlipstreamStatus::NoFrame`] on
+/// timeout, [`SlipstreamStatus::Closed`] once the session ended. Only the DualSense host backend
+/// emits these. Same threading rules as [`slipstream_connection_next_rumble`] (one puller, may run
+/// alongside the other planes).
+///
+/// # Safety
+/// `c` is a valid connection handle; `out` is writable for one `SlipstreamHidOutput`.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_next_hidout(
+    c: *mut SlipstreamConnection,
+    out: *mut SlipstreamHidOutput,
+    timeout_ms: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if out.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        match c
+            .inner
+            .next_hidout(std::time::Duration::from_millis(timeout_ms as u64))
+        {
+            Ok(h) => match SlipstreamHidOutput::from_hid(&h) {
+                Some(v) => {
+                    // SAFETY: per the ABI contract - a caller-owned out-param, non-null on this
+                    // path, written once by value.
+                    unsafe { *out = v };
+                    SlipstreamStatus::Ok
+                }
+                // A raw as-is passthrough report (no C representation) — report "nothing this
+                // poll" and let the embedder's poll loop continue; see `from_hid`.
+                None => SlipstreamStatus::NoFrame,
+            },
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Pull the next static HDR metadata update (ST.2086 mastering display + content light level) for
+/// an HDR session, into `*out`. [`SlipstreamStatus::NoFrame`] on timeout, [`SlipstreamStatus::Closed`]
+/// once the session ended. The host sends one near session start and re-sends it on mastering
+/// changes / keyframes; apply the latest to the display (`SetHDRMetaData` / `CAEDRMetadata` /
+/// `KEY_HDR_STATIC_INFO`). Only an HDR session (`slipstream_connection_color_info` reports a PQ
+/// transfer) ever emits these. Same threading rules as [`slipstream_connection_next_rumble`] (one
+/// puller, may run alongside the other planes).
+///
+/// # Safety
+/// `c` is a valid connection handle; `out` is writable for one `SlipstreamHdrMeta`.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_next_hdr_meta(
+    c: *mut SlipstreamConnection,
+    out: *mut SlipstreamHdrMeta,
+    timeout_ms: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if out.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        match c
+            .inner
+            .next_hdr_meta(std::time::Duration::from_millis(timeout_ms as u64))
+        {
+            Ok(m) => {
+                // SAFETY: per the ABI contract - a caller-owned out-param, non-null on this path,
+                // written once by value.
+                unsafe { *out = SlipstreamHdrMeta::from_meta(&m) };
+                SlipstreamStatus::Ok
+            }
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// One forwarded host-cursor shape (ABI v11, the cursor channel): straight-alpha RGBA8, no
+/// padding, `len == w * h * 4`, hotspot within `w`×`h`. `serial` is the identity
+/// [`SlipstreamCursorState`] refers to — cache the built OS cursor by it.
+#[repr(C)]
+pub struct SlipstreamCursorShape {
+    pub serial: u32,
+    pub w: u16,
+    pub h: u16,
+    pub hot_x: u16,
+    pub hot_y: u16,
+    /// Borrows connection memory until the NEXT cursor-shape call (the audio contract).
+    pub rgba: *const u8,
+    pub len: usize,
+}
+
+/// Per-frame host-cursor state (ABI v11): position (the pointer/hotspot point in the host
+/// video's pixel space), visibility, and the host-driven relative-mode hint. `flags` bit 0 =
+/// visible, bit 1 = relative hint (a host app grabbed/hid the pointer — run captured
+/// relative; clear = return to absolute, reappearing at `x`/`y`).
+#[repr(C)]
+pub struct SlipstreamCursorState {
+    pub serial: u32,
+    pub flags: u8,
+    pub x: i32,
+    pub y: i32,
+}
+
+/// Pull the next forwarded cursor SHAPE (sent on pointer-bitmap change over the reliable
+/// control stream; only a session connected with `SLIPSTREAM_CLIENT_CAP_CURSOR` against a
+/// capable host receives any). On `Ok`, `out->rgba` borrows connection memory until the next
+/// cursor-shape call on this handle. Drain from a dedicated thread (one thread per plane).
+///
+/// # Safety
+/// `c` is a valid connection handle; `out` is writable. At most one thread pulls cursor
+/// shapes; it may run concurrently with every other plane's puller.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_next_cursor_shape(
+    c: *mut SlipstreamConnection,
+    out: *mut SlipstreamCursorShape,
+    timeout_ms: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if out.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        match c
+            .inner
+            .next_cursor_shape(std::time::Duration::from_millis(timeout_ms as u64))
+        {
+            Ok(shape) => {
+                let mut slot = c.last_cursor_shape.lock().unwrap();
+                *slot = Some(shape);
+                let sh = slot.as_ref().unwrap();
+                // SAFETY: per the ABI contract - `out` is a caller-owned writable slot of the
+                // matching `#[repr(C)]` type, written once by value.
+                unsafe {
+                    *out = SlipstreamCursorShape {
+                        serial: sh.serial,
+                        w: sh.w,
+                        h: sh.h,
+                        hot_x: sh.hot_x,
+                        hot_y: sh.hot_y,
+                        rgba: sh.rgba.as_ptr(),
+                        len: sh.rgba.len(),
+                    };
+                }
+                SlipstreamStatus::Ok
+            }
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Pull the next cursor STATE (a `0xD0` datagram per host encode tick — latest-wins; drain
+/// the queue and apply only the newest). Same negotiation gate as
+/// [`slipstream_connection_next_cursor_shape`].
+///
+/// # Safety
+/// `c` is a valid connection handle; `out` is writable. At most one thread pulls cursor
+/// state; it may run concurrently with every other plane's puller.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_next_cursor_state(
+    c: *mut SlipstreamConnection,
+    out: *mut SlipstreamCursorState,
+    timeout_ms: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if out.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        match c
+            .inner
+            .next_cursor_state(std::time::Duration::from_millis(timeout_ms as u64))
+        {
+            Ok(st) => {
+                // SAFETY: per the ABI contract - `out` is a caller-owned writable slot of the
+                // matching `#[repr(C)]` type, written once by value.
+                unsafe {
+                    *out = SlipstreamCursorState {
+                        serial: st.serial,
+                        flags: st.flags,
+                        x: st.x,
+                        y: st.y,
+                    };
+                }
+                SlipstreamStatus::Ok
+            }
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Tell the host who renders the pointer (design/remote-desktop-sweep.md §8 — the mid-stream
+/// mouse-model flip): `client_draws = true` = this client draws it locally (the desktop mouse
+/// model; the host excludes the pointer from the video and forwards shape/state), `false` =
+/// the host composites it into the video (the capture model — full fidelity, the pre-channel
+/// look). Idempotent, latest-wins; harmless against hosts without the cursor cap (an unknown
+/// control message type, ignored). ABI v12.
+///
+/// # Safety
+/// `c` is a valid connection handle.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_set_cursor_render(
+    c: *mut SlipstreamConnection,
+    client_draws: bool,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        match c.inner.set_cursor_render(client_draws) {
+            Ok(()) => SlipstreamStatus::Ok,
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Pull the next per-AU host timing (0xCF) into `*out`: the host's capture→sent duration for one
+/// access unit, correlated to the AU by `pts_ns` (see [`SlipstreamHostTiming`]).
+/// [`SlipstreamStatus::NoFrame`] on timeout, [`SlipstreamStatus::Closed`] once the session ended.
+/// A stats consumer drains this non-blockingly (`timeout_ms = 0`) alongside its frame samples;
+/// an older host never emits any — keep showing the combined `host+network` stage then. Same
+/// threading rules as [`slipstream_connection_next_rumble`] (one puller, may run alongside the
+/// other planes).
+///
+/// # Safety
+/// `c` is a valid connection handle; `out` is writable for one `SlipstreamHostTiming`.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_next_host_timing(
+    c: *mut SlipstreamConnection,
+    out: *mut SlipstreamHostTiming,
+    timeout_ms: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if out.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        match c
+            .inner
+            .next_host_timing(std::time::Duration::from_millis(timeout_ms as u64))
+        {
+            Ok(t) => {
+                // SAFETY: per the ABI contract - `out` is a caller-owned writable slot of the
+                // matching `#[repr(C)]` type, written once by value.
+                unsafe {
+                    *out = SlipstreamHostTiming {
+                        pts_ns: t.pts_ns,
+                        host_us: t.host_us,
+                    }
+                };
+                SlipstreamStatus::Ok
+            }
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Read the session's resolved colour signalling + encode bit depth (from the host's Welcome).
+/// Each out pointer is filled when non-NULL: `primaries`/`transfer`/`matrix` are CICP code points
+/// (BT.709 = 1; BT.2020 = 9; PQ transfer = 16, HLG = 18; BT.2020-NCL matrix = 9), `full_range` is
+/// 0 (limited) or 1 (full), `bit_depth` is 8 or 10. A `transfer` of 16/18 means HDR — configure an
+/// HDR present path and drain [`slipstream_connection_next_hdr_meta`]. Available immediately after a
+/// successful connect (these don't change without a reconfigure).
+///
+/// # Safety
+/// `c` is a valid connection handle; each out pointer is NULL or writable for its scalar.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_color_info(
+    c: *mut SlipstreamConnection,
+    primaries: *mut u8,
+    transfer: *mut u8,
+    matrix: *mut u8,
+    full_range: *mut u8,
+    bit_depth: *mut u8,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        let color = c.inner.color;
+        // SAFETY: per the ABI contract - each out-param below is OPTIONAL, so it is null-checked
+        // before it is written; a non-null one is a caller-owned writable slot.
+        unsafe {
+            if !primaries.is_null() {
+                *primaries = color.primaries;
+            }
+            if !transfer.is_null() {
+                *transfer = color.transfer;
+            }
+            if !matrix.is_null() {
+                *matrix = color.matrix;
+            }
+            if !full_range.is_null() {
+                *full_range = color.full_range;
+            }
+            if !bit_depth.is_null() {
+                *bit_depth = c.inner.bit_depth;
+            }
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Read the session's resolved chroma subsampling (from the host's Welcome) as the HEVC
+/// `chroma_format_idc`: `1` = 4:2:0 (the default every pre-4:4:4 host produced), `3` = full-chroma
+/// 4:4:4. `*out` is filled when non-NULL. The in-band SPS is authoritative; this lets the embedder
+/// pre-size its decoder / pick a 4:4:4 pixel format up front. Available immediately after a
+/// successful connect (it doesn't change without a reconfigure).
+///
+/// # Safety
+/// `c` is a valid connection handle; `out` is NULL or writable for one `u8`.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_chroma_format(
+    c: *mut SlipstreamConnection,
+    out: *mut u8,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if !out.is_null() {
+            // SAFETY: `out` is non-null and the caller guarantees it is writable for one `u8`.
+            unsafe { *out = c.inner.chroma_format };
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Read the video codec the host resolved for this session (from its Welcome): one of
+/// [`SLIPSTREAM_CODEC_H264`] / [`SLIPSTREAM_CODEC_HEVC`] / [`SLIPSTREAM_CODEC_AV1`]. The embedder builds
+/// its decoder from THIS (never assuming HEVC). `*out` is filled when non-NULL. Available
+/// immediately after a successful connect (it doesn't change without a reconfigure). An older host
+/// that didn't negotiate a codec reports [`SLIPSTREAM_CODEC_HEVC`].
+///
+/// # Safety
+/// `c` is a valid connection handle; `out` is NULL or writable for one `u8`.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_codec(
+    c: *mut SlipstreamConnection,
+    out: *mut u8,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if !out.is_null() {
+            // SAFETY: `out` is non-null and the caller guarantees it is writable for one `u8`.
+            unsafe { *out = c.inner.codec };
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Read the session's negotiated wire shard payload (the `Welcome`'s value, bytes). This is the
+/// parse-window size of a [`USER_FLAG_CHUNK_ALIGNED`] AU (PyroWave datagram-aligned mode,
+/// design/pyrowave-codec-plan.md §4.4): every `shard_payload`-sized window of the frame buffer
+/// starts a fresh self-delimiting chunk. Clients that decode PyroWave natively (the Apple Metal
+/// port) need it to walk those AUs; other codecs never need this.
+///
+/// # Safety
+/// `c` is a valid connection handle; `out` is NULL or writable for one `u32`.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_shard_payload(
+    c: *mut SlipstreamConnection,
+    out: *mut u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if !out.is_null() {
+            // SAFETY: `out` is non-null and the caller guarantees it is writable for one `u32`.
+            unsafe { *out = u32::from(c.inner.shard_payload) };
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Send one input event to the host as a QUIC datagram (non-blocking enqueue).
+///
+/// # Safety
+/// `c` is a valid connection handle; `ev` points to a valid [`InputEvent`].
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_send_input(
+    c: *mut SlipstreamConnection,
+    ev: *const InputEvent,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let ev = match unsafe { ev.as_ref() } {
+            Some(e) => e,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        match c.inner.send_input(ev) {
+            Ok(()) => SlipstreamStatus::Ok,
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Send one Opus mic frame to the host as a QUIC datagram (48 kHz; the host decodes it into a
+/// virtual microphone source its apps can record). Non-blocking enqueue; the host uses `seq`/
+/// `pts_ns` (the caller's own counters) only for diagnostics. `opus_data`/`len` may be empty
+/// (a DTX silence frame). The data is copied; the caller may reuse the buffer after this returns.
+///
+/// # Safety
+/// `c` is a valid connection handle; `opus_data` is valid for `len` bytes (or `len == 0`).
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_send_mic(
+    c: *mut SlipstreamConnection,
+    opus_data: *const u8,
+    len: usize,
+    seq: u32,
+    pts_ns: u64,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if opus_data.is_null() && len != 0 {
+            return SlipstreamStatus::NullPointer;
+        }
+        let opus = if len == 0 {
+            Vec::new()
+        } else {
+            // SAFETY: per the ABI contract - a caller-supplied pointer/length pair describing one
+            // readable region, borrowed only for this call.
+            unsafe { std::slice::from_raw_parts(opus_data, len) }.to_vec()
+        };
+        match c.inner.send_mic(seq, pts_ns, opus) {
+            Ok(()) => SlipstreamStatus::Ok,
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Send one rich input event (DualSense touchpad contact or motion sample) to the host as a QUIC
+/// datagram (non-blocking enqueue). The host applies it to its virtual DualSense pad — a no-op
+/// unless the host runs the DualSense gamepad backend. [`SlipstreamStatus::InvalidArg`] on an
+/// unknown `kind`.
+///
+/// # Safety
+/// `c` is a valid connection handle; `rich` points to a valid [`SlipstreamRichInput`].
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_send_rich_input(
+    c: *mut SlipstreamConnection,
+    rich: *const SlipstreamRichInput,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let rich = match unsafe { rich.as_ref() } {
+            Some(r) => r,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        match rich.to_rich() {
+            Some(r) => match c.inner.send_rich_input(r) {
+                Ok(()) => SlipstreamStatus::Ok,
+                Err(e) => e.status(),
+            },
+            None => SlipstreamStatus::InvalidArg,
+        }
+    })
+}
+
+/// Send a rich client→host input via the forward-compatible [`SlipstreamRichInputEx`] — the only way
+/// a C client can emit a `TouchpadEx` (a second trackpad / signed coords / pressure). Set
+/// `rich->struct_size = sizeof(SlipstreamRichInputEx)`; a smaller (older-layout) value is rejected.
+///
+/// # Safety
+/// `c` is a valid connection handle; `rich` is null or points to at least its declared
+/// `struct_size` bytes.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_send_rich_input2(
+    c: *mut SlipstreamConnection,
+    rich: *const SlipstreamRichInputEx,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if rich.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        // Read only the 4-byte size prefix first to bound the subsequent full read (the
+        // `SlipstreamConfig` ABI-skew precedent).
+        // SAFETY: `addr_of!` forms a raw pointer WITHOUT creating a reference, which is the point:
+        // the caller's struct may be an older, smaller version, so the field is read by offset
+        // rather than through a `&`.
+        let declared = unsafe { std::ptr::addr_of!((*rich).struct_size).read_unaligned() } as usize;
+        if declared < std::mem::size_of::<SlipstreamRichInputEx>() {
+            return SlipstreamStatus::InvalidArg;
+        }
+        // SAFETY: per the ABI contract - the pointer operands in this block are caller-supplied
+        // and are null-checked or handle-validated on this path before they are read.
+        match unsafe { *rich }.to_rich() {
+            Some(r) => match c.inner.send_rich_input(r) {
+                Ok(()) => SlipstreamStatus::Ok,
+                Err(e) => e.status(),
+            },
+            None => SlipstreamStatus::InvalidArg,
+        }
+    })
+}
+
+/// Send one stylus sample batch — `count` (`1..=SLIPSTREAM_PEN_BATCH_MAX`) state-full
+/// [`SlipstreamPenSample`]s, oldest first (a capture callback's coalesced samples) — as one
+/// `0xCC/0x05` pen datagram (non-blocking enqueue; design/pen-tablet-input.md). Split longer
+/// runs into consecutive calls. Gate on `slipstream_connection_host_caps() &
+/// SLIPSTREAM_HOST_CAP_PEN`: toward a host without the bit this returns
+/// [`SlipstreamStatus::Unsupported`] — keep the pen-as-touch fallback there.
+/// [`SlipstreamStatus::InvalidArg`] on a bad count or a bad sample (non-finite coordinate,
+/// unknown state bit / tool).
+///
+/// # Safety
+/// `c` is a valid connection handle; `samples` is null or points to `count` valid
+/// [`SlipstreamPenSample`]s.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_send_pen(
+    c: *mut SlipstreamConnection,
+    samples: *const SlipstreamPenSample,
+    count: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if samples.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        if count == 0 || count > SLIPSTREAM_PEN_BATCH_MAX {
+            return SlipstreamStatus::InvalidArg;
+        }
+        // SAFETY: per the ABI contract - a caller-supplied pointer/length pair describing one
+        // readable region, borrowed only for this call.
+        let raw = unsafe { std::slice::from_raw_parts(samples, count as usize) };
+        let mut batch = [crate::quic::PenSample::default(); crate::quic::PEN_BATCH_MAX];
+        for (slot, s) in batch.iter_mut().zip(raw) {
+            match s.to_sample() {
+                Some(v) => *slot = v,
+                None => return SlipstreamStatus::InvalidArg,
+            }
+        }
+        match c.inner.send_pen(&batch[..count as usize]) {
+            Ok(()) => SlipstreamStatus::Ok,
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// The currently active session mode — the Welcome's, until an accepted
+/// [`slipstream_connection_request_mode`] switches it. Safe any time after connect.
+///
+/// # Safety
+/// `c` is a valid connection handle; out pointers are writable (NULLs are skipped).
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_mode(
+    c: *const SlipstreamConnection,
+    width: *mut u32,
+    height: *mut u32,
+    refresh_hz: *mut u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        let mode = c.inner.mode();
+        // SAFETY: per the ABI contract - each out-param below is OPTIONAL, so it is null-checked
+        // before it is written; a non-null one is a caller-owned writable slot.
+        unsafe {
+            if !width.is_null() {
+                *width = mode.width;
+            }
+            if !height.is_null() {
+                *height = mode.height;
+            }
+            if !refresh_hz.is_null() {
+                *refresh_hz = mode.refresh_hz;
+            }
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// The virtual gamepad backend the host actually resolved for this session (one of the
+/// `SLIPSTREAM_GAMEPAD_*` values; the `Welcome`'s echo of the [`slipstream_connect_ex2`]
+/// preference). `SLIPSTREAM_GAMEPAD_AUTO` = an older host that didn't say — assume X-Box 360,
+/// no HID-output feedback. Safe any time after connect.
+///
+/// # Safety
+/// `c` is a valid connection handle; `gamepad` is writable (NULL is skipped).
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_gamepad(
+    c: *const SlipstreamConnection,
+    gamepad: *mut u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        // SAFETY: per the ABI contract - each out-param below is OPTIONAL, so it is null-checked
+        // before it is written; a non-null one is a caller-owned writable slot.
+        unsafe {
+            if !gamepad.is_null() {
+                *gamepad = c.inner.resolved_gamepad.to_u8() as u32;
+            }
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+// ============================================================================================
+// Shared clipboard (design/clipboard-and-file-transfer.md §5.1). Additive, ABI v6. All poll/serve
+// bytes ride the mTLS-pinned QUIC session; nothing here opens a new listener or port.
+// ============================================================================================
+
+/// [`SlipstreamClipEvent::kind`] — the host announced clipboard content is available
+/// (`transfer_id` = the offer `seq`; `data`/`len` = a `\n`-separated `"<mime>\t<size_hint>"`
+/// format list). Fetch it lazily (only on a local paste) via
+/// [`slipstream_connection_clipboard_fetch`].
+pub const SLIPSTREAM_CLIP_REMOTE_OFFER: u8 = 1;
+/// [`SlipstreamClipEvent::kind`] — host ack / policy / backend update (`enabled`/`policy`/`reason`
+/// valid). Reflect it in the toggle UI.
+pub const SLIPSTREAM_CLIP_STATE: u8 = 2;
+/// [`SlipstreamClipEvent::kind`] — the host is pasting our offered data: answer with
+/// [`slipstream_connection_clipboard_serve`] (`transfer_id` = `req_id`; `seq`/`file_index` valid;
+/// `data`/`len` = the requested MIME).
+pub const SLIPSTREAM_CLIP_FETCH_REQUEST: u8 = 3;
+/// [`SlipstreamClipEvent::kind`] — bytes for a fetch we started (`transfer_id` = `xfer_id`;
+/// `data`/`len` = the payload, borrowed until the next `next_clipboard`; `last` = final chunk).
+pub const SLIPSTREAM_CLIP_DATA: u8 = 4;
+/// [`SlipstreamClipEvent::kind`] — a transfer was cancelled (`transfer_id` = the id).
+pub const SLIPSTREAM_CLIP_CANCELLED: u8 = 5;
+/// [`SlipstreamClipEvent::kind`] — a transfer failed (`transfer_id` = the id; `status` = a
+/// `SlipstreamStatus` code).
+pub const SLIPSTREAM_CLIP_ERROR: u8 = 6;
+
+/// One advertised clipboard format passed to [`slipstream_connection_clipboard_offer`].
+#[cfg(feature = "quic")]
+#[repr(C)]
+pub struct SlipstreamClipKind {
+    /// NUL-terminated UTF-8 wire MIME (e.g. `text/plain;charset=utf-8`). ≤ 128 bytes on the wire.
+    pub mime: *const std::os::raw::c_char,
+    /// Best-effort size in bytes; `0` = unknown.
+    pub size_hint: u64,
+}
+
+/// A shared-clipboard event, filled by [`slipstream_connection_next_clipboard`]. A flat tagged
+/// struct (like `SlipstreamHidOutput`): read the fields named in the `kind`'s doc; the rest are 0.
+#[cfg(feature = "quic")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SlipstreamClipEvent {
+    /// One of `SLIPSTREAM_CLIP_*`.
+    pub kind: u8,
+    /// `State`: 1 = enabled, 0 = disabled.
+    pub enabled: u8,
+    /// `State`: bitfield of `quic::CLIP_POLICY_*` — what the host currently permits.
+    pub policy: u8,
+    /// `State`: one of `quic::CLIP_REASON_*`.
+    pub reason: u8,
+    /// `Data`: 1 = final chunk of this transfer.
+    pub last: u8,
+    /// Per-transfer id: the offer `seq` (RemoteOffer), the `req_id` (FetchRequest), or the
+    /// `xfer_id` (Data/Cancelled/Error).
+    pub transfer_id: u32,
+    /// `FetchRequest`: the offer `seq` the request is against.
+    pub seq: u32,
+    /// `FetchRequest`: file index, or `quic::CLIP_FILE_INDEX_NONE`.
+    pub file_index: u32,
+    /// `Error`: a `SlipstreamStatus` code (negative); 0 otherwise.
+    pub status: i32,
+    /// RemoteOffer/FetchRequest/Data: a pointer into a per-connection slot, valid until the next
+    /// `next_clipboard` call; NULL for the other kinds.
+    pub data: *const u8,
+    /// Byte length of `data` (0 when `data` is NULL).
+    pub len: usize,
+}
+
+/// Fill a [`SlipstreamClipEvent`] from a core event, parking any variable-length bytes in `slot`
+/// (borrow-until-next-call) and pointing `data`/`len` at them.
+#[cfg(feature = "quic")]
+fn build_clip_event(
+    ev: crate::clipboard::ClipEventCore,
+    slot: &mut Option<Vec<u8>>,
+) -> SlipstreamClipEvent {
+    use crate::clipboard::ClipEventCore as E;
+    let mut out = SlipstreamClipEvent {
+        kind: 0,
+        enabled: 0,
+        policy: 0,
+        reason: 0,
+        last: 0,
+        transfer_id: 0,
+        seq: 0,
+        file_index: 0,
+        status: 0,
+        data: std::ptr::null(),
+        len: 0,
+    };
+    *slot = None;
+    match ev {
+        E::RemoteOffer { seq, kinds } => {
+            out.kind = SLIPSTREAM_CLIP_REMOTE_OFFER;
+            out.transfer_id = seq;
+            let mut blob = String::new();
+            for k in &kinds {
+                blob.push_str(&k.mime);
+                blob.push('\t');
+                blob.push_str(&k.size_hint.to_string());
+                blob.push('\n');
+            }
+            *slot = Some(blob.into_bytes());
+        }
+        E::State {
+            enabled,
+            policy,
+            reason,
+        } => {
+            out.kind = SLIPSTREAM_CLIP_STATE;
+            out.enabled = enabled as u8;
+            out.policy = policy;
+            out.reason = reason;
+        }
+        E::FetchRequest {
+            req_id,
+            seq,
+            file_index,
+            mime,
+        } => {
+            out.kind = SLIPSTREAM_CLIP_FETCH_REQUEST;
+            out.transfer_id = req_id;
+            out.seq = seq;
+            out.file_index = file_index;
+            *slot = Some(mime.into_bytes());
+        }
+        E::Data {
+            xfer_id,
+            bytes,
+            last,
+        } => {
+            out.kind = SLIPSTREAM_CLIP_DATA;
+            out.transfer_id = xfer_id;
+            out.last = last as u8;
+            *slot = Some(bytes);
+        }
+        E::Cancelled { id } => {
+            out.kind = SLIPSTREAM_CLIP_CANCELLED;
+            out.transfer_id = id;
+        }
+        E::Error { id, code } => {
+            out.kind = SLIPSTREAM_CLIP_ERROR;
+            out.transfer_id = id;
+            out.status = code;
+        }
+    }
+    if let Some(v) = slot.as_ref() {
+        out.data = v.as_ptr();
+        out.len = v.len();
+    }
+    out
+}
+
+/// The host capability bitfield the session's `Welcome` carried — a bitfield of
+/// `SLIPSTREAM_HOST_CAP_GAMEPAD_STATE` / `SLIPSTREAM_HOST_CAP_CLIPBOARD` /
+/// `SLIPSTREAM_HOST_CAP_PEN`. A client tests `caps & SLIPSTREAM_HOST_CAP_CLIPBOARD` to decide
+/// whether to offer the shared-clipboard toggle, `caps & SLIPSTREAM_HOST_CAP_PEN` before
+/// sending stylus batches. Safe any time after connect.
+///
+/// # Safety
+/// `c` is a valid connection handle; `caps` is writable (NULL is skipped).
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_host_caps(
+    c: *const SlipstreamConnection,
+    caps: *mut u8,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        // SAFETY: per the ABI contract - each out-param below is OPTIONAL, so it is null-checked
+        // before it is written; a non-null one is a caller-owned writable slot.
+        unsafe {
+            if !caps.is_null() {
+                *caps = c.inner.host_caps();
+            }
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Enable or disable the shared clipboard for this session (`design` §3.1). Opt-in: nothing is
+/// announced or served until this is called with `enabled = true`. `flags` carries
+/// `quic::CLIP_FLAG_FILES` (allow file transfer). The host replies with a `State` event.
+///
+/// # Safety
+/// `c` is a valid connection handle.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_clipboard_control(
+    c: *const SlipstreamConnection,
+    enabled: bool,
+    flags: u8,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        match c.inner.clip_control(enabled, flags) {
+            Ok(()) => SlipstreamStatus::Ok,
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Announce that the local clipboard changed — the lazy format-list offer. `seq` is a monotonic
+/// per-sender counter (newest wins); `kinds`/`n` is the advertised formats (≤ 16). The bytes cross
+/// only if the host later fetches.
+///
+/// # Safety
+/// `c` is a valid connection handle; `kinds` points to `n` `SlipstreamClipKind`s (NULL allowed only
+/// when `n == 0`), each `mime` a valid NUL-terminated UTF-8 string.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_clipboard_offer(
+    c: *const SlipstreamConnection,
+    seq: u32,
+    kinds: *const SlipstreamClipKind,
+    n: usize,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if kinds.is_null() && n != 0 {
+            return SlipstreamStatus::NullPointer;
+        }
+        let mut out = Vec::with_capacity(n);
+        if n != 0 {
+            // SAFETY: per the ABI contract - a caller-supplied pointer/length pair describing one
+            // readable region, borrowed only for this call.
+            let slice = unsafe { std::slice::from_raw_parts(kinds, n) };
+            for k in slice {
+                let mime = if k.mime.is_null() {
+                    String::new()
+                } else {
+                    // SAFETY: per the ABI contract - a caller-supplied C string, NUL-terminated or
+                    // null, borrowed only for this call.
+                    match unsafe { std::ffi::CStr::from_ptr(k.mime) }.to_str() {
+                        Ok(s) => s.to_string(),
+                        Err(_) => return SlipstreamStatus::InvalidArg,
+                    }
+                };
+                out.push(crate::quic::ClipKind {
+                    mime,
+                    size_hint: k.size_hint,
+                });
+            }
+        }
+        match c.inner.clip_offer(seq, out) {
+            Ok(()) => SlipstreamStatus::Ok,
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Start pulling one format (`mime`) of the host's current offer `seq` — lazily, on a local paste.
+/// `file_index` selects a file for a file transfer, or `quic::CLIP_FILE_INDEX_NONE` for a non-file
+/// format. Writes the transfer id (echoed on the resulting `Data`/`Error`/`Cancelled` event) to
+/// `xfer_id_out`.
+///
+/// # Safety
+/// `c` is a valid connection handle; `mime` is a valid NUL-terminated UTF-8 string; `xfer_id_out`
+/// is writable (NULL is skipped).
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_clipboard_fetch(
+    c: *const SlipstreamConnection,
+    seq: u32,
+    mime: *const std::os::raw::c_char,
+    file_index: u32,
+    xfer_id_out: *mut u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if mime.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        // SAFETY: per the ABI contract - a caller-supplied C string, NUL-terminated or null,
+        // borrowed only for this call.
+        let mime = match unsafe { std::ffi::CStr::from_ptr(mime) }.to_str() {
+            Ok(s) => s.to_string(),
+            Err(_) => return SlipstreamStatus::InvalidArg,
+        };
+        match c.inner.clip_fetch(seq, mime, file_index) {
+            Ok(xfer_id) => {
+                // SAFETY: per the ABI contract - each out-param below is OPTIONAL, so it is null-
+                // checked before it is written; a non-null one is a caller-owned writable slot.
+                unsafe {
+                    if !xfer_id_out.is_null() {
+                        *xfer_id_out = xfer_id;
+                    }
+                }
+                SlipstreamStatus::Ok
+            }
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Provide bytes answering a `FetchRequest` event (the host is pasting our offered data). Call
+/// repeatedly to stream a large payload; `last = true` completes it. `data` may be NULL only when
+/// `len == 0` (e.g. a final empty chunk). `slipstream_connection_clipboard_cancel(req_id)` aborts.
+///
+/// # Safety
+/// `c` is a valid connection handle; `data` points to `len` bytes (NULL allowed only when
+/// `len == 0`).
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_clipboard_serve(
+    c: *const SlipstreamConnection,
+    req_id: u32,
+    data: *const u8,
+    len: usize,
+    last: bool,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if data.is_null() && len != 0 {
+            return SlipstreamStatus::NullPointer;
+        }
+        let bytes = if len == 0 {
+            Vec::new()
+        } else {
+            // SAFETY: per the ABI contract - a caller-supplied pointer/length pair describing one
+            // readable region, borrowed only for this call.
+            unsafe { std::slice::from_raw_parts(data, len) }.to_vec()
+        };
+        match c.inner.clip_serve(req_id, bytes, last) {
+            Ok(()) => SlipstreamStatus::Ok,
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Cancel a clipboard transfer by id — either an outbound fetch (`xfer_id` from
+/// [`slipstream_connection_clipboard_fetch`]) or an inbound serve (`req_id` from a `FetchRequest`).
+///
+/// # Safety
+/// `c` is a valid connection handle.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_clipboard_cancel(
+    c: *const SlipstreamConnection,
+    id: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        match c.inner.clip_cancel(id) {
+            Ok(()) => SlipstreamStatus::Ok,
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Pull the next shared-clipboard event into `*out`. [`SlipstreamStatus::NoFrame`] on timeout,
+/// [`SlipstreamStatus::Closed`] once the session ended. A native client drains this on its own
+/// thread and drives the OS pasteboard from it. The `data`/`len` pointer (when non-NULL) borrows a
+/// per-connection buffer valid until the next `next_clipboard` call on this handle.
+///
+/// # Safety
+/// `c` is a valid connection handle; `out` is writable for one `SlipstreamClipEvent`.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_next_clipboard(
+    c: *mut SlipstreamConnection,
+    out: *mut SlipstreamClipEvent,
+    timeout_ms: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if out.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        match c
+            .inner
+            .next_clip(std::time::Duration::from_millis(timeout_ms as u64))
+        {
+            Ok(ev) => {
+                let mut slot = c.last_clip.lock().unwrap();
+                let out_ev = build_clip_event(ev, &mut slot);
+                // SAFETY: per the ABI contract - a caller-owned out-param, non-null on this path,
+                // written once by value.
+                unsafe { *out = out_ev };
+                SlipstreamStatus::Ok
+            }
+            Err(e) => {
+                // Release the parked payload once the embedder polls past it: clipboard
+                // traffic is sporadic, so without this a one-off 50 MiB paste stays resident
+                // for the rest of the session (there is no other release entry point). The
+                // borrow contract already says `out` data is valid only until the next call.
+                *c.last_clip.lock().unwrap() = None;
+                e.status()
+            }
+        }
+    })
+}
+
+/// The compositor backend the host actually resolved for this session (one of the
+/// `SLIPSTREAM_COMPOSITOR_*` values; the `Welcome`'s echo of the [`slipstream_connect_ex`]
+/// preference). `SLIPSTREAM_COMPOSITOR_AUTO` = an older host that didn't say. Clients use it for
+/// compositor-specific behavior — e.g. a client-side cursor by default on
+/// `SLIPSTREAM_COMPOSITOR_GAMESCOPE`, whose PipeWire capture carries no cursor. Safe any time after
+/// connect.
+///
+/// # Safety
+/// `c` is a valid connection handle; `compositor` is writable (NULL is skipped).
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_compositor(
+    c: *const SlipstreamConnection,
+    compositor: *mut u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        // SAFETY: per the ABI contract - each out-param below is OPTIONAL, so it is null-checked
+        // before it is written; a non-null one is a caller-owned writable slot.
+        unsafe {
+            if !compositor.is_null() {
+                *compositor = c.inner.resolved_compositor.to_u8() as u32;
+            }
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// The video encoder bitrate (kilobits per second) the host actually configured for this session
+/// — the [`slipstream_connect_ex3`] request clamped to the host's range, or its default when `0`
+/// was requested. `0` = an older host that didn't report it. Safe any time after connect.
+///
+/// # Safety
+/// `c` is a valid connection handle; `bitrate_kbps` is writable (NULL is skipped).
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_bitrate(
+    c: *const SlipstreamConnection,
+    bitrate_kbps: *mut u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        // SAFETY: per the ABI contract - each out-param below is OPTIONAL, so it is null-checked
+        // before it is written; a non-null one is a caller-owned writable slot.
+        unsafe {
+            if !bitrate_kbps.is_null() {
+                *bitrate_kbps = c.inner.resolved_bitrate_kbps;
+            }
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// The host↔client wall-clock offset (nanoseconds, **host minus client**) measured by the
+/// connect-time skew handshake. Add it to a local receive/present timestamp (same realtime clock,
+/// `CLOCK_REALTIME` / `gettimeofday`-epoch nanoseconds) to express that instant in the host's
+/// capture clock — the clock the per-access-unit `pts_ns` is stamped in — so glass-to-glass latency
+/// (e.g. present-time minus `pts_ns`) is valid across machines. `0` = no correction: either an older
+/// host that didn't answer the handshake, or genuinely synchronized clocks. Safe any time after
+/// connect.
+///
+/// # Safety
+/// `c` is a valid connection handle; `offset_ns` is writable (NULL is skipped).
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_clock_offset_ns(
+    c: *const SlipstreamConnection,
+    offset_ns: *mut i64,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        // SAFETY: per the ABI contract - each out-param below is OPTIONAL, so it is null-checked
+        // before it is written; a non-null one is a caller-owned writable slot.
+        unsafe {
+            if !offset_ns.is_null() {
+                *offset_ns = c.inner.clock_offset_ns;
+            }
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// The **live** host↔client wall-clock offset (nanoseconds, host minus client): the
+/// connect-time estimate of [`slipstream_connection_clock_offset_ns`], updated by every applied
+/// mid-stream clock re-sync. Ongoing latency math (per-frame `received − pts` splits, the
+/// glass-to-glass meter) must use this one — after a wall-clock step/slew the frozen
+/// connect-time value reads tens of milliseconds wrong for the rest of the session, while the
+/// core itself has already re-synced. Same clock contract as the connect-time getter.
+///
+/// # Safety
+/// `c` is a valid connection handle; `offset_ns` is writable (NULL is skipped).
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_clock_offset_now_ns(
+    c: *const SlipstreamConnection,
+    offset_ns: *mut i64,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        // SAFETY: per the ABI contract - each out-param below is OPTIONAL, so it is null-checked
+        // before it is written; a non-null one is a caller-owned writable slot.
+        unsafe {
+            if !offset_ns.is_null() {
+                *offset_ns = c.inner.clock_offset_now_ns();
+            }
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Ask the host to switch the live session to `width`x`height`@`refresh_hz` without
+/// reconnecting (window resized, refresh changed). Non-blocking enqueue: on acceptance the
+/// stream continues at the new mode — the first new-mode access unit is an IDR with
+/// in-band parameter sets (rebuild the decoder from it) — and
+/// [`slipstream_connection_mode`] reflects the switch. A rejected request leaves the
+/// session unchanged.
+///
+/// # Safety
+/// `c` is a valid connection handle.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_request_mode(
+    c: *const SlipstreamConnection,
+    width: u32,
+    height: u32,
+    refresh_hz: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        match c.inner.request_mode(crate::config::Mode {
+            width,
+            height,
+            refresh_hz,
+        }) {
+            Ok(()) => SlipstreamStatus::Ok,
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Ask the host's encoder to emit a fresh IDR keyframe now — client recovery when the
+/// decoder has stalled (the infinite-GOP stream sends one opening IDR then P-frames only, so
+/// a wedged decoder would otherwise freeze until the next loss-triggered recovery keyframe).
+/// Non-blocking, fire-and-forget; the recovered keyframe is the only ack. The caller should
+/// THROTTLE — the decode stays wedged for several frames until the IDR lands, so requesting
+/// every frame would flood the control stream.
+///
+/// # Safety
+/// `c` is a valid connection handle.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_request_keyframe(
+    c: *const SlipstreamConnection,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        match c.inner.request_keyframe() {
+            Ok(()) => SlipstreamStatus::Ok,
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Ask the host to recover from loss by **reference-frame invalidation** rather than a full IDR:
+/// report the range `[first_frame, last_frame]` of access units the client can no longer trust
+/// (the first missing `frame_index` through the newest received). An RFI-capable host (AMD LTR /
+/// NVENC) re-references a known-good picture before `first_frame` and emits a clean P-frame tagged
+/// `USER_FLAG_RECOVERY_ANCHOR` — no 20-40x IDR spike; a host that can't RFI forces an IDR instead
+/// (same effect as [`slipstream_connection_request_keyframe`]). Non-blocking, fire-and-forget; the
+/// recovered frame is the only ack, so THROTTLE it exactly like the keyframe request. Prefer this
+/// over the keyframe request on loss so AMD/RFI hosts avoid the spike; keep the keyframe request as
+/// the backstop for when the recovery frame itself is lost.
+///
+/// # Safety
+/// `c` is a valid connection handle.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_request_rfi(
+    c: *const SlipstreamConnection,
+    first_frame: u32,
+    last_frame: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        match c.inner.request_rfi(first_frame, last_frame) {
+            Ok(()) => SlipstreamStatus::Ok,
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Feed each received frame's `frame_index` (the [`SlipstreamFrame::frame_index`] field, in receive
+/// order) so the client recovers from loss with a cheap reference-frame invalidation instead of a
+/// full IDR. On a forward gap (a `frame_index` jump = the intervening frames were lost and the
+/// following AUs reference a picture that never arrived) this fires a THROTTLED
+/// [`slipstream_connection_request_rfi`] for the lost range; an RFI-capable host (AMD LTR / NVENC)
+/// then recovers with a clean P-frame instead of a 20-40x IDR spike. Call it for every received
+/// frame — it is cheap and idempotent, and the [`slipstream_connection_frames_dropped`]-driven
+/// keyframe request stays the backstop. Writes whether a forward gap was detected this call to
+/// `gap_out` (nullable — a client with a post-loss display freeze can use it to re-arm; most
+/// clients pass NULL and ignore it).
+///
+/// # Safety
+/// `c` is a valid connection handle; `gap_out` is writable or NULL.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_note_frame_index(
+    c: *const SlipstreamConnection,
+    frame_index: u32,
+    gap_out: *mut bool,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        let gap = c.inner.note_frame_index(frame_index);
+        if !gap_out.is_null() {
+            // SAFETY: per the ABI contract - a caller-owned out-param, non-null on this path,
+            // written once by value.
+            unsafe { *gap_out = gap };
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Cumulative access units the host→client reassembler dropped as unrecoverable (FEC couldn't
+/// rebuild them). A video loop polls this and calls [`slipstream_connection_request_keyframe`]
+/// when it climbs — the correct loss trigger under the host's infinite GOP, where unrecoverable
+/// loss yields reference-missing delta frames the decoder *silently conceals* (frozen / garbage
+/// picture, no decode error), so a decode-error trigger rarely fires. Monotonic for the session;
+/// compare against the last observed value. Writes 0 to `out` on a NULL connection.
+///
+/// # Safety
+/// `c` is a valid connection handle; `out` is writable (NULL is skipped).
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_frames_dropped(
+    c: *const SlipstreamConnection,
+    out: *mut u64,
+) -> SlipstreamStatus {
+    guard(|| {
+        // The header promises "writes 0 on a NULL connection" — honor it BEFORE the handle
+        // check, so an embedder that skips the status never reads an uninitialized slot.
+        if !out.is_null() {
+            // SAFETY: per the ABI contract - a caller-owned out-param, non-null on this path,
+            // written once by value.
+            unsafe { *out = 0 };
+        }
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        // SAFETY: per the ABI contract - each out-param below is OPTIONAL, so it is null-checked
+        // before it is written; a non-null one is a caller-owned writable slot.
+        unsafe {
+            if !out.is_null() {
+                *out = c.inner.frames_dropped();
+            }
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Report one decoded frame's decode-stage latency, in microseconds: the wall-clock elapsed from
+/// the access unit leaving [`slipstream_connection_next_au`] to its decoded output becoming
+/// available (VideoToolbox/D3D11VA/… produced the frame). This feeds the "Automatic" bitrate
+/// controller's decode signal — the only one that sees the client's own decoder, so the rate is
+/// capped at the real decode limit instead of climbing to the network link ceiling and choking a
+/// slower hardware decoder (a fast LAN feeding a mobile-class decoder). Measure from the AU pull,
+/// NOT from the decoder-submit call, so decoder-input backpressure (the backlog) is included;
+/// exclude the presenter's vsync wait so a paced/capped frame rate doesn't read as decode latency.
+/// Cheap — the client may call it every frame; the controller ignores it unless armed (query
+/// [`slipstream_connection_wants_decode_latency`] once to skip the measurement entirely when it's not).
+///
+/// # Safety
+/// `c` is a valid connection handle.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_report_decode_us(
+    c: *const SlipstreamConnection,
+    us: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        c.inner.report_decode_us(us);
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Report this client's display-latch grid so the host can phase-lock its capture tick
+/// (design/phase-locked-capture.md). `next_latch_host_ns` must already be host clock — convert
+/// with the connection's clock offset (`T_host = T_client + offset`). Fire-and-forget; call ~1 Hz
+/// from a vsync-aware presenter. No-op toward a host that never negotiated the capability.
+///
+/// # Safety
+/// `c` is an opaque handle from a `*_new`/`*_pair` the caller has not yet freed, or null (an
+/// error, not UB).
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_report_phase(
+    c: *const SlipstreamConnection,
+    next_latch_host_ns: u64,
+    latch_period_ns: u32,
+    uncertainty_ns: u32,
+    arrival_lead_ns: u32,
+    coherence_milli: u16,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_ref` reports as `None` and the `match` handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        c.inner.report_phase(
+            next_latch_host_ns,
+            latch_period_ns,
+            uncertainty_ns,
+            arrival_lead_ns,
+            coherence_milli,
+        );
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Whether [`slipstream_connection_report_decode_us`] is worth calling this session: writes 1 to
+/// `out` only when the adaptive-bitrate controller is armed (Automatic bitrate, non-PyroWave), so a
+/// client can skip the per-frame decode-latency measurement entirely for explicit-bitrate and
+/// PyroWave sessions (where the signal is ignored). Constant for the session — query once. Writes 0
+/// on a NULL connection.
+///
+/// # Safety
+/// `c` is a valid connection handle; `out` is writable (NULL is skipped).
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_wants_decode_latency(
+    c: *const SlipstreamConnection,
+    out: *mut bool,
+) -> SlipstreamStatus {
+    guard(|| {
+        // The header promises "writes 0 on a NULL connection" — honor it BEFORE the handle
+        // check: an uninitialized byte is not even a valid C++/Swift bool to read.
+        if !out.is_null() {
+            // SAFETY: per the ABI contract - a caller-owned out-param, non-null on this path,
+            // written once by value.
+            unsafe { *out = false };
+        }
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        // SAFETY: per the ABI contract - each out-param below is OPTIONAL, so it is null-checked
+        // before it is written; a non-null one is a caller-owned writable slot.
+        unsafe {
+            if !out.is_null() {
+                *out = c.inner.wants_decode_latency();
+            }
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// A speed-test measurement, filled by [`slipstream_connection_probe_result`]. `done` is 0 until
+/// the host's end-of-burst report lands, then 1 (the numbers are final). `throughput_kbps` is the
+/// delivered wire throughput to drive a bitrate choice from; `loss_pct` is the link loss and
+/// `host_drop_pct` the host-side send-buffer drop (raise `net.core.wmem_max`) — they're measured
+/// separately so a host that can't keep up reads differently from a lossy link.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SlipstreamProbeResult {
+    /// 1 once the host's end-of-burst report arrived (measurement final); else 0 (partial).
+    pub done: u8,
+    /// Delivered wire bytes (header + shard) / packets the client received during the burst.
+    pub recv_bytes: u64,
+    pub recv_packets: u32,
+    /// Application goodput bytes / access units the host offered.
+    pub host_bytes: u64,
+    pub host_packets: u32,
+    /// The host's measured burst duration, milliseconds (the throughput denominator).
+    pub elapsed_ms: u32,
+    /// Delivered wire throughput = `recv_bytes * 8 / elapsed_ms` (kilobits/second).
+    pub throughput_kbps: u32,
+    /// Link loss `(wire_packets_sent − recv_packets) / wire_packets_sent` as a percentage.
+    pub loss_pct: f32,
+    /// Host-side send-buffer drop `send_dropped / (wire_packets_sent + send_dropped)`, percent.
+    pub host_drop_pct: f32,
+    /// Wire packets the host put on the link, and the ones its send buffer dropped (raw counts).
+    pub wire_packets_sent: u32,
+    pub send_dropped: u32,
+}
+
+/// Start a bandwidth speed test: ask the host to burst filler over the data plane at
+/// `target_kbps` of goodput for `duration_ms` (each clamped host-side to ≤ 3 Gbps / ≤ 5 s),
+/// *briefly pausing video*. Non-blocking — poll [`slipstream_connection_probe_result`] until its
+/// `done` field is 1. Starting a probe resets any prior measurement.
+///
+/// # Safety
+/// `c` is a valid connection handle.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_speed_test(
+    c: *const SlipstreamConnection,
+    target_kbps: u32,
+    duration_ms: u32,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        match c.inner.request_probe(target_kbps, duration_ms) {
+            Ok(()) => SlipstreamStatus::Ok,
+            Err(e) => e.status(),
+        }
+    })
+}
+
+/// Read the current speed-test measurement into `*out` (partial until `out->done == 1`). Safe to
+/// poll repeatedly after [`slipstream_connection_speed_test`]; before any probe it reports zeros.
+///
+/// # Safety
+/// `c` is a valid connection handle; `out` is writable for one `SlipstreamProbeResult` (NULL is an
+/// error).
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_probe_result(
+    c: *const SlipstreamConnection,
+    out: *mut SlipstreamProbeResult,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let c = match unsafe { c.as_ref() } {
+            Some(c) => c,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if out.is_null() {
+            return SlipstreamStatus::NullPointer;
+        }
+        let o = c.inner.probe_result();
+        // SAFETY: per the ABI contract - `out` is a caller-owned writable slot of the matching
+        // `#[repr(C)]` type, written once by value.
+        unsafe {
+            *out = SlipstreamProbeResult {
+                done: o.done as u8,
+                recv_bytes: o.recv_bytes,
+                recv_packets: o.recv_packets,
+                host_bytes: o.host_bytes,
+                host_packets: o.host_packets,
+                elapsed_ms: o.elapsed_ms,
+                throughput_kbps: o.throughput_kbps,
+                loss_pct: o.loss_pct,
+                host_drop_pct: o.host_drop_pct,
+                wire_packets_sent: o.wire_packets_sent,
+                send_dropped: o.send_dropped,
+            };
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Signal a **deliberate quit** (a user "stop", not a network drop) before closing: the connection
+/// closes with [`QUIT_CLOSE_CODE`] instead of code 0, so the host tears the session down immediately
+/// (skips the keep-alive linger) rather than holding it for a reconnect. Call this right before
+/// [`slipstream_connection_close`] on a user-initiated disconnect; a plain close (network drop,
+/// backgrounding) leaves the linger intact. NULL is a no-op.
+///
+/// # Safety
+/// `c` was returned by [`slipstream_connect`] and remains valid (closed via `slipstream_connection_close`).
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_disconnect_quit(c: *mut SlipstreamConnection) {
+    guard_void(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller has
+        // not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match` here
+        // handles.
+        if let Some(c) = unsafe { c.as_ref() } {
+            c.inner.disconnect_quit();
+        }
+    });
+}
+
+/// Close the connection and free the handle (joins the internal threads). NULL is a no-op.
+///
+/// # Safety
+/// `c` was returned by [`slipstream_connect`] and is not used after this call.
+#[cfg(feature = "quic")]
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_connection_close(c: *mut SlipstreamConnection) {
+    guard_void(|| {
+        if !c.is_null() {
+            // SAFETY: per the ABI contract - the pointer operands in this block are caller-supplied
+            // and are null-checked or handle-validated on this path before they are read.
+            drop(unsafe { Box::from_raw(c) });
+        }
+    });
+}
+
+// ---- Post-loss re-anchor freeze gate ----
+//
+// The shared [`ReanchorGate`](crate::reanchor::ReanchorGate) exposed for the Swift client (Rust
+// embedders — Android/Windows/Linux — use the struct directly). After an unrecoverable reference
+// loss the decoder silently conceals the missing-reference deltas (gray/garbage picture, no error);
+// the client freezes on the last good frame and lifts only on a proven clean re-anchor. The gate
+// takes time internally (`Instant::now`) so no timestamps cross the boundary. Drive it per session:
+// `arm` on a loss (frame-index gap from `slipstream_connection_note_frame_index`, a decoder
+// wedge/demotion), `on_decoded` per decoded frame to gate presentation, `on_no_output` per AU that
+// produced nothing, and `poll` each iteration for the dropped-count climb + overdue backstop. Route
+// the returned keyframe intents through the client's existing request throttle.
+
+/// Create a re-anchor gate seeded with the session's current `frames_dropped` (so the first
+/// [`slipstream_reanchor_gate_poll`] doesn't read the baseline as a loss). Free with
+/// [`slipstream_reanchor_gate_free`]. Never returns NULL.
+#[no_mangle]
+pub extern "C" fn slipstream_reanchor_gate_new(frames_dropped: u64) -> *mut ReanchorGate {
+    Box::into_raw(Box::new(ReanchorGate::new(frames_dropped)))
+}
+
+/// Free a gate created by [`slipstream_reanchor_gate_new`]. NULL is a no-op.
+///
+/// # Safety
+/// `g` was returned by [`slipstream_reanchor_gate_new`] and is not used after this call.
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_reanchor_gate_free(g: *mut ReanchorGate) {
+    guard_void(|| {
+        if !g.is_null() {
+            // SAFETY: per the ABI contract - the pointer operands in this block are caller-supplied
+            // and are null-checked or handle-validated on this path before they are read.
+            drop(unsafe { Box::from_raw(g) });
+        }
+    });
+}
+
+/// Arm the freeze: a loss was detected (a frame-index gap, or a decoder wedge/demotion). Zeroes the
+/// recovery-mark count and (re-)sets the backstop deadline. NULL is a no-op.
+///
+/// # Safety
+/// `g` is a valid gate handle.
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_reanchor_gate_arm(g: *mut ReanchorGate) {
+    guard_void(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller has
+        // not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match` here
+        // handles.
+        if let Some(g) = unsafe { g.as_mut() } {
+            g.arm(std::time::Instant::now());
+        }
+    });
+}
+
+/// Fold one decoded frame and write to `out_present` whether to display it (`true`) or withhold it as
+/// a post-loss concealment (`false`). `flags` is the AU's `user_flags` word ([`SlipstreamFrame::flags`]):
+/// the gate reads `FLAG_SOF` (the host's IDR marker), `USER_FLAG_RECOVERY_ANCHOR` and
+/// `USER_FLAG_RECOVERY_POINT`. Pass `decoder_keyframe = false` where the platform decoder doesn't flag
+/// IDRs (VideoToolbox/MediaCodec) — the wire `FLAG_SOF` covers it.
+///
+/// # Safety
+/// `g` is a valid gate handle; `out_present` is writable or NULL.
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_reanchor_gate_on_decoded(
+    g: *mut ReanchorGate,
+    flags: u32,
+    decoder_keyframe: bool,
+    out_present: *mut bool,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let g = match unsafe { g.as_mut() } {
+            Some(g) => g,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        let present = g.on_decoded(flags, decoder_keyframe, std::time::Instant::now())
+            == GateVerdict::Present;
+        if !out_present.is_null() {
+            // SAFETY: per the ABI contract - a caller-owned out-param, non-null on this path,
+            // written once by value.
+            unsafe { *out_present = present };
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// A received AU produced no decoded frame. Writes to `out_request_kf` whether the no-output streak has
+/// tripped and the client should (throttled) request a keyframe — the gate arms the freeze at the same
+/// time.
+///
+/// # Safety
+/// `g` is a valid gate handle; `out_request_kf` is writable or NULL.
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_reanchor_gate_on_no_output(
+    g: *mut ReanchorGate,
+    out_request_kf: *mut bool,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let g = match unsafe { g.as_mut() } {
+            Some(g) => g,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        let request = g.on_no_output(std::time::Instant::now());
+        if !out_request_kf.is_null() {
+            // SAFETY: per the ABI contract - a caller-owned out-param, non-null on this path,
+            // written once by value.
+            unsafe { *out_request_kf = request };
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Periodic fold of the session's `frames_dropped` counter plus the overdue backstop. Writes to
+/// `out_request_kf` whether the client should (throttled) request a keyframe (a drop-count climb armed
+/// a fresh freeze, or the freeze is overdue and re-asks while it keeps holding).
+///
+/// # Safety
+/// `g` is a valid gate handle; `out_request_kf` is writable or NULL.
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_reanchor_gate_poll(
+    g: *mut ReanchorGate,
+    frames_dropped: u64,
+    out_request_kf: *mut bool,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let g = match unsafe { g.as_mut() } {
+            Some(g) => g,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        let request = g.poll(frames_dropped, std::time::Instant::now());
+        if !out_request_kf.is_null() {
+            // SAFETY: per the ABI contract - a caller-owned out-param, non-null on this path,
+            // written once by value.
+            unsafe { *out_request_kf = request };
+        }
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Whether the gate is currently withholding concealed frames (frozen on the last good picture).
+/// Writes `false` on a NULL gate.
+///
+/// # Safety
+/// `g` is a valid gate handle; `out_holding` is writable or NULL.
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_reanchor_gate_is_holding(
+    g: *const ReanchorGate,
+    out_holding: *mut bool,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let holding = unsafe { g.as_ref() }.is_some_and(ReanchorGate::is_holding);
+        if !out_holding.is_null() {
+            // SAFETY: per the ABI contract - a caller-owned out-param, non-null on this path,
+            // written once by value.
+            unsafe { *out_holding = holding };
+        }
+        SlipstreamStatus::Ok
+    })
+}

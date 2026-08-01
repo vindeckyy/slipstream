@@ -1,0 +1,131 @@
+//! # slipstream-core
+//!
+//! The shared protocol / transport / FEC core for the slipstream low-latency streaming
+//! stack. It is compiled exactly once and linked by every host and client — directly
+//! as a Rust `lib`, or across the [C ABI](crate::abi) by Swift / Kotlin / C clients.
+//!
+//! Everything platform-specific (capture, encode, decode, present, input injection)
+//! lives *outside* this crate. What lives *here*:
+//!
+//! - [`fec`] — erasure coding. GF(2⁸) for GameStream/Moonlight compatibility (P1) and
+//!   GF(2¹⁶) Leopard-RS (P2) which removes the ~1 Gbps per-frame shard-count ceiling.
+//! - [`packet`] — `#[repr(C)]` zero-copy wire framing: splitting an access unit into
+//!   FEC blocks of MTU-sized shards and reassembling them on the far side.
+//! - [`crypto`] — AES-128-GCM session sealing, matching GameStream in P1.
+//! - [`session`] — the host (submit frame → FEC → packetize → seal → send) and client
+//!   (recv → open → reorder → FEC recover → reassemble) state machines.
+//! - [`transport`] — pluggable packet I/O (in-process loopback for tests; UDP for real).
+//! - [`abi`] — the `extern "C"` surface and `cbindgen`-generated `slipstream_core.h`.
+//! - [`config`] / [`error`] / [`stats`] — session configuration, the shared error/status
+//!   vocabulary, and the counters snapshot.
+//! - [`input`] — the wire input-event vocabulary (keyboard/mouse/touch, gamepad snapshots).
+//! - [`reject`] — typed application-close rejection codes · [`reanchor`] — the post-loss
+//!   freeze-until-reanchor client gate · [`render_scale`] — the shared render-scale setting ·
+//!   [`audio`] — Opus PCM decode for C-ABI embedders · [`wol`] — Wake-on-LAN.
+//! - `quic` (feature `quic`) — the slipstream/1 control plane: handshake, typed control
+//!   messages, pairing (SPAKE2), the datagram plane codecs, and clock sync. With it come
+//!   `client` (the embeddable NativeClient worker), `abr` (the adaptive-bitrate
+//!   controller), and `clipboard` (the shared-clipboard transport task). `tls`
+//!   (feature `tls`) — the pinned-fingerprint certificate verifier.
+//!
+//! ## Threading contract
+//!
+//! Nothing in the per-frame path touches an async runtime. `tokio`/`quinn` are gated
+//! behind the off-by-default `quic` feature and used only for the control plane.
+
+// Unsafe-proof program: every `unsafe {}` / `unsafe impl` in this crate carries a `// SAFETY:`
+// proof. The bulk lives in `abi.rs`, whose sites are instances of the ABI contract stated once at
+// the top of that file rather than 141 independent arguments.
+#![deny(clippy::undocumented_unsafe_blocks)]
+#![forbid(unsafe_op_in_unsafe_fn)]
+
+pub mod abi;
+#[cfg(feature = "quic")]
+mod abr;
+pub mod audio;
+#[cfg(feature = "quic")]
+pub mod client;
+/// Client-side shared-clipboard transport: the per-session task that runs the fetch-stream accept
+/// loop, drives outbound fetches, and serves inbound ones — surfaced to the embedder as poll
+/// events. Wire codecs live in [`quic`]; the OS pasteboard integration lives in the native client.
+#[cfg(feature = "quic")]
+pub mod clipboard;
+pub mod config;
+pub mod crypto;
+pub mod error;
+pub mod fec;
+pub mod input;
+pub mod packet;
+pub mod phase;
+#[cfg(feature = "quic")]
+pub mod quic;
+pub mod reanchor;
+pub mod reject;
+pub mod render_scale;
+pub mod session;
+pub mod stats;
+#[cfg(feature = "tls")]
+pub mod tls;
+pub mod transport;
+pub mod wol;
+
+pub use config::{CompositorPref, Config, FecConfig, FecScheme, Mode, ProtocolPhase, Role};
+pub use error::{SlipstreamError, SlipstreamStatus, Result};
+pub use session::{Frame, Session};
+pub use stats::Stats;
+
+/// Bump on any breaking change to the [C ABI](crate::abi). Mirrors
+/// `slipstream_abi_version()` and is checked by clients before use.
+///
+/// v2: `slipstream_connect` gained `client_cert_pem`/`client_key_pem` (pairing identities);
+/// added `slipstream_pair` / `slipstream_generate_identity` / `slipstream_connection_request_mode`.
+/// v3: added `slipstream_wake_on_lan` (Wake-on-LAN magic packet; the host's wake MAC(s) reach
+/// clients out-of-band via the mDNS `mac` TXT record, so no connection is required to wake).
+/// v4: added `slipstream_probe` (bounded, trust-agnostic, mDNS-independent reachability handshake —
+/// the display-side companion to dial-first, so saved-host "online" pips reflect real reachability).
+/// v5: added `slipstream_connection_next_rumble2` (rumble pull that also yields the self-terminating
+/// TTL of a v2 envelope; `slipstream_connection_next_rumble` is unchanged and drops it). Additive —
+/// the wire is backward-compatible (the envelope is a length-tolerant tail on 0xCA), so
+/// [`WIRE_VERSION`] is unchanged.
+/// v6: added the `slipstream_reanchor_gate_*` surface (post-loss freeze-until-reanchor gate for the
+/// Swift client; Rust embedders use [`reanchor::ReanchorGate`] directly). Additive, client-local —
+/// no wire change, so [`WIRE_VERSION`] is unchanged.
+/// v7: added `slipstream_connect_ex8` (`status_out` — typed connect-failure reporting, including
+/// the host-rejection block `SLIPSTREAM_STATUS_REJECTED_*` decoded from the host's QUIC
+/// application close) and the `SlipstreamStatus` −20 block itself. Additive — the close codes are
+/// new application-close vocabulary an old peer simply never sends/reads, so [`WIRE_VERSION`] is
+/// unchanged.
+/// v8: added the shared-clipboard client surface — `slipstream_connection_host_caps` and
+/// `slipstream_connection_clipboard_{control,offer,fetch,serve,cancel}` +
+/// `slipstream_connection_next_clipboard`. Additive; the wire grows only backward-compatible control
+/// messages (0x40-0x44) and a new `Welcome::host_caps` bit, so [`WIRE_VERSION`] is unchanged.
+/// v9: `SlipstreamFrame` grew `received_ns` — the reassembly-completion receipt stamp, so
+/// embedders stop stamping receipt at the hand-off pull (which folds the pre-decode queue wait
+/// into apparent network latency). Struct-size change on the frame poll surface = a hard ABI
+/// break for embedders reading `SlipstreamFrame`; nothing on the wire moved, so [`WIRE_VERSION`]
+/// is unchanged.
+/// v10: added `slipstream_connection_clock_offset_now_ns` — the LIVE (mid-stream re-synced)
+/// clock offset ongoing latency math must use; the connect-time getter stays frozen by
+/// contract. Additive, client-local — no wire change, so [`WIRE_VERSION`] is unchanged.
+/// v12: added `slipstream_connection_set_cursor_render` — the mid-stream cursor-render flip
+/// (design/remote-desktop-sweep.md §8): the client's mouse-model chord tells the host who
+/// renders the pointer. Additive; rides the existing control stream (a new message TYPE, which
+/// pre-§8 hosts ignore), so [`WIRE_VERSION`] is unchanged.
+/// v13: added `slipstream_connection_send_pen` — the stylus wire plane
+/// (design/pen-tablet-input.md): a client sends `RICH_PEN` sample batches once the host
+/// advertises `HOST_CAP_PEN`. Additive and capability-gated, so [`WIRE_VERSION`] is unchanged.
+/// v14: added `slipstream_connection_report_phase` + the `SLIPSTREAM_CLIENT_CAP_PHASE_LOCK` mirror
+/// — the phase-locked capture reporter (design/phase-locked-capture.md): a client that advertises
+/// the cap reports its next display latch (already converted to host clock), the panel period, an
+/// uncertainty and the circular arrival-lead statistic the host's controller steers on. Additive;
+/// the wire grows only a new control message (`PhaseReport`, 0x32) an old host never reads and a
+/// strict-prefix append on the 0xCF host-timing tail, so [`WIRE_VERSION`] is unchanged.
+pub const ABI_VERSION: u32 = 14;
+
+/// The slipstream/1 **wire** version — what `Hello`/`Welcome` carry and hosts equality-check.
+/// Deliberately its own constant: [`ABI_VERSION`] tracks the embeddable **C surface**
+/// (functions a client links), which can grow without changing a single wire byte — v3's
+/// `slipstream_wake_on_lan` is client-local, and riding the C-ABI bump onto the wire locked
+/// every new client out of every deployed host ("ABI mismatch: client 3 host 2", observed
+/// live). Bump this ONLY when the handshake/planes actually change incompatibly.
+pub const WIRE_VERSION: u32 = 2;

@@ -305,7 +305,7 @@ impl AudioPlayback {
         let shutdown = Arc::new(AtomicBool::new(false));
         let sd = shutdown.clone();
         let join = std::thread::Builder::new()
-            .name("pf-audio".into())
+            .name("ss-audio".into())
             .spawn(move || decode_loop(client, tx, free_rx, sd, counters, channels))
             .ok();
 

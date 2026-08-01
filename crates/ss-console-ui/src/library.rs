@@ -1,0 +1,491 @@
+//! The console library's model and math — everything about the coverflow that isn't
+//! Skia: the shared binary↔overlay state (games, phase, incoming art bytes), the
+//! spring-driven motion and cursor arithmetic (ported verbatim from the GTK launcher,
+//! tests included), and the geometry constants. Rendering lives in `skia_overlay`.
+
+use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
+
+// --- Geometry (the GTK launcher's constants — Apple coverflow parity) --------------------
+
+/// Poster geometry: 2:3 covers, sized so the focused poster + detail panel + hint bar
+/// fit a Deck's 1280×800 with air. Scaled uniformly for other window sizes.
+pub const POSTER_W: f64 = 220.0;
+pub const POSTER_H: f64 = 330.0;
+/// Center of the focused card to the center of its first neighbor.
+pub const FOCUS_GAP: f64 = 230.0;
+/// Center-to-center distance between successive SIDE cards — much tighter than their
+/// projected width, so the side stacks overlap like the classic coverflow shelf.
+pub const SIDE_SPACING: f64 = 104.0;
+/// Cards farther than this from the eased position aren't drawn at all.
+pub const VISIBLE_RANGE: f64 = 5.5;
+/// Neighbors recede to this scale…
+pub const RECEDE_SCALE: f64 = 0.24;
+/// …and swing this many degrees about their own vertical axis under perspective, side
+/// cards facing the corridor (their inner edge recedes behind the focus).
+pub const ROTATE_DEG: f64 = 38.0;
+/// Perspective depth for the tilt, px (CSS `perspective()` semantics).
+pub const PERSPECTIVE: f64 = 800.0;
+/// The darkening veil's max opacity (side cards stay opaque — they overlap).
+pub const RECEDE_DIM: f64 = 0.30;
+/// Boundary recoil: a refused move deflects the strip this many px against the push.
+pub const BUMP_PX: f64 = 16.0;
+/// L1/R1 jump distance.
+pub const JUMP: i32 = 5;
+
+// The motion is spring-driven (semi-implicit Euler), not eased — velocity carries across
+// retargets, so holding a direction glides and a release settles like a detent.
+/// Cursor chase: ζ ≈ 0.85 — settles in ~0.3 s with a whisker of overshoot.
+pub const SPRING_K: f64 = 200.0;
+pub const SPRING_C: f64 = 24.0;
+/// Boundary recoil: stiffer and more underdamped (ζ ≈ 0.55) — one visible wobble.
+pub const BUMP_K: f64 = 600.0;
+pub const BUMP_C: f64 = 27.0;
+
+/// One semi-implicit-Euler step of a damped spring toward `target`.
+fn spring_step(pos: f64, vel: f64, target: f64, k: f64, c: f64, dt: f64) -> (f64, f64) {
+    let vel = vel + (k * (target - pos) - c * vel) * dt;
+    (pos + vel * dt, vel)
+}
+
+/// Advance a damped spring by a whole frame, integrating in ≤ 8 ms substeps — a stalled
+/// frame stays far inside the integrator's stability bound, so the motion feels
+/// identical at any frame rate.
+pub fn spring_advance(
+    mut pos: f64,
+    mut vel: f64,
+    target: f64,
+    k: f64,
+    c: f64,
+    dt: f64,
+) -> (f64, f64) {
+    let n = (dt / 0.008).ceil().max(1.0) as usize;
+    let h = dt / n as f64;
+    for _ in 0..n {
+        (pos, vel) = spring_step(pos, vel, target, k, c, h);
+    }
+    (pos, vel)
+}
+
+/// Pure cursor arithmetic for a move/jump: `clamp` lands jumps on the ends, a plain
+/// step refuses to leave them.
+#[derive(Debug, PartialEq, Eq)]
+pub enum StepResult {
+    Moved(i32),
+    Boundary,
+}
+
+pub fn step_cursor(cursor: i32, len: usize, delta: i32, clamp: bool) -> StepResult {
+    if len == 0 {
+        return StepResult::Boundary;
+    }
+    let max = len as i32 - 1;
+    let target = if clamp {
+        (cursor + delta).clamp(0, max)
+    } else {
+        cursor + delta
+    };
+    if target == cursor || target < 0 || target > max {
+        StepResult::Boundary
+    } else {
+        StepResult::Moved(target)
+    }
+}
+
+// --- 4×4 matrix (row-major) — the coverflow card transform ------------------------------
+
+/// `T(cx,cy) · P(depth) · Ry(angle) · S(s) · T(-w/2,-h/2)`: card-local (0..w, 0..h) →
+/// screen, rotated about the card's own vertical center axis under perspective — the
+/// GSK transform chain from the GTK launcher, as one row-major matrix for
+/// `Canvas::concat_44`.
+#[allow(clippy::too_many_arguments)]
+pub fn card_matrix(
+    cx: f64,
+    cy: f64,
+    angle_deg: f64,
+    scale: f64,
+    w: f64,
+    h: f64,
+    depth: f64,
+) -> [f32; 16] {
+    let t1 = translate(cx, cy);
+    let p = perspective(depth);
+    let r = rotate_y(angle_deg.to_radians());
+    let s = scale_xy(scale);
+    let t2 = translate(-w / 2.0, -h / 2.0);
+    let m = mat_mul(&mat_mul(&mat_mul(&mat_mul(&t1, &p), &r), &s), &t2);
+    core::array::from_fn(|i| m[i] as f32)
+}
+
+fn translate(x: f64, y: f64) -> [f64; 16] {
+    let mut m = identity();
+    m[3] = x;
+    m[7] = y;
+    m
+}
+
+fn perspective(d: f64) -> [f64; 16] {
+    let mut m = identity();
+    m[14] = -1.0 / d; // row 3, col 2 — w' = 1 − z/d (CSS convention)
+    m
+}
+
+fn rotate_y(rad: f64) -> [f64; 16] {
+    let (s, c) = rad.sin_cos();
+    let mut m = identity();
+    m[0] = c;
+    m[2] = s;
+    m[8] = -s;
+    m[10] = c;
+    m
+}
+
+fn scale_xy(s: f64) -> [f64; 16] {
+    let mut m = identity();
+    m[0] = s;
+    m[5] = s;
+    m
+}
+
+fn identity() -> [f64; 16] {
+    let mut m = [0.0; 16];
+    m[0] = 1.0;
+    m[5] = 1.0;
+    m[10] = 1.0;
+    m[15] = 1.0;
+    m
+}
+
+fn mat_mul(a: &[f64; 16], b: &[f64; 16]) -> [f64; 16] {
+    let mut out = [0.0; 16];
+    for r in 0..4 {
+        for c in 0..4 {
+            out[r * 4 + c] = (0..4).map(|k| a[r * 4 + k] * b[k * 4 + c]).sum();
+        }
+    }
+    out
+}
+
+// --- Mesh-gradient background (the Swift `GamepadScreenBackground` MeshGradient, ported) --
+
+/// The 16 mesh colours, row-major 4×4 (sRGB) — a verbatim port of the Swift client's
+/// `meshColors`: dark-violet corners sink the frame, the edges carry mid-tone violets, and
+/// the four interior points hold the bright brand family (warm pools left, cool right).
+pub const MESH_COLORS: [(f64, f64, f64); 16] = [
+    (0.075, 0.060, 0.160),
+    (0.34, 0.27, 0.72),
+    (0.30, 0.26, 0.74),
+    (0.075, 0.060, 0.160),
+    (0.42, 0.20, 0.54),
+    (0.49, 0.39, 0.95),
+    (0.28, 0.31, 0.84),
+    (0.16, 0.26, 0.64),
+    (0.45, 0.23, 0.60),
+    (0.53, 0.31, 0.75),
+    (0.35, 0.35, 0.91),
+    (0.19, 0.28, 0.70),
+    (0.075, 0.060, 0.160),
+    (0.22, 0.18, 0.54),
+    (0.24, 0.20, 0.58),
+    (0.075, 0.060, 0.160),
+];
+
+/// The four interior control points that wander; the 12 boundary points stay pinned to the
+/// frame (a drifting edge point would shrink the field and expose the black behind it). Each
+/// row is `(base_ux, base_uy, amplitude, speed_x, speed_y, phase)` in unit UV / rad·s⁻¹ —
+/// the exact `wob()` parameters from the Swift `meshPoints(at:)`. Their live displacement
+/// `(amp·sin(t·sx+ph), amp·cos(t·sy+ph·1.3))` drives a domain warp, so the bright colour
+/// pools follow the points as they breathe (periods ~90–130 s, out of phase so it never loops).
+pub const MESH_INTERIOR: [(f64, f64, f64, f64, f64, f64); 4] = [
+    (0.333, 0.333, 0.11, 0.049, 0.063, 0.4),
+    (0.667, 0.333, 0.10, 0.055, 0.052, 2.1),
+    (0.333, 0.667, 0.10, 0.058, 0.049, 3.6),
+    (0.667, 0.667, 0.12, 0.047, 0.061, 5.0),
+];
+
+/// The mesh gradient as SkSL, palette + motion baked into the source (only time and
+/// resolution are uniforms). A smooth bicubic blend of the 16 colours — a separable
+/// cubic-Bézier basis in x then y, C∞ and edge-to-edge, the fragment-shader analogue of
+/// SwiftUI's `MeshGradient(smoothsColors: true)`. The four interior points drive a
+/// bounded (weighted-average) domain warp so the bright pools drift; then the whole field
+/// gets the ±8°/~5-min hue sway, an elliptical vignette, and the vertical legibility scrim,
+/// all matching the Swift `composite(at:)`. Runs on the GPU at full rate.
+pub fn mesh_sksl() -> String {
+    // Colours as `float3(r, g, b)` literals, indices 0..15 (row-major 4×4).
+    let c = |i: usize| {
+        let (r, g, b) = MESH_COLORS[i];
+        format!("float3({r}, {g}, {b})")
+    };
+    // The four interior-point domain-warp accumulators. Displacement matches Swift `wob()`:
+    // x uses sin(t·sx+ph), y uses cos(t·sy+ph·1.3). SIG sets how far each point's pull
+    // reaches; the warp is the weight-normalised average displacement, so |warp| ≤ max|amp|.
+    let mut warp = String::new();
+    for (bx, by, amp, sx, sy, ph) in MESH_INTERIOR {
+        warp.push_str(&format!(
+            "    q = uv - float2({bx}, {by});\n\
+                 ww = exp(-dot(q, q) / (2.0 * 0.30 * 0.30));\n\
+                 d = float2({amp} * sin(u_t * {sx} + {ph}), \
+                            {amp} * cos(u_t * {sy} + {ph} * 1.3));\n\
+                 wsum += d * ww; wtot += ww;\n",
+        ));
+    }
+    format!(
+        "uniform float2 u_res;\n\
+         uniform float u_t;\n\
+         \n\
+         // Cubic-Bézier basis over four control values — the smooth 4-point blend per axis.\n\
+         float bz(float t, float a, float b, float c, float d) {{\n\
+         \x20   float u = 1.0 - t;\n\
+         \x20   return u*u*u*a + 3.0*u*u*t*b + 3.0*u*t*t*c + t*t*t*d;\n\
+         }}\n\
+         float3 bz3(float t, float3 a, float3 b, float3 c, float3 d) {{\n\
+         \x20   return float3(bz(t, a.r, b.r, c.r, d.r), bz(t, a.g, b.g, c.g, d.g), \
+                              bz(t, a.b, b.b, c.b, d.b));\n\
+         }}\n\
+         // Hue rotation about the grey axis (Rodrigues) — the ±8° warm/cool sway.\n\
+         float3 hue(float3 col, float a) {{\n\
+         \x20   float3 k = float3(0.5773503);\n\
+         \x20   float cs = cos(a); float sn = sin(a);\n\
+         \x20   return col*cs + cross(k, col)*sn + k*dot(k, col)*(1.0 - cs);\n\
+         }}\n\
+         \n\
+         half4 main(float2 xy) {{\n\
+         \x20   float2 uv = xy / u_res;\n\
+         \x20   // Interior control points wander → bounded domain warp (pools follow them).\n\
+         \x20   float2 wsum = float2(0.0); float wtot = 0.0; float2 q; float ww; float2 d;\n\
+         {warp}\
+         \x20   uv = clamp(uv - wsum / (wtot + 1e-4), 0.0, 1.0);\n\
+         \n\
+         \x20   // Bicubic blend of the 16 mesh colours: cubic-Bézier in x per row, then in y.\n\
+         \x20   float3 r0 = bz3(uv.x, {c0}, {c1}, {c2}, {c3});\n\
+         \x20   float3 r1 = bz3(uv.x, {c4}, {c5}, {c6}, {c7});\n\
+         \x20   float3 r2 = bz3(uv.x, {c8}, {c9}, {c10}, {c11});\n\
+         \x20   float3 r3 = bz3(uv.x, {c12}, {c13}, {c14}, {c15});\n\
+         \x20   float3 col = bz3(uv.y, r0, r1, r2, r3);\n\
+         \n\
+         \x20   col = hue(col, sin(u_t * 0.021) * 0.1396263);\n\
+         \n\
+         \x20   // Elliptical vignette: clear at r=0.25 → black·0.42 at r=1.15 (aspect-fit ellipse).\n\
+         \x20   float2 e = (xy / u_res - 0.5) * 2.0;\n\
+         \x20   float vig = clamp((length(e) - 0.25) / 0.90, 0.0, 1.0) * 0.42;\n\
+         \x20   col *= 1.0 - vig;\n\
+         \n\
+         \x20   // Vertical legibility scrim: black 0.38/0.06/0.08/0.40 at 0/0.32/0.68/1.\n\
+         \x20   float v = xy.y / u_res.y;\n\
+         \x20   float s = v < 0.32 ? mix(0.38, 0.06, v / 0.32)\n\
+         \x20           : v < 0.68 ? mix(0.06, 0.08, (v - 0.32) / 0.36)\n\
+         \x20           : mix(0.08, 0.40, (v - 0.68) / 0.32);\n\
+         \x20   col *= 1.0 - s;\n\
+         \n\
+         \x20   return half4(half3(col), 1.0);\n\
+         }}\n",
+        c0 = c(0), c1 = c(1), c2 = c(2), c3 = c(3),
+        c4 = c(4), c5 = c(5), c6 = c(6), c7 = c(7),
+        c8 = c(8), c9 = c(9), c10 = c(10), c11 = c(11),
+        c12 = c(12), c13 = c(13), c14 = c(14), c15 = c(15),
+    )
+}
+
+// --- The shared binary↔overlay model ------------------------------------------------------
+
+#[derive(Clone, PartialEq)]
+pub enum LibraryPhase {
+    Loading,
+    Error {
+        title: String,
+        body: String,
+        can_retry: bool,
+    },
+    Empty,
+    /// Games are loaded — the carousel.
+    Ready,
+}
+
+#[derive(Clone)]
+pub struct LibraryGame {
+    pub id: String,
+    pub title: String,
+    pub store: String,
+}
+
+struct Shared {
+    phase: LibraryPhase,
+    games: Vec<LibraryGame>,
+    /// Fetched poster bytes the renderer hasn't decoded yet (id, encoded image).
+    art_in: VecDeque<(String, Vec<u8>)>,
+    /// Bumped on phase/games changes so the renderer re-syncs its snapshot.
+    generation: u64,
+}
+
+/// The binary's write handle / the overlay's read handle — fetch threads push into it,
+/// the renderer drains per frame. Cheap locks, no rendering data inside.
+#[derive(Clone)]
+pub struct LibraryShared(Arc<Mutex<Shared>>);
+
+impl Default for LibraryShared {
+    fn default() -> Self {
+        LibraryShared(Arc::new(Mutex::new(Shared {
+            phase: LibraryPhase::Loading,
+            games: Vec::new(),
+            art_in: VecDeque::new(),
+            generation: 0,
+        })))
+    }
+}
+
+impl LibraryShared {
+    pub fn set_phase(&self, phase: LibraryPhase) {
+        let mut s = self.0.lock().unwrap();
+        s.phase = phase;
+        s.generation += 1;
+    }
+
+    /// Loaded games → the carousel (empty = the empty scene).
+    pub fn set_games(&self, games: Vec<LibraryGame>) {
+        let mut s = self.0.lock().unwrap();
+        s.phase = if games.is_empty() {
+            LibraryPhase::Empty
+        } else {
+            LibraryPhase::Ready
+        };
+        s.games = games;
+        s.generation += 1;
+    }
+
+    pub fn push_art(&self, id: String, bytes: Vec<u8>) {
+        self.0.lock().unwrap().art_in.push_back((id, bytes));
+    }
+
+    /// Renderer side: the generation stamp (re-snapshot on change).
+    pub(crate) fn generation(&self) -> u64 {
+        self.0.lock().unwrap().generation
+    }
+
+    pub(crate) fn snapshot(&self) -> (LibraryPhase, Vec<LibraryGame>, u64) {
+        let s = self.0.lock().unwrap();
+        (s.phase.clone(), s.games.clone(), s.generation)
+    }
+
+    pub(crate) fn drain_art(&self) -> Vec<(String, Vec<u8>)> {
+        self.0.lock().unwrap().art_in.drain(..).collect()
+    }
+}
+
+/// Store id → display label (the GTK `ui_library` table).
+pub fn store_label(store: &str) -> &'static str {
+    match store {
+        "steam" => "Steam",
+        "custom" => "Custom",
+        "heroic" => "Heroic",
+        "lutris" => "Lutris",
+        "epic" => "Epic",
+        "gog" => "GOG",
+        "xbox" => "Xbox",
+        _ => "Game",
+    }
+}
+
+/// Monogram for the placeholder tile: the first letters of the first two words.
+pub fn initials(title: &str) -> String {
+    title
+        .split_whitespace()
+        .take(2)
+        .filter_map(|w| w.chars().next())
+        .flat_map(char::to_uppercase)
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The GTK launcher's cursor tests, ported with the math.
+    #[test]
+    fn step_refuses_the_ends() {
+        assert_eq!(step_cursor(0, 5, -1, false), StepResult::Boundary);
+        assert_eq!(step_cursor(4, 5, 1, false), StepResult::Boundary);
+        assert_eq!(step_cursor(2, 5, 1, false), StepResult::Moved(3));
+        assert_eq!(step_cursor(0, 0, 1, false), StepResult::Boundary);
+    }
+
+    #[test]
+    fn jump_clamps_onto_the_ends() {
+        assert_eq!(step_cursor(1, 5, -JUMP, true), StepResult::Moved(0));
+        assert_eq!(step_cursor(3, 5, JUMP, true), StepResult::Moved(4));
+        assert_eq!(step_cursor(0, 5, -JUMP, true), StepResult::Boundary);
+    }
+
+    /// Springs converge onto the target and stay finite through a stalled frame.
+    #[test]
+    fn springs_converge() {
+        let (mut pos, mut vel) = (0.0, 0.0);
+        for _ in 0..120 {
+            (pos, vel) = spring_advance(pos, vel, 3.0, SPRING_K, SPRING_C, 1.0 / 60.0);
+        }
+        assert!((pos - 3.0).abs() < 0.01, "{pos}");
+        let (p, v) = spring_advance(0.0, 0.0, 1.0, BUMP_K, BUMP_C, 0.05);
+        assert!(
+            p.is_finite() && v.is_finite() && p > 0.0 && p < 2.0,
+            "{p}/{v}"
+        );
+    }
+
+    /// The focused card (angle 0, scale 1) maps its center to (cx, cy) exactly.
+    #[test]
+    fn card_matrix_centers_the_focused_card() {
+        let m = card_matrix(640.0, 400.0, 0.0, 1.0, POSTER_W, POSTER_H, PERSPECTIVE);
+        // Apply to the card-local center (w/2, h/2, 0, 1).
+        let (x, y) = (POSTER_W as f32 / 2.0, POSTER_H as f32 / 2.0);
+        let px = m[0] * x + m[1] * y + m[3];
+        let py = m[4] * x + m[5] * y + m[7];
+        let pw = m[12] * x + m[13] * y + m[15];
+        assert!((px / pw - 640.0).abs() < 0.01, "{}", px / pw);
+        assert!((py / pw - 400.0).abs() < 0.01, "{}", py / pw);
+    }
+
+    /// A right-side card's INNER (left) edge recedes: its projected x compresses toward
+    /// the center relative to the flat card — the coverflow corridor.
+    #[test]
+    fn side_card_inner_edge_recedes() {
+        let flat = card_matrix(900.0, 400.0, 0.0, 1.0, POSTER_W, POSTER_H, PERSPECTIVE);
+        let tilted = card_matrix(
+            900.0,
+            400.0,
+            -ROTATE_DEG,
+            1.0,
+            POSTER_W,
+            POSTER_H,
+            PERSPECTIVE,
+        );
+        let project = |m: &[f32; 16], x: f32, y: f32| {
+            let px = m[0] * x + m[1] * y + m[3];
+            let pw = m[12] * x + m[13] * y + m[15];
+            px / pw
+        };
+        // The inner edge is x=0 in card space. Perspective divide: receding (w < 1 side)
+        // pushes it AWAY from the vanishing center — the edge reads as farther.
+        let flat_left = project(&flat, 0.0, POSTER_H as f32 / 2.0);
+        let tilt_left = project(&tilted, 0.0, POSTER_H as f32 / 2.0);
+        let flat_right = project(&flat, POSTER_W as f32, POSTER_H as f32 / 2.0);
+        let tilt_right = project(&tilted, POSTER_W as f32, POSTER_H as f32 / 2.0);
+        // Tilt narrows the card's projected width (it turned away from the viewer).
+        assert!((tilt_right - tilt_left) < (flat_right - flat_left) * 0.95);
+    }
+
+    #[test]
+    fn initials_take_two_words() {
+        assert_eq!(initials("Dota 2"), "D2");
+        assert_eq!(initials("half-life"), "H");
+    }
+
+    /// The generated SkSL parses as far as syntax we control (sanity: balanced braces, all
+    /// 16 colours baked in, the five bicubic evals and four interior warp terms present).
+    #[test]
+    fn mesh_sksl_shape() {
+        let src = mesh_sksl();
+        assert!(src.matches("float3(").count() >= 16, "16 colours baked");
+        assert_eq!(src.matches("bz3(").count(), 6); // 1 definition + 5 call sites
+        assert_eq!(src.matches("wtot +=").count(), 4); // one per interior point
+        assert_eq!(src.matches('{').count(), src.matches('}').count());
+    }
+}

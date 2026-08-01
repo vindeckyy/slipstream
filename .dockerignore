@@ -6,7 +6,7 @@
 !web
 !api/openapi.json
 !rust-toolchain.toml
-!ci/pf-host-cc
+!ci/ss-host-cc
 web/node_modules
 web/.output
 web/dist

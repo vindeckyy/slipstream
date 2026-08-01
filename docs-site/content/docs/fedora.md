@@ -105,7 +105,7 @@ in general, including the opt-in one-click button in the web console, is covered
 
 > `fedora-44` and `bazzite` are the only stable groups published, so on Fedora 42 or older — or on a
 > release newer than 44 — there's nothing matching yet. Build one with the same toolchain CI uses —
-> `docker build --build-arg FEDORA_VERSION=NN -f ci/fedora-rpm.Dockerfile -t pf-rpm ci` then run
+> `docker build --build-arg FEDORA_VERSION=NN -f ci/fedora-rpm.Dockerfile -t ss-rpm ci` then run
 > `packaging/rpm/build-rpm.sh` inside it — or build from source (appendix below).
 
 ## 3. Check it installed
@@ -207,7 +207,7 @@ sudo dnf install gcc gcc-c++ make cmake clang clang-devel nasm git pkgconf-pkg-c
   libdrm-devel mesa-libgbm-devel mesa-libGL-devel mesa-libEGL-devel mesa-libGLES-devel libva-devel \
   ffmpeg-devel libei-devel
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-git clone https://github.com/vindeckyy/slipstream.git && cd slipstream
+git clone https://github.com/vindeckyy/slipstream/slipstream.git && cd slipstream
 cargo build --release --locked \
   --features slipstream-host/nvenc,slipstream-host/vulkan-encode \
   -p slipstream-host

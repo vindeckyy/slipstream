@@ -80,12 +80,11 @@ pairing is done there.
 
   ```sh
   systemctl --user enable --now slipstream-web
-  sed -n 's/^SLIPSTREAM_UI_PASSWORD=//p' ~/.config/slipstream/web-password
   ```
 
-  The second command prints the login password generated on first start.
+  Choose the login password when the setup screen appears.
 - **SteamOS:** the install script already started the console and printed its URL when it finished.
-  It generated the login password into `~/.config/slipstream/web.env`.
+  Choose the login password when the setup screen appears.
 
 The certificate is the host's own self-signed one, so your browser warns once — trust it and
 continue. Full details: [The Web Console](/docs/web-console).

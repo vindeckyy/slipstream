@@ -5,7 +5,7 @@
 //! (on Qualcomm Snapdragon in particular — its ADPF backend is among the most responsive) then keeps
 //! those threads on the fast cores at high clocks instead of migrating them to a little core or
 //! down-clocking between frames. For a stream client the win is on the in-process hot path we
-//! control — the `pf-decode` feed/drain/present loop — *not* the hardware codec itself (that decodes
+//! control — the `ss-decode` feed/drain/present loop — *not* the hardware codec itself (that decodes
 //! in the mediacodec service, a separate process we can't hint); keeping our loop from being
 //! scheduled late directly trims the jitter between "AU received" and "buffer released to the
 //! Surface." It complements the codec-side `operating-rate`/`priority` hints, which push the codec's
@@ -94,7 +94,7 @@ fn resolve_api() -> Option<Api> {
 }
 
 /// A live ADPF hint session bound to a set of thread ids. Dropping it closes the session. Holds raw
-/// handles, so it is `!Send`/`!Sync` — created and used only on the `pf-decode` thread.
+/// handles, so it is `!Send`/`!Sync` — created and used only on the `ss-decode` thread.
 pub struct HintSession {
     api: Api,
     session: *mut c_void,

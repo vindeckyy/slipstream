@@ -1,0 +1,45 @@
+# slipstream management web console — systemd USER unit (Nitro SSR on bun, port 47992, HTTPS).
+#
+# Installed by the slipstream-web .deb to /usr/lib/systemd/user/. AUTO-WIRED — no env editing:
+# it sources the host's mgmt token and an optional login password, serves HTTPS (HTTP/1.1 over TLS)
+# with the host's own identity cert (~/.config/slipstream/{cert,key}.pem), and points the /api proxy
+# at the host's loopback HTTPS mgmt API. The self-signed cert is accepted only for that loopback hop,
+# scoped inside the proxy code (Bun per-request TLS) — no process-wide NODE_TLS_REJECT_UNAUTHORIZED.
+# Enable per user:
+#   systemctl --user enable --now slipstream-web
+[Unit]
+Description=slipstream management web console
+# web-init prepares the config directory; the host writes the mgmt token. Order after both.
+After=slipstream-web-init.service slipstream-host.service
+Wants=slipstream-web-init.service
+# Retry indefinitely while the host is still writing the mgmt token + identity cert. Without this,
+# systemd's default rate limit (5 starts / 10 s) plus RestartSec=2 gives up permanently after ~10 s
+# - so a console enabled before the host's first run stayed dead until someone restarted it by hand
+# (the same defect the Windows SlipstreamWeb task had).
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# Both are KEY=VALUE files. mgmt-token is REQUIRED (written by the host's `serve`); if absent the
+# unit fails + Restart retries until the host has created it. web-password is optional until the
+# browser setup flow saves the first password.
+EnvironmentFile=%h/.config/slipstream/mgmt-token
+EnvironmentFile=-%h/.config/slipstream/web-password
+Environment=SLIPSTREAM_MGMT_URL=https://127.0.0.1:47990
+Environment=PORT=47992
+Environment=HOST=0.0.0.0
+# Serve HTTPS (HTTP/1.1 over TLS) with the host's own identity cert; mark the
+# session cookie Secure. The host's `serve` writes these PEMs; if absent at start the unit fails and
+# Restart retries (same as the mgmt-token wait above) rather than silently serving plain HTTP.
+Environment=SLIPSTREAM_UI_TLS_CERT=%h/.config/slipstream/cert.pem
+Environment=SLIPSTREAM_UI_TLS_KEY=%h/.config/slipstream/key.pem
+Environment=SLIPSTREAM_UI_SECURE=1
+ExecStart=/usr/bin/slipstream-web-server
+# `always`, not `on-failure`: a console that exits 0 has still stopped serving, and on-failure would
+# leave it down. An explicit `systemctl --user stop` is still honoured (Restart= never fights that).
+# Windows parity: web-run.cmd likewise relaunches bun on ANY exit.
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

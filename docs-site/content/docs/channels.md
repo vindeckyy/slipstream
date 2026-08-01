@@ -10,7 +10,7 @@ channels can sit on different commits. A `vX.Y.Z` git tag cuts a **stable** rele
 every platform is built at that one version, published to the stable channels, and all the
 artifacts (`.deb`, `.rpm`, `.msix`, host installer, `.apk`/`.aab`, `.dmg`, `.ipa`, flatpak, Decky
 zip, winget manifests) are attached to a single
-[GitHub Release](https://github.com/vindeckyy/slipstream.git/releases).
+[GitHub Release](https://github.com/vindeckyy/slipstream/slipstream/releases).
 
 The two tracks are **separate repos / tracks per platform**, never a shared version line — so a
 stable box never gets pulled onto a canary build, and a canary box always moves forward. Pick the
@@ -30,11 +30,11 @@ track per machine; switching is a one-line change.
 | **rpm** (host) | baseurl `…/rpm/bazzite-canary` (or `fedora-44-canary`) | `…/rpm/bazzite` (or `fedora-44`) |
 | **sysext** (Bazzite host) | `sudo slipstream-sysext install --channel canary` | `… install` / default (feeds `…/slipstream-sysext/f43[-canary]`) |
 | **pacman** (Arch host/client) | `[slipstream-canary]` repo section | `[slipstream]` (`Server = …/api/packages/unom/arch/$repo/$arch`) |
-| **Flatpak** (client) | `flatpak install --user https://flatpak.unom.io/io.unom.Slipstream.Canary.flatpakref` | `…/io.unom.Slipstream.flatpakref` |
+| **Flatpak** (client) | `flatpak install --user https://flatpak.unom.io/io.slipstream.Canary.flatpakref` | `…/io.slipstream.flatpakref` |
 | **Decky** (Steam Deck) | install-from-URL `…/generic/slipstream-decky/canary/slipstream.zip` | `…/slipstream-decky/latest/slipstream.zip` |
 | **Windows client** (MSIX) | `…/generic/slipstream-client-windows/canary/slipstream-client-windows_x64.msix` | `…/latest/…` + the release page |
 | **Windows host** (installer) | `…/generic/slipstream-host-windows/canary/slipstream-host-setup.exe` | `…/latest/…` + the release page |
-| **Windows host** (winget) | — *(stable only)* | `winget install unom.SlipstreamHost` / `winget upgrade unom.SlipstreamHost`, after `winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest` |
+| **Windows host** (winget) | — *(stable only)* | `winget install vindeckyy.SlipstreamHost` / `winget upgrade vindeckyy.SlipstreamHost`, after `winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest` |
 | **Android** | Play **Internal testing** + sideload `…/generic/slipstream-android/canary/slipstream-android.apk` | Play **closed (alpha)** track + the release page |
 | **Apple** (mac/iOS/tvOS) | **TestFlight** | TestFlight + a notarized `.dmg` on the release page |
 
@@ -71,7 +71,7 @@ A build broke something and you want the previous one? Every channel can serve a
 | **pacman** | Reinstall from the package cache: `sudo pacman -U /var/cache/pacman/pkg/slipstream-host-<version>-x86_64.pkg.tar.zst`, then add `IgnorePkg = slipstream-host` to `/etc/pacman.conf` so the next `-Syu` leaves it alone. |
 | **Bazzite sysext** | `slipstream-sysext status` prints your feed URL; download the `slipstream-<version>-x86-64.raw` you want from it, then `sudo slipstream-sysext install --from-file slipstream-<version>-x86-64.raw`. |
 | **Windows installer** | Run the older `slipstream-host-setup-<version>.exe` over the current install. |
-| **Windows / winget** | `winget install unom.SlipstreamHost --version <x.y.z>` — the source serves per-version manifests. |
+| **Windows / winget** | `winget install vindeckyy.SlipstreamHost --version <x.y.z>` — the source serves per-version manifests. |
 | **Decky plugin** | Install-from-URL with an exact version: `https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/<version>/slipstream.zip`. |
 | **SteamOS (on-device build)** | `git -C ~/slipstream checkout v<x.y.z>` then `bash ~/slipstream/scripts/steamdeck/update.sh` (no `--pull` — that would fetch `main` again). |
 | **NixOS** | `sudo nixos-rebuild switch --rollback` for the previous generation, or pin the flake input to a `v<x.y.z>` tag and rebuild. |
@@ -102,7 +102,7 @@ That's the whole ritual: **push a tag, done.** There is nothing else to hand-edi
 
 ### Versioning is derived — never hand-edited
 
-Every workflow gets its version number from one place, `scripts/ci/pf-version.{sh,ps1}`
+Every workflow gets its version number from one place, `scripts/ci/ss-version.{sh,ps1}`
 (the pwsh twin is for the Windows runners), so the number can never drift out of sync:
 
 - **stable** (a `vX.Y.Z` tag) → the tag version (`-rc`/`+meta` dropped where a strictly-numeric
@@ -153,5 +153,5 @@ sudo sed -i 's#/rpm/bazzite#/rpm/bazzite-canary#' /etc/yum.repos.d/slipstream.re
 rpm-ostree upgrade
 
 # Flatpak (Steam Deck client)
-flatpak install --user https://flatpak.unom.io/io.unom.Slipstream.Canary.flatpakref
+flatpak install --user https://flatpak.unom.io/io.slipstream.Canary.flatpakref
 ```

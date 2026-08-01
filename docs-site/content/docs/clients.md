@@ -140,7 +140,7 @@ Prefer the broadest compatibility, or no install? **Moonlight** also streams to 
 
 ## webOS (LG TV) — community
 
-[`pf-webos`](https://github.com/dyptan-io/pf-webos) is a native client for LG webOS TVs, built and
+[`ss-webos`](https://github.com/dyptan-io/ss-webos) is a native client for LG webOS TVs, built and
 maintained by the community ([dyptan-io](https://github.com/dyptan-io)) on top of Slipstream's
 `slipstream/1` protocol and core. It's not an official Slipstream app, but it speaks the real protocol
 directly (not Moonlight/GameStream) — LAN discovery or add-by-IP, PIN pairing with pinned reconnects,
@@ -174,7 +174,7 @@ Exit codes are stable, so a script can branch without parsing prose: **0** ok, *
 **3** trust rejected (re-pair), **4** the renderer couldn't start, **5** nothing matched what you
 named, **6** it needs a person (pairing, or an unknown host).
 
-Under the Flatpak, run it as `flatpak run --command=slipstream io.unom.Slipstream <args>`.
+Under the Flatpak, run it as `flatpak run --command=slipstream io.slipstream <args>`.
 
 > The older headless flags stay supported for existing scripts — `slipstream-client --connect`,
 > `--discover` and `--headless --speed-test` on both Linux and Windows. `slipstream` is the surface
@@ -219,7 +219,7 @@ tvOS have neither. See [Shared clipboard](/docs/clipboard).
 | A **Steam Deck** | The **[Decky plugin](/docs/steam-deck)** in Gaming Mode, or the [GTK4 client](#linux-desktop-client-gtk4) in Desktop Mode |
 | An Android phone or TV | The **[Android app](#android-app-phone--android-tv)** |
 | Windows | The native **[`slipstream-client`](#windows-desktop-client)** (signed MSIX) or **[Moonlight](/docs/moonlight)** |
-| An **LG webOS TV** | The community **[`pf-webos`](https://github.com/dyptan-io/pf-webos)** client, or **[Moonlight](/docs/moonlight)** |
+| An **LG webOS TV** | The community **[`ss-webos`](https://github.com/dyptan-io/ss-webos)** client, or **[Moonlight](/docs/moonlight)** |
 | A browser, another smart TV, or any other device | **[Moonlight](/docs/moonlight)** |
 | Scripts, plugins, home automation | The headless **[`slipstream`](#scripting-the-slipstream-cli)** CLI |
 | Protocol development / latency measurement | **`slipstream-probe`** (source build only) |

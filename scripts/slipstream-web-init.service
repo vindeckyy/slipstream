@@ -1,0 +1,16 @@
+# slipstream web console first-run setup, systemd USER one-shot.
+#
+# Prepares the streaming user's private config directory. The browser creates the console password
+# on its first visit. A .deb postinst runs as root (wrong $HOME), so this setup still runs as the
+# user.
+# Pulled in by slipstream-web.service (Wants=); also runnable directly.
+[Unit]
+Description=slipstream web console first-run setup
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/share/slipstream-web/web-init.sh
+
+[Install]
+WantedBy=default.target

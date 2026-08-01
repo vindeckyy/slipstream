@@ -46,9 +46,9 @@ depends on the display manager driving the autologin:
 - **SDDM** (Bazzite, SteamOS): handled automatically — no setup.
 - **plasmalogin** (Nobara) and other display managers: the host must stop the display manager
   itself for the length of the stream and restart it afterwards, which needs privilege. The
-  packages ship that privilege: a root helper (`/usr/libexec/slipstream/pf-dm-helper`, or
-  `/usr/lib/slipstream/pf-dm-helper` from the Arch package) behind its own polkit action
-  (`io.unom.slipstream.dm-helper`), invoked automatically when the plain
+  packages ship that privilege: a root helper (`/usr/libexec/slipstream/ss-dm-helper`, or
+  `/usr/lib/slipstream/ss-dm-helper` from the Arch package) behind its own polkit action
+  (`io.slipstream.dm-helper`), invoked automatically when the plain
   `systemctl` verbs are denied — no setup. The helper only stops/restores the unit the
   `display-manager.service` symlink points at, the same class of local-seat operation these
   distros already authorize for their own session switcher (Nobara's `os-session-select`).

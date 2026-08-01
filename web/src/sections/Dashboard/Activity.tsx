@@ -1,8 +1,8 @@
 import { Activity as ActivityIcon } from "lucide-react";
 import type { FC } from "react";
 import { type ActivityEntry, useActivity } from "@/api/events";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EventTimeline } from "@/components/observatory";
+import type { TimelineEvent, TimelineTone } from "@/components/observatory";
 import { fmtDateTime } from "@/lib/format";
 import { m } from "@/paraglide/messages";
 
@@ -16,42 +16,32 @@ import { m } from "@/paraglide/messages";
  * In-memory and bounded, so it starts empty on a page load and fills as things happen. That is the
  * honest shape for a live tail — pretending to be a durable log would need the host to keep one.
  */
-export const ActivityCard: FC = () => {
-	const entries = useActivity();
+export const ActivityCard: FC<{
+	/** Supply entries in a story or another pure composition; live pages use the event ring by default. */
+	entries?: ActivityEntry[];
+	/** Keep an overview feed short without changing the shared event ring. */
+	limit?: number;
+}> = ({ entries: suppliedEntries, limit }) => {
+	const liveEntries = useActivity();
+	const entries =
+		limit == null
+			? (suppliedEntries ?? liveEntries)
+			: (suppliedEntries ?? liveEntries).slice(0, Math.max(0, limit));
+	const events: TimelineEvent[] = entries.map((e) => ({
+		id: e.seq,
+		title: kindLabel(e.kind),
+		description: describe(e) || undefined,
+		timestamp: fmtDateTime(e.ts_ms),
+		tone: toneFor(e.kind),
+		icon: <ActivityIcon className="size-3.5" />,
+	}));
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle className="flex items-center gap-2">
-					<ActivityIcon className="size-4" />
-					{m.activity_title()}
-				</CardTitle>
-			</CardHeader>
-			<CardContent>
-				{entries.length === 0 ? (
-					<p className="text-sm text-muted-foreground">{m.activity_empty()}</p>
-				) : (
-					<ul className="flex flex-col divide-y">
-						{entries.map((e) => (
-							<li
-								key={e.seq}
-								className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 first:pt-0 last:pb-0"
-							>
-								<Badge variant={toneFor(e.kind)}>{kindLabel(e.kind)}</Badge>
-								<span className="min-w-0 flex-1 truncate text-sm">
-									{describe(e)}
-								</span>
-								<time
-									dateTime={new Date(e.ts_ms).toISOString()}
-									className="shrink-0 text-xs tabular-nums text-muted-foreground"
-								>
-									{fmtDateTime(e.ts_ms)}
-								</time>
-							</li>
-						))}
-					</ul>
-				)}
-			</CardContent>
-		</Card>
+		<EventTimeline
+			title={m.activity_title()}
+			events={events}
+			emptyMessage={m.activity_empty()}
+			ariaLabel={m.activity_title()}
+		/>
 	);
 };
 
@@ -87,15 +77,15 @@ function pick(obj: unknown, key: string): string | undefined {
 /** Colour by what the event means, not by its domain — good news green, losses muted, denials red. */
 function toneFor(
 	kind: string,
-): "success" | "destructive" | "secondary" | "outline" {
-	if (kind === "pairing.denied") return "destructive";
+): TimelineTone {
+	if (kind === "pairing.denied") return "danger";
 	if (kind.endsWith(".connected") || kind.endsWith(".started"))
 		return "success";
 	if (kind === "pairing.completed") return "success";
 	if (kind.endsWith(".disconnected") || kind.endsWith(".ended"))
-		return "outline";
-	if (kind.endsWith(".stopped") || kind.endsWith(".exited")) return "outline";
-	return "secondary";
+		return "neutral";
+	if (kind.endsWith(".stopped") || kind.endsWith(".exited")) return "neutral";
+	return "info";
 }
 
 /** Translated label per kind, falling back to the raw kind so a new host event still shows. */

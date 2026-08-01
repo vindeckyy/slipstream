@@ -3,7 +3,7 @@
 //! One console-subsystem binary over the same brain the GUI shells use, so a script gets the
 //! same behaviour a click does — including wake-then-connect, which the Linux shell's old
 //! exec-style `--connect` never had. It is a FRONT-END, not the brain: policy lives in
-//! `pf_client_core`, and the shells call the same functions in-process rather than shelling
+//! `ss_client_core`, and the shells call the same functions in-process rather than shelling
 //! out to this. That is the whole point of the split — if the GUI shelled out for connects,
 //! trust prompts and wake progress would have to squeeze through an IPC contract.
 //!
@@ -21,13 +21,13 @@
 
 #[cfg(any(target_os = "linux", windows))]
 mod cli {
-    use pf_client_core::deeplink::{self, DeepLink, HostResolution};
-    use pf_client_core::orchestrate::{
+    use ss_client_core::deeplink::{self, DeepLink, HostResolution};
+    use ss_client_core::orchestrate::{
         self, ConnectPlan, PlanOutcome, SessionEvent, WakeOutcome, WakeWait,
     };
-    use pf_client_core::profiles::ProfilesFile;
-    use pf_client_core::trust::{self, KnownHost, KnownHosts};
-    use pf_client_core::{library, wol};
+    use ss_client_core::profiles::ProfilesFile;
+    use ss_client_core::trust::{self, KnownHost, KnownHosts};
+    use ss_client_core::{library, wol};
     use std::time::Duration;
 
     pub const OK: u8 = 0;

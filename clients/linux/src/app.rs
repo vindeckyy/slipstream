@@ -16,51 +16,51 @@ use relm4::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-pub const APP_ID: &str = "io.unom.Slipstream";
+pub const APP_ID: &str = "io.slipstream";
 
 /// Custom styles on top of libadwaita for the host cards: status pills, presence pips,
 /// the most-recent accent bar, dashed discovered cards. Colours come from the adwaita
 /// named palette so dark mode just works.
 const CSS: &str = "
-.pf-host-card { padding: 16px; }
+.ss-host-card { padding: 16px; }
 /* The FlowBoxChild draws the hover/selection highlight AROUND the card (it wraps it
    with its own padding), so its corners must run concentric with the card's 12px —
    radius = card radius + the child's padding ring. */
-.pf-host-grid > flowboxchild { border-radius: 15px; }
-.pf-pill { font-size: 0.72em; font-weight: bold; padding: 2px 10px; border-radius: 999px;
+.ss-host-grid > flowboxchild { border-radius: 15px; }
+.ss-pill { font-size: 0.72em; font-weight: bold; padding: 2px 10px; border-radius: 999px;
            color: alpha(currentColor, 0.8); background: alpha(currentColor, 0.1); }
-.pf-pill.pf-green { color: @success_color; background: alpha(@success_color, 0.15); }
-.pf-pill.pf-accent { color: @accent_color; background: alpha(@accent_color, 0.15); }
-.pf-pill.pf-neutral { color: alpha(currentColor, 0.75); background: alpha(currentColor, 0.12); }
-.pf-pip { min-width: 8px; min-height: 8px; border-radius: 999px;
+.ss-pill.ss-green { color: @success_color; background: alpha(@success_color, 0.15); }
+.ss-pill.ss-accent { color: @accent_color; background: alpha(@accent_color, 0.15); }
+.ss-pill.ss-neutral { color: alpha(currentColor, 0.75); background: alpha(currentColor, 0.12); }
+.ss-pip { min-width: 8px; min-height: 8px; border-radius: 999px;
           background: alpha(currentColor, 0.35); }
-.pf-pip.pf-online { background: @success_color; }
+.ss-pip.ss-online { background: @success_color; }
 /* An overridden row in profile scope: an accent dot in the prefix, so which settings this
    profile changes is legible at a glance without reading every value. (Plain string literal
    -- a quote in here would end it.) */
-.pf-override-dot { min-width: 8px; min-height: 8px; border-radius: 999px;
+.ss-override-dot { min-width: 8px; min-height: 8px; border-radius: 999px;
                    background: @accent_color; }
 /* Profile colour swatches (the accent a profile's chips carry). One class per palette entry
    because a per-widget CSS provider for eight buttons is a lot of machinery for a dot. */
-.pf-swatch { min-width: 26px; min-height: 26px; border-radius: 999px; padding: 0; }
-.pf-swatch-none   { background: alpha(currentColor, 0.15); }
-.pf-swatch-red    { background: #e01b24; }
-.pf-swatch-orange { background: #ff7800; }
-.pf-swatch-yellow { background: #f6d32d; }
-.pf-swatch-green  { background: #33d17a; }
-.pf-swatch-blue   { background: #3584e4; }
-.pf-swatch-purple { background: #9141ac; }
-.pf-swatch-pink   { background: #d16d9e; }
-.pf-swatch-slate  { background: #77767b; }
-.pf-swatch-on { outline: 2px solid @accent_color; outline-offset: 2px; }
+.ss-swatch { min-width: 26px; min-height: 26px; border-radius: 999px; padding: 0; }
+.ss-swatch-none   { background: alpha(currentColor, 0.15); }
+.ss-swatch-red    { background: #e01b24; }
+.ss-swatch-orange { background: #ff7800; }
+.ss-swatch-yellow { background: #f6d32d; }
+.ss-swatch-green  { background: #33d17a; }
+.ss-swatch-blue   { background: #3584e4; }
+.ss-swatch-purple { background: #9141ac; }
+.ss-swatch-pink   { background: #d16d9e; }
+.ss-swatch-slate  { background: #77767b; }
+.ss-swatch-on { outline: 2px solid @accent_color; outline-offset: 2px; }
 /* Most-recent host: a full accent ring drawn as an inset outline so it follows the card's
    rounded corners (an `inset` box-shadow bar gets eaten by the 12px corner clip) and leaves
    the card's own elevation shadow intact. */
-.pf-recent { outline: 2px solid @accent_color; outline-offset: -2px; }
-.pf-discovered { border: 1px dashed alpha(currentColor, 0.35); }
-.pf-poster { border-radius: 10px; background: alpha(currentColor, 0.08); }
-.pf-poster-monogram { font-size: 2.4em; font-weight: bold; color: alpha(currentColor, 0.45); }
-.pf-store-badge { color: white; background: rgba(0, 0, 0, 0.55); }
+.ss-recent { outline: 2px solid @accent_color; outline-offset: -2px; }
+.ss-discovered { border: 1px dashed alpha(currentColor, 0.35); }
+.ss-poster { border-radius: 10px; background: alpha(currentColor, 0.08); }
+.ss-poster-monogram { font-size: 2.4em; font-weight: bold; color: alpha(currentColor, 0.45); }
+.ss-store-badge { color: white; background: rgba(0, 0, 0, 0.55); }
 ";
 
 /// Everything the shell shares below the component tree.
@@ -212,7 +212,7 @@ impl SimpleComponent for AppModel {
                                 .collect()
                         })
                         .unwrap_or_default();
-                let (speakers, mics) = pf_client_core::audio::devices().unwrap_or_default();
+                let (speakers, mics) = ss_client_core::audio::devices().unwrap_or_default();
                 let _ = tx.send_blocking(crate::ui_settings::DeviceProbes {
                     adapters,
                     speakers,
@@ -550,9 +550,9 @@ impl AppModel {
     /// so a link gets the identical wake, trust and error surfaces and NOT a second connect
     /// path of its own.
     fn open_deep_link(&mut self, url: &str, sender: &ComponentSender<AppModel>) {
-        use pf_client_core::deeplink;
-        use pf_client_core::orchestrate::{plan_from_link, PlanOutcome};
-        use pf_client_core::profiles::ProfilesFile;
+        use ss_client_core::deeplink;
+        use ss_client_core::orchestrate::{plan_from_link, PlanOutcome};
+        use ss_client_core::profiles::ProfilesFile;
 
         tracing::debug!(%url, "deep link");
         let link = match deeplink::parse(url) {
@@ -698,7 +698,7 @@ impl AppModel {
                     None,  // launch: probe connect, no game
                     // Knock under this device's name, not a fingerprint placeholder, when the
                     // probed host doesn't know us yet.
-                    Some(pf_client_core::trust::device_name()),
+                    Some(ss_client_core::trust::device_name()),
                     pin,
                     Some(identity),
                     std::time::Duration::from_secs(15),
@@ -793,9 +793,9 @@ enum SpeedTestTarget {
     /// No profile bound — the global default, i.e. what has always happened.
     Global,
     /// The bound profile already overrides bitrate, so that override is what this host reads.
-    Profile(pf_client_core::profiles::StreamProfile),
+    Profile(ss_client_core::profiles::StreamProfile),
     /// Bound, but the profile inherits bitrate: writing either layer is defensible, so ask.
-    Ask(pf_client_core::profiles::StreamProfile),
+    Ask(ss_client_core::profiles::StreamProfile),
 }
 
 impl SpeedTestTarget {
@@ -813,7 +813,7 @@ impl SpeedTestTarget {
         let Some(reference) = reference else {
             return SpeedTestTarget::Global;
         };
-        let catalog = pf_client_core::profiles::ProfilesFile::load();
+        let catalog = ss_client_core::profiles::ProfilesFile::load();
         match catalog.resolve(&reference).0 {
             Some(p) if p.overrides.bitrate_kbps.is_some() => SpeedTestTarget::Profile(p.clone()),
             Some(p) => SpeedTestTarget::Ask(p.clone()),
@@ -825,7 +825,7 @@ impl SpeedTestTarget {
 
 /// Write a measured bitrate into one profile's overlay, leaving everything else alone.
 fn write_profile_bitrate(id: &str, kbps: u32) {
-    let mut catalog = pf_client_core::profiles::ProfilesFile::load();
+    let mut catalog = ss_client_core::profiles::ProfilesFile::load();
     let Some(p) = catalog.profiles.iter_mut().find(|p| p.id == id) else {
         return; // deleted while the test ran — the toast still tells the truth about the test
     };
@@ -944,7 +944,7 @@ pub fn run() -> glib::ExitCode {
 }
 
 /// Register the embedded gresource (built by build.rs from `data/`) and point the icon
-/// theme at it, so the host cards' `pf-os-*-symbolic` OS marks resolve — and recolor —
+/// theme at it, so the host cards' `ss-os-*-symbolic` OS marks resolve — and recolor —
 /// like any themed icon.
 fn install_os_icons() {
     if let Err(e) = gio::resources_register_include!("slipstream-client.gresource") {
@@ -952,7 +952,7 @@ fn install_os_icons() {
         return;
     }
     if let Some(display) = gdk::Display::default() {
-        gtk::IconTheme::for_display(&display).add_resource_path("/io/unom/Slipstream/icons");
+        gtk::IconTheme::for_display(&display).add_resource_path("/io/slipstream/icons");
     }
 }
 

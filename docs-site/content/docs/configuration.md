@@ -168,13 +168,13 @@ the host needs a clipboard backend underneath. Both, and what a greyed-out toggl
 ## Windows host
 
 Capture of the **secure desktop** — UAC prompts, the lock screen, the login screen — is always on
-and has no setting: the host reads the pf-vdisplay driver's ring directly, and those surfaces are in
+and has no setting: the host reads the ss-vdisplay driver's ring directly, and those surfaces are in
 it. If an older `host.env` on your machine still carries a `SLIPSTREAM_SECURE_DDA` line, nothing reads
 it — leave it or delete it, it makes no difference.
 
 | Setting | Values | Meaning |
 |---|---|---|
-| `SLIPSTREAM_VDISPLAY` | `pf` | Virtual-display backend. The bundled pf-vdisplay IddCx driver is the only backend now — informational; leave as `pf`. |
+| `SLIPSTREAM_VDISPLAY` | `pf` | Virtual-display backend. The bundled ss-vdisplay IddCx driver is the only backend now — informational; leave as `pf`. |
 | `SLIPSTREAM_MONITOR_LINGER_MS` | ms (default `10000`) | Defer tearing a per-client virtual display down after disconnect. A reconnect inside the window preempts it and creates a fresh one (a reused IddCx swap-chain is dead); the stable per-client monitor id keeps Windows' saved display config applying either way. Superseded by the console's **Keep alive** setting — see [Virtual displays](/docs/virtual-displays). |
 | `SLIPSTREAM_EXCLUSIVE_REASSERT_MS` | ms (default `2000`), `0` = off | How often the host re-checks that **exclusive** display topology actually held. Windows (or a GPU driver / display-poller tool) can quietly re-activate a physical panel moments after the host disabled it — seen on hybrid Intel+NVIDIA laptops — putting windows, the cursor, and the lock screen on a screen that isn't streamed. The host re-asserts and logs when that happens; `0` restores the old fire-and-forget behavior. |
 | `SLIPSTREAM_RENDER_ADAPTER` | description substring | Multi-GPU boxes only: force the NVENC/capture GPU by adapter Description substring (e.g. `4090`). Leave unset on single-GPU machines. Superseded by a manual GPU preference in the console — see the *Picking a GPU* note under [Core](/docs/configuration#core); it still decides while the console is on Automatic. |

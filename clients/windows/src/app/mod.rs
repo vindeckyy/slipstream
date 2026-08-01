@@ -56,7 +56,7 @@ mod style;
 use crate::discovery::{self, DiscoveredHost};
 use crate::trust::{KnownHosts, Settings};
 use hosts::HostsProps;
-use pf_client_core::gamepad::GamepadService;
+use ss_client_core::gamepad::GamepadService;
 use slipstream_core::client::NativeClient;
 use speed::{SpeedProps, SpeedState};
 use std::collections::HashMap;
@@ -222,7 +222,7 @@ fn apply_window_icon_when_ready() {
         LR_DEFAULTCOLOR, SM_CXICON, SM_CXSMICON, WM_SETICON,
     };
     let _ = std::thread::Builder::new()
-        .name("pf-window-icon".into())
+        .name("ss-window-icon".into())
         // SAFETY: every call in this thread is a Win32 window/icon API taking either a static wide
         // literal, a handle it just obtained and checked, or the module handle of this process; none
         // of them dereference caller memory, and the loop gives up after 100 tries.
@@ -314,7 +314,7 @@ fn root(cx: &mut RenderCx, ctx: &Arc<AppCtx>) -> Element {
         let set_deep_link = set_deep_link.clone();
         move || {
             std::thread::Builder::new()
-                .name("pf-deeplink-poll".into())
+                .name("ss-deeplink-poll".into())
                 .spawn(move || loop {
                     for url in crate::deeplink::drain() {
                         set_deep_link.call(Some(url));
@@ -332,7 +332,7 @@ fn root(cx: &mut RenderCx, ctx: &Arc<AppCtx>) -> Element {
         let (gp, set_pads) = (ctx.gamepad.clone(), set_pads.clone());
         move || {
             std::thread::Builder::new()
-                .name("pf-pads".into())
+                .name("ss-pads".into())
                 .spawn(move || loop {
                     std::thread::sleep(std::time::Duration::from_secs(2));
                     set_pads.call(gp.pads().len());
@@ -369,7 +369,7 @@ fn root(cx: &mut RenderCx, ctx: &Arc<AppCtx>) -> Element {
                 set_status.call(msg);
                 set_screen.call(Screen::Hosts);
             };
-            let link = match pf_client_core::deeplink::parse(&url) {
+            let link = match ss_client_core::deeplink::parse(&url) {
                 Ok(l) => l,
                 Err(e) => return refuse(e.message()),
             };
@@ -379,13 +379,13 @@ fn root(cx: &mut RenderCx, ctx: &Arc<AppCtx>) -> Element {
                 return refuse("A session is already running \u{2014} end it first.".into());
             }
             let known = KnownHosts::load();
-            let plan = pf_client_core::orchestrate::plan_from_link(
+            let plan = ss_client_core::orchestrate::plan_from_link(
                 &link,
                 &known,
-                &pf_client_core::profiles::ProfilesFile::load(),
+                &ss_client_core::profiles::ProfilesFile::load(),
                 &ctx.settings.lock().unwrap().clone(),
             );
-            use pf_client_core::orchestrate::PlanOutcome;
+            use ss_client_core::orchestrate::PlanOutcome;
             match plan {
                 Ok(PlanOutcome::Connect(p)) => {
                     let target = Target {
@@ -479,7 +479,7 @@ fn root(cx: &mut RenderCx, ctx: &Arc<AppCtx>) -> Element {
         let set_hud = set_hud.clone();
         move || {
             std::thread::Builder::new()
-                .name("pf-hud".into())
+                .name("ss-hud".into())
                 .spawn(move || loop {
                     std::thread::sleep(std::time::Duration::from_millis(400));
                     set_hud.call(stream::HudSample {
@@ -501,7 +501,7 @@ fn root(cx: &mut RenderCx, ctx: &Arc<AppCtx>) -> Element {
         let shared = ctx.shared.clone();
         move || {
             std::thread::Builder::new()
-                .name("pf-probe".into())
+                .name("ss-probe".into())
                 .spawn(move || loop {
                     // A spawned session/browse child is running: the shell is hidden
                     // (nobody sees the pips) and one of these hosts is mid-stream —

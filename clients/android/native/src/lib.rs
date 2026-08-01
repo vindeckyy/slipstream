@@ -15,7 +15,7 @@
 //! keeps only the Android-framework surface it must (Compose UI, `SurfaceView`, input capture, the
 //! Wi-Fi `MulticastLock` + permission UX, Keystore identity).
 //!
-//! JNI symbols map to `io.unom.slipstream.kit.NativeBridge` in the `:kit` Gradle module
+//! JNI symbols map to `io.slipstream.kit.NativeBridge` in the `:kit` Gradle module
 //! (`clients/android`). The surface: the native-link proof (`abiVersion`/`coreVersion`), mDNS host
 //! discovery ([`discovery`]), and the session lifecycle in [`session`] — connect/pair + the trust
 //! surface, the per-plane pumps (video → AMediaCodec, audio ↔ AAudio, mic uplink), input, and

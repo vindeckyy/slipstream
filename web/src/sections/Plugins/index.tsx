@@ -2,17 +2,24 @@
 // first and only mount the iframe when it answers — otherwise the iframe would show the proxy's raw
 // 502. The iframe is same-origin (proxied through /plugin-ui), so the plugin can talk to its own
 // loopback REST with the operator's session and, optionally, keep the address bar in sync by posting
-// `{ type: "pf-ui:navigate", path }` to the parent.
+// `{ type: "ss-ui:navigate", path }` to the parent.
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
-import { ExternalLink, RefreshCw } from "lucide-react";
+import {
+	AlertTriangle,
+	CheckCircle2,
+	ExternalLink,
+	RefreshCw,
+} from "lucide-react";
 import { type FC, useEffect, useMemo, useRef } from "react";
 import { pluginIcon, usePlugins } from "@/api/plugins";
 import { useInstalledPlugins } from "@/api/store";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages";
-import { TierBadge } from "@/sections/Store/TierBadge";
+import { SourceChip, TierBadge } from "@/sections/Store/TierBadge";
 
 const route = getRouteApi("/plugins/$pluginId/$");
 
@@ -69,13 +76,18 @@ export const SectionPlugin: FC = () => {
 		() => `/plugin-ui/${pluginId}/${_splat ?? ""}`,
 		[pluginId],
 	);
+	const healthState: PluginHealthState = health.isError
+		? "offline"
+		: health.isSuccess
+			? "running"
+			: "loading";
 
 	// Keep the console address bar in sync with the plugin's internal routing.
 	useEffect(() => {
 		const onMessage = (e: MessageEvent) => {
 			if (e.source !== iframeRef.current?.contentWindow) return;
 			const data = e.data as { type?: string; path?: string };
-			if (data?.type === "pf-ui:navigate" && typeof data.path === "string") {
+			if (data?.type === "ss-ui:navigate" && typeof data.path === "string") {
 				navigate({
 					to: "/plugins/$pluginId/$",
 					params: { pluginId, _splat: data.path.replace(/^\//, "") },
@@ -88,27 +100,65 @@ export const SectionPlugin: FC = () => {
 	}, [pluginId, navigate]);
 
 	return (
-		<div className="flex h-[calc(100dvh-7rem)] min-h-[480px] flex-col gap-3 sm:h-[calc(100dvh-5rem)]">
-			{/* Header strip: identity + open-in-new-tab (the plugin stands alone full-window too). */}
-			<div className="flex items-center gap-3">
-				<Icon className="size-5 text-muted-foreground" />
-				<h1 className="text-lg font-semibold">{title}</h1>
-				{meta?.version && (
-					<span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-						v{meta.version}
+		<section
+			aria-labelledby="plugin-frame-title"
+			className="flex h-[calc(100dvh-8rem)] min-h-0 flex-col gap-3 sm:h-[calc(100dvh-6rem)] lg:h-[calc(100dvh-5rem)]"
+		>
+			<header className="flex shrink-0 flex-col gap-3 rounded-xl border border-border/70 bg-card/90 p-3 shadow-sm sm:p-4">
+				<div className="flex min-w-0 items-start gap-3">
+					<span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/12 ring-1 ring-primary/20">
+						<Icon className="size-5 text-foreground" aria-hidden />
 					</span>
-				)}
-				{provenance && <TierBadge tier={provenance.tier} />}
-				<a
-					href={`/plugin-ui/${pluginId}/`}
-					target="_blank"
-					rel="noreferrer"
-					className="ml-auto inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-				>
-					<ExternalLink className="size-4" />
-					{m.plugin_open_new_tab()}
-				</a>
-			</div>
+					<div className="min-w-0 flex-1">
+						<p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground/70">
+							{m.nav_plugins()}
+						</p>
+						<div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+							<h1
+								id="plugin-frame-title"
+								className="min-w-0 truncate text-lg font-semibold tracking-tight"
+							>
+								{title}
+							</h1>
+							{meta?.version && (
+								<span className="rounded-md bg-muted px-1.5 py-0.5 text-xs tabular-nums text-muted-foreground">
+									v{meta.version}
+								</span>
+							)}
+						</div>
+						<div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
+							<code className="max-w-full truncate rounded-md border border-border/60 bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+								{pluginId}
+							</code>
+							<PluginHealthBadge state={healthState} />
+							{provenance && (
+								<>
+									<TierBadge tier={provenance.tier} />
+									{provenance.tier === "external" && provenance.source && (
+										<SourceChip
+											source={provenance.source}
+											className="rounded-md border border-border/60 bg-muted/30 px-2 py-1"
+										/>
+									)}
+								</>
+							)}
+						</div>
+					</div>
+					<a
+						href={initialSrc}
+						target="_blank"
+						rel="noopener noreferrer"
+						aria-label={`${m.plugin_open_new_tab()} ${title}`}
+						title={m.plugin_open_new_tab()}
+						className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border/70 bg-background/70 text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
+					>
+						<ExternalLink className="size-4" aria-hidden />
+						<span className="hidden text-sm font-medium sm:inline">
+							{m.plugin_open_new_tab()}
+						</span>
+					</a>
+				</div>
+			</header>
 
 			{health.isError ? (
 				<OfflineCard title={title} onRetry={() => health.refetch()} />
@@ -117,40 +167,111 @@ export const SectionPlugin: FC = () => {
 					ref={iframeRef}
 					src={initialSrc}
 					title={title}
-					className="w-full flex-1 rounded-lg border bg-card"
+					className="min-h-0 w-full flex-1 rounded-xl border border-border/70 bg-card shadow-sm"
 					// The plugin is operator-installed code on our own origin (no new trust boundary —
 					// plugin-ui-surface §7.4); allow it to run scripts, forms, popups, and full-window.
 					sandbox="allow-scripts allow-forms allow-popups allow-same-origin allow-modals"
 					allow="fullscreen"
 				/>
 			) : (
-				// Probing: a calm shimmer rather than a flash of empty frame.
-				<div className="flex-1 animate-pulse rounded-lg border bg-card/50" />
+				// Probing: keep the frame-shaped surface stable while avoiding motion for reduced-motion
+				// users.
+				<div
+					role="status"
+					aria-label={m.common_loading()}
+					className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-muted/30"
+				>
+					<div
+						aria-hidden
+						className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-primary/5 motion-safe:animate-pulse motion-reduce:animate-none"
+					/>
+					<div className="relative flex flex-col items-center gap-2 text-center">
+						<RefreshCw
+							className="size-5 text-muted-foreground motion-safe:animate-spin motion-reduce:animate-none"
+							aria-hidden
+						/>
+						<span className="text-sm text-muted-foreground">
+							{m.common_loading()}
+						</span>
+					</div>
+				</div>
 			)}
-		</div>
+		</section>
 	);
 };
+
+type PluginHealthState = "loading" | "running" | "offline";
+
+const PluginHealthBadge: FC<{ state: PluginHealthState }> = ({ state }) => (
+	<Badge
+		variant={
+			state === "running"
+				? "success"
+				: state === "offline"
+					? "destructive"
+					: "secondary"
+		}
+		className={cn(
+			"gap-1.5 whitespace-nowrap",
+			state === "loading" && "text-muted-foreground",
+		)}
+		role="status"
+		aria-live="polite"
+	>
+		{state === "running" ? (
+			<CheckCircle2 className="size-3.5" aria-hidden />
+		) : state === "offline" ? (
+			<AlertTriangle className="size-3.5" aria-hidden />
+		) : (
+			<RefreshCw
+				className="size-3.5 motion-safe:animate-spin motion-reduce:animate-none"
+				aria-hidden
+			/>
+		)}
+		{state === "running"
+			? m.store_running()
+			: state === "offline"
+				? m.store_stopped()
+				: m.common_loading()}
+	</Badge>
+);
 
 const OfflineCard: FC<{ title: string; onRetry: () => void }> = ({
 	title,
 	onRetry,
 }) => (
-	<div className="flex flex-1 items-center justify-center rounded-lg border border-dashed">
-		<div className="flex max-w-md flex-col items-center gap-3 p-8 text-center">
-			<h2 className="text-base font-semibold">{m.plugin_offline_title()}</h2>
-			<p className="text-sm text-muted-foreground">
-				<span className="font-medium text-foreground">{title}</span> —{" "}
-				{m.plugin_offline_hint()}
-			</p>
+	<div
+		role="alert"
+		className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto rounded-xl border border-dashed border-border/80 bg-muted/20"
+	>
+		<div className="flex w-full max-w-lg flex-col items-center gap-4 p-4 text-center sm:p-8">
+			<span className="flex size-11 items-center justify-center rounded-full bg-destructive/10 text-destructive ring-1 ring-destructive/20">
+				<AlertTriangle className="size-5" aria-hidden />
+			</span>
+			<div className="space-y-1">
+				<h2 className="text-base font-semibold tracking-tight">
+					{m.plugin_offline_title()}
+				</h2>
+				<p className="text-sm text-muted-foreground">
+					<span className="font-medium text-foreground">{title}</span>
+					{": "}
+					{m.plugin_offline_hint()}
+				</p>
+			</div>
 			{/* The exact runner commands, so the operator can act without leaving the page. */}
-			<pre className="w-full overflow-x-auto rounded-md bg-muted p-3 text-left text-xs text-muted-foreground">
+			<pre className="w-full overflow-x-auto rounded-lg border border-border/60 bg-muted/50 p-3 text-left text-xs text-muted-foreground">
 				<code>
 					systemctl --user status slipstream-scripting{"\n"}
 					Get-ScheduledTask SlipstreamScripting{"  # Windows"}
 				</code>
 			</pre>
-			<Button variant="outline" size="sm" onClick={onRetry}>
-				<RefreshCw className="size-4" />
+			<Button
+				variant="outline"
+				size="sm"
+				className="w-full sm:w-auto"
+				onClick={onRetry}
+			>
+				<RefreshCw className="size-4" aria-hidden />
 				{m.plugin_retry()}
 			</Button>
 		</div>

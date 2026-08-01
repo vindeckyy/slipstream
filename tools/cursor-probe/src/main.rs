@@ -47,9 +47,9 @@ mod linux {
         let embedded = args.iter().any(|a| a == "--embedded");
         let gpu = args.iter().any(|a| a == "--gpu");
 
-        let compositor = pf_vdisplay::detect()?;
+        let compositor = ss_vdisplay::detect()?;
         println!("cursor-probe: compositor = {compositor:?}");
-        let mut vd = pf_vdisplay::open(compositor)?;
+        let mut vd = ss_vdisplay::open(compositor)?;
         // The cursor-channel session's request: out-of-band cursor (Mutter/KWin metadata mode).
         vd.set_hw_cursor(!embedded);
         println!(
@@ -61,7 +61,7 @@ mod linux {
             }
         );
         let vout = vd
-            .create(pf_vdisplay::Mode {
+            .create(ss_vdisplay::Mode {
                 width: W,
                 height: H,
                 refresh_hz: 60,
@@ -70,7 +70,7 @@ mod linux {
         println!("cursor-probe: node_id = {}", vout.node_id);
 
         // Encode-backend facts don't matter to the metadata question; all-off = CPU-friendly.
-        let policy = pf_capture::ZeroCopyPolicy {
+        let policy = ss_capture::ZeroCopyPolicy {
             backend_is_vaapi: false,
             backend_is_gpu: gpu,
             pyrowave_session: false,
@@ -78,7 +78,7 @@ mod linux {
             pyrowave_modifiers: Vec::new(),
             hdr_cuda_ok: false,
         };
-        let mut cap = pf_capture::open_virtual_output(
+        let mut cap = ss_capture::open_virtual_output(
             vout.remote_fd,
             vout.node_id,
             vout.preferred_mode,
@@ -99,13 +99,13 @@ mod linux {
         // Wiggle the pointer over the virtual output through the production injector (libei on
         // GNOME/KWin). The region ladder maps the absolute events onto the output by size match —
         // W×H is deliberately distinctive.
-        let backend = pf_inject::default_backend();
+        let backend = ss_inject::default_backend();
         println!("cursor-probe: input backend = {backend:?} (4 s device-resume wait)");
         let stop = Arc::new(AtomicBool::new(false));
         let stop_inj = stop.clone();
         // `dyn InputInjector` isn't Send — build it on the thread that drives it.
         let injector = std::thread::spawn(move || {
-            let mut inj = match pf_inject::open(backend) {
+            let mut inj = match ss_inject::open(backend) {
                 Ok(i) => i,
                 Err(e) => {
                     tracing::error!(error = %format!("{e:#}"), "cursor-probe: injector open failed");
@@ -155,7 +155,7 @@ mod linux {
 
         let dump = args.iter().any(|a| a == "--dump");
         let dump_dir = format!(
-            "/tmp/pf-probe-frames-{}",
+            "/tmp/ss-probe-frames-{}",
             if embedded { "embedded" } else { "metadata" }
         );
         if dump {
@@ -174,7 +174,7 @@ mod linux {
             // Damage-driven source: timeouts (gaps) are normal, hence the missing error arm.
             if let Ok(f) = cap.next_frame_within(Duration::from_millis(500)) {
                 frames += 1;
-                if let pf_frame::FramePayload::Cpu(data) = &f.payload {
+                if let ss_frame::FramePayload::Cpu(data) = &f.payload {
                     if !prev.is_empty()
                         && prev.len() == data.len()
                         && prev.as_slice() != data.as_slice()
@@ -256,14 +256,14 @@ mod linux {
         path: &str,
         w: u32,
         h: u32,
-        format: pf_frame::PixelFormat,
+        format: ss_frame::PixelFormat,
         data: &[u8],
     ) -> Result<()> {
         use std::io::Write;
         let mut out = std::io::BufWriter::new(std::fs::File::create(path)?);
         write!(out, "P6\n{w} {h}\n255\n")?;
         let (ri, gi, bi) = match format {
-            pf_frame::PixelFormat::Rgbx | pf_frame::PixelFormat::Rgba => (0usize, 1usize, 2usize),
+            ss_frame::PixelFormat::Rgbx | ss_frame::PixelFormat::Rgba => (0usize, 1usize, 2usize),
             _ => (2usize, 1usize, 0usize),
         };
         for px in data.chunks_exact(4).take((w as usize) * (h as usize)) {

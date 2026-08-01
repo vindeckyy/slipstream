@@ -56,13 +56,15 @@ export const LiveCard: FC<{ live: Loadable<Capture> }> = ({ live }) => {
 			: live.error;
 	return (
 		<Card>
-			<CardHeader>
-				<CardTitle>{m.stats_live_title()}</CardTitle>
+			<CardHeader className="space-y-1">
+				<CardTitle className="text-base tracking-tight">
+					{m.stats_live_title()}
+				</CardTitle>
 			</CardHeader>
-			<CardContent className="space-y-8">
+			<CardContent className="space-y-6">
 				<QueryState isLoading={false} error={error} refetch={live.refetch}>
 					{samples.length === 0 ? (
-						<p className="py-8 text-center text-sm text-muted-foreground">
+						<p className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
 							{m.stats_live_waiting()}
 						</p>
 					) : (

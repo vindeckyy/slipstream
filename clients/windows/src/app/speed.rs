@@ -6,7 +6,7 @@ use super::style::*;
 use super::{Screen, Svc};
 use crate::probe::run_speed_probe;
 use crate::trust::KnownHosts;
-use pf_client_core::profiles::ProfilesFile;
+use ss_client_core::profiles::ProfilesFile;
 use windows_reactor::*;
 
 /// Speed-test lifecycle. Held as ROOT state (the probe worker completes it via
@@ -53,7 +53,7 @@ pub(crate) fn speed_page(props: &SpeedProps, cx: &mut RenderCx) -> Element {
             // out and started another test) must not publish over the newer run.
             let generation = shared.speed_gen.load(Ordering::SeqCst);
             std::thread::Builder::new()
-                .name("pf-speedtest".into())
+                .name("ss-speedtest".into())
                 .spawn(move || {
                     let outcome = run_speed_probe(
                         &target.addr,

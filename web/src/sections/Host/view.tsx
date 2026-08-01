@@ -1,18 +1,18 @@
 import Section from "@unom/ui/section";
+import { Cpu, Globe2, Network, Radio, Server, ShieldCheck } from "lucide-react";
 import type { FC, ReactNode } from "react";
-import type { AvailableCompositor } from "@/api/gen/model/availableCompositor";
 import type { HostInfo } from "@/api/gen/model/hostInfo";
 import { OsIcon } from "@/components/os-icon";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Loadable } from "@/lib/query";
+import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages";
 import { ConnectCard } from "./ConnectCard";
 
 export const HostView: FC<{
 	host: Loadable<HostInfo>;
-	compositors: Loadable<AvailableCompositor[]>;
 	/** The GPU inventory/selection card (a self-contained container — see `GpuCard.tsx`). */
 	gpu?: ReactNode;
 	/** The update-check card (a self-contained container — see `UpdateCard.tsx`). */
@@ -20,12 +20,63 @@ export const HostView: FC<{
 	/** Warning about other Moonlight-compatible servers on this machine — renders nothing when
 	 * there are none (see `ConflictsCard.tsx`). Sits at the top: it explains "nothing can connect". */
 	conflicts?: ReactNode;
-}> = ({ host, compositors, gpu, update, conflicts }) => {
+}> = ({ host, gpu, update, conflicts }) => {
 	const h = host.data;
 	return (
 		<Section maxWidth={false}>
-			<div className="flex flex-col gap-card">
-				<h1 className="text-2xl font-semibold">{m.nav_host()}</h1>
+			<div className="flex flex-col gap-5">
+				<div className="relative overflow-hidden rounded-xl border border-primary/30 bg-card/90 shadow-sm ring-1 ring-primary/10">
+					<div
+						aria-hidden
+						className="pointer-events-none absolute inset-y-0 right-0 w-2/3 bg-gradient-to-l from-primary/10 via-primary/5 to-transparent"
+					/>
+					<div className="relative space-y-5 p-4 sm:p-6">
+						<div className="flex flex-wrap items-start justify-between gap-4">
+							<div className="space-y-2">
+								<div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-primary">
+									<Server className="size-3.5" aria-hidden />
+									<span>{m.nav_host()}</span>
+								</div>
+								<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+									{h?.hostname || m.nav_host()}
+								</h1>
+								{h && (
+									<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+										<span>{m.host_uniqueid()}</span>
+										<code className="font-mono">{h.uniqueid}</code>
+									</div>
+								)}
+							</div>
+							{h && (
+								<div className="flex items-center gap-2 rounded-full border border-border/70 bg-muted/40 px-3 py-2">
+									<OsIcon os={h.os} className="size-4 shrink-0" />
+									<span className="text-sm font-medium">{h.os_name}</span>
+								</div>
+							)}
+						</div>
+						{h && (
+							<dl className="grid gap-px overflow-hidden rounded-lg border border-border/70 bg-border/50 sm:grid-cols-3">
+								<HeroMetric
+									label={m.host_local_ip()}
+									value={h.local_ip}
+									icon={<Globe2 className="size-3.5" />}
+									mono
+								/>
+								<HeroMetric
+									label={m.host_version()}
+									value={`${h.app_version} (${h.version})`}
+									icon={<Cpu className="size-3.5" />}
+								/>
+								<HeroMetric
+									label={m.host_abi()}
+									value={String(h.abi_version)}
+									icon={<ShieldCheck className="size-3.5" />}
+									mono
+								/>
+							</dl>
+						)}
+					</div>
+				</div>
 
 				{conflicts}
 				{h && <ConnectCard host={h} />}
@@ -36,13 +87,16 @@ export const HostView: FC<{
 					refetch={host.refetch}
 				>
 					{h && (
-						<div className="grid gap-card lg:grid-cols-2">
-							<Card>
-								<CardHeader>
-									<CardTitle>{m.host_identity()}</CardTitle>
+						<div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+							<Card className="overflow-hidden">
+								<CardHeader className="border-b border-border/60 bg-muted/15">
+									<CardTitle className="flex items-center gap-2 tracking-tight">
+										<Server className="size-4 text-primary" aria-hidden />
+										{m.host_identity()}
+									</CardTitle>
 								</CardHeader>
-								<CardContent>
-									<dl className="grid grid-cols-1 gap-3">
+								<CardContent className="pt-4 sm:pt-5">
+									<dl className="grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-border/70 bg-border/50 sm:grid-cols-2">
 										<Row label={m.host_hostname()} value={h.hostname} />
 										{/* The OS mark resolves from the identity chain (h.os), which also
 										    serves as the tooltip for the curious; the text is the pretty name. */}
@@ -57,36 +111,48 @@ export const HostView: FC<{
 											label={m.host_version()}
 											value={`${h.app_version} (${h.version})`}
 										/>
-										<Row label={m.host_abi()} value={String(h.abi_version)} />
+										<Row
+											label={m.host_abi()}
+											value={String(h.abi_version)}
+											mono
+										/>
 										<Row label={m.host_uniqueid()} value={h.uniqueid} mono />
 									</dl>
 								</CardContent>
 							</Card>
-							<div className="space-y-card">
-								<Card>
-									<CardHeader>
-										<CardTitle>{m.host_codecs()}</CardTitle>
+							<div className="flex flex-col gap-5">
+								<Card className="overflow-hidden">
+									<CardHeader className="border-b border-border/60 bg-muted/15">
+										<CardTitle className="flex items-center gap-2 tracking-tight">
+											<Radio className="size-4 text-primary" aria-hidden />
+											{m.host_codecs()}
+										</CardTitle>
 									</CardHeader>
-									<CardContent className="flex flex-wrap gap-2">
-										{h.codecs.map((c) => (
+									<CardContent className="flex flex-wrap gap-2 pt-4 sm:pt-5">
+										{(h.codecs ?? []).map((c) => (
 											<Badge key={c} variant="secondary">
 												{c.toUpperCase()}
 											</Badge>
 										))}
 									</CardContent>
 								</Card>
-								<Card>
-									<CardHeader>
-										<CardTitle>{m.host_ports()}</CardTitle>
+								<Card className="overflow-hidden">
+									<CardHeader className="border-b border-border/60 bg-muted/15">
+										<CardTitle className="flex items-center gap-2 tracking-tight">
+											<Network className="size-4 text-primary" aria-hidden />
+											{m.host_ports()}
+										</CardTitle>
 									</CardHeader>
-									<CardContent>
-										<dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm tabular-nums">
+									<CardContent className="pt-4 sm:pt-5">
+										<dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border/70 bg-border/50 text-sm tabular-nums">
 											{Object.entries(h.ports).map(([k, v]) => (
-												<div key={k} className="flex justify-between">
-													<dt className="text-muted-foreground uppercase">
+												<div key={k} className="min-w-0 bg-card px-3 py-3">
+													<dt className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
 														{k}
 													</dt>
-													<dd className="font-medium">{v as number}</dd>
+													<dd className="mt-1 font-mono font-medium">
+														{v as number}
+													</dd>
 												</div>
 											))}
 										</dl>
@@ -100,62 +166,36 @@ export const HostView: FC<{
 				{update}
 
 				{gpu}
-
-				<Card>
-					<CardHeader>
-						<CardTitle>{m.host_compositors()}</CardTitle>
-					</CardHeader>
-					<CardContent className="space-y-4">
-						<p className="text-sm text-muted-foreground">
-							{m.host_compositors_help()}
-						</p>
-						<QueryState
-							isLoading={compositors.isLoading}
-							error={compositors.error}
-							refetch={compositors.refetch}
-						>
-							{/* Empty is a real answer, not a load failure: a Windows host drives the
-						    pf-vdisplay driver and has no compositor backends at all. */}
-							{compositors.data?.length === 0 ? (
-								<p className="rounded-md border p-4 text-sm text-muted-foreground">
-									{m.compositor_none()}
-								</p>
-							) : (
-								<ul className="divide-y rounded-md border">
-									{compositors.data?.map((c) => (
-										<li
-											key={c.id}
-											className="flex items-center justify-between gap-4 px-4 py-3"
-										>
-											<div className="min-w-0">
-												<div className="flex items-center gap-2">
-													<span className="font-medium">{c.label}</span>
-													{c.default && (
-														<Badge variant="secondary">
-															{m.compositor_default()}
-														</Badge>
-													)}
-												</div>
-												<code className="text-xs text-muted-foreground">
-													{c.id}
-												</code>
-											</div>
-											<Badge variant={c.available ? "default" : "outline"}>
-												{c.available
-													? m.compositor_available()
-													: m.compositor_unavailable()}
-											</Badge>
-										</li>
-									))}
-								</ul>
-							)}
-						</QueryState>
-					</CardContent>
-				</Card>
 			</div>
 		</Section>
 	);
 };
+
+const HeroMetric: FC<{
+	label: string;
+	value: string;
+	icon: ReactNode;
+	mono?: boolean;
+}> = ({ label, value, icon, mono }) => (
+	<div className="min-w-0 bg-card/80 px-3 py-3 sm:px-4">
+		<dt className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+			{label}
+		</dt>
+		<dd
+			className={cn(
+				"mt-1 flex min-w-0 items-center gap-1.5 text-sm font-semibold",
+				mono && "font-mono text-xs",
+			)}
+		>
+			<span aria-hidden="true" className="shrink-0 text-primary">
+				{icon}
+			</span>
+			<span className="min-w-0 truncate" title={value}>
+				{value}
+			</span>
+		</dd>
+	</div>
+);
 
 const Row: FC<{
 	label: string;
@@ -166,10 +206,16 @@ const Row: FC<{
 	/** Tooltip override — defaults to the value itself (which may be truncated). */
 	title?: string;
 }> = ({ label, value, mono, icon, title }) => (
-	<div className="flex items-baseline justify-between gap-4">
-		<dt className="text-sm text-muted-foreground">{label}</dt>
+	<div className="min-w-0 bg-card px-3 py-3">
+		<dt className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+			{label}
+		</dt>
 		<dd
-			className={`${mono ? "truncate font-mono text-xs" : "font-medium"}${icon ? " flex items-center gap-2" : ""}`}
+			className={cn(
+				"mt-1.5",
+				mono ? "truncate font-mono text-xs" : "text-sm font-medium",
+				icon && "flex items-center gap-2",
+			)}
 			title={title ?? value}
 		>
 			{icon}

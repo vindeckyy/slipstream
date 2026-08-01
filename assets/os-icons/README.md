@@ -3,7 +3,7 @@
 The canonical OS/distro brand marks every client derives its host-card OS icon from
 (web console inline SVGs, GTK symbolic icons, Windows PNGs, Apple template imagesets,
 Android `ImageVector`s). One file per **icon token** of the host's OS-identity chain
-(see `crates/slipstream-host/src/osinfo.rs` and `crates/pf-client-core/src/os.rs`):
+(see `crates/slipstream-host/src/osinfo.rs` and `crates/ss-client-core/src/os.rs`):
 
 | token | mark | source |
 |---|---|---|

@@ -8,7 +8,7 @@ use super::Screen;
 use windows_reactor::*;
 
 /// The in-stream keyboard shortcuts, in the GTK Shortcuts window's order: the chord, then what it
-/// does. Read-only — the keyboard bindings live in the session window (`pf-presenter`'s run
+/// does. Read-only — the keyboard bindings live in the session window (`ss-presenter`'s run
 /// loop), the controller chord in its gamepad service.
 const STREAM_SHORTCUTS: &[(&str, &str)] = &[
     ("F11 / Alt+Enter", "Toggle fullscreen"),

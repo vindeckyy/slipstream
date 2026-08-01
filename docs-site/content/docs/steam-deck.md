@@ -9,7 +9,7 @@ couch-friendly front end for the Steam Deck — built from real Steam UI, gamepa
 
 Under the hood the plugin doesn't decode video itself: it discovers hosts, runs the PIN pairing, and
 **launches the regular [Linux client](/docs/clients#linux-desktop-client-gtk4)** (usually the
-`io.unom.Slipstream` Flatpak) the way gamescope needs so it fullscreens correctly. So the Deck has two
+`io.slipstream` Flatpak) the way gamescope needs so it fullscreens correctly. So the Deck has two
 ways to stream, and they share one client + one paired identity:
 
 - **Gaming Mode** → the **Decky plugin** (this page).
@@ -25,7 +25,7 @@ You need three things on the Deck:
    client. On a normal Deck that's the Flatpak, installed once in **Desktop Mode**:
 
    ```sh
-   flatpak install --user https://flatpak.unom.io/io.unom.Slipstream.flatpakref
+   flatpak install --user https://flatpak.unom.io/io.slipstream.flatpakref
    ```
 
    (Full options: [Install a Client → Steam Deck](/docs/install-client#steam-deck).) If you have
@@ -49,12 +49,12 @@ developer toolchain — just paste a URL into Decky:
 3. Paste the **stable** link and confirm:
 
    ```
-   https://github.com/vindeckyy/slipstream/pf-decky
+   https://github.com/vindeckyy/slipstream/ss-decky
    ```
 
 The **Slipstream** panel appears in the Quick Access Menu right away — no Deck restart needed.
 
-> **Channels.** `https://github.com/vindeckyy/slipstream/pf-decky` is a short link to the **stable** channel (moves on
+> **Channels.** `https://github.com/vindeckyy/slipstream/ss-decky` is a short link to the **stable** channel (moves on
 > `vX.Y.Z` releases), currently
 > `https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/latest/slipstream.zip`. For the
 > latest `main` build use the **canary** zip —
@@ -127,7 +127,7 @@ The plugin check follows the [channel](/docs/channels) you installed from: a plu
 **stable** link tracks stable releases; one installed from the **canary** link tracks `main` builds.
 
 > **Updating the client from the terminal?** The Flatpak client is installed **per-user**, so run
-> `flatpak update --user io.unom.Slipstream` — **without `sudo`**. `sudo flatpak update` only touches
+> `flatpak update --user io.slipstream` — **without `sudo`**. `sudo flatpak update` only touches
 > the *system* installation and silently skips the client. (Un-sudo'd `flatpak update` updates both
 > scopes, so it's the safe default.)
 
@@ -165,7 +165,7 @@ Removing the plugin through Decky removes the plugin and nothing else, so do the
 3. **Remove the client**, if you're done streaming on this Deck. In Desktop Mode:
 
    ```sh
-   flatpak uninstall --user --delete-data io.unom.Slipstream
+   flatpak uninstall --user --delete-data io.slipstream
    ```
 
    Your identity and saved hosts live in `~/.config/slipstream` and survive that — delete the
@@ -181,4 +181,4 @@ per-account configset entry pointing at it. Leave them — with the shortcuts go
 nothing — or delete the file if you'd rather not see it offered as a template.
 
 The plugin source lives in
-[`clients/decky`](https://github.com/vindeckyy/slipstream.git/src/branch/main/clients/decky/README.md).
+[`clients/decky`](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/clients/decky/README.md).

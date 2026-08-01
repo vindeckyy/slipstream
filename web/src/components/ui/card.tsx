@@ -3,23 +3,32 @@ import type { ComponentProps } from "react";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-// The console's Card IS @unom/ui's animated card — a `bg-neutral` (#1c1530)
-// surface with a soft brand-violet ring, on-mount motion + material gloss
-// (enabled via UnomProviders). We keep the composed shadcn-style sub-component
-// API (CardHeader/Title/Description/Content/Footer own their own padding), so
-// the card defaults to `padding={false}` to avoid doubling it, and soften the
-// 2px ring to a subtle 1px brand tint.
+// The console's Card IS @unom/ui's animated card — tonal surface (`bg-neutral` /
+// `--card`) with on-mount motion + material gloss (via UnomProviders). We keep
+// the composed shadcn-style sub-component API (Header/Title/Description/Content/
+// Footer own their own padding), so the card defaults to `padding={false}` to
+// avoid doubling it. Surface elevation is M3-style: hairline border + soft
+// tonal shadow instead of a heavy brand ring.
 type CardProps = ComponentProps<typeof AnimatedCard>;
 
 const Card = ({
 	className,
 	padding = false,
+	interactive,
 	children,
 	...props
 }: CardProps) => (
 	<AnimatedCard
 		padding={padding}
-		className={cn("ring-1 ring-accent/40", className)}
+		interactive={interactive}
+		className={cn(
+			"ring-1 ring-border/80 shadow-sm",
+			"transition-[box-shadow,background-color,ring-color] duration-200 ease-out",
+			"motion-reduce:transition-none",
+			interactive &&
+				"hover:bg-muted/50 hover:shadow-md hover:ring-border dark:hover:bg-muted/40",
+			className,
+		)}
 		{...props}
 	>
 		{children}
@@ -33,7 +42,10 @@ const CardHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
 	<div
 		ref={ref}
-		className={cn("flex flex-col space-y-1.5 p-4 sm:p-6", className)}
+		className={cn(
+			"flex flex-col gap-1.5 px-4 pb-3 pt-4 sm:px-6 sm:pb-4 sm:pt-6",
+			className,
+		)}
 		{...props}
 	/>
 ));
@@ -45,7 +57,10 @@ const CardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
 	<div
 		ref={ref}
-		className={cn("font-semibold leading-none tracking-tight", className)}
+		className={cn(
+			"text-base font-semibold leading-snug tracking-tight text-card-foreground",
+			className,
+		)}
 		{...props}
 	/>
 ));
@@ -57,7 +72,7 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
 	<div
 		ref={ref}
-		className={cn("text-sm text-muted-foreground", className)}
+		className={cn("text-sm leading-relaxed text-muted-foreground", className)}
 		{...props}
 	/>
 ));
@@ -79,7 +94,10 @@ const CardContent = React.forwardRef<
 >(({ className, flush = false, ...props }, ref) => (
 	<div
 		ref={ref}
-		className={cn(!flush && "p-4 pt-0 sm:p-6 sm:pt-0", className)}
+		className={cn(
+			!flush && "px-4 pb-4 pt-0 sm:px-6 sm:pb-6 sm:pt-0",
+			className,
+		)}
 		{...props}
 	/>
 ));
@@ -91,7 +109,10 @@ const CardFooter = React.forwardRef<
 >(({ className, ...props }, ref) => (
 	<div
 		ref={ref}
-		className={cn("flex items-center p-4 pt-0 sm:p-6 sm:pt-0", className)}
+		className={cn(
+			"flex items-center gap-2 px-4 pb-4 pt-0 sm:px-6 sm:pb-6 sm:pt-0",
+			className,
+		)}
 		{...props}
 	/>
 ));

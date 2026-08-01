@@ -1,13 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HostView } from "@/sections/Host/view";
-import { compositors, hostInfo } from "./lib/fixtures";
+import { hostInfo } from "./lib/fixtures";
 
 const meta = {
 	title: "Pages/Host",
 	component: HostView,
 	args: {
 		host: { data: hostInfo, isLoading: false, error: null },
-		compositors: { data: compositors, isLoading: false, error: null },
 	},
 } satisfies Meta<typeof HostView>;
 
@@ -16,12 +15,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-/** A non-Linux host: compositor backends don't exist there, so the list is empty by design. */
-export const NoCompositors: Story = {
-	args: { compositors: { data: [], isLoading: false, error: null } },
-};
-
-/** A Windows host wears the Windows mark (and, correctly, has no compositors). */
+/** A Windows host wears the Windows mark. */
 export const WindowsHost: Story = {
 	args: {
 		host: {
@@ -29,7 +23,6 @@ export const WindowsHost: Story = {
 			isLoading: false,
 			error: null,
 		},
-		compositors: { data: [], isLoading: false, error: null },
 	},
 };
 
@@ -64,6 +57,5 @@ export const UnknownDistro: Story = {
 export const Loading: Story = {
 	args: {
 		host: { data: undefined, isLoading: true, error: null },
-		compositors: { data: undefined, isLoading: true, error: null },
 	},
 };

@@ -5,10 +5,10 @@
 //! shell never touches video (slipstream-planning `linux-client-rearchitecture.md`).
 #![forbid(unsafe_code)]
 
-// The UI-agnostic plumbing lives in `pf-client-core`, shared with the session binary.
+// The UI-agnostic plumbing lives in `ss-client-core`, shared with the session binary.
 // Root re-exports keep every `crate::trust`-style path resolving unchanged.
 #[cfg(target_os = "linux")]
-pub use pf_client_core::{discovery, gamepad, library, os, trust, video, wol};
+pub use ss_client_core::{discovery, gamepad, library, os, trust, video, wol};
 
 #[cfg(target_os = "linux")]
 mod app;

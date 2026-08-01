@@ -14,8 +14,8 @@
 use super::style::*;
 use super::{AppCtx, Screen};
 use crate::trust::{KnownHosts, Settings};
-use pf_client_core::profiles::{ProfilesFile, StreamProfile};
-use pf_client_core::trust::StatsVerbosity;
+use ss_client_core::profiles::{ProfilesFile, StreamProfile};
+use ss_client_core::trust::StatsVerbosity;
 use slipstream_core::config::GamepadPref;
 use std::sync::Arc;
 use windows_reactor::*;
@@ -933,9 +933,9 @@ pub(crate) fn settings_page(
     // labels are friendly names, the stored value is the endpoint id. Hidden when the
     // probe found at most the default; a saved device that's gone keeps a revertable
     // "(not detected)" entry, like the GPU row. Device facts — defaults scope only.
-    let (speakers, mics) = pf_client_core::audio::devices().unwrap_or_default();
+    let (speakers, mics) = ss_client_core::audio::devices().unwrap_or_default();
     let dev_combo = |saved: &str,
-                     devs: &[pf_client_core::audio::AudioDevice],
+                     devs: &[ss_client_core::audio::AudioDevice],
                      apply: fn(&mut Settings, String)| {
         let mut names = vec!["System default".to_string()];
         let mut keys = vec![String::new()];
@@ -1683,7 +1683,7 @@ pub(crate) fn settings_page(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pf_client_core::profiles::SettingsOverlay;
+    use ss_client_core::profiles::SettingsOverlay;
 
     /// Every overlay field maps to its row flag — including the tri-state resolution
     /// (any of width/height/match_window marks the one Resolution row) and the 4:4:4

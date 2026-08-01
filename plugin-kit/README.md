@@ -4,7 +4,7 @@ The Effect-based framework slipstream plugins are built on. It owns everything t
 same in every plugin — lifecycle, config/state, the sync engine, UI serving, the CLI
 scaffold, logging — so a plugin is just its domain logic, its HttpApi contract, and its UI.
 The reference consumer (and the blueprint to copy) is
-[`slipstream-plugin-rom-manager`](https://github.com/vindeckyy/slipstream.git-plugin-rom-manager).
+[`slipstream-plugin-rom-manager`](https://github.com/vindeckyy/slipstream/slipstream-plugin-rom-manager).
 
 Built on [`@slipstream/host`](../sdk) (the SDK stays the low-level host client; the kit is
 the opinionated plugin layer on top). Effect `4.x` and the SDK are peer dependencies —
@@ -51,8 +51,8 @@ export default definePluginKit({
 | `sseRoute` | the status SSE endpoint (httpapi has no event-stream media type) |
 | `runPluginCli` | `<bin> <command>` dispatcher reusing the plugin's layer graph (deliberately not `effect/unstable/cli` — that would drag platform packages into every plugin) |
 | `loggingLayer` | runner-journal line format |
-| `@slipstream/plugin-kit/react` | browser glue: `createPluginRouter` (path→hash→fallback deep-link restore + `pf-ui:navigate`), `resolvePluginBase`, `useIsEmbedded`, `ResultGate`, `sseAtom` |
-| `@slipstream/plugin-kit/theme.css` | the console's violet identity for plugin UIs (import first in your Tailwind entry) |
+| `@slipstream/plugin-kit/react` | browser glue: `createPluginRouter` (path→hash→fallback deep-link restore + `ss-ui:navigate`), `resolvePluginBase`, `useIsEmbedded`, `ResultGate`, `sseAtom` |
+| `@slipstream/plugin-kit/theme.css` | the console's cyan observatory identity for plugin UIs (import first in your Tailwind entry) |
 
 ## Telling the host how to recognize a running title (`detect`)
 

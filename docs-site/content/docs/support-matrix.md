@@ -294,7 +294,7 @@ This is a **GPU and encoder** question, not a compositor one, which is why it is
 | macOS · iOS · tvOS | VideoToolbox only | H.264, HEVC, AV1 ⁶ | ⚠️ ⁷ | ⚠️ ⁸ |
 | Android · Android TV | MediaCodec only ⁹ | H.264, HEVC, AV1 ¹⁰ | ⚠️ ⁷ | ❌ |
 | Moonlight | your Moonlight app's | negotiated | ⚠️ ¹¹ | ❌ |
-| LG webOS (`pf-webos`) | ❓ | ❓ | ❓ | ❓ ¹² |
+| LG webOS (`ss-webos`) | ❓ | ❓ | ❓ | ❓ ¹² |
 
 1. **The order depends on your GPU vendor.** NVIDIA and AMD get Vulkan Video first; Intel and
    unknown vendors get the platform decoder first (VAAPI on Linux, D3D11VA on Windows), because
@@ -328,7 +328,7 @@ This is a **GPU and encoder** question, not a compositor one, which is why it is
 11. Whether HDR is offered is decided by the host and layered into what Moonlight is told, so an
     HDR toggle only appears in Moonlight when the host could really do it. See
     [Moonlight](/docs/moonlight).
-12. `pf-webos` is a community client in a separate repository. Nothing in this codebase can
+12. `ss-webos` is a community client in a separate repository. Nothing in this codebase can
     establish its capabilities, so it is honestly blank rather than optimistically filled in.
 
 **Multi-slice frames** are advertised by the Linux and Windows desktop clients only. Apple and
@@ -517,7 +517,7 @@ capability.
 | **Decky plugin** (Steam Deck) | Ships through install-from-URL rather than the Decky store, and keeps itself and the client it launches up to date. It launches the Linux client rather than streaming itself, and has no settings surface of its own beyond the flat values it writes into the shared client settings. |
 | **Web console** | The full management surface — dashboard and sessions, pairing, library, displays, plugins and the plugin store, logs, stats, settings, and host updates. It cannot yet run a speed test or set a bitrate; the client apps can. |
 | **Plugins** | Three first-party ones (ROM Manager, Playnite, VirtualHere) plus the SDK, installed from the console. See [Plugins](/docs/plugins). |
-| **`pf-webos`** (LG TV) | A community client in a separate repository. Nothing here can establish its state; ask that project. |
+| **`ss-webos`** (LG TV) | A community client in a separate repository. Nothing here can establish its state; ask that project. |
 
 ## Mixing versions
 
@@ -565,7 +565,7 @@ whose caveat *is* "nobody has run this on real hardware" — a wrong ✅ is wors
   well-trodden path, and there is no probe that would catch it failing. One spawn-and-capture run on
   an NVIDIA box settles it.
 - **Touch input from a Windows client.** Same shared code as Linux, no on-glass run.
-- **The `pf-webos` LG TV client.** A community project in another repository. Its codecs, HDR
+- **The `ss-webos` LG TV client.** A community project in another repository. Its codecs, HDR
   behaviour and feature set cannot be established from here.
 - **Everything client-side about Moonlight.** Wake-on-LAN, overlays, updates and which extensions
   it sends differ per Moonlight flavour. The honest answer is "ask your Moonlight app".

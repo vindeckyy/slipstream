@@ -3,19 +3,19 @@
      assets/os-icons masters; see that directory's README for provenance/licensing).
      Registered under the hicolor-style layout IconTheme::add_resource_path expects. -->
 <gresources>
-  <gresource prefix="/io/unom/Slipstream">
-    <file>icons/scalable/actions/pf-os-windows-symbolic.svg</file>
-    <file>icons/scalable/actions/pf-os-apple-symbolic.svg</file>
-    <file>icons/scalable/actions/pf-os-linux-symbolic.svg</file>
-    <file>icons/scalable/actions/pf-os-steam-symbolic.svg</file>
-    <file>icons/scalable/actions/pf-os-ubuntu-symbolic.svg</file>
-    <file>icons/scalable/actions/pf-os-fedora-symbolic.svg</file>
-    <file>icons/scalable/actions/pf-os-arch-symbolic.svg</file>
-    <file>icons/scalable/actions/pf-os-debian-symbolic.svg</file>
-    <file>icons/scalable/actions/pf-os-nixos-symbolic.svg</file>
-    <file>icons/scalable/actions/pf-os-opensuse-symbolic.svg</file>
-    <file>icons/scalable/actions/pf-os-bazzite-symbolic.svg</file>
-    <file>icons/scalable/actions/pf-os-cachyos-symbolic.svg</file>
-    <file>icons/scalable/actions/pf-os-nobara-symbolic.svg</file>
+  <gresource prefix="/io/slipstream">
+    <file>icons/scalable/actions/ss-os-windows-symbolic.svg</file>
+    <file>icons/scalable/actions/ss-os-apple-symbolic.svg</file>
+    <file>icons/scalable/actions/ss-os-linux-symbolic.svg</file>
+    <file>icons/scalable/actions/ss-os-steam-symbolic.svg</file>
+    <file>icons/scalable/actions/ss-os-ubuntu-symbolic.svg</file>
+    <file>icons/scalable/actions/ss-os-fedora-symbolic.svg</file>
+    <file>icons/scalable/actions/ss-os-arch-symbolic.svg</file>
+    <file>icons/scalable/actions/ss-os-debian-symbolic.svg</file>
+    <file>icons/scalable/actions/ss-os-nixos-symbolic.svg</file>
+    <file>icons/scalable/actions/ss-os-opensuse-symbolic.svg</file>
+    <file>icons/scalable/actions/ss-os-bazzite-symbolic.svg</file>
+    <file>icons/scalable/actions/ss-os-cachyos-symbolic.svg</file>
+    <file>icons/scalable/actions/ss-os-nobara-symbolic.svg</file>
   </gresource>
 </gresources>

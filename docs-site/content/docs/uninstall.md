@@ -194,7 +194,7 @@ Uninstall from Add/Remove Programs (**Settings → Apps → Installed apps**) �
 if you installed with winget:
 
 ```powershell
-winget uninstall unom.SlipstreamHost
+winget uninstall vindeckyy.SlipstreamHost
 ```
 
 Both run the same uninstaller, which takes the `SlipstreamHost` service, the scheduled tasks, the
@@ -247,7 +247,7 @@ Removing a client does **not** tell the host to forget it. Unpair the device fro
 ### Linux — Flatpak
 
 ```sh
-flatpak uninstall --user --delete-data io.unom.Slipstream
+flatpak uninstall --user --delete-data io.slipstream
 ```
 
 `--delete-data` clears the Flatpak's own per-app directory. It does **not** clear
@@ -280,7 +280,7 @@ the paired identity — run `slipstream-client --reset` instead.
 ### Windows client (MSIX)
 
 ```powershell
-Get-AppxPackage unom.Slipstream | Remove-AppxPackage
+Get-AppxPackage vindeckyy.Slipstream | Remove-AppxPackage
 ```
 
 The client's saved hosts, settings and pairing identity live under `%APPDATA%\slipstream` and are not
@@ -315,7 +315,7 @@ launched and `~/.config/slipstream` all survive. The step-by-step is on
 
 ### LG webOS TV
 
-Remove the app from the TV's launcher like any other Homebrew Channel app. [`pf-webos`](https://github.com/dyptan-io/pf-webos)
+Remove the app from the TV's launcher like any other Homebrew Channel app. [`ss-webos`](https://github.com/dyptan-io/ss-webos)
 is a community project — its repository is the place for anything beyond that.
 
 ## Plugins and the script runner

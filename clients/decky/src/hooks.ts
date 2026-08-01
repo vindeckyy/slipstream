@@ -262,7 +262,7 @@ export function clientUpdateIsOneTap(info: UpdateInfo | null | undefined): boole
 
 /**
  * How the client got onto this box, in words a Deck user recognises. The raw kind comes from
- * the client's own detector (`pf_update_check::detect`); anything unmapped falls through as
+ * the client's own detector (`ss_update_check::detect`); anything unmapped falls through as
  * itself rather than as "unknown", because the raw word is still more useful than a shrug.
  */
 export function clientInstallLabel(kind: string): string {

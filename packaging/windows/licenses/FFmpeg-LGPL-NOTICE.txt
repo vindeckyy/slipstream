@@ -33,7 +33,7 @@ project. The exact source for the FFmpeg release used is available from:
   * Exact build recipe:      https://github.com/BtbN/FFmpeg-Builds
 
 A copy of the corresponding FFmpeg source for the version shipped here is
-available on request from the slipstream maintainers (https://github.com/vindeckyy/slipstream.git).
+available on request from the slipstream maintainers (https://github.com/vindeckyy/slipstream/slipstream).
 
 Trademark
 ---------

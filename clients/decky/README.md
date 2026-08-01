@@ -5,7 +5,7 @@ Stream to your **Steam Deck** without ever leaving Gaming Mode. This
 (the `…` button): discover hosts on your network, pair with a PIN, tweak stream settings, and launch
 a fullscreen, gamescope-focused stream — all from the couch, gamepad-navigable.
 
-The video itself is the native GTK4 Linux client (the `io.unom.Slipstream` flatpak); the plugin
+The video itself is the native GTK4 Linux client (the `io.slipstream` flatpak); the plugin
 discovers, pairs, configures, and *launches it the right way* so gamescope fullscreens it — the same
 Steam-shortcut trick MoonDeck uses. Because it's built from real Steam UI primitives (`@decky/ui`),
 the panel looks and feels native to Gaming Mode.
@@ -34,7 +34,7 @@ To leave a stream: the in-client controller chord (**L1 + R1 + Start + Select**)
 
 ## Install on the Deck
 
-You need **[Decky Loader](https://decky.xyz/)** and the **`io.unom.Slipstream` flatpak**
+You need **[Decky Loader](https://decky.xyz/)** and the **`io.slipstream` flatpak**
 ([`packaging/flatpak`](../../packaging/flatpak/README.md)) installed on the Deck — SteamOS `/usr` is
 read-only, so the flatpak (which bundles libadwaita/SDL3) is the canonical client. Discovery uses
 `avahi-browse`, which ships on SteamOS/Bazzite.
@@ -43,7 +43,7 @@ read-only, so the flatpak (which bundles libadwaita/SDL3) is the canonical clien
 **Install Plugin from URL**, paste:
 
 ```
-https://github.com/vindeckyy/slipstream/pf-decky
+https://github.com/vindeckyy/slipstream/ss-decky
 ```
 
 (short link for `https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/latest/slipstream.zip`;
@@ -62,7 +62,7 @@ kind so the answer is never a mystery:
 
 | Install | Update |
 | --- | --- |
-| **Flatpak** (the usual Deck client) | One tap. `flatpak update --user io.unom.Slipstream` — a per-user install, which is why `sudo flatpak update` never touches it. |
+| **Flatpak** (the usual Deck client) | One tap. `flatpak update --user io.slipstream` — a per-user install, which is why `sudo flatpak update` never touches it. |
 | **.deb / .rpm** (and rpm-ostree, which stages for the next reboot) | One tap, *after* an explicit opt-in: `sudo usermod -aG slipstream-update $USER`. The tap starts a fixed, parameterless root oneshot (`slipstream-client-update.service`) through polkit — nothing about the request is attacker-influenceable, and the payload comes from your distro's own signed repositories. |
 | **pacman** | Same, plus the root-owned `PACMAN_FULL_SYSUPGRADE=1` in `/etc/slipstream/update.conf` — a partial upgrade is against Arch doctrine, so the only thing the helper will run is a full `pacman -Syu`. |
 | **sysext, nix, a source build** | The plugin shows the command and stops. There is no feed behind those installs, and a button that can only fail is worse than one honest line. |

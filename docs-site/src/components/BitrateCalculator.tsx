@@ -93,7 +93,7 @@ function Toggle({
         fontSize: '0.9rem',
         fontWeight: 600,
         background: active
-          ? 'var(--color-fd-primary, #6c5bf3)'
+          ? 'var(--color-fd-primary, #0891b2)'
           : 'var(--color-fd-background, transparent)',
         color: active
           ? 'var(--color-fd-primary-foreground, #fff)'
@@ -239,7 +239,7 @@ export default function BitrateCalculator() {
           style={{
             fontSize: '2rem',
             fontWeight: 700,
-            color: 'var(--color-fd-primary, #6c5bf3)',
+            color: 'var(--color-fd-primary, #0891b2)',
             lineHeight: 1.1,
           }}
         >
@@ -288,7 +288,7 @@ export default function BitrateCalculator() {
                     width: `${Math.min(100, (mbps / l.mbps) * 100)}%`,
                     height: '100%',
                     background: fits
-                      ? 'var(--color-fd-primary, #6c5bf3)'
+                      ? 'var(--color-fd-primary, #0891b2)'
                       : '#e5484d',
                   }}
                 />

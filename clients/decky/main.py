@@ -47,8 +47,8 @@ from pathlib import Path
 
 import decky
 
-# Flatpak application id of the GTK client (packaging/flatpak/io.unom.Slipstream.yml).
-APP_ID = "io.unom.Slipstream"
+# Flatpak application id of the GTK client (packaging/flatpak/io.slipstream.yml).
+APP_ID = "io.slipstream"
 
 # Service type advertised by slipstream/1 hosts (matches NATIVE_SERVICE in the Rust host).
 SERVICE_TYPE = "_slipstream._udp"
@@ -197,7 +197,7 @@ def _parse_library_tsv(stdout: str) -> list[dict]:
 def _classify_library_error(stderr: str) -> str:
     """Map the client's ``library: <LibraryError Display>`` stderr line to a stable error
     code for the UI. Substring-matched against the Display strings in
-    ``crates/pf-client-core/src/library.rs`` — a wording change degrades to ``client-error``
+    ``crates/ss-client-core/src/library.rs`` — a wording change degrades to ``client-error``
     (generic copy), never a crash."""
     s = stderr.lower()
     if "didn't recognize this device" in s:
@@ -339,7 +339,7 @@ def _flatpak() -> str | None:
 # The flatpak is the Deck's usual client, but it is not the only one: a sysext, a .deb/.rpm, an
 # AUR build, a nix profile and a hand-built binary all install a NATIVE `slipstream-client`, and
 # on those the plugin used to be dead in the water — every headless call went through
-# `flatpak run io.unom.Slipstream` and simply failed. Both kinds keep identity, known-hosts and
+# `flatpak run io.slipstream` and simply failed. Both kinds keep identity, known-hosts and
 # settings in the same ~/.config/slipstream (the flatpak's sandbox HOME resolves to the real
 # home), so nothing else in this file has to care which one answered.
 NATIVE_BIN = "slipstream-client"
@@ -614,7 +614,7 @@ async def _client_update_state() -> dict:
 # drives the packaged root helper — and this backend is a UI over those, exactly as it already
 # is for `--pair` / `--library` / `--list-hosts`.
 #
-# Shape of `--check-update --json` (pf_client_core::update::Status):
+# Shape of `--check-update --json` (ss_client_core::update::Status):
 #   {kind, channel, current, latest, update_available, apply, applier, command,
 #    opt_in_hint?, notes_url, error?}
 # `applier` is what this file routes on: "flatpak" (we run flatpak), "helper" (the client runs
@@ -1002,7 +1002,7 @@ class Plugin:
                 new = _upsert_configset_entry(text, key, "template", CONTROLLER_TEMPLATE)
                 if new != text:
                     if f.exists():  # keep one recoverable backup before our first edit
-                        bak = f.with_name(f.name + ".pf-bak")
+                        bak = f.with_name(f.name + ".ss-bak")
                         if not bak.exists():
                             shutil.copyfile(f, bak)
                             _chown_like_parent(bak)

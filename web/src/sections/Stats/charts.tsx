@@ -24,15 +24,17 @@ import { m } from "@/paraglide/messages";
 const CHART_H = 240;
 
 const axisTick = { fontSize: 11, fill: "var(--muted-foreground)" } as const;
-const gridStroke = "var(--border)";
+const gridStroke = "color-mix(in oklab, var(--border) 85%, transparent)";
 const tooltipStyle = {
 	background: "var(--card)",
 	border: "1px solid var(--border)",
-	borderRadius: 8,
+	borderRadius: 10,
 	fontSize: 12,
 	color: "var(--foreground)",
+	boxShadow:
+		"0 8px 24px color-mix(in oklab, var(--background) 70%, transparent)",
 } as const;
-const legendStyle = { fontSize: 12 } as const;
+const legendStyle = { fontSize: 12, paddingTop: 4 } as const;
 
 // Known stages get a stable hue; anything else falls back to the palette by
 // appearance order, so an unexpected stage name still renders a distinct band.
@@ -40,14 +42,14 @@ const STAGE_COLORS: Record<string, string> = {
 	// `queue` (native pipeline's first stage) needs its own hue — without it, it fell back to
 	// PALETTE[0], which is capture's exact purple, making the bottom two bands indistinguishable.
 	queue: "#64748b",
-	capture: "#6c5bf3",
+	capture: "#0891b2",
 	submit: "#22a2f2",
 	encode: "#f2a922",
 	packetize: "#1fb6a8",
 	send: "#f25c8a",
 };
 const PALETTE = [
-	"#6c5bf3",
+	"#0891b2",
 	"#22a2f2",
 	"#f2a922",
 	"#1fb6a8",
@@ -82,7 +84,7 @@ function stageNames(samples: StatsSample[]): string[] {
 }
 
 function colorFor(name: string, i: number): string {
-	return STAGE_COLORS[name] ?? PALETTE[i % PALETTE.length] ?? "#6c5bf3";
+	return STAGE_COLORS[name] ?? PALETTE[i % PALETTE.length] ?? "#0891b2";
 }
 
 /**
@@ -163,29 +165,32 @@ export function LatencyChart({
 	}, [samples, names, p99]);
 
 	return (
-		<div className="space-y-2">
+		<div className="space-y-3">
 			{toggle && (
 				// The button used to be labelled with the percentile currently PLOTTED while looking
 				// like an action, so it read as "click to show p99" when p99 was already showing.
 				// Two explicit options, with the active one pressed, says which is which.
-				<div className="flex justify-end gap-1">
-					{([false, true] as const).map((wantP99) => (
-						<Button
-							key={String(wantP99)}
-							variant={p99 === wantP99 ? "default" : "outline"}
-							size="sm"
-							aria-pressed={p99 === wantP99}
-							onClick={() => setP99(wantP99)}
-						>
-							{wantP99 ? m.stats_p99() : m.stats_p50()}
-						</Button>
-					))}
+				<div className="flex justify-end">
+					<div className="inline-flex rounded-lg border border-border/70 bg-background/60 p-0.5">
+						{([false, true] as const).map((wantP99) => (
+							<Button
+								key={String(wantP99)}
+								variant={p99 === wantP99 ? "secondary" : "ghost"}
+								size="sm"
+								className="h-7 px-2.5"
+								aria-pressed={p99 === wantP99}
+								onClick={() => setP99(wantP99)}
+							>
+								{wantP99 ? m.stats_p99() : m.stats_p50()}
+							</Button>
+						))}
+					</div>
 				</div>
 			)}
 			<ChartFrame>
 				<AreaChart
 					data={rows}
-					margin={{ top: 6, right: 8, left: 0, bottom: 0 }}
+					margin={{ top: 8, right: 10, left: 0, bottom: 2 }}
 				>
 					<CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
 					<XAxis {...timeAxis} />
@@ -206,7 +211,7 @@ export function LatencyChart({
 							stackId="lat"
 							stroke={colorFor(n, i)}
 							fill={colorFor(n, i)}
-							fillOpacity={0.5}
+							fillOpacity={0.45}
 							isAnimationActive={false}
 						/>
 					))}
@@ -235,7 +240,7 @@ export function ThroughputChart({ samples }: { samples: StatsSample[] }) {
 	);
 	return (
 		<ChartFrame>
-			<LineChart data={rows} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+			<LineChart data={rows} margin={{ top: 8, right: 10, left: 0, bottom: 2 }}>
 				<CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
 				<XAxis {...timeAxis} />
 				<YAxis
@@ -259,7 +264,7 @@ export function ThroughputChart({ samples }: { samples: StatsSample[] }) {
 					type="monotone"
 					dataKey="fps"
 					name={m.stats_fps_new()}
-					stroke="#6c5bf3"
+					stroke="#0891b2"
 					dot={false}
 					isAnimationActive={false}
 				/>
@@ -324,14 +329,14 @@ export function HealthChart({
 	return (
 		<>
 			{kind === "gamestream" && (
-				<p className="mb-2 text-xs text-muted-foreground">
+				<p className="mb-3 text-xs text-muted-foreground">
 					{m.stats_health_gamestream_note()}
 				</p>
 			)}
 			<ChartFrame>
 				<LineChart
 					data={rows}
-					margin={{ top: 6, right: 8, left: 0, bottom: 0 }}
+					margin={{ top: 8, right: 10, left: 0, bottom: 2 }}
 				>
 					<CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
 					<XAxis {...timeAxis} />

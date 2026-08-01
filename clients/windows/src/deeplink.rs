@@ -131,7 +131,7 @@ pub(crate) fn forward_to_primary(url: &str) -> bool {
 /// window exists — it retries on its own thread until the shell window can be found.
 pub(crate) fn install_receiver() {
     std::thread::Builder::new()
-        .name("pf-deeplink-receiver".into())
+        .name("ss-deeplink-receiver".into())
         .spawn(|| {
             for _ in 0..200 {
                 // SAFETY: `FindWindowW` takes static literals, and `SetWindowSubclass` is given

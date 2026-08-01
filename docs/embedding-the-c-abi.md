@@ -752,4 +752,4 @@ mid-session mode change (`request_mode`), tear down and re-prepare the `mediacod
 - **Header (the contract):** [`include/slipstream_core.h`](../include/slipstream_core.h)
 - **Minimal C link + round-trip proof:** [`crates/slipstream-core/tests/c/`](../crates/slipstream-core/tests/c/)
 - **Core crate README:** [`crates/slipstream-core/README.md`](../crates/slipstream-core/README.md)
-- **A full reference client (Rust, same ABI surface):** `crates/pf-client-core/src/session.rs`
+- **A full reference client (Rust, same ABI surface):** `crates/ss-client-core/src/session.rs`

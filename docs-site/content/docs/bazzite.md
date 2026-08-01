@@ -33,7 +33,7 @@ maintainers ship via the [fedora-sysexts](https://fedora-sysexts.github.io/) pro
 
 ```sh
 # One-time bootstrap (afterwards the updater is on PATH as `slipstream-sysext`):
-curl -fsSLO https://github.com/vindeckyy/slipstream.git/raw/branch/main/packaging/bazzite/slipstream-sysext.sh
+curl -fsSLO https://github.com/vindeckyy/slipstream/slipstream/raw/branch/main/packaging/bazzite/slipstream-sysext.sh
 sudo bash slipstream-sysext.sh install          # add `--channel canary` for rolling builds
 ```
 
@@ -168,7 +168,7 @@ Bazzite/SteamOS. See [Configuration](/docs/configuration) for the full list of k
 ### Streaming the KDE Plasma desktop
 
 The **virtual output** (video) for the Desktop session needs no config — the host package ships an
-`io.unom.Slipstream.Host.desktop` file whose `X-KDE-Wayland-Interfaces` grants the host KWin's
+`io.slipstream.Host.desktop` file whose `X-KDE-Wayland-Interfaces` grants the host KWin's
 restricted screencast protocol on a normal interactive Plasma session (background:
 [KDE Plasma](/docs/kde)). After a **fresh host install, log out and back into the Desktop session
 once** so KWin re-reads that grant.

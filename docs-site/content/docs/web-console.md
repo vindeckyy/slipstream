@@ -48,23 +48,28 @@ game-library browsing to paired clients.
 The console is password-protected. Where that password lives and how you change it depends on the
 host platform.
 
-**Linux packages (apt / RPM / Bazzite).** On first start `slipstream-web-init` generates a random
-password and saves it to `~/.config/slipstream/web-password` (as `SLIPSTREAM_UI_PASSWORD=…`). Read it
-back from the init service's journal or straight from the file:
+**Linux packages (apt / RPM / Bazzite).** On a new install, open the console and choose the password
+when the setup screen appears. It is then saved to `~/.config/slipstream/web-password` as
+`SLIPSTREAM_UI_PASSWORD=…`.
+
+For new Linux and SteamOS consoles, open the page from a trusted device first. Until the password is
+saved, the first visitor can complete setup.
 
 ```sh
-journalctl --user -u slipstream-web-init | sed -n 's/.*password generated: //p'
 sed -n 's/^SLIPSTREAM_UI_PASSWORD=//p' ~/.config/slipstream/web-password
 ```
+
+Older Linux installs may already have a generated password in that file. Read it with the command
+above, or remove the file before restarting the console if you want the browser setup screen instead.
 
 To set your own, edit that file (`SLIPSTREAM_UI_PASSWORD=<your-password>`) and restart the console:
 `systemctl --user restart slipstream-web`.
 
-**SteamOS host.** Same idea, but the install script writes the generated password to
-`~/.config/slipstream/web.env` and prints it at the end of the install run:
+**SteamOS host.** New installs ask you to choose the password in the browser. The password is saved
+to `~/.config/slipstream/web-password`; the session secret remains in `web.env`:
 
 ```sh
-sed -n 's/^SLIPSTREAM_UI_PASSWORD=//p' ~/.config/slipstream/web.env
+sed -n 's/^SLIPSTREAM_UI_PASSWORD=//p' ~/.config/slipstream/web-password
 ```
 
 Edit that file and `systemctl --user restart slipstream-web` to change it.

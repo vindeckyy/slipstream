@@ -43,11 +43,11 @@ desktop (UAC prompts, the lock screen).
 ## Install
 
 Download the signed `slipstream-host-setup-<ver>.exe` from the
-[latest release](https://github.com/vindeckyy/slipstream.git/releases) and run it. The installer:
+[latest release](https://github.com/vindeckyy/slipstream/slipstream/releases) and run it. The installer:
 
 - drops the host into `C:\Program Files\slipstream` and registers + starts the **`SlipstreamHost`**
   service,
-- installs the bundled **virtual-display driver** (`pf-vdisplay`) so the host can create per-client
+- installs the bundled **virtual-display driver** (`ss-vdisplay`) so the host can create per-client
   displays,
 - installs the bundled **virtual gamepad drivers** (DualSense, DualShock 4, Xbox 360),
 - registers the bundled **HDR Vulkan layer** so Vulkan games can enable HDR over the virtual display,
@@ -60,7 +60,7 @@ Download the signed `slipstream-host-setup-<ver>.exe` from the
 Prefer the CLI, or want the full service/firewall details? See
 [Running as a Service → Windows](/docs/running-as-a-service#windows).
 Packaging internals live in
-[`packaging/windows`](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/windows/README.md).
+[`packaging/windows`](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/windows/README.md).
 
 ### Install with winget
 
@@ -69,7 +69,7 @@ per machine, from an **elevated** terminal:
 
 ```powershell
 winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest
-winget install unom.SlipstreamHost
+winget install vindeckyy.SlipstreamHost
 ```
 
 Before it downloads anything, winget shows the package's agreements — the bundled VB-CABLE notice,
@@ -83,12 +83,12 @@ To change an individual installer task on the silent path, pass the whole switch
 line:
 
 ```powershell
-winget install unom.SlipstreamHost --override "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /MERGETASKS=gamestream"
+winget install vindeckyy.SlipstreamHost --override "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /MERGETASKS=gamestream"
 ```
 
 The source carries every **stable** release, so `--version <x.y.z>` installs a specific one instead
 of the newest; canary builds are not published there — use the setup `.exe` for those. Later updates
-are `winget upgrade unom.SlipstreamHost` and removal is `winget uninstall unom.SlipstreamHost`.
+are `winget upgrade vindeckyy.SlipstreamHost` and removal is `winget uninstall vindeckyy.SlipstreamHost`.
 
 ### About the signatures
 
@@ -208,7 +208,7 @@ detail, set `RUST_LOG=debug` in `host.env` and restart the service.
 ### Updating
 
 The web console's Host page shows an **Updates** card with an **Update now** button —
-see [Updating the Host](/docs/updating). You can also run `winget upgrade unom.SlipstreamHost`, or
+see [Updating the Host](/docs/updating). You can also run `winget upgrade vindeckyy.SlipstreamHost`, or
 simply run the newer `slipstream-host-setup-<ver>.exe` over the old install. All three upgrade in
 place and keep your config, pairings and console password. If an update you started from the console
 leaves the host crash-looping, the service rolls itself back to the cached previous installer and
@@ -217,11 +217,11 @@ records why in the Updates card.
 ### Uninstalling
 
 Open **Settings → Apps → Installed apps → Slipstream Host → Uninstall**, or run
-`winget uninstall unom.SlipstreamHost`. Either way the uninstaller:
+`winget uninstall vindeckyy.SlipstreamHost`. Either way the uninstaller:
 
 - closes the status icon,
 - stops and removes the **`SlipstreamHost`** service and its firewall rules,
-- removes the `pf-vdisplay` and virtual-gamepad drivers — the device nodes *and* their driver-store
+- removes the `ss-vdisplay` and virtual-gamepad drivers — the device nodes *and* their driver-store
   packages — together with the `CN=slipstream-driver` certificate it had added,
 - removes the **`SlipstreamScripting`** scheduled task (and the legacy **`SlipstreamWeb`** task older
   versions used for the console) and the console firewall rule,
@@ -266,15 +266,15 @@ pipeline orchestration are all shared with the Linux host. The Windows host is a
 
 | Subsystem | Linux backend | Windows backend |
 |---|---|---|
-| **Capture** | xdg ScreenCast portal → PipeWire (dmabuf) | **IDD direct-push** — the `pf-vdisplay` driver copies finished frames into a host-owned shared GPU texture ring that the host consumes in-process (no Desktop Duplication, no Windows.Graphics.Capture); FP16/10-bit when the session negotiated HDR |
-| **Virtual display** | KWin / Mutter / Sway / gamescope | **pf-vdisplay** signed IDD — create a `WxH@Hz` monitor per session, capture it, tear it down |
+| **Capture** | xdg ScreenCast portal → PipeWire (dmabuf) | **IDD direct-push** — the `ss-vdisplay` driver copies finished frames into a host-owned shared GPU texture ring that the host consumes in-process (no Desktop Duplication, no Windows.Graphics.Capture); FP16/10-bit when the session negotiated HDR |
+| **Virtual display** | KWin / Mutter / Sway / gamescope | **ss-vdisplay** signed IDD — create a `WxH@Hz` monitor per session, capture it, tear it down |
 | **Encode** | NVENC (CUDA) / VAAPI (AMD·Intel) / Vulkan Video / software, plus [PyroWave](/docs/pyrowave) | **NVENC** (NVIDIA) · **AMF** (AMD) · **QSV** (Intel) · software H.264 — H.264, HEVC (Main10 / BT.2020 PQ for HDR) and AV1 where the GPU supports it, plus [PyroWave](/docs/pyrowave) |
 | **Input — mouse/keyboard** | libei / wlr protocols | **SendInput** (Win32 VK + absolute mouse) |
 | **Input — gamepads** | uinput Xbox 360 + UHID DualSense/DS4 | **UMDF** virtual pads — DualSense, DualShock 4, Xbox 360 (XUSB) + rumble |
 | **Audio capture** | PipeWire sink-monitor | **WASAPI loopback** |
 | **Virtual mic** | PipeWire `Audio/Source` | **VB-CABLE** virtual device (optional), captured via WASAPI |
 
-The virtual display is **pf-vdisplay**, Slipstream's own all-Rust **Indirect Display Driver (IDD)**. The
+The virtual display is **ss-vdisplay**, Slipstream's own all-Rust **Indirect Display Driver (IDD)**. The
 host creates a shared GPU texture ring and the driver pushes finished frames straight into it — a real
 virtual display at the client's exact `WxH@Hz`, with no physical monitor and no dummy plug, captured
 in-process from Session 0 so the secure desktop streams too. There is **no** Desktop Duplication or

@@ -1,5 +1,5 @@
 {
-  "$comment": "Cross-language contract for the slipstream:// grammar (design/client-deep-links.md §2). The Rust (crates/pf-client-core/src/deeplink.rs), Swift (SlipstreamShared/DeepLink.swift) and Kotlin parsers each run every case in their own test suite, so the three cannot drift into three different security postures. `expect` fields absent from a case must parse as absent; `emit` is the canonical URL the parsed link must serialise back to (note that pf:// never round-trips — it is an accepted input alias, never an output). `error` is the stable refusal code, not a message.",
+  "$comment": "Cross-language contract for the slipstream:// grammar (design/client-deep-links.md §2). The Rust (crates/ss-client-core/src/deeplink.rs), Swift (SlipstreamShared/DeepLink.swift) and Kotlin parsers each run every case in their own test suite, so the three cannot drift into three different security postures. `expect` fields absent from a case must parse as absent; `emit` is the canonical URL the parsed link must serialise back to (note that pf:// never round-trips — it is an accepted input alias, never an output). `error` is the stable refusal code, not a message.",
   "version": 1,
   "cases": [
     {
@@ -38,7 +38,7 @@
       }
     },
     {
-      "name": "pf-alias-parses-but-is-never-emitted",
+      "name": "ss-alias-parses-but-is-never-emitted",
       "url": "pf://connect/Desk",
       "expect": {
         "route": "connect",

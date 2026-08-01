@@ -1,7 +1,7 @@
 // The host row's OS mark, resolved from the host's OS-identity chain (mDNS `os` TXT /
 // `--list-hosts` `os`, e.g. "linux/fedora/bazzite"): walk the chain most-specific-first and
 // take the first token we ship a mark for, so an unknown distro degrades to its family's
-// mark and finally to Tux. Mirrors pf-client-core's `os_icon_tokens` (aliases macos→apple,
+// mark and finally to Tux. Mirrors ss-client-core's `os_icon_tokens` (aliases macos→apple,
 // steamos→steam); null when the chain is absent or entirely unknown — the row then renders
 // exactly as it did before the field existed.
 //

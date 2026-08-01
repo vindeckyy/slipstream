@@ -52,13 +52,13 @@ pub fn install() {
 }
 
 /// The `file:///` URI of the mark for an OS-identity chain: walk most-specific-first
-/// (pf-client-core's shared order/aliases) and take the first token we ship art for.
+/// (ss-client-core's shared order/aliases) and take the first token we ship art for.
 /// `None` (no image element at all) when the host doesn't advertise a chain or nothing
 /// in it is recognized — the tile then renders exactly as it did before the field.
 pub fn uri(chain: &str) -> Option<String> {
     static DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
     let dir = DIR.get_or_init(dir).as_ref()?;
-    let token = pf_client_core::os::os_icon_tokens(chain)
+    let token = ss_client_core::os::os_icon_tokens(chain)
         .into_iter()
         .find(|t| ICONS.iter().any(|(name, _)| name == t))?;
     let p = dir.join(format!("{token}.png"));

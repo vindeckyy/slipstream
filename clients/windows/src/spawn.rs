@@ -144,7 +144,7 @@ pub(crate) fn spawn_session(
     slot: SessionChild,
     on_event: impl FnMut(SpawnEvent) + Send + 'static,
 ) -> Result<(), String> {
-    use pf_client_core::orchestrate::{ConnectPlan, HostTarget};
+    use ss_client_core::orchestrate::{ConnectPlan, HostTarget};
     let mut plan = ConnectPlan::for_target(
         HostTarget {
             name: String::new(), // display-only; this shell's screens carry their own copy
@@ -264,7 +264,7 @@ fn spawn_with(
                     // The window size is the spawner's to persist — the renderer only
                     // reports it (same handling as orchestrate's own reader).
                     Some(ChildLine::Window { w, h }) => {
-                        pf_client_core::orchestrate::persist_window_size(w, h);
+                        ss_client_core::orchestrate::persist_window_size(w, h);
                     }
                     None => {}
                 }

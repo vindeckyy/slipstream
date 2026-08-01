@@ -5,7 +5,7 @@
 //! of one process), the session's end returns to the console, B at the root quits to
 //! Gaming Mode.
 //!
-//! This file is the console's SERVICE side: the shell (pf-console-ui) renders and
+//! This file is the console's SERVICE side: the shell (ss-console-ui) renders and
 //! raises [`ConsoleCmd`]s; worker threads here run everything that blocks — mDNS
 //! discovery, reachability probes, the SPAKE2 pairing ceremony, wake-on-LAN loops,
 //! library fetches, known-hosts persistence — and write results into the shared
@@ -15,14 +15,14 @@
 use crate::session_main::{
     arg_flag, arg_value, fullscreen_mode, parse_host_port, session_params, window_pos,
 };
-use pf_client_core::gamepad::is_steam_deck;
-use pf_client_core::{discovery, library, trust, wol};
-use pf_console_ui::{
+use ss_client_core::gamepad::is_steam_deck;
+use ss_client_core::{discovery, library, trust, wol};
+use ss_console_ui::{
     ConsoleCmd, ConsoleEntry, ConsoleHandles, ConsoleOptions, ConsoleShared, HostRow, LibraryGame,
     LibraryPhase, LibraryShared, PairPhase, SkiaOverlay, WakeStatus,
 };
-use pf_presenter::overlay::OverlayAction;
-use pf_presenter::ActionOutcome;
+use ss_presenter::overlay::OverlayAction;
+use ss_presenter::ActionOutcome;
 use std::collections::{HashMap, VecDeque};
 use std::net::Ipv4Addr;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -153,7 +153,7 @@ pub fn run(target: Option<&str>) -> u8 {
     let pending_approval: Arc<Mutex<Option<PendingApproval>>> = Arc::new(Mutex::new(None));
     let pending_cb = pending_approval.clone();
 
-    let opts = pf_presenter::SessionOpts {
+    let opts = ss_presenter::SessionOpts {
         window_title: window_label.map_or_else(
             || "Slipstream".to_string(),
             |label| format!("Slipstream · {label}"),
@@ -193,7 +193,7 @@ pub fn run(target: Option<&str>) -> u8 {
     };
 
     let result =
-        pf_presenter::run_browse(opts, |action, gamepad, native, force_software, vulkan| {
+        ss_presenter::run_browse(opts, |action, gamepad, native, force_software, vulkan| {
             match action {
                 OverlayAction::Launch {
                     addr,
@@ -311,7 +311,7 @@ impl Service {
     fn start(
         console: ConsoleShared,
         library_model: LibraryShared,
-        bus: pf_console_ui::ConsoleBus,
+        bus: ss_console_ui::ConsoleBus,
         identity: (String, String),
         seed: Option<HostRow>,
     ) -> Service {
@@ -349,7 +349,7 @@ impl Service {
 struct ServiceState {
     console: ConsoleShared,
     library: LibraryShared,
-    bus: pf_console_ui::ConsoleBus,
+    bus: ss_console_ui::ConsoleBus,
     identity: (String, String),
     /// A `--browse` target that isn't in the store yet — kept on the list until the
     /// store or discovery covers it.

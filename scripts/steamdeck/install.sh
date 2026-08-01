@@ -204,16 +204,16 @@ fi
 
 # KWin authorization for Desktop-Mode streaming (and mid-stream Game↔Desktop switches): KWin
 # resolves a connecting client's /proc/<pid>/exe against a .desktop `Exec=` and only then grants
-# the restricted Wayland globals it lists (see packaging/linux/io.unom.Slipstream.Host.desktop).
+# the restricted Wayland globals it lists (see packaging/linux/io.slipstream.Host.desktop).
 # Exec must therefore be THIS install's binary path, not the packaged /usr/bin one. KWin reads
 # grants at session start — after first install, restart the Desktop session (Game Mode and back).
-DESKTOP_DST="$HOME/.local/share/applications/io.unom.Slipstream.Host.desktop"
+DESKTOP_DST="$HOME/.local/share/applications/io.slipstream.Host.desktop"
 # First-time install of the grant: KWin only reads it at session start, so a fresh login is required
 # before Desktop-mode capture works. A re-run that just rewrites it needs no relogin.
 [ -f "$DESKTOP_DST" ] || NEED_RELOGIN=1
 mkdir -p "$HOME/.local/share/applications"
-sed "s|^Exec=.*|Exec=$BIN|" "$SRC/packaging/linux/io.unom.Slipstream.Host.desktop" > "$DESKTOP_DST"
-ok "KWin desktop-capture authorization (io.unom.Slipstream.Host.desktop → $BIN)"
+sed "s|^Exec=.*|Exec=$BIN|" "$SRC/packaging/linux/io.slipstream.Host.desktop" > "$DESKTOP_DST"
+ok "KWin desktop-capture authorization (io.slipstream.Host.desktop → $BIN)"
 
 # KDE Desktop-mode INPUT: a normal Plasma login lacks the RemoteDesktop portal grant the host's libei
 # input path needs, so it would pop an "Allow remote control?" dialog a headless host can't answer.
@@ -231,18 +231,16 @@ elif [ -s "$GRANT_SRC" ]; then
 fi
 
 if [ "$WITH_WEB" = 1 ] && [ ! -f "$CONFIG/web.env" ]; then
-    # Random login password + session secret for the web console, generated once.
+    # Keep the session secret here. The browser creates the login password on first visit.
     # `|| true` swallows the SIGPIPE `tr` takes when `head` closes the pipe (pipefail would abort).
-    WEB_PW="$(LC_ALL=C tr -dc 'a-z0-9' </dev/urandom 2>/dev/null | head -c 12 || true)"
     WEB_SECRET="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom 2>/dev/null | head -c 32 || true)"
     cat > "$CONFIG/web.env" <<EOF
-SLIPSTREAM_UI_PASSWORD=$WEB_PW
 SLIPSTREAM_UI_SECRET=$WEB_SECRET
 EOF
     chmod 600 "$CONFIG/web.env"
-    ok "wrote web.env (generated login password)"
+    ok "wrote web.env (browser password setup enabled)"
 else
-    [ "$WITH_WEB" = 1 ] && ok "web.env exists (login password unchanged)"
+    [ "$WITH_WEB" = 1 ] && ok "web.env exists (session secret unchanged)"
 fi
 
 # --- 3b. HDR gamescope (slipstream-gamescope, best-effort) ------------------
@@ -401,7 +399,7 @@ echo
 log "Done — slipstream host is running on this Steam Deck"
 echo "  • Host status:   systemctl --user status slipstream-host"
 if [ "$WITH_WEB" = 1 ]; then
-    echo "  • Web console:   https://${IP:-steamdeck.local}:$WEB_PORT   (login: see $CONFIG/web.env)"
+    echo "  • Web console:   https://${IP:-steamdeck.local}:$WEB_PORT   (choose a login password on first visit)"
     echo "  • Pair a device: open the web console → Devices → arm pairing → enter the PIN on the client"
 fi
 if [ "$OPEN" = 1 ]; then

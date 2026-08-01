@@ -157,7 +157,7 @@ deliberate about which machine you host on — see [Security & Safe Use](/docs/s
 
 The easy path is the **signed installer**: download `slipstream-host-setup-<ver>.exe` from the package
 registry ([`slipstream-host-windows`](https://github.com/vindeckyy/slipstream/unom/-/packages)) and run it. It drops the host
-into `C:\Program Files\slipstream`, installs the bundled **pf-vdisplay** virtual-display driver, and
+into `C:\Program Files\slipstream`, installs the bundled **ss-vdisplay** virtual-display driver, and
 registers + starts the service for you (`/VERYSILENT` for unattended). Upgrades and uninstall are
 handled through Add/Remove Programs.
 

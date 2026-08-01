@@ -58,7 +58,7 @@ kwin_wayland --version
 ## Streaming the interactive desktop
 
 To stream a logged-in Plasma desktop (rather than a headless session, below), KWin has to hand the
-host its restricted screencast protocol. The host package ships an `io.unom.Slipstream.Host.desktop`
+host its restricted screencast protocol. The host package ships an `io.slipstream.Host.desktop`
 file whose `X-KDE-Wayland-Interfaces` grants exactly that on a normal interactive session
 (least-privilege, the same mechanism krfb/krdp use). After a **fresh install, log out and back into
 the Desktop session once** so KWin re-reads the grant.

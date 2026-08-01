@@ -27,7 +27,7 @@ RUN dnf -y install \
       mesa-libGL-devel mesa-libgbm-devel \
       # slipstream-client link deps (GTK4 shell + SDL3 gamepads)
       gtk4-devel libadwaita-devel SDL3-devel \
-      # pf-ffvk bindgen over libavutil/hwcontext_vulkan.h needs <vulkan/vulkan.h>
+      # ss-ffvk bindgen over libavutil/hwcontext_vulkan.h needs <vulkan/vulkan.h>
       vulkan-headers \
   && dnf clean all
 

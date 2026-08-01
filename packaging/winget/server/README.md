@@ -8,9 +8,9 @@ Slipstream Windows host, so users can install and upgrade with `winget` instead 
 # one-time, from an ELEVATED prompt (winget requires admin to add a source)
 winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest
 
-winget install unom.SlipstreamHost                 # silent, wizard defaults
-winget install unom.SlipstreamHost --interactive   # the full wizard
-winget upgrade unom.SlipstreamHost
+winget install vindeckyy.SlipstreamHost                 # silent, wizard defaults
+winget install vindeckyy.SlipstreamHost --interactive   # the full wizard
+winget upgrade vindeckyy.SlipstreamHost
 ```
 
 ## Why self-hosted rather than the community repo

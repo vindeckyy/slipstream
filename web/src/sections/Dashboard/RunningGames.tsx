@@ -5,6 +5,7 @@ import type { GameEntry } from "@/api/gen/model/gameEntry";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages";
 
 /**
@@ -21,17 +22,19 @@ export const RunningGames: FC<{
 	onEnd: (game: ActiveGame) => void;
 	isEnding: boolean;
 }> = ({ games, library, onEnd, isEnding }) => {
-	if (games.length === 0) return null;
+	// Older hosts omit `games` from `/status`; treat missing as empty so Home does not crash.
+	const rows = games ?? [];
+	if (rows.length === 0) return null;
 	return (
 		<Card>
-			<CardHeader>
+			<CardHeader className="pb-3 sm:pb-3">
 				<CardTitle className="flex items-center gap-2">
-					<Gamepad2 className="size-4" />
+					<Gamepad2 className="size-4 shrink-0 text-muted-foreground" />
 					{m.games_title()}
 				</CardTitle>
 			</CardHeader>
-			<CardContent className="flex flex-col gap-3">
-				{games.map((g, i) => (
+			<CardContent className="flex flex-col gap-2">
+				{rows.map((g, i) => (
 					<GameRow
 						// A host can run the same title for two clients at once (native admits concurrent
 						// sessions), so the title alone is not a key. The index is the last resort: every
@@ -57,12 +60,19 @@ const GameRow: FC<{
 }> = ({ game, art, onEnd, isEnding }) => {
 	const waiting = game.state === "grace";
 	return (
-		<div className="flex items-center gap-3">
+		<div
+			className={cn(
+				"flex items-center gap-3 rounded-lg border border-transparent px-2 py-2 sm:px-3",
+				waiting
+					? "border-destructive/30 bg-destructive/10"
+					: "bg-muted/30",
+			)}
+		>
 			{/* Fixed slot so rows line up whether or not a title has a cover. Plenty won't: an
 			    operator-typed command has no catalog entry behind it, a custom entry may carry no
 			    art, and nothing does until `/library` has loaded — an empty box reads as broken, so
 			    the placeholder says "game" instead of nothing. */}
-			<div className="flex h-16 w-11 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
+			<div className="flex h-14 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
 				{art ? (
 					<img
 						src={art}
@@ -71,12 +81,12 @@ const GameRow: FC<{
 						className="size-full object-cover"
 					/>
 				) : (
-					<Gamepad2 className="size-5 text-muted-foreground/60" />
+					<Gamepad2 className="size-4 text-muted-foreground/60" />
 				)}
 			</div>
 			<div className="min-w-0 flex-1">
 				<div className="flex flex-wrap items-center gap-2">
-					<span className="truncate font-medium">{game.title}</span>
+					<span className="truncate text-sm font-semibold">{game.title}</span>
 					<Badge variant={waiting ? "destructive" : stateVariant(game.state)}>
 						{stateLabel(game.state)}
 					</Badge>
@@ -94,6 +104,7 @@ const GameRow: FC<{
 				size="sm"
 				disabled={isEnding}
 				onClick={onEnd}
+				className="shrink-0"
 			>
 				<XCircle className="size-3.5" />
 				{m.games_end_now()}

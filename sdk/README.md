@@ -1,6 +1,6 @@
 # @slipstream/host
 
-TypeScript SDK for the [slipstream](https://github.com/vindeckyy/slipstream.git) streaming host: a typed
+TypeScript SDK for the [slipstream](https://github.com/vindeckyy/slipstream/slipstream) streaming host: a typed
 management-API client plus the host's lifecycle **event stream** (client connect/disconnect,
 stream start/stop, pairing, displays, library) — built on [Effect](https://effect.website).
 

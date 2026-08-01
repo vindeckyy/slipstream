@@ -11,8 +11,8 @@
 # (PipeWire, Wayland, xkbcommon, GL/EGL/GBM, Vulkan; opus is vendored via cmake) is soname-compatible
 # on 24.04, so this ONE universal host .deb replaces the 26.04-built one for every Ubuntu user.
 #
-# libcuda is deliberately NOT provided: the host dlopen's libcuda.so.1 at runtime (pf-zerocopy /
-# pf-encode) and never link-imports it, so — unlike the full-workspace rust-ci image, which builds
+# libcuda is deliberately NOT provided: the host dlopen's libcuda.so.1 at runtime (ss-zerocopy /
+# ss-encode) and never link-imports it, so — unlike the full-workspace rust-ci image, which builds
 # tests that DO link a cuda stub — this host-only build needs no NVIDIA driver package. NVENC/EGL
 # come from whatever driver the target runs, out of band.
 #

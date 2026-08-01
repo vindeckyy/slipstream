@@ -1,0 +1,513 @@
+//! The nvhttp servers: plain HTTP on 47989 and mutual-TLS on 47984. Serves `/serverinfo`,
+//! the `/pair` flow, `/applist`, and `/launch`/`/resume`/`/cancel`. Over HTTPS the client is
+//! mutual-TLS-authenticated, so `/serverinfo` reports `PairStatus=1` there.
+//!
+//! The pairing PIN is delivered out-of-band ONLY through the bearer-authenticated management
+//! API (`POST /api/v1/pair/pin`): the operator reads the PIN off the Moonlight client and
+//! types it into the host console. There is deliberately NO unauthenticated nvhttp PIN
+//! endpoint — one would let a network client submit its own displayed PIN and drive the whole
+//! ceremony to a pinned cert with no operator consent (security-review 2026-06-28 #1).
+
+use super::tls::{PeerAddr, PeerCertFingerprint};
+use super::{serverinfo, AppState, LaunchSession, HTTPS_PORT, HTTP_PORT, RTSP_PORT};
+use anyhow::{anyhow, Context, Result};
+use axum::{
+    extract::{Query, State},
+    http::{header, StatusCode},
+    response::{IntoResponse, Response},
+    routing::get,
+    Extension, Router,
+};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::sync::Arc;
+
+/// Which listener a request arrived on — HTTPS means a mutual-TLS-authenticated client.
+#[derive(Clone, Copy)]
+struct Https(bool);
+
+pub async fn run(state: Arc<AppState>) -> Result<()> {
+    // Mutual-TLS: request + verify the client cert (Moonlight presents one for the
+    // post-pairing pairchallenge + all post-pair endpoints).
+    let tls = super::tls::server_config(&state.identity.cert_pem, &state.identity.key_pem)?;
+
+    let http_addr = SocketAddr::from(([0, 0, 0, 0], HTTP_PORT));
+    let https_addr = SocketAddr::from(([0, 0, 0, 0], HTTPS_PORT));
+    tracing::info!(%http_addr, %https_addr, "nvhttp listening (serverinfo + pair + launch)");
+
+    let http = axum_server::bind(http_addr).serve(router(state.clone(), false).into_make_service());
+    // HTTPS runs the handshake itself (super::tls::serve_https) so handlers see the verified peer
+    // cert as a PeerCertFingerprint extension; the post-pair endpoints gate on the paired allow-list.
+    tokio::try_join!(
+        async { http.await.context("nvhttp HTTP server") },
+        super::tls::serve_https(https_addr, router(state, true), tls),
+    )?;
+    Ok(())
+}
+
+/// True iff the request arrived over HTTPS with a client cert whose SHA-256 fingerprint is pinned
+/// in the paired allow-list. Plain-HTTP requests carry no client cert and are never paired. This is
+/// the post-handshake authorization check (Apollo's `get_verified_cert`) gating the launch surface.
+fn peer_is_paired(peer: &Option<Extension<PeerCertFingerprint>>, st: &AppState) -> bool {
+    let Some(Extension(PeerCertFingerprint(Some(fp)))) = peer else {
+        return false;
+    };
+    st.paired
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|der| hex::encode(slipstream_core::quic::endpoint::cert_fingerprint(der)) == *fp)
+}
+
+/// The peer's client-cert fingerprint as raw bytes — the form [`LaunchSession::owner_fp`] stores.
+/// `None` when no (or a blank/short) cert was presented.
+fn peer_fp(peer: &Option<Extension<PeerCertFingerprint>>) -> Option<[u8; 32]> {
+    match peer {
+        Some(Extension(PeerCertFingerprint(Some(fp)))) => hex::decode(fp)
+            .ok()
+            .and_then(|v| <[u8; 32]>::try_from(v).ok()),
+        _ => None,
+    }
+}
+
+/// Whether the caller may control (resume/cancel) the current launch session. `true` when there is
+/// no session (nothing to protect — keeps cancel idempotent), or the session's owner fingerprint
+/// matches the caller's. Only a paired-but-DIFFERENT client with a known, mismatching fingerprint is
+/// rejected — so a same-client control action always succeeds, but one paired client can no longer
+/// resume or cancel *another* paired client's session (security-review 2026-07-17).
+fn peer_may_control_session(peer: &Option<Extension<PeerCertFingerprint>>, st: &AppState) -> bool {
+    match st.launch.lock().unwrap().as_ref() {
+        None => true,
+        Some(session) => match (session.owner_fp, peer_fp(peer)) {
+            (Some(owner), Some(caller)) => owner == caller,
+            // Owner or caller fingerprint unknown → the `peer_is_paired` gate already applied stands.
+            _ => true,
+        },
+    }
+}
+
+fn router(state: Arc<AppState>, https: bool) -> Router {
+    Router::new()
+        .route("/serverinfo", get(h_serverinfo))
+        .route("/pair", get(h_pair))
+        .route("/applist", get(h_applist))
+        .route("/appasset", get(h_appasset))
+        .route("/launch", get(h_launch))
+        .route("/resume", get(h_resume))
+        .route("/cancel", get(h_cancel))
+        .layer(Extension(Https(https)))
+        .with_state(state)
+}
+
+fn xml(body: String) -> impl IntoResponse {
+    ([(header::CONTENT_TYPE, "application/xml")], body)
+}
+
+async fn h_serverinfo(
+    State(st): State<Arc<AppState>>,
+    Extension(Https(https)): Extension<Https>,
+    peer: Option<Extension<PeerCertFingerprint>>,
+) -> impl IntoResponse {
+    // PairStatus=1 only when the HTTPS peer presented a *pinned* client cert; an unpaired client
+    // (or plain HTTP) sees 0 and is steered into the pairing flow.
+    let paired = https && peer_is_paired(&peer, &st);
+    xml(serverinfo::serverinfo_xml(&st.host, https, paired))
+}
+
+async fn h_applist(
+    State(st): State<Arc<AppState>>,
+    peer: Option<Extension<PeerCertFingerprint>>,
+) -> impl IntoResponse {
+    if !peer_is_paired(&peer, &st) {
+        tracing::warn!("applist rejected — client is not paired");
+        return xml(error_xml());
+    }
+    xml(super::apps::applist_xml())
+}
+
+/// Box-art cover proxy (`/appasset?appid=N&AssetType=2&AssetIdx=0`). Moonlight fetches per-app covers
+/// from the HOST, so we resolve the appid to its library title and proxy the cover image bytes (Steam/
+/// Epic CDN, etc.). 404 for Desktop / apps.json entries (no art) or any fetch failure — Moonlight then
+/// shows its title-only placeholder. Paired clients only (same gate as `/applist`). The resolve+fetch is
+/// blocking (disk + network), so it runs on a blocking thread off the async runtime.
+async fn h_appasset(
+    State(st): State<Arc<AppState>>,
+    peer: Option<Extension<PeerCertFingerprint>>,
+    Query(q): Query<HashMap<String, String>>,
+) -> Response {
+    if !peer_is_paired(&peer, &st) {
+        tracing::warn!("appasset rejected — client is not paired");
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    let Some(appid) = q.get("appid").and_then(|s| s.parse::<u32>().ok()) else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    match tokio::task::spawn_blocking(move || super::apps::appasset_bytes(appid)).await {
+        Ok(Some((bytes, ctype))) => ([(header::CONTENT_TYPE, ctype)], bytes).into_response(),
+        _ => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn h_launch(
+    State(st): State<Arc<AppState>>,
+    peer: Option<Extension<PeerCertFingerprint>>,
+    addr: Option<Extension<PeerAddr>>,
+    Query(q): Query<HashMap<String, String>>,
+) -> Response {
+    if !peer_is_paired(&peer, &st) {
+        tracing::warn!("launch rejected — client is not paired");
+        return xml(error_xml()).into_response();
+    }
+    let req_fp: Option<[u8; 32]> = peer_fp(&peer);
+
+    // Mode-conflict ADMISSION (Stage 4) — GameStream is single-session (`st.launch`), so a DIFFERENT
+    // paired client launching while a session is live is governed by `mode_conflict` (see
+    // [`gamestream_admission`]). Snapshot the live owner + mode (Copy) so the lock isn't held over it.
+    let mut forced_mode: Option<(u32, u32, u32)> = None;
+    {
+        let live = st
+            .launch
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|s| (s.owner_fp, (s.width, s.height, s.fps)));
+        // Same Windows default as the native path (separate → reject; see `effective_conflict`) so a
+        // 2nd Moonlight client gets a clean 503 rather than wedging the shared monitor's capture.
+        let conflict = crate::vdisplay::admission::effective_conflict();
+        match gamestream_admission(live, req_fp, conflict) {
+            GsDecision::Serve => {}
+            GsDecision::Join((w, h, f)) => {
+                forced_mode = Some((w, h, f));
+                tracing::info!(
+                    "GameStream launch JOIN — admitting at the live session's mode {w}x{h}@{f}"
+                );
+            }
+            GsDecision::Reject => {
+                tracing::warn!(
+                    "GameStream launch REJECTED — host busy (mode_conflict=reject, session owned by another client)"
+                );
+                return (StatusCode::SERVICE_UNAVAILABLE, xml(error_xml())).into_response();
+            }
+        }
+    }
+
+    match launch(&st, &q) {
+        Ok(mut session) => {
+            // Bind the (unauthenticated) RTSP/UDP media plane to this paired client's source IP.
+            session.peer_ip = addr.map(|Extension(PeerAddr(a))| a.ip());
+            session.owner_fp = req_fp;
+            if let Some((w, h, f)) = forced_mode {
+                session.width = w;
+                session.height = h;
+                session.fps = f;
+            }
+            // A new session starts undecided: whatever ended the last one says nothing about this
+            // one (see `AppState::quit`). The game this launch reclaims — if this client left one
+            // waiting out its reconnect window — is reprieved by the stream thread, which resolves
+            // the title anyway and so needs no second library scan here.
+            st.quit.store(false, std::sync::atomic::Ordering::SeqCst);
+            *st.launch.lock().unwrap() = Some(session);
+            tracing::info!(
+                w = session.width,
+                h = session.height,
+                fps = session.fps,
+                rikeyid = session.rikeyid,
+                "launch — session created; RTSP at rtsp://{}:{RTSP_PORT}",
+                st.host.local_ip
+            );
+            xml(session_url_xml(&st, "gamesession")).into_response()
+        }
+        Err(e) => {
+            tracing::warn!(error = %format!("{e:#}"), "launch failed");
+            xml(error_xml()).into_response()
+        }
+    }
+}
+
+async fn h_resume(
+    State(st): State<Arc<AppState>>,
+    peer: Option<Extension<PeerCertFingerprint>>,
+) -> impl IntoResponse {
+    if !peer_is_paired(&peer, &st) {
+        tracing::warn!("resume rejected — client is not paired");
+        return xml(error_xml());
+    }
+    if !peer_may_control_session(&peer, &st) {
+        tracing::warn!("resume rejected — caller does not own the session");
+        return xml(error_xml());
+    }
+    if st.launch.lock().unwrap().is_some() {
+        xml(session_url_xml(&st, "resume"))
+    } else {
+        xml(error_xml())
+    }
+}
+
+async fn h_cancel(
+    State(st): State<Arc<AppState>>,
+    peer: Option<Extension<PeerCertFingerprint>>,
+) -> impl IntoResponse {
+    if !peer_is_paired(&peer, &st) {
+        tracing::warn!("cancel rejected — client is not paired");
+        return xml(error_xml());
+    }
+    if !peer_may_control_session(&peer, &st) {
+        tracing::warn!("cancel rejected — caller does not own the session");
+        return xml(error_xml());
+    }
+    // Quit semantics, and now literally so: `/cancel` is Moonlight's "Quit App" — a decision, not a
+    // drop. The shared full teardown (launch cleared + both media threads stop on their flags) runs
+    // with the session's quit flag set, so the virtual display skips its keep-alive linger and the
+    // end-game-on-session-end policy treats this as the operator asking. The virtual
+    // output/gamescope teardown follows via the capturer's RAII.
+    st.quit_session("client /cancel");
+    xml("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<root status_code=\"200\"><cancel>1</cancel></root>\n".to_string())
+}
+
+/// Parse the `/launch` query (rikey/rikeyid/mode) into a [`LaunchSession`].
+fn launch(_st: &AppState, q: &HashMap<String, String>) -> Result<LaunchSession> {
+    let rikey = q.get("rikey").ok_or_else(|| anyhow!("missing rikey"))?;
+    let key_bytes = hex::decode(rikey).context("rikey hex")?;
+    if key_bytes.len() < 16 {
+        return Err(anyhow!("rikey too short"));
+    }
+    let mut gcm_key = [0u8; 16];
+    gcm_key.copy_from_slice(&key_bytes[..16]);
+    // rikeyid is a signed 32-bit int (negative values wrap to a big-endian u32 IV later).
+    let rikeyid: i32 = q.get("rikeyid").and_then(|s| s.parse().ok()).unwrap_or(0);
+    let (width, height, fps) = q
+        .get("mode")
+        .and_then(|m| parse_mode(m))
+        .unwrap_or((1920, 1080, 60));
+    let appid = q.get("appid").and_then(|s| s.parse().ok()).unwrap_or(1);
+    Ok(LaunchSession {
+        gcm_key,
+        rikeyid,
+        width,
+        height,
+        fps,
+        appid,
+        peer_ip: None,  // set by `h_launch` from the verified HTTPS peer address
+        owner_fp: None, // set by `h_launch` from the verified HTTPS peer cert fingerprint
+    })
+}
+
+/// `"1920x1080x60"` → `(1920, 1080, 60)`.
+fn parse_mode(mode: &str) -> Option<(u32, u32, u32)> {
+    let mut it = mode.split('x');
+    let w = it.next()?.parse().ok()?;
+    let h = it.next()?.parse().ok()?;
+    let fps = it.next()?.parse().ok()?;
+    Some((w, h, fps))
+}
+
+/// A live GameStream session's `(owner cert fingerprint, mode)` snapshot for [`gamestream_admission`].
+type LiveGs = (Option<[u8; 32]>, (u32, u32, u32));
+
+/// The outcome of [`gamestream_admission`].
+enum GsDecision {
+    /// Proceed with the launch (no live session, a same-client re-launch, or `steal`/`separate`
+    /// taking over the single session).
+    Serve,
+    /// Serve at the live session's mode (`join` — honest-downgrade).
+    Join((u32, u32, u32)),
+    /// Refuse with a 503 (`reject`).
+    Reject,
+}
+
+/// The GameStream single-session mode-conflict decision (Stage 4, pure so it's unit-tested). `live`
+/// is the currently-live session's `(owner_fp, mode)` (`None` ⇒ no session live). No session or a
+/// same-client re-launch ⇒ `Serve`; a DIFFERENT client launching applies `policy` — `reject` ⇒
+/// `Reject`, `join` ⇒ `Join` the live mode, `steal`/`separate` (GameStream has no separate) ⇒ `Serve`
+/// (take over the one session).
+fn gamestream_admission(
+    live: Option<LiveGs>,
+    req_fp: Option<[u8; 32]>,
+    policy: crate::vdisplay::policy::ModeConflict,
+) -> GsDecision {
+    use crate::vdisplay::policy::ModeConflict;
+    let Some((owner, mode)) = live else {
+        return GsDecision::Serve;
+    };
+    let different = match (owner, req_fp) {
+        (Some(o), Some(r)) => o != r,
+        _ => true, // unknown owner or anonymous requester → treat as a different client
+    };
+    if !different {
+        return GsDecision::Serve;
+    }
+    match policy {
+        ModeConflict::Reject => GsDecision::Reject,
+        ModeConflict::Join => GsDecision::Join(mode),
+        ModeConflict::Steal | ModeConflict::Separate => GsDecision::Serve,
+    }
+}
+
+fn session_url_xml(st: &AppState, tag: &str) -> String {
+    format!(
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<root status_code=\"200\">\n<sessionUrl0>rtsp://{}:{RTSP_PORT}</sessionUrl0>\n<{tag}>1</{tag}>\n</root>\n",
+        st.host.local_ip
+    )
+}
+
+async fn h_pair(
+    State(st): State<Arc<AppState>>,
+    Query(q): Query<HashMap<String, String>>,
+) -> impl IntoResponse {
+    let uniqueid = q.get("uniqueid").cloned().unwrap_or_default();
+    let phrase = q.get("phrase").map(String::as_str);
+
+    let step = phrase
+        .filter(|p| *p == "getservercert" || *p == "pairchallenge")
+        .or_else(|| {
+            [
+                "clientchallenge",
+                "serverchallengeresp",
+                "clientpairingsecret",
+            ]
+            .into_iter()
+            .find(|k| q.contains_key(*k))
+        })
+        .unwrap_or("?");
+    tracing::info!(uniqueid, step, "pair request");
+
+    let result = if phrase == Some("getservercert") {
+        match (q.get("salt"), q.get("clientcert")) {
+            (Some(salt), Some(cc)) => {
+                st.pairing
+                    .getservercert(&st.identity, &uniqueid, salt, cc)
+                    .await
+            }
+            _ => Ok(pair_error_xml()),
+        }
+    } else if phrase == Some("pairchallenge") {
+        // Reached only over the TLS port with the pinned host cert; the handshake is the
+        // proof, so acknowledge success.
+        Ok(paired_ok_xml())
+    } else if let Some(v) = q.get("clientchallenge") {
+        st.pairing.clientchallenge(&st.identity, &uniqueid, v)
+    } else if let Some(v) = q.get("serverchallengeresp") {
+        st.pairing.serverchallengeresp(&st.identity, &uniqueid, v)
+    } else if let Some(v) = q.get("clientpairingsecret") {
+        st.pairing.clientpairingsecret(&uniqueid, v, &st.paired)
+    } else {
+        Ok(pair_error_xml())
+    };
+
+    let body = result.unwrap_or_else(|e| {
+        tracing::warn!(error = %format!("{e:#}"), uniqueid, "pair handler error");
+        pair_error_xml()
+    });
+    xml(body)
+}
+
+fn paired_ok_xml() -> String {
+    "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<root status_code=\"200\"><paired>1</paired></root>\n"
+        .to_string()
+}
+
+fn pair_error_xml() -> String {
+    "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<root status_code=\"200\"><paired>0</paired></root>\n"
+        .to_string()
+}
+
+fn error_xml() -> String {
+    "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<root status_code=\"400\"></root>\n".to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::{IpAddr, Ipv4Addr};
+
+    fn test_state() -> Arc<AppState> {
+        let host = super::super::Host {
+            hostname: "t".into(),
+            uniqueid: "id".into(),
+            local_ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            http_port: HTTP_PORT,
+            https_port: HTTPS_PORT,
+            os_chain: "linux".into(),
+            os_name: "Linux".into(),
+        };
+        let identity = super::super::cert::ServerIdentity::ephemeral().expect("ephemeral identity");
+        let stats = crate::stats_recorder::StatsRecorder::new(
+            std::env::temp_dir().join(format!("ss-nvhttp-stats-{}", std::process::id())),
+        );
+        Arc::new(AppState::new(host, identity, stats))
+    }
+
+    fn fp_of(der: &[u8]) -> String {
+        hex::encode(slipstream_core::quic::endpoint::cert_fingerprint(der))
+    }
+
+    /// The launch surface (launch/resume/applist/cancel) must reject any client whose cert
+    /// fingerprint is not in the paired allow-list — including a certless (plain-HTTP) peer.
+    #[test]
+    fn launch_gate_requires_a_pinned_client_cert() {
+        let st = test_state();
+        let der = b"a-client-cert-der".to_vec();
+        let peer = Some(Extension(PeerCertFingerprint(Some(fp_of(&der)))));
+
+        // Empty allow-list: a presented cert, an absent extension, and an explicit None all fail.
+        assert!(!peer_is_paired(&peer, &st), "unknown cert must be rejected");
+        assert!(
+            !peer_is_paired(&None, &st),
+            "no client cert must be rejected"
+        );
+        assert!(
+            !peer_is_paired(&Some(Extension(PeerCertFingerprint(None))), &st),
+            "certless HTTPS peer must be rejected"
+        );
+
+        // After pinning, the same fingerprint is accepted but a different cert still isn't.
+        st.paired.lock().unwrap().push(der);
+        assert!(peer_is_paired(&peer, &st), "pinned cert must be accepted");
+        let other = Some(Extension(PeerCertFingerprint(Some(fp_of(
+            b"different-der",
+        )))));
+        assert!(
+            !peer_is_paired(&other, &st),
+            "a non-pinned cert stays rejected"
+        );
+    }
+
+    #[test]
+    fn gamestream_admission_policy_matrix() {
+        use crate::vdisplay::policy::ModeConflict;
+        let (a, b) = ([1u8; 32], [2u8; 32]);
+        let live = Some((Some(a), (2560, 1440, 120)));
+        // No live session → always Serve.
+        assert!(matches!(
+            gamestream_admission(None, Some(b), ModeConflict::Reject),
+            GsDecision::Serve
+        ));
+        // Same-client re-launch → Serve regardless of policy.
+        assert!(matches!(
+            gamestream_admission(live, Some(a), ModeConflict::Reject),
+            GsDecision::Serve
+        ));
+        // A DIFFERENT client applies the policy.
+        assert!(matches!(
+            gamestream_admission(live, Some(b), ModeConflict::Reject),
+            GsDecision::Reject
+        ));
+        assert!(matches!(
+            gamestream_admission(live, Some(b), ModeConflict::Join),
+            GsDecision::Join((2560, 1440, 120))
+        ));
+        assert!(matches!(
+            gamestream_admission(live, Some(b), ModeConflict::Steal),
+            GsDecision::Serve
+        ));
+        assert!(matches!(
+            gamestream_admission(live, Some(b), ModeConflict::Separate),
+            GsDecision::Serve
+        ));
+        // Anonymous requester (no cert presented) is treated as a different client.
+        assert!(matches!(
+            gamestream_admission(live, None, ModeConflict::Reject),
+            GsDecision::Reject
+        ));
+    }
+}

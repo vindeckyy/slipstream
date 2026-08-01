@@ -34,7 +34,7 @@ APPLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$APPLE_DIR"
 
 OUT="${OUT:-$APPLE_DIR/screenshots}"
-BUNDLE_ID="io.unom.slipstream"
+BUNDLE_ID="io.slipstream"
 SCENES=(01-stream 02-hosts 03-pair 04-trust 05-settings)
 SETTLE="${SETTLE:-4}" # seconds to let a scene lay out before capturing
 
@@ -105,7 +105,7 @@ shoot_sim() {
     rt="$(xcrun simctl list runtimes available | grep -E "^$platform " \
       | grep -oE 'com\.apple\.CoreSimulator\.SimRuntime\.[A-Za-z0-9.-]+' | tail -1 || true)"
     if [ -n "$devtype" ] && [ -n "$rt" ]; then
-      udid="$(xcrun simctl create "pf-shot-$prefix" "$devtype" "$rt" 2>/dev/null || true)"
+      udid="$(xcrun simctl create "ss-shot-$prefix" "$devtype" "$rt" 2>/dev/null || true)"
       [ -n "$udid" ] && log "$prefix — created Simulator $udid ($devtype)"
     fi
   fi

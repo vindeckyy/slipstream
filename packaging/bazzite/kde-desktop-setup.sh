@@ -5,7 +5,7 @@
 #
 #   bash /usr/share/slipstream/bazzite/kde-desktop-setup.sh
 #
-# The VIRTUAL OUTPUT (video) needs no setup: the host package ships io.unom.Slipstream.Host.desktop,
+# The VIRTUAL OUTPUT (video) needs no setup: the host package ships io.slipstream.Host.desktop,
 # whose X-KDE-Wayland-Interfaces grants the host KWin's restricted zkde_screencast protocol on a
 # normal interactive Plasma session — least-privilege (only the host, only that interface), the same
 # mechanism krfb/krdp use. No session-wide KWIN_WAYLAND_NO_PERMISSION_CHECKS hack is needed. KWin

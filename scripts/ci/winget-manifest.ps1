@@ -12,9 +12,9 @@
 # Usage (from windows-host.yml, stable tags only):
 #     & scripts/ci/winget-manifest.ps1 -Version 0.19.2 -InstallerPath C:\t\out\slipstream-host-setup-0.19.2.exe -OutDir C:\t\out\winget
 #
-# Emits: <OutDir>/unom.SlipstreamHost.yaml
-#        <OutDir>/unom.SlipstreamHost.installer.yaml
-#        <OutDir>/unom.SlipstreamHost.locale.en-US.yaml
+# Emits: <OutDir>/vindeckyy.SlipstreamHost.yaml
+#        <OutDir>/vindeckyy.SlipstreamHost.installer.yaml
+#        <OutDir>/vindeckyy.SlipstreamHost.locale.en-US.yaml
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$Version,
@@ -23,7 +23,7 @@ param(
     [Parameter(Mandatory = $true)][string]$OutDir,
     [string]$TemplateDir = (Join-Path $PSScriptRoot '..\..\packaging\winget'),
     # Overridable so a fork/mirror can retarget without editing the templates.
-    [string]$UrlBase = 'https://github.com/vindeckyy/slipstream.git/releases/download'
+    [string]$UrlBase = 'https://github.com/vindeckyy/slipstream/slipstream/releases/download'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -44,9 +44,9 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 # Anchored replacements (line-leading key) so a version string inside prose — e.g. the release-notes
 # URL in the locale manifest — is never rewritten by accident.
 $files = @(
-    'unom.SlipstreamHost.yaml',
-    'unom.SlipstreamHost.installer.yaml',
-    'unom.SlipstreamHost.locale.en-US.yaml'
+    'vindeckyy.SlipstreamHost.yaml',
+    'vindeckyy.SlipstreamHost.installer.yaml',
+    'vindeckyy.SlipstreamHost.locale.en-US.yaml'
 )
 foreach ($f in $files) {
     $src = Join-Path $TemplateDir $f
@@ -58,7 +58,7 @@ foreach ($f in $files) {
     $text = [regex]::Replace($text, '(?m)^(\s*)InstallerSha256:.*$', "`${1}InstallerSha256: $sha")
     # The release-notes link is per-version and lives outside the anchored keys above.
     $text = [regex]::Replace($text, '(?m)^ReleaseNotesUrl:.*$',
-        "ReleaseNotesUrl: https://github.com/vindeckyy/slipstream.git/src/tag/v$Version/docs/releases/v$Version.md")
+        "ReleaseNotesUrl: https://github.com/vindeckyy/slipstream/slipstream/src/tag/v$Version/docs/releases/v$Version.md")
 
     $dest = Join-Path $OutDir $f
     # UTF-8 *without* BOM: winget's YAML parser rejects a BOM'd manifest.
@@ -68,7 +68,7 @@ foreach ($f in $files) {
 
 # Fail loudly if a template ever loses one of the fields we rewrite — a silently un-substituted
 # manifest would publish the PREVIOUS release's hash, which winget would then refuse to install.
-$inst = Get-Content -Path (Join-Path $OutDir 'unom.SlipstreamHost.installer.yaml') -Raw
+$inst = Get-Content -Path (Join-Path $OutDir 'vindeckyy.SlipstreamHost.installer.yaml') -Raw
 foreach ($needle in @($Version, $sha, $url)) {
     if ($inst -notmatch [regex]::Escape($needle)) { throw "substitution failed - '$needle' missing from the installer manifest" }
 }

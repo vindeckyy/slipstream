@@ -71,7 +71,7 @@ const ALIASES: Record<string, string> = { macos: "apple", steamos: "steam" };
 /**
  * Resolve an OS-identity chain (`HostInfo.os`, e.g. "linux/fedora/bazzite") to its mark:
  * walk most-specific-first and take the first token with art, so an unknown distro degrades
- * to its family's mark and finally to Tux. Mirrors pf-client-core's `os_icon_tokens`.
+ * to its family's mark and finally to Tux. Mirrors ss-client-core's `os_icon_tokens`.
  */
 const resolve = (os?: string): { viewBox: string; d: string } | undefined => {
 	for (const raw of (os ?? "").toLowerCase().split("/").reverse()) {

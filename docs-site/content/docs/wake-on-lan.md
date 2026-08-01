@@ -97,7 +97,7 @@ connect budget to 75 seconds, so the connection survives the host resuming from 
 
 `slipstream`, the client-side command, has a wake verb. It ships with the Linux `slipstream-client`
 packages and the Windows client; inside the Flatpak it is
-`flatpak run --command=slipstream io.unom.Slipstream`. See [Host CLI](/docs/host-cli) for the rest of
+`flatpak run --command=slipstream io.slipstream`. See [Host CLI](/docs/host-cli) for the rest of
 it.
 
 ```bash

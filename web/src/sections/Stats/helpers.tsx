@@ -23,9 +23,13 @@ export const Stat: FC<{ label: string; value: string }> = ({
 	label,
 	value,
 }) => (
-	<div className="flex flex-col">
-		<dt className="text-xs text-muted-foreground">{label}</dt>
-		<dd className="font-medium">{value}</dd>
+	<div className="flex min-w-[5.5rem] flex-col gap-0.5">
+		<dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+			{label}
+		</dt>
+		<dd className="text-sm font-semibold tabular-nums tracking-tight">
+			{value}
+		</dd>
 	</div>
 );
 
@@ -34,11 +38,13 @@ export const ChartBlock: FC<{
 	desc?: string;
 	children: ReactNode;
 }> = ({ title, desc, children }) => (
-	<div className="space-y-2">
-		<div>
-			<h3 className="text-sm font-medium">{title}</h3>
+	<div className="space-y-3">
+		<div className="space-y-0.5">
+			<h3 className="text-sm font-medium tracking-tight">{title}</h3>
 			{desc && <p className="text-xs text-muted-foreground">{desc}</p>}
 		</div>
-		{children}
+		<div className="overflow-hidden rounded-lg border border-border/70 bg-muted/25 p-3 sm:p-4">
+			{children}
+		</div>
 	</div>
 );

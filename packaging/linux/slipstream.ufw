@@ -1,0 +1,43 @@
+# ufw application profile for the slipstream host — installed to
+# /etc/ufw/applications.d/slipstream by the .deb and the Arch/CachyOS package.
+#
+# This is the ufw analogue of the firewalld service definitions
+# (slipstream-native.xml / slipstream-gamestream.xml): it turns opening the host's
+# ports into a one-liner on the distros that use ufw instead of firewalld
+# (CachyOS ships ufw enabled; Debian/Ubuntu ship it installed-but-inactive). ufw
+# reads this directory on every command, so no reload is needed after the
+# package drops the file — just:
+#
+#     sudo ufw allow slipstream-native        # the secure native slipstream/1 host (the default)
+#     sudo ufw allow slipstream-gamestream    # add GameStream/Moonlight compat (opt-in)
+#     sudo ufw allow slipstream-web           # reach the web console from the LAN (if slipstream-web is installed)
+#     sudo ufw app info slipstream-native     # show what a profile opens
+#
+# Same port map as the firewalld services. The slipstream/1 DATA plane is an
+# ephemeral UDP port chosen per session and is NOT listed here: the host
+# hole-punches, so a deny-inbound firewall still works (it just adds ~2.5 s at
+# session start). To open a fixed one instead, run the host with
+# `serve --data-port 9778` and `sudo ufw allow 9778/udp`.
+
+[slipstream-native]
+title=slipstream host (native slipstream/1)
+description=slipstream/1 native streaming: QUIC control plane + mDNS auto-discovery + mgmt/library API (HTTPS + mTLS)
+ports=9777/udp|5353/udp|47990/tcp
+
+[slipstream-gamestream]
+title=slipstream host (GameStream/Moonlight)
+description=GameStream/Moonlight compatibility ports (opt-in, trusted LAN only)
+ports=47984,47989,48010/tcp|47998:48010/udp|5353/udp
+
+# The mgmt REST API (TCP 47990, in the slipstream-native profile above) binds all interfaces by
+# default so paired clients can browse the game library over mTLS. Off-loopback it exposes ONLY the
+# read-only status + library endpoints, and only to a paired client certificate; every admin action
+# (arming pairing, removing devices, session control, library edits) is honored over loopback only.
+# Run the host with `--mgmt-bind 127.0.0.1:47990` to keep 47990 loopback-only (then don't open it).
+#
+# The optional web console (the separate slipstream-web package). Open only if you installed it and
+# want to reach it from another device — it binds all interfaces on TCP 47992 (HTTPS, login-gated).
+[slipstream-web]
+title=slipstream web console
+description=The optional slipstream management web console (HTTPS, login-gated) reachable from the LAN
+ports=47992/tcp

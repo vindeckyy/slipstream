@@ -51,7 +51,7 @@ const withService = <A>(
 	);
 
 beforeEach(() => {
-	tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pf-kit-config-"));
+	tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ss-kit-config-"));
 	process.env.SLIPSTREAM_CONFIG_DIR = tmp;
 });
 afterEach(() => {

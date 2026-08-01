@@ -46,7 +46,7 @@ serving HTTPS (HTTP/1.1 over TLS) with the host's identity cert), so its service
 | `rebuild-check.sh` | The post-OS-update self-heal (run by `slipstream-rebuild-check.service` before the host at session start): `ldd`-probes the host binary **and the HDR gamescope** — milliseconds when healthy, a full `update.sh` rebuild only when a SteamOS update actually broke library links. |
 
 ```sh
-git clone https://github.com/vindeckyy/slipstream.git ~/slipstream
+git clone https://github.com/vindeckyy/slipstream/slipstream ~/slipstream
 bash ~/slipstream/scripts/steamdeck/install.sh            # PIN pairing required (secure default)
 bash ~/slipstream/scripts/steamdeck/install.sh --open     # trusted LAN: accept unpaired clients
 bash ~/slipstream/scripts/steamdeck/install.sh --no-web   # host only, no web console
@@ -63,9 +63,9 @@ default `pf2`), `SLIPSTREAM_MGMT_PORT` (47990), `SLIPSTREAM_WEB_PORT` (47992).
 ## What gets installed
 
 - **Binary:** `~/slipstream/target-steamos/release/slipstream-host` (built in `pf2`, run natively).
-- **Config:** `~/.config/slipstream/host.env` (encoder/compositor) and `web.env` (generated web login
-  password + session secret). Trust material (`cert.pem`, `mgmt-token`, `slipstream1-paired.json`) lives
-  here too and persists across updates.
+- **Config:** `~/.config/slipstream/host.env` (encoder/compositor) and `web.env` (session secret).
+  The browser-selected login password is saved in `web-password`. Trust material (`cert.pem`,
+  `mgmt-token`, `slipstream1-paired.json`) lives here too and persists across updates.
 - **Services:** `~/.config/systemd/user/slipstream-host.service` (runs `serve --gamestream --mgmt-bind
   0.0.0.0:47990`, `+ --open` if chosen — `--gamestream` adds the Moonlight-compat planes so the Deck's
   Game Mode also streams to stock Moonlight; the native `slipstream/1` plane is always on),

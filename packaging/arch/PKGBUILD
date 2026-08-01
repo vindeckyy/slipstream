@@ -37,7 +37,7 @@ pkgrel="${PF_PKGREL:-1}"
 # NVENC/QSV/AMF, all x86. On aarch64 the split below drops slipstream-host from `pkgname`, so
 # makepkg builds only the client and never tries to compile the host crate.
 arch=('x86_64' 'aarch64')
-url="https://github.com/vindeckyy/slipstream.git"
+url="https://github.com/vindeckyy/slipstream/slipstream"
 license=('MIT OR Apache-2.0')
 # !lto: makepkg's `lto` option injects -flto=auto into CFLAGS; aws-lc-sys (rustls' crypto)
 # compiles its C with those flags and GCC LTO bitcode objects are unreadable by rust's lld
@@ -47,7 +47,7 @@ options=('!lto' '!debug')
 
 # All build deps for both crates (Arch runtime packages ship their own headers, so these cover
 # build + link). aws-lc/ring need clang+cmake; nasm is for asm. vulkan-headers: the client's
-# pf-ffvk crate runs bindgen over FFmpeg's libavutil/hwcontext_vulkan.h (#include <vulkan/vulkan.h>).
+# ss-ffvk crate runs bindgen over FFmpeg's libavutil/hwcontext_vulkan.h (#include <vulkan/vulkan.h>).
 makedepends=('rust' 'cargo' 'clang' 'cmake' 'nasm' 'pkgconf' 'git' 'vulkan-headers'
              'gtk4' 'libadwaita' 'sdl3' 'ffmpeg' 'pipewire' 'wayland' 'libxkbcommon' 'opus' 'libei')
 
@@ -66,7 +66,7 @@ fi
 # build() uses it instead AND the fetch is skipped entirely (a canary pkgver has no tag to
 # clone, and CI already has the checkout).
 if [ -z "${PF_SRCDIR:-}" ]; then
-  source=("git+https://github.com/vindeckyy/slipstream.git#tag=v${pkgver}")
+  source=("git+https://github.com/vindeckyy/slipstream/slipstream.git#tag=v${pkgver}")
   sha256sums=('SKIP')
 else
   source=()
@@ -95,14 +95,14 @@ build() {
   # Pure Rust `ash` (no new lib, no link-time deps); default on for HEVC (SLIPSTREAM_VULKAN_ENCODE=0
   # opts back to libav VAAPI), and a failed open falls back to VAAPI so unsupported devices are safe.
   if [ "$CARCH" = 'aarch64' ]; then
-    # Client-only: no host crate, so none of the encode features below apply. pf-update still
+    # Client-only: no host crate, so none of the encode features below apply. ss-update still
     # builds — the client package ships its own copy for `--apply-update`.
     cargo build --release --locked -p slipstream-client-linux -p slipstream-client-session \
-      -p slipstream-cli -p pf-update
+      -p slipstream-cli -p ss-update
   else
   cargo build --release --locked --features slipstream-host/nvenc,slipstream-host/vulkan-encode \
     -p slipstream-host -p slipstream-client-linux -p slipstream-client-session -p slipstream-cli \
-    -p pf-update
+    -p ss-update
   # The status tray in its OWN cargo invocation — load-bearing, not tidiness. Cargo unifies features
   # across everything in one build, so co-building the tray with the host pulls the host's
   # ashpd -> zbus/tokio onto the tray's shared zbus; the tray (ksni async-io + blocking, no tokio
@@ -157,19 +157,19 @@ package_slipstream-host() {
   # Managed gamescope takeover on DM-autologin boxes: root helper + polkit action so the host can
   # stop/restore the display manager for the stream. Arch has no /usr/libexec — install under
   # /usr/lib/slipstream and rewrite the policy's exec.path annotation to match (the host probes both).
-  install -Dm0755 "$R/scripts/pf-dm-helper"           "$pkgdir/usr/lib/slipstream/pf-dm-helper"
-  install -Dm0644 "$R/scripts/io.unom.slipstream.dm-helper.policy" \
-    "$pkgdir/usr/share/polkit-1/actions/io.unom.slipstream.dm-helper.policy"
-  sed -i 's#/usr/libexec/slipstream/pf-dm-helper#/usr/lib/slipstream/pf-dm-helper#' \
-    "$pkgdir/usr/share/polkit-1/actions/io.unom.slipstream.dm-helper.policy"
+  install -Dm0755 "$R/scripts/ss-dm-helper"           "$pkgdir/usr/lib/slipstream/ss-dm-helper"
+  install -Dm0644 "$R/scripts/io.slipstream.dm-helper.policy" \
+    "$pkgdir/usr/share/polkit-1/actions/io.slipstream.dm-helper.policy"
+  sed -i 's#/usr/libexec/slipstream/ss-dm-helper#/usr/lib/slipstream/ss-dm-helper#' \
+    "$pkgdir/usr/share/polkit-1/actions/io.slipstream.dm-helper.policy"
   # Web-console-triggered updates (host-update-from-web-console.md §7): root helper + oneshot
-  # unit + group-scoped polkit rule. Same no-libexec relocation as pf-dm-helper, with the
+  # unit + group-scoped polkit rule. Same no-libexec relocation as ss-dm-helper, with the
   # unit's ExecStart rewritten to match. On pacman the helper additionally requires the
   # explicit PACMAN_FULL_SYSUPGRADE opt-in (partial upgrades are against Arch doctrine).
-  install -Dm0755 "$T/pf-update"                      "$pkgdir/usr/lib/slipstream/pf-update"
+  install -Dm0755 "$T/ss-update"                      "$pkgdir/usr/lib/slipstream/ss-update"
   install -Dm0644 "$R/packaging/linux/slipstream-update.service" \
     "$pkgdir/usr/lib/systemd/system/slipstream-update.service"
-  sed -i 's#/usr/libexec/slipstream/pf-update#/usr/lib/slipstream/pf-update#' \
+  sed -i 's#/usr/libexec/slipstream/ss-update#/usr/lib/slipstream/ss-update#' \
     "$pkgdir/usr/lib/systemd/system/slipstream-update.service"
   install -Dm0644 "$R/packaging/linux/49-slipstream-update.rules" \
     "$pkgdir/usr/share/polkit-1/rules.d/49-slipstream-update.rules"
@@ -189,9 +189,9 @@ package_slipstream-host() {
     "$pkgdir/usr/share/slipstream/slipstream-host-desktop-session.conf"
   # Install-kind + channel marker, read by the host's update-check surface (planning:
   # host-update-from-web-console.md §4.1). A canary build's pkgrel is `0.<zero-padded run>`.
-  local _pf_update_channel=stable
-  [[ $pkgrel == 0.* ]] && _pf_update_channel=canary
-  printf 'pacman %s\n' "$_pf_update_channel" | \
+  local _ss_update_channel=stable
+  [[ $pkgrel == 0.* ]] && _ss_update_channel=canary
+  printf 'pacman %s\n' "$_ss_update_channel" | \
     install -Dm0644 /dev/stdin "$pkgdir/usr/share/slipstream/install-kind"
   install -Dm0644 "$R/scripts/slipstream-kde-session.service" "$pkgdir/usr/lib/systemd/user/slipstream-kde-session.service"
   sed -i 's#%h/slipstream/scripts/headless/run-headless-kde.sh#/usr/share/slipstream/headless/run-headless-kde.sh#' \
@@ -200,13 +200,13 @@ package_slipstream-host() {
   # host bind KWin's restricted zkde_screencast (virtual output) + fake_input globals on an
   # interactive Plasma session. Must ship with the host (KWin caches the per-exe grant on first
   # connect). See the file's header comment.
-  install -Dm0644 "$R/packaging/linux/io.unom.Slipstream.Host.desktop" \
-    "$pkgdir/usr/share/applications/io.unom.Slipstream.Host.desktop"
+  install -Dm0644 "$R/packaging/linux/io.slipstream.Host.desktop" \
+    "$pkgdir/usr/share/applications/io.slipstream.Host.desktop"
   # Status tray: per-user SNI icon + XDG autostart entry (self-gating: --autostart exits silently
   # for users who don't run a host) + the hicolor status icons it names.
   install -Dm0755 "$T/slipstream-tray" "$pkgdir/usr/bin/slipstream-tray"
-  install -Dm0644 "$R/packaging/linux/io.unom.Slipstream.Tray.desktop" \
-    "$pkgdir/etc/xdg/autostart/io.unom.Slipstream.Tray.desktop"
+  install -Dm0644 "$R/packaging/linux/io.slipstream.Tray.desktop" \
+    "$pkgdir/etc/xdg/autostart/io.slipstream.Tray.desktop"
   local sz png
   for sz in 22x22 48x48; do
     for png in "$R"/packaging/linux/icons/hicolor/$sz/apps/*.png; do
@@ -274,10 +274,10 @@ package_slipstream-client() {
   # The headless CLI (design/client-architecture-split.md §4).
   install -Dm0755 "$T/slipstream" "$pkgdir/usr/bin/slipstream"
   # The app icon the desktop entry (and the About dialog) name.
-  install -Dm0644 "$R/packaging/linux/icons/hicolor/scalable/apps/io.unom.Slipstream.svg" \
-    "$pkgdir/usr/share/icons/hicolor/scalable/apps/io.unom.Slipstream.svg"
-  install -Dm0644 "$R/packaging/linux/io.unom.Slipstream.desktop" \
-    "$pkgdir/usr/share/applications/io.unom.Slipstream.desktop"
+  install -Dm0644 "$R/packaging/linux/icons/hicolor/scalable/apps/io.slipstream.svg" \
+    "$pkgdir/usr/share/icons/hicolor/scalable/apps/io.slipstream.svg"
+  install -Dm0644 "$R/packaging/linux/io.slipstream.desktop" \
+    "$pkgdir/usr/share/applications/io.slipstream.desktop"
   # DualSense hidraw access (full pad fidelity through SDL's HIDAPI driver).
   install -Dm0644 "$R/scripts/70-slipstream-client.rules" \
     "$pkgdir/usr/lib/udev/rules.d/70-slipstream-client.rules"
@@ -290,10 +290,10 @@ package_slipstream-client() {
   # pacman conflict. Same no-libexec relocation as the host's copy, with the unit's ExecStart
   # rewritten to match. On pacman the helper additionally requires the explicit
   # PACMAN_FULL_SYSUPGRADE opt-in (partial upgrades are against Arch doctrine).
-  install -Dm0755 "$T/pf-update" "$pkgdir/usr/lib/slipstream/pf-update-client"
+  install -Dm0755 "$T/ss-update" "$pkgdir/usr/lib/slipstream/ss-update-client"
   install -Dm0644 "$R/packaging/linux/slipstream-client-update.service" \
     "$pkgdir/usr/lib/systemd/system/slipstream-client-update.service"
-  sed -i 's#/usr/libexec/slipstream/pf-update#/usr/lib/slipstream/pf-update-client#' \
+  sed -i 's#/usr/libexec/slipstream/ss-update#/usr/lib/slipstream/ss-update-client#' \
     "$pkgdir/usr/lib/systemd/system/slipstream-client-update.service"
   install -Dm0644 "$R/packaging/linux/49-slipstream-client-update.rules" \
     "$pkgdir/usr/share/polkit-1/rules.d/49-slipstream-client-update.rules"

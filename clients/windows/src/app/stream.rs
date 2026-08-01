@@ -7,7 +7,7 @@ use std::sync::Arc;
 use windows_reactor::*;
 
 /// One HUD refresh: the session child's latest formatted `stats:` line, mirrored into root state
-/// by the poll thread (`pf-hud`) and passed down as a prop.
+/// by the poll thread (`ss-hud`) and passed down as a prop.
 #[derive(Clone, Default, PartialEq)]
 pub(crate) struct HudSample {
     /// The session child's latest formatted `stats:` line, for the status page. Empty before the

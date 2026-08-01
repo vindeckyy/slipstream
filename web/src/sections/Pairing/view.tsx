@@ -15,10 +15,14 @@ export const PairingView: FC<{
 }> = ({ pending, native, moonlight, paired }) => (
 	<Section maxWidth={false}>
 		<div className="flex flex-col gap-card">
-			<h1 className="text-2xl font-semibold">{m.pairing_title()}</h1>
+			<div className="space-y-1">
+				<h1 className="text-2xl font-semibold tracking-tight">
+					{m.pairing_title()}
+				</h1>
+			</div>
 
 			{pending}
-			<div className="lg:grid lg:grid-cols-2 flex flex-col gap-card">
+			<div className="flex flex-col gap-card lg:grid lg:grid-cols-2">
 				{native}
 				{moonlight}
 			</div>

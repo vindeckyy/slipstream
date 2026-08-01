@@ -79,25 +79,29 @@ export const CaptureControlCard: FC<{
 			refetch={status.refetch}
 		>
 			<Card>
-				<CardHeader>
-					<CardTitle className="flex items-center justify-between gap-3">
-						<span>{m.stats_capture_title()}</span>
-						{armed ? (
-							<Badge variant="destructive" className="gap-1.5">
-								<Circle className="size-2.5 animate-pulse fill-current" />
-								{m.stats_recording()}
-							</Badge>
-						) : (
-							<Badge variant="outline">{m.stats_idle()}</Badge>
-						)}
-					</CardTitle>
+				<CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+					<div className="min-w-0 space-y-1">
+						<CardTitle className="text-base tracking-tight">
+							{m.stats_capture_title()}
+						</CardTitle>
+						<p className="text-sm text-muted-foreground">
+							{m.stats_capture_desc()}
+						</p>
+					</div>
+					{armed ? (
+						<Badge variant="destructive" className="shrink-0 gap-1.5">
+							<Circle className="size-2.5 animate-pulse fill-current" />
+							{m.stats_recording()}
+						</Badge>
+					) : (
+						<Badge variant="outline" className="shrink-0">
+							{m.stats_idle()}
+						</Badge>
+					)}
 				</CardHeader>
 				<CardContent className="space-y-4">
-					<p className="text-sm text-muted-foreground">
-						{m.stats_capture_desc()}
-					</p>
 					{armed && s && (
-						<dl className="flex flex-wrap gap-x-8 gap-y-2 text-sm tabular-nums">
+						<dl className="flex flex-wrap gap-x-6 gap-y-3 rounded-lg border border-border/70 bg-muted/30 px-3 py-3 sm:px-4">
 							<Stat label={m.stats_elapsed()} value={fmtDuration(elapsed)} />
 							<Stat label={m.stats_samples()} value={String(s.sample_count)} />
 							{s.kind && (
@@ -105,7 +109,7 @@ export const CaptureControlCard: FC<{
 							)}
 						</dl>
 					)}
-					<div className="flex gap-2">
+					<div className="flex flex-wrap gap-2">
 						{armed ? (
 							<Button
 								variant="destructive"

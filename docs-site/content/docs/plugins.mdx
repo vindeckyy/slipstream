@@ -66,7 +66,7 @@ They are always attributed to it and never carry the Verified badge, which belon
 catalog alone.
 
 To publish a plugin to the built-in catalog, open a pull request against
-[`slipstream-plugin-index`](https://github.com/vindeckyy/slipstream.git-plugin-index) — its README covers the
+[`slipstream-plugin-index`](https://github.com/vindeckyy/slipstream/slipstream-plugin-index) — its README covers the
 format and what review looks for.
 
 ## Installing from the CLI
@@ -212,7 +212,7 @@ directory `plugins enable` grants the low-privilege runner write access to. A co
 anywhere else under `%ProgramData%\slipstream` is not read.
 
 Full options and the platform/emulator list are in
-[the plugin's repo](https://github.com/vindeckyy/slipstream.git-plugin-rom-manager).
+[the plugin's repo](https://github.com/vindeckyy/slipstream/slipstream-plugin-rom-manager).
 
 ## Playnite
 
@@ -232,13 +232,13 @@ keeps its library locked while running, there are **two parts**:
    ```
 
 2. **The Slipstream Sync extension** (in Playnite) — download `slipstream-sync.pext` from the
-   [plugin's builds](https://github.com/vindeckyy/slipstream.git-plugin-playnite/actions) and **double-click
+   [plugin's builds](https://github.com/vindeckyy/slipstream/slipstream-plugin-playnite/actions) and **double-click
    it** to install it in Playnite like any add-on, then restart Playnite once.
 
 Open the console's **Playnite** page — it shows "Exporter connected", and your games sync within
 seconds of any library change. Filters (installed-only, per-store, hidden) live on that page or in
 `%ProgramData%\slipstream\plugin-state\playnite\config.json`. Details are in
-[the plugin's repo](https://github.com/vindeckyy/slipstream.git-plugin-playnite).
+[the plugin's repo](https://github.com/vindeckyy/slipstream/slipstream-plugin-playnite).
 
 ## VirtualHere (USB passthrough)
 
@@ -280,7 +280,7 @@ part to fix. The same checks are available as `slipstream-plugin-virtualhere doc
 useful thing to paste into a support thread.
 
 Full configuration is in
-[the plugin's repo](https://github.com/vindeckyy/slipstream.git-plugin-virtualhere).
+[the plugin's repo](https://github.com/vindeckyy/slipstream/slipstream-plugin-virtualhere).
 
 ## Troubleshooting
 
@@ -324,6 +324,6 @@ A plugin is a TypeScript module built on **`@slipstream/plugin-kit`** (`definePl
 by the runner. The kit owns lifecycle, config and state, the library sync engine, and serving the
 plugin's console page; `@slipstream/host` (`definePlugin`) is the lower-level host client underneath
 it. Start from the
-[plugin-kit README](https://github.com/vindeckyy/slipstream.git/src/branch/main/plugin-kit) and
-[ROM Manager](https://github.com/vindeckyy/slipstream.git-plugin-rom-manager), which is the reference
+[plugin-kit README](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/plugin-kit) and
+[ROM Manager](https://github.com/vindeckyy/slipstream/slipstream-plugin-rom-manager), which is the reference
 implementation — or any of the three plugins above.

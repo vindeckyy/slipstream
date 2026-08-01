@@ -50,7 +50,7 @@ while a sysext overlays `/usr` at runtime, survives OS updates, and updates in o
 no reboot. CI wraps the same RPMs below into the image, so content and channels are identical.
 
 ```sh
-curl -fsSLO https://github.com/vindeckyy/slipstream.git/raw/branch/main/packaging/bazzite/slipstream-sysext.sh
+curl -fsSLO https://github.com/vindeckyy/slipstream/slipstream/raw/branch/main/packaging/bazzite/slipstream-sysext.sh
 sudo bash slipstream-sysext.sh install     # then: sudo slipstream-sysext update | status | remove
 ```
 
@@ -118,9 +118,9 @@ cp /usr/share/slipstream/host.env.bazzite ~/.config/slipstream/host.env   # edit
 systemctl --user enable --now slipstream-host
 
 # Management web console (pairing + status) — pulled in by default (the host RPM Recommends it;
-# `--no-install-recommends` / headless-only boxes can skip it). Enable it and read the login password:
+# `--no-install-recommends` / headless-only boxes can skip it). Enable it, then choose a password:
 systemctl --user enable --now slipstream-web
-journalctl --user -u slipstream-web-init | sed -n 's/.*password generated: //p'   # then open https://<host-ip>:47992
+# open https://<host-ip>:47992
 ```
 
 Pair a stock Moonlight client (mDNS-discovered), or connect the native slipstream/1 client — via the
@@ -147,6 +147,6 @@ An RPM (or the bootc layer) installs into the host system where those just work.
 ```sh
 git archive --format=tar.gz --prefix=slipstream-0.3.0/ -o ~/rpmbuild/SOURCES/slipstream-0.3.0.tar.gz HEAD
 rpmbuild -ba packaging/rpm/slipstream.spec     # needs the BuildRequires from the spec
-# (0.3.0 = the spec's default %{pf_version}; the prefix and tarball name must match it)
+# (0.3.0 = the spec's default %{ss_version}; the prefix and tarball name must match it)
 ```
 (Not buildable on Debian/Ubuntu — use a Fedora toolbox/container or COPR.)

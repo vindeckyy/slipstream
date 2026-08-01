@@ -9,7 +9,13 @@ import {
 import type { GameEntry } from "@/api/gen/model/gameEntry";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import { apiErrorMessage } from "@/lib/errors";
 import { m } from "@/paraglide/messages";
 
@@ -55,49 +61,47 @@ export const ProvidersCard: FC<{
 
 	return (
 		<Card>
-			<CardHeader>
-				<CardTitle>{m.library_providers_title()}</CardTitle>
+			<CardHeader className="pb-3">
+				<CardTitle className="text-base">
+					{m.library_providers_title()}
+				</CardTitle>
+				<CardDescription>{m.library_providers_help()}</CardDescription>
 			</CardHeader>
-			<CardContent className="space-y-3">
-				<p className="max-w-prose text-sm text-muted-foreground">
-					{m.library_providers_help()}
-				</p>
-				<div className="flex flex-col gap-2">
-					{[...counts.entries()].map(([provider, count]) => (
-						<div
-							key={provider}
-							className="flex flex-wrap items-center gap-3 rounded-lg border p-3"
-						>
-							<span className="font-medium">{provider}</span>
+			<CardContent className="space-y-2">
+				{[...counts.entries()].map(([provider, count]) => (
+					<div
+						key={provider}
+						className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/30 p-3 sm:flex-row sm:items-center"
+					>
+						<div className="flex min-w-0 flex-wrap items-center gap-2">
+							<span className="font-medium tracking-tight">{provider}</span>
 							<Badge variant="secondary">
 								{m.library_provider_count({ count })}
 							</Badge>
-							<div className="ml-auto flex gap-2">
-								<Button
-									size="sm"
-									variant={active === provider ? "default" : "outline"}
-									aria-pressed={active === provider}
-									onClick={() =>
-										onFilter(active === provider ? null : provider)
-									}
-								>
-									{active === provider
-										? m.library_provider_show_all()
-										: m.library_provider_filter()}
-								</Button>
-								<Button
-									size="sm"
-									variant="outline"
-									disabled={purge.isPending}
-									aria-label={m.library_provider_purge()}
-									onClick={() => onPurge(provider, count)}
-								>
-									<Trash2 className="size-4 text-destructive" />
-								</Button>
-							</div>
 						</div>
-					))}
-				</div>
+						<div className="flex flex-wrap gap-2 sm:ml-auto">
+							<Button
+								size="sm"
+								variant={active === provider ? "default" : "outline"}
+								aria-pressed={active === provider}
+								onClick={() => onFilter(active === provider ? null : provider)}
+							>
+								{active === provider
+									? m.library_provider_show_all()
+									: m.library_provider_filter()}
+							</Button>
+							<Button
+								size="sm"
+								variant="outline"
+								disabled={purge.isPending}
+								aria-label={m.library_provider_purge()}
+								onClick={() => onPurge(provider, count)}
+							>
+								<Trash2 className="size-4 text-destructive" />
+							</Button>
+						</div>
+					</div>
+				))}
 			</CardContent>
 		</Card>
 	);

@@ -1,20 +1,20 @@
 <#
 .SYNOPSIS
-  Build + sign the slipstream virtual-gamepad UMDF drivers (pf-gamepad = DualSense/DualShock 4/Edge/Deck, pf-xusb =
+  Build + sign the slipstream virtual-gamepad UMDF drivers (ss-gamepad = DualSense/DualShock 4/Edge/Deck, ss-xusb =
   Xbox 360 / XInput) FROM SOURCE, in CI, and stage them for the host installer. The gamepad analogue of
-  build-pf-vdisplay.ps1 - replaces the checked-in prebuilt binaries (packaging/windows/gamepad-drivers/)
+  build-ss-vdisplay.ps1 - replaces the checked-in prebuilt binaries (packaging/windows/gamepad-drivers/)
   so the .dll/.inf/.cat stay in lockstep with the source and never go stale.
 
 .DESCRIPTION
   Both drivers are members of the in-tree drivers workspace (packaging/windows/drivers/), so one
   `cargo build --release` builds the whole workspace (this shares wdk-sys/wdk-build + the bindgen pin with
-  pf-vdisplay). Then, per driver: CLEAR the FORCE_INTEGRITY PE bit, sign the .dll, stampinf a DriverVer
+  ss-vdisplay). Then, per driver: CLEAR the FORCE_INTEGRITY PE bit, sign the .dll, stampinf a DriverVer
   into the INF; then Inf2Cat both catalogs and sign them. Both drivers share ONE self-signed cert (or a
   supplied DRIVER_CERT secret) + ONE exported .cer - the layout `slipstream-host.exe driver install
   --gamepad` consumes (per-driver .inf/.cat/.dll + one shared slipstream-driver.cer).
 
-  Output (-Out): pf_gamepad.{dll,inf,cat} + pf_xusb.{dll,inf,cat} + pf_mouse.{dll,inf,cat} +
-  slipstream-driver.cer. (pf_mouse is the resident virtual HID pointer, not a gamepad - it shares
+  Output (-Out): ss_gamepad.{dll,inf,cat} + ss_xusb.{dll,inf,cat} + ss_mouse.{dll,inf,cat} +
+  slipstream-driver.cer. (ss_mouse is the resident virtual HID pointer, not a gamepad - it shares
   this pipeline + the --gamepad install path.)
 
 .EXAMPLE
@@ -56,12 +56,12 @@ $DriversDir = (Resolve-Path $DriversDir).Path
 $clear = Join-Path $PSScriptRoot 'clear-force-integrity.ps1'
 
 $drivers = @(
-    @{ crate = 'pf-gamepad';   dll = 'pf_gamepad.dll';   inx = 'pf-gamepad\pf_gamepad.inx';     inf = 'pf_gamepad.inf';   cat = 'pf_gamepad.cat' }
-    @{ crate = 'pf-xusb';      dll = 'pf_xusb.dll';      inx = 'pf-xusb\pf_xusb.inx';           inf = 'pf_xusb.inf';      cat = 'pf_xusb.cat' }
+    @{ crate = 'ss-gamepad';   dll = 'ss_gamepad.dll';   inx = 'ss-gamepad\ss_gamepad.inx';     inf = 'ss_gamepad.inf';   cat = 'ss_gamepad.cat' }
+    @{ crate = 'ss-xusb';      dll = 'ss_xusb.dll';      inx = 'ss-xusb\ss_xusb.inx';           inf = 'ss_xusb.inf';      cat = 'ss_xusb.cat' }
     # Not a gamepad, but it rides the identical UMDF HID pipeline + the same install path
     # (`driver install --gamepad` adds every staged .inf): the resident virtual HID mouse that
     # keeps SM_MOUSEPRESENT true so DWM composites a cursor on headless hosts.
-    @{ crate = 'pf-mouse';     dll = 'pf_mouse.dll';     inx = 'pf-mouse\pf_mouse.inx';         inf = 'pf_mouse.inf';     cat = 'pf_mouse.cat' }
+    @{ crate = 'ss-mouse';     dll = 'ss_mouse.dll';     inx = 'ss-mouse\ss_mouse.inx';         inf = 'ss_mouse.inf';     cat = 'ss_mouse.cat' }
 )
 foreach ($d in $drivers) {
     if (-not (Test-Path (Join-Path $DriversDir $d.inx))) { throw "no $($d.inx) under $DriversDir" }
@@ -73,7 +73,7 @@ if (-not $env:LIBCLANG_PATH -and (Test-Path 'C:\Program Files\LLVM\bin\libclang.
     $env:LIBCLANG_PATH = 'C:\Program Files\LLVM\bin'
 }
 # Build into the DEFAULT workspace target dir (not an external CARGO_TARGET_DIR) - wdk-build walks up
-# from OUT_DIR for a Cargo.lock and doesn't support out-of-tree target dirs. See build-pf-vdisplay.ps1.
+# from OUT_DIR for a Cargo.lock and doesn't support out-of-tree target dirs. See build-ss-vdisplay.ps1.
 $rel = Join-Path $DriversDir 'target\x86_64-pc-windows-msvc\release'
 
 # --- 1. build (release) - one build covers the whole workspace --------------------------------

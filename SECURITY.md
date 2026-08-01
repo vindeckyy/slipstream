@@ -9,12 +9,12 @@ Slipstream ships on two tracks — **stable** (a `vX.Y.Z` tag; the current line 
 **canary** (built from `main`). Fixes ship as a new release on those tracks; in practice
 we don't backport to older minor versions, so the supported versions are the latest stable release
 and the current canary build. If you're on an older build, please check that the issue still
-reproduces on the latest stable before reporting it. See
-[Release Channels](https://docs.slipstream.unom.io/docs/channels).
+reproduces on the latest stable before reporting it.
 
 ## Reporting a vulnerability
 
-**Please report security issues privately by email to security@slipstream.com.**
+**Please report security issues privately via a private GitHub security advisory on
+[vindeckyy/slipstream](https://github.com/vindeckyy/slipstream), or contact the maintainer directly.**
 
 Do **not** open a public issue, pull request, or chat/forum post for a suspected vulnerability — that
 exposes other users before a fix exists.
@@ -89,7 +89,7 @@ us beyond the download itself.
   machine's trusted roots for a self-signed driver to install at all, so — unlike the cases above —
   this signature does **not** authenticate the download: it gives the drivers a stable publisher
   identity you can compare against the published fingerprint, and it is removed again on uninstall.
-  Verify with `Get-AuthenticodeSignature` on the installed `pf_vdisplay.dll`, or list what is
+  Verify with `Get-AuthenticodeSignature` on the installed `ss_vdisplay.dll`, or list what is
   trusted with `Get-ChildItem Cert:\LocalMachine\Root | ? Subject -like '*slipstream*'`.
 
 A checksum on its own only tells you the download wasn't corrupted in transit — it says nothing

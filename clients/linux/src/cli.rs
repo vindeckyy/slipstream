@@ -460,13 +460,13 @@ fn headless_version() -> glib::ExitCode {
 
 /// `--check-update [--json]` — is a newer client available for this box's channel, and can
 /// anything here install it? The answer comes from the same Ed25519-signed manifest the host
-/// checks (`pf_client_core::update`); this is only its presentation.
+/// checks (`ss_client_core::update`); this is only its presentation.
 ///
 /// Exit code carries the verdict for scripts: 0 = up to date, 10 = an update is available,
 /// 1 = the check could not be completed (offline, bad signature, disabled). The distinction
 /// matters — "could not tell" must never be scripted as "up to date".
 fn headless_check_update() -> glib::ExitCode {
-    let status = pf_client_core::update::check(version_string());
+    let status = ss_client_core::update::check(version_string());
     if arg_flag("--json") {
         match serde_json::to_string(&status) {
             Ok(s) => println!("{s}"),
@@ -519,8 +519,8 @@ fn headless_check_update() -> glib::ExitCode {
 }
 
 /// The human line describing how an update would be applied.
-fn update_apply_line(status: &pf_client_core::update::Status) -> String {
-    use pf_client_core::update::Applier;
+fn update_apply_line(status: &ss_client_core::update::Status) -> String {
+    use ss_client_core::update::Applier;
     match status.applier {
         Applier::Helper => format!("slipstream-client --apply-update   ({})", status.command),
         Applier::Flatpak => status.command.clone(),
@@ -530,9 +530,9 @@ fn update_apply_line(status: &pf_client_core::update::Status) -> String {
 
 /// `--apply-update [--json]` — drive the packaged root helper for this install. Refuses (with
 /// the command to run instead) for every kind it does not own; see
-/// `pf_client_core::update::apply`.
+/// `ss_client_core::update::apply`.
 fn headless_apply_update() -> glib::ExitCode {
-    let outcome = pf_client_core::update::apply(version_string());
+    let outcome = ss_client_core::update::apply(version_string());
     if arg_flag("--json") {
         match serde_json::to_string(&outcome) {
             Ok(s) => println!("{s}"),
@@ -661,7 +661,7 @@ pub fn run_shot(ctx: &ShotCtx, scene: &str) {
         }
         "settings" | "03-settings" => {
             // Mock devices so the shot shows the probe-dependent pickers populated.
-            let dev = |name: &str, description: &str| pf_client_core::audio::AudioDevice {
+            let dev = |name: &str, description: &str| ss_client_core::audio::AudioDevice {
                 name: name.to_string(),
                 description: description.to_string(),
             };
@@ -680,7 +680,7 @@ pub fn run_shot(ctx: &ShotCtx, scene: &str) {
                 .ok()
                 .filter(|v| !v.is_empty())
                 .and_then(|reference| {
-                    pf_client_core::profiles::ProfilesFile::load()
+                    ss_client_core::profiles::ProfilesFile::load()
                         .resolve(&reference)
                         .0
                         .map(|p| crate::ui_settings::Scope::Profile(p.id.clone()))

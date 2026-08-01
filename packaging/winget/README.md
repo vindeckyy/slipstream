@@ -1,15 +1,15 @@
 # winget manifests — Windows host
 
-The reviewed source of truth for the `unom.SlipstreamHost` winget package. Everything except
+The reviewed source of truth for the `vindeckyy.SlipstreamHost` winget package. Everything except
 `PackageVersion` / `InstallerUrl` / `InstallerSha256` / `ReleaseNotesUrl` is edited **here**;
 `scripts/ci/winget-manifest.ps1` only substitutes those four per release, so the switches,
 agreements and installation notes stay under normal code review.
 
 | File | Purpose |
 | --- | --- |
-| `unom.SlipstreamHost.yaml` | Version manifest — ties the other two together. |
-| `unom.SlipstreamHost.installer.yaml` | Installer type, scope, silent switches, `ProductCode`, URL + hash. |
-| `unom.SlipstreamHost.locale.en-US.yaml` | User-facing metadata, `Agreements`, `InstallationNotes`. |
+| `vindeckyy.SlipstreamHost.yaml` | Version manifest — ties the other two together. |
+| `vindeckyy.SlipstreamHost.installer.yaml` | Installer type, scope, silent switches, `ProductCode`, URL + hash. |
+| `vindeckyy.SlipstreamHost.locale.en-US.yaml` | User-facing metadata, `Agreements`, `InstallationNotes`. |
 
 ## Why these choices
 
@@ -20,7 +20,7 @@ agreements and installation notes stay under normal code review.
   installed host with the package for `winget list` / `winget upgrade`. **It must track `AppId` in
   `packaging/windows/slipstream-host.iss`** — if that GUID ever changes, change it here too or
   upgrades silently stop being detected.
-- **`interactive` is in `InstallModes`.** `winget install unom.SlipstreamHost --interactive` runs the
+- **`interactive` is in `InstallModes`.** `winget install vindeckyy.SlipstreamHost --interactive` runs the
   full existing wizard: every task checkbox, the web-console password page, the VB-CABLE notice.
   Nothing about the installer changes to support it.
 - **No `/MERGETASKS` in the silent switches.** A silent install deliberately takes the *same* task
@@ -38,7 +38,7 @@ Inno's `/MERGETASKS` takes `!` prefixes to deselect a default-checked task. Use 
 `/MERGETASKS` on one command line):
 
 ```powershell
-winget install unom.SlipstreamHost --override "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /MERGETASKS=!gamestream"
+winget install vindeckyy.SlipstreamHost --override "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /MERGETASKS=!gamestream"
 ```
 
 Task names: `installdriver`, `installgamepad`, `installaudiocable`, `installhdrlayer`,
@@ -100,7 +100,7 @@ ships its catalogue on every stable tag, so releasing is one pipeline with no ma
 
 ```powershell
 winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest   # elevated, once
-winget install unom.SlipstreamHost
+winget install vindeckyy.SlipstreamHost
 ```
 
 These manifests stay in winget-pkgs' own format rather than a bespoke one, so submitting upstream

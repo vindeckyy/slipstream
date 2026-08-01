@@ -155,7 +155,7 @@ The installer installs and removes the bundled drivers, so you rarely touch this
 removing one without uninstalling the host:
 
 ```powershell
-slipstream-host driver uninstall            # the pf-vdisplay virtual display driver
+slipstream-host driver uninstall            # the ss-vdisplay virtual display driver
 slipstream-host driver uninstall --gamepad  # the virtual-gamepad driver instead
 ```
 

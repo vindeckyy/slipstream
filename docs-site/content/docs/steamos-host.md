@@ -58,7 +58,7 @@ Vulkan encode behind that flag, and without it sessions quietly fall back to VAA
 In Desktop Mode open **Konsole** (or ssh in), then:
 
 ```sh
-git clone https://github.com/vindeckyy/slipstream.git ~/slipstream
+git clone https://github.com/vindeckyy/slipstream/slipstream ~/slipstream
 ```
 
 ## 2. Run the installer
@@ -218,7 +218,7 @@ distrobox rm -f pf2                       # the build container (~1 GB)
 rm -f  ~/.local/bin/slipstream-scripting ~/.local/bin/slipstream-gamescope
 rm -rf ~/.local/lib/slipstream-scripting ~/.local/share/slipstream-scripting
 rm -f  ~/.local/share/slipstream/gamescope.stamp
-rm -f  ~/.local/share/applications/io.unom.Slipstream.Host.desktop
+rm -f  ~/.local/share/applications/io.slipstream.Host.desktop
 rm -rf ~/slipstream                        # the source checkout and its target-steamos build dir
 ```
 
@@ -270,6 +270,6 @@ See [Uninstalling](/docs/uninstall) for the other install methods and what each 
   (`slipstream-rebuild-check`) probes the host binary and re-runs the build only if the new OS
   actually broke its library links — you should never need to intervene. (Re-running `update.sh`
   by hand still works and is harmless.)
-- Deeper reference (services, container, manual steps): [`scripts/steamdeck/README.md`](https://github.com/vindeckyy/slipstream.git/src/branch/main/scripts/steamdeck/README.md).
+- Deeper reference (services, container, manual steps): [`scripts/steamdeck/README.md`](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/scripts/steamdeck/README.md).
 
 Trouble? See [Troubleshooting](/docs/troubleshooting) and [Pairing](/docs/pairing).

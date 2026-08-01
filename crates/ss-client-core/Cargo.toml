@@ -1,0 +1,90 @@
+[package]
+name = "ss-client-core"
+description = "Shared client plumbing (Linux + Windows) — session pump, FFmpeg decode, PipeWire/WASAPI audio, SDL3 gamepads, trust store, discovery — extracted from the GTK client so the shells and the Vulkan session binary build on one implementation"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+# Linux + Windows: the Vulkan session client builds on both; `cargo build --workspace`
+# stays green on macOS (the Mac client lives in clients/apple) — there this crate is
+# `wol` plus stubs-free emptiness. `wol` is pure std and stays cross-platform, matching
+# the old main.rs. Audio is the one per-OS swap: PipeWire on Linux, WASAPI on Windows
+# (same public surface — see lib.rs).
+[target.'cfg(any(target_os = "linux", windows))'.dependencies]
+slipstream-core = { path = "../slipstream-core", features = ["quic"] }
+# FFmpeg's Vulkan hwcontext surface (Vulkan Video decode on the presenter's device).
+ss-ffvk = { path = "../ss-ffvk" }
+async-channel = "2"
+
+# Video decode (same FFmpeg pin as the host) and Opus for the audio planes.
+ffmpeg-next = "8"
+opus = "0.3"
+
+mdns-sd = "0.20"
+
+# PyroWave decode (the opt-in wired-LAN wavelet codec, design/pyrowave-codec-plan.md
+# §4.5) — pure Vulkan compute on the presenter's shared device, so it builds wherever the
+# spawned Vulkan session presenter runs: Linux AND Windows (pyrowave-sys covers both; it
+# is an empty stub elsewhere). `ash` only wraps the presenter's existing raw handles
+# (same pinned version as ss-presenter).
+pyrowave-sys = { path = "../pyrowave-sys", optional = true }
+ash = { version = "0.38", optional = true }
+# Game-library fetch from the host's management API over mTLS + fingerprint pinning.
+# `ureq` is small + sync (the host uses it too) and its rustls unifies with the
+# workspace's (quinn's) 0.23; the pinning verifier mirrors core's private `PinVerify`.
+ureq = "2"
+# Signed update-manifest fetch/verify + the install-kind ladder, shared with the host so one
+# trust rule serves both (crates/ss-update-check).
+ss-update-check = { path = "../ss-update-check" }
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+tracing = "0.1"
+# Stable ids for profiles and host records (profiles.rs) — the OS RNG only, same version the
+# workspace already resolves for slipstream-core. No uuid crate: the v4 layout is four lines.
+rand = "0.9"
+
+# Gamepads: capture + feedback (full DualSense fidelity — touchpad/motion/triggers/LEDs
+# need the hidapi driver). Linux links the system SDL3; Windows builds it from source
+# (no system SDL3 there — same choice as clients/windows).
+[target.'cfg(target_os = "linux")'.dependencies]
+pipewire = "0.9"
+sdl3 = { version = "0.18", features = ["hidapi"] }
+
+[target.'cfg(windows)'.dependencies]
+wasapi = "0.23"
+sdl3 = { version = "0.18", features = ["hidapi", "build-from-source"] }
+# D3D11VA decode (video_d3d11.rs): device/adapter selection, DXVA probes, and the shared
+# NT-handle hand-off ring. Same pinned rev as clients/windows so the workspace builds ONE
+# windows-rs.
+windows = { git = "https://github.com/microsoft/windows-rs", rev = "acb5a1a7441033d9312b16842af02eb0c2b403dc", features = [
+    # Features are header-named since windows-rs generates from the SDK headers directly
+    # (#4689) — one feature per header, replacing the old `Win32_*` namespace features.
+    "d3d11",
+    "d3dcommon",
+    "dxgi",
+    "handleapi",
+    # RECT/HMONITOR for DXGI_OUTPUT_DESC1 (the display-HDR volume query).
+    "windef",
+    # IDXGIResource1::CreateSharedHandle takes an optional SECURITY_ATTRIBUTES.
+    "minwinbase",
+    # The GlobalAlloc block the clipboard takes ownership of (clipboard.rs).
+    "winbase",
+    # The OS-clipboard bridge (clipboard.rs): Open/Get/SetClipboardData + the sequence
+    # number — all in winuser now.
+    "winuser",
+] }
+
+[features]
+# PyroWave client decode ships in every default build (flatpak included; pyrowave-sys is a
+# vendored in-repo tree, offline-safe, and an empty stub off Linux/Windows). The codec is
+# still strictly per-session opt-in (Settings codec pick / SLIPSTREAM_PREFER_PYROWAVE=1).
+default = ["pyrowave"]
+pyrowave = ["dep:pyrowave-sys", "dep:ash"]
+
+[lints]
+workspace = true

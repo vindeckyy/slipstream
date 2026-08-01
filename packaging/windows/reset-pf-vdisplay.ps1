@@ -1,8 +1,8 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-  Recover the pf-vdisplay (slipstream) virtual-display driver after it WEDGES under rapid ADD/REMOVE
-  churn - no reboot. The dev-iteration counterpart to redeploy-pf-vdisplay.ps1.
+  Recover the ss-vdisplay (slipstream) virtual-display driver after it WEDGES under rapid ADD/REMOVE
+  churn - no reboot. The dev-iteration counterpart to redeploy-ss-vdisplay.ps1.
 
 .DESCRIPTION
   Sustained connect/disconnect churn (e.g. a client reconnect loop x the host's 8 pipeline-build
@@ -16,7 +16,7 @@
     1. Stop the host service (it holds the driver's control device).
     2. pnputil /remove-device the GHOST (Status != OK = not-present) slipstream virtual-monitor nodes
        that accumulated - the root of the slot exhaustion.
-    3. Disable + Enable the pf-vdisplay adapter (ROOT\DISPLAY\*, "Slipstream Virtual Display") to
+    3. Disable + Enable the ss-vdisplay adapter (ROOT\DISPLAY\*, "Slipstream Virtual Display") to
        reload the IddCx driver instance and reset its monitor list. (Restart-PnpDevice does NOT exist
        on this box's PowerShell, so we disable+enable explicitly.)
     4. Restart the host service.
@@ -28,15 +28,15 @@
 .PARAMETER GhostMatch  FriendlyName substring of the virtual monitors to reap. Default "Slipstream".
 .PARAMETER KeepGhosts  Skip the ghost-node cleanup; only cycle the adapter.
 .PARAMETER NoHost      Don't stop/start the host service (just reset the driver) - used by
-                       redeploy-pf-vdisplay.ps1, which manages the service itself.
+                       redeploy-ss-vdisplay.ps1, which manages the service itself.
 .PARAMETER Verify      After recovery, run a slipstream-probe loopback and report whether ADD works
                        again (best-effort; needs slipstream-probe.exe on PATH or via -Probe).
 .PARAMETER Probe       Path to slipstream-probe.exe for -Verify.
 
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File reset-pf-vdisplay.ps1
+  powershell -ExecutionPolicy Bypass -File reset-ss-vdisplay.ps1
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File reset-pf-vdisplay.ps1 -Verify -Probe C:\t-goal1\debug\slipstream-probe.exe
+  powershell -ExecutionPolicy Bypass -File reset-ss-vdisplay.ps1 -Verify -Probe C:\t-goal1\debug\slipstream-probe.exe
 #>
 [CmdletBinding()]
 param(
@@ -80,7 +80,7 @@ if (-not $KeepGhosts) {
 # 3) Reload the IddCx adapter instance (disable + enable) to clear its monitor list.
 $ad = Get-PfAdapter
 if (-not $ad) {
-    Write-Warning "pf-vdisplay adapter '$AdapterName' not found (Class Display) - is the driver installed?"
+    Write-Warning "ss-vdisplay adapter '$AdapterName' not found (Class Display) - is the driver installed?"
 }
 else {
     Write-Host "==> cycling adapter $($ad.InstanceId)"
@@ -120,11 +120,11 @@ if ($Verify) {
         & $Probe *> $null
         Start-Sleep -Seconds 2
         $last = Get-Content $log -Tail 80 -ErrorAction SilentlyContinue |
-            Select-String -Pattern 'pf-vdisplay created|Element nicht|0x80070490' | Select-Object -Last 1
+            Select-String -Pattern 'ss-vdisplay created|Element nicht|0x80070490' | Select-Object -Last 1
         if ($last -match 'created') { Write-Host "    OK: ADD succeeded after reset." }
         elseif ($last) { Write-Warning "    ADD still failing after reset: $($last.Line.Trim())" }
         else { Write-Warning "    no ADD outcome found in the log; check $log." }
     }
 }
 
-Write-Host "pf-vdisplay reset done."
+Write-Host "ss-vdisplay reset done."

@@ -18,7 +18,7 @@ path = "src/main.rs"
 # Session pump, decode, audio, gamepads, trust, discovery, keymap — the UI-agnostic
 # plumbing, shared with the upcoming Vulkan session binary (design: slipstream-planning
 # linux-client-rearchitecture.md). This crate keeps only the GTK shell + GL presenter.
-pf-client-core = { path = "../../crates/pf-client-core" }
+ss-client-core = { path = "../../crates/ss-client-core" }
 slipstream-core = { path = "../../crates/slipstream-core", features = ["quic"] }
 
 # UI shell. GraphicsOffload needs GTK ≥ 4.14; black-background ≥ 4.16. AlertDialog/

@@ -98,13 +98,13 @@ let
       cmake # pyrowave-sys (C++/Vulkan), the vendored libopus (opus crate), aws-lc-sys (rustls)
       nasm # libopus SIMD + OpenH264 (openh264 `source` feature)
       perl # aws-lc-sys asm generation (rustls' aws-lc-rs crypto provider)
-      rustPlatform.bindgenHook # LIBCLANG_PATH + clang args for ffmpeg-sys-next / pf-ffvk / pyrowave-sys bindgen
+      rustPlatform.bindgenHook # LIBCLANG_PATH + clang args for ffmpeg-sys-next / ss-ffvk / pyrowave-sys bindgen
       addDriverRunpath # provides the `addDriverRunpath` shell fn used in postFixup
     ];
   };
 
   meta = {
-    homepage = "https://github.com/vindeckyy/slipstream.git";
+    homepage = "https://github.com/vindeckyy/slipstream/slipstream";
     license = with lib.licenses; [
       mit
       asl20
@@ -171,15 +171,15 @@ in
         install -Dm0644 scripts/60-slipstream.rules "$out/lib/udev/rules.d/60-slipstream.rules"
 
         # KWin Desktop-mode authorization (zkde_screencast + fake_input). Point Exec at the store binary.
-        install -Dm0644 packaging/linux/io.unom.Slipstream.Host.desktop \
-          "$out/share/applications/io.unom.Slipstream.Host.desktop"
-        substituteInPlace "$out/share/applications/io.unom.Slipstream.Host.desktop" \
+        install -Dm0644 packaging/linux/io.slipstream.Host.desktop \
+          "$out/share/applications/io.slipstream.Host.desktop"
+        substituteInPlace "$out/share/applications/io.slipstream.Host.desktop" \
           --replace-fail "/usr/bin/slipstream-host" "$out/bin/slipstream-host"
 
         # Status-tray autostart entry + its hicolor status icons.
-        install -Dm0644 packaging/linux/io.unom.Slipstream.Tray.desktop \
-          "$out/etc/xdg/autostart/io.unom.Slipstream.Tray.desktop"
-        substituteInPlace "$out/etc/xdg/autostart/io.unom.Slipstream.Tray.desktop" \
+        install -Dm0644 packaging/linux/io.slipstream.Tray.desktop \
+          "$out/etc/xdg/autostart/io.slipstream.Tray.desktop"
+        substituteInPlace "$out/etc/xdg/autostart/io.slipstream.Tray.desktop" \
           --replace-fail "/usr/bin/slipstream-tray" "$out/bin/slipstream-tray"
         for sz in 22x22 48x48; do
           for png in packaging/linux/icons/hicolor/$sz/apps/*.png; do
@@ -227,7 +227,7 @@ in
         "--locked -p slipstream-client-linux -p slipstream-client-session -p slipstream-cli "
         + "--no-default-features --features slipstream-client-session/pyrowave";
 
-      # pf-ffvk runs bindgen over libavutil/hwcontext_vulkan.h, which `#include <vulkan/vulkan.h>`.
+      # ss-ffvk runs bindgen over libavutil/hwcontext_vulkan.h, which `#include <vulkan/vulkan.h>`.
       # There is no /usr/include on NixOS, so hand it the Vulkan-Headers include dir explicitly
       # (build.rs turns this into a clang `-I`). libavutil's own include path comes from pkg-config.
       PF_FFVK_VULKAN_INCLUDE = "${vulkan-headers}/include";
@@ -235,7 +235,7 @@ in
       nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ wrapGAppsHook4 ];
 
       buildInputs = [
-        ffmpeg # FFmpeg decode (pf-client-core) + pf-ffvk links libavutil
+        ffmpeg # FFmpeg decode (ss-client-core) + ss-ffvk links libavutil
         pipewire # PipeWire audio playback + mic capture
         libopus # audiopus_sys → system opus via pkg-config (Opus decode)
         sdl3 # window + gamepads (SDL3 HIDAPI: DualSense touchpad/motion/triggers)
@@ -259,13 +259,13 @@ in
         install -Dm0644 scripts/70-slipstream-client.rules "$out/lib/udev/rules.d/70-slipstream-client.rules"
 
         # The app icon the desktop entry (and the About dialog) name.
-        install -Dm0644 packaging/linux/icons/hicolor/scalable/apps/io.unom.Slipstream.svg \
-          "$out/share/icons/hicolor/scalable/apps/io.unom.Slipstream.svg"
+        install -Dm0644 packaging/linux/icons/hicolor/scalable/apps/io.slipstream.svg \
+          "$out/share/icons/hicolor/scalable/apps/io.slipstream.svg"
 
         # Desktop launcher — point Exec at the store binary (wrapped below).
-        install -Dm0644 packaging/linux/io.unom.Slipstream.desktop \
-          "$out/share/applications/io.unom.Slipstream.desktop"
-        substituteInPlace "$out/share/applications/io.unom.Slipstream.desktop" \
+        install -Dm0644 packaging/linux/io.slipstream.desktop \
+          "$out/share/applications/io.slipstream.desktop"
+        substituteInPlace "$out/share/applications/io.slipstream.desktop" \
           --replace-fail "Exec=slipstream-client" "Exec=$out/bin/slipstream-client"
       '';
 

@@ -10,7 +10,7 @@ plugins {
 }
 
 android {
-    namespace = "io.unom.slipstream"
+    namespace = "io.slipstream"
     compileSdk = 37 // Android 17 — required by androidx.core 1.19.0.
 
     defaultConfig {
@@ -21,7 +21,7 @@ android {
             envFile.inputStream().use { props.load(it) }
         }
 
-        applicationId = "io.unom.slipstream"
+        applicationId = "io.slipstream"
         // Android 9. Reaches older Android TV boxes (e.g. Amlogic streamers still on Android 9–11);
         // the handful of API 31+ APIs we use are runtime-gated (Material You → brand palette, rumble
         // → legacy Vibrator, NEARBY_WIFI/lights/ADPF already gated), so nothing is lost above 28.

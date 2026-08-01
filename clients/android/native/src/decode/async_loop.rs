@@ -69,7 +69,7 @@ enum DecodeEvent {
 /// latency the sync loop left on the table). The callbacks run on the codec's internal looper thread
 /// and only *push events* — every `AMediaCodec` buffer op stays on this thread, which owns the codec,
 /// sidestepping the self-reference that would arise from a callback calling back into the codec it's
-/// stored in. A small `pf-decode-feed` thread blocks on the network so this loop never does.
+/// stored in. A small `ss-decode-feed` thread blocks on the network so this loop never does.
 pub(super) fn run_async(
     client: Arc<NativeClient>,
     window: NativeWindow,
@@ -240,7 +240,7 @@ pub(super) fn run_async(
         let shutdown = shutdown.clone();
         let ev_tx = ev_tx.clone();
         std::thread::Builder::new()
-            .name("pf-decode-feed".into())
+            .name("ss-decode-feed".into())
             .spawn(move || {
                 feeder_loop(
                     client,
@@ -566,7 +566,7 @@ pub(super) fn run_async(
     log::info!("decode: stopped (async, fed={fed} rendered={rendered} discarded={discarded})");
 }
 
-/// The `pf-decode-feed` thread: block on the connector for the next access unit so the async loop
+/// The `ss-decode-feed` thread: block on the connector for the next access unit so the async loop
 /// never has to. Records the `received` HUD stat (receipt point) — including the Phase-2 host/network
 /// split from any matching 0xCF host timings — then hands the AU to the loop via the event channel.
 /// Exits when `shutdown` is set, the session closes, or the loop's receiver is gone.

@@ -84,7 +84,7 @@ install -Dm0644 web/README.md                       "$DOCDIR/README.md"
 cat > "$DOCDIR/copyright" <<EOF
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: slipstream
-Source: https://github.com/vindeckyy/slipstream.git
+Source: https://github.com/vindeckyy/slipstream/slipstream
 
 Files: *
 Copyright: slipstream contributors
@@ -107,18 +107,18 @@ Maintainer: unom <packages@unom.io>
 Installed-Size: $INSTALLED_KB
 Section: net
 Priority: optional
-Homepage: https://github.com/vindeckyy/slipstream.git
+Homepage: https://github.com/vindeckyy/slipstream/slipstream
 Description: slipstream management web console (Nitro SSR on bun + React)
  The browser console for a slipstream streaming host: status, paired devices, and the
  SPAKE2 PIN pairing flow every client needs. Runs as a systemd --user service on port
  47992 over HTTPS (HTTP/1.1 over TLS, with the host's own identity cert), login-gated (a
- password generated on first start), proxying the host's loopback HTTPS management API
+ password chosen in the browser on first start), proxying the host's loopback HTTPS management API
  with a bearer token injected server-side (never sent to the browser). Bundles its own
  bun runtime (no system nodejs/bun dependency).
  .
- Auto-wired to the host on a packaged install: it sources the host's
- ~/.config/slipstream/mgmt-token and a generated login password — no env editing. Enable
- the systemd user service slipstream-web; read the login password from the --user journal.
+Auto-wired to the host on a packaged install: it sources the host's
+~/.config/slipstream/mgmt-token and an optional login password — no env editing. Enable
+the systemd user service slipstream-web; choose the login password in the browser on first visit.
 EOF
 
 cat > "$STAGE/DEBIAN/postinst" <<'EOF'
@@ -127,10 +127,8 @@ set -e
 if [ "$1" = "configure" ]; then
     echo "slipstream-web installed. Enable it for your user:"
     echo "    systemctl --user enable --now slipstream-web"
-    echo "A login password is generated on first start — read it with:"
-    echo "    journalctl --user -u slipstream-web-init | sed -n 's/.*password generated: //p'"
-    echo "    (or: sed -n 's/^SLIPSTREAM_UI_PASSWORD=//p' ~/.config/slipstream/web-password)"
-    echo "Then open https://<host-ip>:47992 (self-signed host cert — trust it once)"
+    echo "Open https://<host-ip>:47992 and choose a login password on first visit"
+    echo "(self-signed host cert — trust it once)"
 fi
 exit 0
 EOF

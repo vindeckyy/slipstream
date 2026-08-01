@@ -1,11 +1,11 @@
-# Production compose for the deployed slipstream pieces — runs on github-actions (the DMZ services VM, 192.168.50.50) under
-# ~/slipstream-docs (synced there by .github/workflows/docker.yml's deploy job; pattern
-# follows unom/website + unom/cms). Caddy on github-pages-1 serves
-# docs.slipstream.unom.io -> github-actions:3220 (vhost in unom/reverse-proxy).
-name: slipstream-docs-prod
+# Optional local docs compose. Upstream used unom infra; this fork has no deploy target yet.
+# Build and run the docs image yourself if you need it locally.
+name: slipstream-docs
 services:
   docs:
-    image: github.com/vindeckyy/slipstream/unom/slipstream-docs:latest
+    build:
+      context: docs-site
+      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
       - "3220:3000"

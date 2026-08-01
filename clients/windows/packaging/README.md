@@ -26,7 +26,7 @@ stamps the manifest `ProcessorArchitecture` and names the output. See
 | `Microsoft.WindowsAppRuntime.Bootstrap.dll`, `resources.pri` | staged by the client's `build.rs` via `windows-reactor-setup::as_framework_dependent()` |
 | `SDL3.dll` | auto-staged by the `sdl3` crate |
 | `avcodec/avformat/avutil/swscale/swresample/...-*.dll` | `FFMPEG_DIR\bin` |
-| `Assets\*.png` | checked-in tile/store logos (rasterized from `packaging/flatpak/io.unom.Slipstream.svg`) |
+| `Assets\*.png` | checked-in tile/store logos (rasterized from `packaging/flatpak/io.slipstream.svg`) |
 | `AppxManifest.xml` | the template here, with `{VERSION}`/`{PUBLISHER}` substituted |
 
 ### Why an "unpackaged" WinUI app packages cleanly

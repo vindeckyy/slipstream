@@ -73,7 +73,7 @@ impl VsyncShared {
         self.period_ns.load(Ordering::Relaxed)
     }
 
-    /// The panel's own refresh period (0 = unknown) — for the pf-present line's decomposition.
+    /// The panel's own refresh period (0 = unknown) — for the ss-present line's decomposition.
     pub(super) fn panel_period_ns(&self) -> i64 {
         self.panel_period_ns.load(Ordering::Relaxed)
     }
@@ -393,7 +393,7 @@ impl VsyncClock {
         });
         let thread_shared = shared.clone();
         let join = std::thread::Builder::new()
-            .name("pf-vsync".into())
+            .name("ss-vsync".into())
             .spawn(move || {
                 let looper = ndk::looper::ThreadLooper::prepare();
                 // SAFETY: getInstance on a thread with a prepared looper returns this thread's

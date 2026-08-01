@@ -20,9 +20,9 @@ mod console;
 
 #[cfg(any(target_os = "linux", windows))]
 mod session_main {
-    use pf_client_core::gamepad::GamepadService;
-    use pf_client_core::session::SessionParams;
-    use pf_client_core::trust;
+    use ss_client_core::gamepad::GamepadService;
+    use ss_client_core::session::SessionParams;
+    use ss_client_core::trust;
     use slipstream_core::config::{CompositorPref, GamepadPref, Mode};
     use std::sync::atomic::AtomicBool;
     use std::sync::Arc;
@@ -168,7 +168,7 @@ mod session_main {
         gamepad: &GamepadService,
         native: Mode,
         force_software: Arc<AtomicBool>,
-        vulkan: Option<pf_client_core::video::VulkanDecodeDevice>,
+        vulkan: Option<ss_client_core::video::VulkanDecodeDevice>,
     ) -> SessionParams {
         // Per-host clipboard opt-in (design/clipboard-and-file-transfer.md §5.3). In spec
         // mode the spawner already resolved it; otherwise this looks it up itself, which is
@@ -280,7 +280,7 @@ mod session_main {
             #[cfg(windows)]
             display_hdr: settings
                 .hdr_enabled
-                .then(|| pf_client_core::video_d3d11::display_hdr_volume(window_pos()))
+                .then(|| ss_client_core::video_d3d11::display_hdr_volume(window_pos()))
                 .flatten(),
             #[cfg(not(windows))]
             display_hdr: None,
@@ -309,7 +309,7 @@ mod session_main {
             // grid itself is written by the presenter (run_session clones the Arc out of
             // these params) and folded into ~1 Hz PhaseReports by the session pump.
             phase_lock,
-            latch_grid: std::sync::Arc::new(pf_client_core::session::LatchGrid::default()),
+            latch_grid: std::sync::Arc::new(ss_client_core::session::LatchGrid::default()),
         }
     }
 
@@ -343,7 +343,7 @@ mod session_main {
             Box::new(move |w: u32, h: u32| {
                 println!("{{\"window\":{{\"w\":{w},\"h\":{h}}}}}");
                 if persist_locally {
-                    pf_client_core::orchestrate::persist_window_size(w, h);
+                    ss_client_core::orchestrate::persist_window_size(w, h);
                 }
             }) as Box<dyn FnMut(u32, u32)>
         })
@@ -407,7 +407,7 @@ mod session_main {
         // `--list-adapters`: print the Vulkan physical devices' marketing names (one per
         // line, discrete first) for the desktop shells' GPU picker, then exit.
         if arg_flag("--list-adapters") {
-            return match pf_presenter::vk::list_adapters() {
+            return match ss_presenter::vk::list_adapters() {
                 Ok(names) => {
                     for n in names {
                         println!("{n}");
@@ -426,7 +426,7 @@ mod session_main {
         // same enumeration the GTK shell probes.
         #[cfg(target_os = "linux")]
         if arg_flag("--list-audio") {
-            return match pf_client_core::audio::devices() {
+            return match ss_client_core::audio::devices() {
                 Ok((sinks, sources)) => {
                     for d in sinks {
                         println!("sink\t{}\t{}", d.name, d.description);
@@ -476,7 +476,7 @@ mod session_main {
         {
             let s = arg_value("--resolved-spec")
                 .and_then(|p| {
-                    pf_client_core::orchestrate::ResolvedSpec::read(std::path::Path::new(&p)).ok()
+                    ss_client_core::orchestrate::ResolvedSpec::read(std::path::Path::new(&p)).ok()
                 })
                 .map_or_else(trust::Settings::load, |spec| spec.settings);
             for (var, value) in [
@@ -552,7 +552,7 @@ mod session_main {
         // helper, so the two modes cannot drift.
         let spec = arg_value("--resolved-spec").map(std::path::PathBuf::from);
         let (settings, profile_name, clipboard_override) = match &spec {
-            Some(path) => match pf_client_core::orchestrate::ResolvedSpec::read(path) {
+            Some(path) => match ss_client_core::orchestrate::ResolvedSpec::read(path) {
                 Ok(s) => {
                     tracing::info!(path = %path.display(), "running from a resolved spec");
                     (s.settings, s.profile, Some(s.clipboard))
@@ -603,7 +603,7 @@ mod session_main {
             || std::env::var_os("SteamDeck").is_some()
             || std::env::var_os("GAMESCOPE_WAYLAND_DISPLAY").is_some();
 
-        let opts = pf_presenter::SessionOpts {
+        let opts = ss_presenter::SessionOpts {
             window_title: format!("Slipstream · {title}"),
             fullscreen,
             window_pos: window_pos(),
@@ -625,7 +625,7 @@ mod session_main {
             // The Skia console UI (stats OSD, capture HUD) — compiled out of the
             // power-user build (`--no-default-features` drops the `ui` feature).
             #[cfg(feature = "ui")]
-            overlay: Some(Box::new(pf_console_ui::SkiaOverlay::new())),
+            overlay: Some(Box::new(ss_console_ui::SkiaOverlay::new())),
             #[cfg(not(feature = "ui"))]
             overlay: None,
             window_size: window_size(&settings),
@@ -636,7 +636,7 @@ mod session_main {
         };
 
         let outcome =
-            pf_presenter::run_session(opts, move |gamepad, native, force_software, vulkan| {
+            ss_presenter::run_session(opts, move |gamepad, native, force_software, vulkan| {
                 session_params(
                     &settings,
                     profile_name,
@@ -654,14 +654,14 @@ mod session_main {
             });
 
         match outcome {
-            Ok(pf_presenter::Outcome::Ended(None)) => 0,
-            Ok(pf_presenter::Outcome::Ended(Some(reason))) => {
+            Ok(ss_presenter::Outcome::Ended(None)) => 0,
+            Ok(ss_presenter::Outcome::Ended(Some(reason))) => {
                 // The host ending the session (game quit, host shutdown) is a normal end
                 // for a one-shot stream binary — report the reason, exit clean.
                 json_line("ended", &reason, None);
                 0
             }
-            Ok(pf_presenter::Outcome::ConnectFailed {
+            Ok(ss_presenter::Outcome::ConnectFailed {
                 msg,
                 trust_rejected,
             }) => {

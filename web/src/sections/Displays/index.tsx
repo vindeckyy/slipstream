@@ -20,7 +20,14 @@ export const SectionDisplays: FC = () => {
 	return (
 		<Section maxWidth={false}>
 			<div className="flex flex-col gap-card">
-				<h1 className="text-2xl font-semibold">{m.nav_displays()}</h1>
+				<div className="space-y-1">
+					<h1 className="text-2xl font-semibold tracking-tight">
+						{m.nav_displays()}
+					</h1>
+					<p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+						{m.host_displays_help()}
+					</p>
+				</div>
 				<DisplaySection />
 				<MonitorCard />
 				<SessionGameCard />

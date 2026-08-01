@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  firewalld service definition for the slipstream management web console (the optional slipstream-web
+  package: device pairing, status, GPU selection, performance graphs).
+
+  Installed to /usr/lib/firewalld/services/ by the slipstream-host package. NOT enabled automatically
+  (packages never touch the admin's firewall). Only useful if you installed the console (slipstream-web)
+  AND want to reach it from another device on the LAN — the console binds all interfaces on TCP 47992
+  (HTTPS, login-gated). The streaming host itself does not need this open; enable it deliberately with
+  firewall-cmd (add-service=slipstream-web, then reload). CachyOS/Ubuntu: use the ufw slipstream-web
+  profile instead.
+
+  The mgmt REST API (TCP 47990) is a different surface — the console proxies to it over loopback, and
+  it is opened for paired clients by the slipstream-native profile (not here). Off-loopback the mgmt API
+  serves only read-only status/library to a paired client cert; its admin surface stays loopback-only.
+-->
+<service>
+  <short>Slipstream web console</short>
+  <description>The optional slipstream management web console (device pairing, status, GPU selection, performance graphs) over HTTPS. Open only if you run the slipstream-web package and want the console reachable from other devices on the LAN.</description>
+  <port protocol="tcp" port="47992"/>  <!-- HTTPS web console (login-gated) -->
+</service>

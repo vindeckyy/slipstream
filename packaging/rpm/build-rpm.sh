@@ -62,9 +62,9 @@ fi
 # rpmbuild's RPM-level check sees — skip it; a genuinely missing dep fails the compile/link.
 rpmbuild -bb --nodeps "${WEB_OPT[@]}" "${SCRIPTING_OPT[@]}" "${HOST_OPT[@]}" \
   --define "_topdir $TOP" \
-  --define "pf_version ${PF_VERSION}" \
-  --define "pf_release ${PF_RELEASE}" \
-  --define "pf_channel $(case "${PF_RELEASE:-1}" in 0.ci*) echo canary ;; *) echo stable ;; esac)" \
+  --define "ss_version ${PF_VERSION}" \
+  --define "ss_release ${PF_RELEASE}" \
+  --define "ss_channel $(case "${PF_RELEASE:-1}" in 0.ci*) echo canary ;; *) echo stable ;; esac)" \
   packaging/rpm/slipstream.spec
 
 mkdir -p dist

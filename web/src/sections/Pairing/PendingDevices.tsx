@@ -11,7 +11,13 @@ import {
 	useListPendingDevices,
 } from "@/api/gen/native/native";
 import { QueryState } from "@/components/query-state";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import type { Loadable } from "@/lib/query";
 import { fmtAge } from "@/lib/utils";
@@ -80,74 +86,74 @@ export const PendingDevices: FC<{
 	if (rows.length === 0 && !pending.error) return null;
 
 	return (
-		<Card>
-			<CardContent flush>
-				<CardHeader>
-					<CardTitle>
-						<h2 className="flex items-center gap-2 text-lg font-medium">
-							<UserPlus className="size-4" />
-							{m.pairing_pending_title()}
-						</h2>
-						<p className="text-sm text-muted-foreground">
-							{m.pairing_pending_desc()}
-						</p>
-					</CardTitle>
-				</CardHeader>
+		<Card className="border-primary/25 bg-primary/5 ring-primary/20">
+			<CardHeader>
+				<CardTitle className="flex items-center gap-2 tracking-tight">
+					<UserPlus className="size-4 text-primary" />
+					{m.pairing_pending_title()}
+				</CardTitle>
+				<CardDescription className="leading-relaxed">
+					{m.pairing_pending_desc()}
+				</CardDescription>
+			</CardHeader>
 
+			<CardContent flush>
 				<QueryState
 					isLoading={pending.isLoading}
 					error={pending.error}
 					refetch={pending.refetch}
 				>
-					<Table>
-						<TableBody>
-							{rows.map((p) => (
-								<TableRow className="h-18" key={p.id}>
-									{/* The row must keep the actions on-canvas in a portrait phone
-									    viewport: the name flexes and truncates (w-full + max-w-0),
-									    and the fingerprint/age columns collapse into a sub-line
-									    here below md/sm instead of widening the row past the
-									    screen (the table wrapper scrolls, the page doesn't — an
-									    off-canvas Approve button is unreachable on mobile). */}
-									<TableCell className="w-full max-w-0 font-medium">
-										<div className="truncate">{p.name}</div>
-										<div className="truncate font-mono text-xs font-normal text-muted-foreground md:hidden">
+					<div className="overflow-x-auto border-t border-border/60">
+						<Table>
+							<TableBody>
+								{rows.map((p) => (
+									<TableRow className="h-18" key={p.id}>
+										{/* The row must keep the actions on-canvas in a portrait phone
+										    viewport: the name flexes and truncates (w-full + max-w-0),
+										    and the fingerprint/age columns collapse into a sub-line
+										    here below md/sm instead of widening the row past the
+										    screen (the table wrapper scrolls, the page doesn't — an
+										    off-canvas Approve button is unreachable on mobile). */}
+										<TableCell className="w-full max-w-0 font-medium">
+											<div className="truncate">{p.name}</div>
+											<div className="truncate font-mono text-xs font-normal text-muted-foreground md:hidden">
+												{p.fingerprint.slice(0, 16)}…
+												<span className="ml-2 font-sans sm:hidden">
+													{fmtAge(p.age_secs)}
+												</span>
+											</div>
+										</TableCell>
+										<TableCell className="hidden font-mono text-xs text-muted-foreground md:table-cell">
 											{p.fingerprint.slice(0, 16)}…
-											<span className="ml-2 font-sans sm:hidden">
-												{fmtAge(p.age_secs)}
-											</span>
-										</div>
-									</TableCell>
-									<TableCell className="hidden font-mono text-xs text-muted-foreground md:table-cell">
-										{p.fingerprint.slice(0, 16)}…
-									</TableCell>
-									<TableCell className="hidden text-xs text-muted-foreground sm:table-cell">
-										{fmtAge(p.age_secs)}
-									</TableCell>
-									<TableCell className="whitespace-nowrap text-right">
-										<div className="flex justify-end gap-2">
-											<Button
-												size="sm"
-												disabled={pendingId === p.id}
-												onClick={() => onApprove(p.id, p.name)}
-											>
-												{m.pairing_pending_approve()}
-											</Button>
-											<Button
-												size="sm"
-												variant="ghost"
-												aria-label={m.pairing_pending_deny()}
-												disabled={pendingId === p.id}
-												onClick={() => onDeny(p.id)}
-											>
-												<X className="size-4" />
-											</Button>
-										</div>
-									</TableCell>
-								</TableRow>
-							))}
-						</TableBody>
-					</Table>
+										</TableCell>
+										<TableCell className="hidden text-xs text-muted-foreground sm:table-cell">
+											{fmtAge(p.age_secs)}
+										</TableCell>
+										<TableCell className="whitespace-nowrap text-right">
+											<div className="flex justify-end gap-2">
+												<Button
+													size="sm"
+													disabled={pendingId === p.id}
+													onClick={() => onApprove(p.id, p.name)}
+												>
+													{m.pairing_pending_approve()}
+												</Button>
+												<Button
+													size="sm"
+													variant="ghost"
+													aria-label={m.pairing_pending_deny()}
+													disabled={pendingId === p.id}
+													onClick={() => onDeny(p.id)}
+												>
+													<X className="size-4" />
+												</Button>
+											</div>
+										</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
+					</div>
 				</QueryState>
 			</CardContent>
 		</Card>

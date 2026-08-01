@@ -59,12 +59,12 @@ export const InstallDialog: FC<{
 						</DialogDescription>
 					</DialogHeader>
 
-					<p className="rounded-md bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
+					<p className="rounded-lg bg-muted/60 px-3 py-2.5 font-mono text-xs text-muted-foreground">
 						{entry.pkg}@{entry.version}
 					</p>
 
 					{external && (
-						<p className="rounded-md border border-amber-600/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-600 dark:border-amber-500/40 dark:text-amber-500">
+						<p className="rounded-lg border border-amber-600/40 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-700 dark:border-amber-500/40 dark:text-amber-400">
 							{m.store_install_external_note()}
 						</p>
 					)}
@@ -140,7 +140,7 @@ export const SpecInstallDialog: FC<{
 					<DialogDescription>{m.store_spec_lead()}</DialogDescription>
 				</DialogHeader>
 
-				<p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+				<p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
 					{m.store_spec_permanent()}
 				</p>
 

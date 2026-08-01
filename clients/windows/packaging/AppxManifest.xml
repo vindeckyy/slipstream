@@ -24,7 +24,7 @@
   IgnorableNamespaces="uap uap5 rescap">
 
   <Identity
-    Name="unom.Slipstream"
+    Name="vindeckyy.Slipstream"
     Publisher="{PUBLISHER}"
     Version="{VERSION}"
     ProcessorArchitecture="{ARCH}" />

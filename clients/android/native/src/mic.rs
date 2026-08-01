@@ -223,7 +223,7 @@ impl MicCapture {
         let shutdown = Arc::new(AtomicBool::new(false));
         let sd = shutdown.clone();
         let join = std::thread::Builder::new()
-            .name("pf-mic".into())
+            .name("ss-mic".into())
             .spawn(move || encode_loop(client, rx, free_tx, sd, muted, captured, dropped))
             .ok();
 

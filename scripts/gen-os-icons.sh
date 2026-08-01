@@ -50,7 +50,7 @@ for t in "${tokens[@]}"; do
 
   # GTK: the master with the fill resolved to black — Adwaita recolors a `-symbolic` icon
   # from the fill it finds, so the value only has to be a real colour, not the final one.
-  sed 's/currentColor/#000000/' "$src" > "$GTK/pf-os-$t-symbolic.svg"
+  sed 's/currentColor/#000000/' "$src" > "$GTK/ss-os-$t-symbolic.svg"
 
   # Windows: same black-to-grey substitution, rasterized at a fixed height so every mark
   # shares an optical size and keeps its own aspect ratio.

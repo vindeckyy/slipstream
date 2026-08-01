@@ -8,11 +8,11 @@ tolerates it being raw JSON *or* base64-encoded JSON.
 
 Usage (upload a new build):
   SERVICE_ACCOUNT_JSON='<raw-or-base64 SA key>' \
-    python3 play-upload.py --package io.unom.slipstream \
+    python3 play-upload.py --package io.slipstream \
       --aab path/to/app-release.aab --track internal --status completed [--no-commit]
 
 Usage (promote a build that is already on Play, no rebuild):
-  python3 play-upload.py --package io.unom.slipstream \
+  python3 play-upload.py --package io.slipstream \
       --promote 10816 --promote-from alpha --track production
 
 Promotion assigns an EXISTING versionCode to another track, so what ships to production is the

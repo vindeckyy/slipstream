@@ -160,7 +160,7 @@ sudo firewall-cmd --permanent --add-service=slipstream-web && sudo firewall-cmd 
 That opens **TCP 47992** (HTTPS, login-gated). The mgmt API (47990) is opened for paired clients by the
 `slipstream-native` profile (game-library browsing over mTLS); off-loopback it serves only read-only
 status/library, and every admin action stays loopback-only. Full port lists (`nftables`, explicit ports) are in
-[`packaging/arch/README.md`](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/arch/README.md#firewall).
+[`packaging/arch/README.md`](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/arch/README.md#firewall).
 
 ## 6. Connect a client
 
@@ -182,7 +182,7 @@ To build instead of using the binary repo, use the split `PKGBUILD` in `packagin
 `PF_WITH_SCRIPTING=1` to also build `slipstream-scripting` — both need `bun`):
 
 ```sh
-git clone https://github.com/vindeckyy/slipstream.git && cd slipstream/packaging/arch
+git clone https://github.com/vindeckyy/slipstream/slipstream.git && cd slipstream/packaging/arch
 # Build the working tree (no git fetch):
 PF_SRCDIR="$(git rev-parse --show-toplevel)" makepkg -f --holdver
 sudo pacman -U slipstream-host-*.pkg.tar.zst
@@ -191,6 +191,6 @@ sudo pacman -U slipstream-host-*.pkg.tar.zst
 NVENC/EGL come from the NVIDIA driver (`nvidia-utils`); on a GPU-less builder, symlink the CUDA
 stub into the link path first (the `PKGBUILD` header documents this). Full details, the
 Fedora→Arch dependency map, and the systemd-sysext mechanism are in
-[`packaging/arch/README.md`](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/arch/README.md).
+[`packaging/arch/README.md`](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/arch/README.md).
 (For a **SteamOS host**, use the [on-device installer](/docs/steamos-host) instead — it builds
 the host and the HDR gamescope against the running OS.)

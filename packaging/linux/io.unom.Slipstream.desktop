@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Slipstream
+Comment=Stream a remote slipstream host
+Exec=slipstream-client %u
+Icon=io.slipstream
+Terminal=false
+Categories=Network;Game;
+Keywords=streaming;remote;game;moonlight;
+StartupNotify=true
+MimeType=x-scheme-handler/slipstream;

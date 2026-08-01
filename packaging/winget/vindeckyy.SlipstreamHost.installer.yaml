@@ -1,0 +1,63 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+#
+# Installer manifest for the Windows host (packaging/windows/slipstream-host.iss -> Inno Setup 6).
+#
+# The host is a machine-wide, elevated install: it registers a SYSTEM service, installs the
+# ss-vdisplay + gamepad drivers, and opens firewall ports. There is no per-user scope.
+PackageIdentifier: vindeckyy.SlipstreamHost
+PackageVersion: 0.19.2
+
+InstallerType: inno
+Scope: machine
+# PrivilegesRequired=admin in the .iss -> Setup raises its own UAC prompt.
+ElevationRequirement: elevatesSelf
+# Windows 11 22H2 floor: ss-vdisplay is built against IddCx 1.10 with no runtime downgrade, so on
+# anything older the device fails to start with Code 10 (see the MinVersion gate in the .iss).
+MinimumOSVersion: 10.0.22621.0
+
+InstallModes:
+  # interactive keeps the FULL wizard — every task checkbox, the web-console password page, and the
+  # VB-CABLE notice text. `winget install vindeckyy.SlipstreamHost --interactive`.
+  - interactive
+  - silent
+  - silentWithProgress
+
+InstallerSwitches:
+  # Spelled out rather than relying on winget's built-in `inno` defaults, so the unattended
+  # behaviour is reviewable here. No /MERGETASKS: a silent install deliberately takes the SAME
+  # task defaults the wizard shows, so the product does not differ by install channel. The
+  # disclosures the wizard puts on screen are carried by Agreements/InstallationNotes in the
+  # locale manifest instead.
+  #
+  # To CHANGE individual tasks, callers pass Inno's /MERGETASKS via --override: a bare name adds a
+  # task, a `!` prefix removes one. GameStream is opt-in (its plane pairs over plain HTTP), so
+  # enabling it unattended is the additive form:
+  #   winget install vindeckyy.SlipstreamHost --override "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /MERGETASKS=gamestream"
+  # and dropping a default-on task is the negated form, e.g. /MERGETASKS=!trayicon
+  # Task names: installdriver, installgamepad, installaudiocable, installhdrlayer,
+  #             gamestream, allowpublicfw, startservice, trayicon
+  Silent: /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+  SilentWithProgress: /SILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+  # <LOGPATH> is winget's OWN token and the only spelling it substitutes (see the schema this file
+  # declares: "…<LOGPATH> token can be included in the switch value so that winget will replace the
+  # token with user provided path"). It was written |LOGPATH| — not a token, so winget passed the
+  # literal string through and Inno rejected it: `|` is not legal in a Windows filename, giving
+  # "Error creating log file: The filename, directory name, or volume label syntax is incorrect."
+  # That aborted the install in EVERY mode, interactive included, for any caller that asks for a
+  # log — UniGetUI does so by default, which is how it was reported.
+  Log: /LOG="<LOGPATH>"
+
+# Inno writes its ARP entry under <AppId>_is1; this is what correlates an installed host with the
+# package for `winget list` / `winget upgrade`. Must track AppId in the .iss.
+ProductCode: '{7C9E6A52-1F4B-4E8D-A3C7-2B5D8F1E0A93}_is1'
+# Inno upgrades in place (UsePreviousAppDir=yes) — do not uninstall first, that would run the
+# [UninstallRun] service/driver teardown between versions.
+UpgradeBehavior: install
+
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/vindeckyy/slipstream/slipstream/releases/download/v0.19.2/slipstream-host-setup-0.19.2.exe
+    InstallerSha256: 96964117125BFD5AC4556987DAFAA3966A4A57BBC29C838803857852D595BF4D
+
+ManifestType: installer
+ManifestVersion: 1.6.0

@@ -95,12 +95,10 @@ pinned. The layers, from the outside in:
   can administer the host from another machine, and it performs those local-only actions on your
   behalf, over loopback, once you've logged in. So treat anyone who can reach port 47992 as a
   candidate administrator, and restrict that port at the host firewall if your LAN is shared.
-- **The web console has its own password**, on every platform — which makes it the real remote-admin
-  credential. Linux packages generate a random one on first start into
-  `~/.config/slipstream/web-password`; the SteamOS installer writes it to
-  `~/.config/slipstream/web.env` and points you at that file when it finishes; on Windows you choose
-  it during install (a strong random default is pre-filled) and it is stored readable only by
-  Administrators and SYSTEM.
+- **The web console has its own password**, on every platform, which makes it the real remote-admin
+  credential. New Linux and SteamOS installs ask you to choose one in the browser and save it to
+  `~/.config/slipstream/web-password`; on Windows you choose it during install (a strong random
+  default is pre-filled) and it is stored readable only by Administrators and SYSTEM.
   Pick a strong one and keep it out of shared documents; repeated wrong guesses are rate-limited per
   IP. To read it back or change it, see [Forgot your Password?](/docs/forgot-password).
 - **The [shared clipboard](/docs/clipboard) is opt-in at both ends.** The host never advertises it
@@ -263,4 +261,4 @@ Helpful things to include:
 We acknowledge reports within **3 business days** and practice coordinated disclosure — we'll keep
 you posted, agree a disclosure date, and credit you when the fix ships (unless you'd rather stay
 anonymous). The full policy is in
-[`SECURITY.md`](https://github.com/vindeckyy/slipstream.git/src/branch/main/SECURITY.md).
+[`SECURITY.md`](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/SECURITY.md).

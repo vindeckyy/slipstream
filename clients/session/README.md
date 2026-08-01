@@ -7,7 +7,7 @@ presenter of the Linux client re-architecture (slipstream-planning:
 
 This binary is deliberately dumb: a renderer the front-ends call INTO — the GTK shell
 (`slipstream-client`), the WinUI shell, and the `slipstream` CLI all spawn it through the
-same brain (`pf_client_core::orchestrate`), which resolves policy (profiles, settings,
+same brain (`ss_client_core::orchestrate`), which resolves policy (profiles, settings,
 wake) and hands the result down, normally as a `--resolved-spec` file. It reads the
 shared stores only as the compat fallback for a bare hand-launched invocation.
 

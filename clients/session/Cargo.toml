@@ -19,11 +19,11 @@ default = ["ui", "pyrowave"]
 # codec pick, or SLIPSTREAM_PREFER_PYROWAVE=1). The Windows ARM64 leg builds
 # --no-default-features and so skips it — note that also drops `ui` (the Skia console/OSD),
 # not just pyrowave; hardware video decode itself (D3D11VA / Vulkan Video) is unaffected.
-pyrowave = ["pf-client-core/pyrowave", "pf-presenter/pyrowave"]
+pyrowave = ["ss-client-core/pyrowave", "ss-presenter/pyrowave"]
 # The Skia console UI (stats OSD, capture HUD, later the gamepad library). Dropping it
 # (`--no-default-features`) is the ~15 MB-smaller power-user build: same streaming,
 # stats on stdout only.
-ui = ["dep:pf-console-ui", "dep:serde_json"]
+ui = ["dep:ss-console-ui", "dep:serde_json"]
 
 # Same Linux+Windows gating as the rest of the client stack; elsewhere this is a stub
 # binary.
@@ -32,9 +32,9 @@ ui = ["dep:pf-console-ui", "dep:serde_json"]
 # switch that turns the wavelet codec on, and it enables it explicitly on each. Inheriting their
 # defaults instead would make `--no-default-features` a lie — the Windows ARM64 leg builds that
 # way precisely to skip the vendored PyroWave C++, which has no ARM64 SIMD path.
-pf-presenter = { path = "../../crates/pf-presenter", default-features = false }
-pf-console-ui = { path = "../../crates/pf-console-ui", optional = true }
-pf-client-core = { path = "../../crates/pf-client-core", default-features = false }
+ss-presenter = { path = "../../crates/ss-presenter", default-features = false }
+ss-console-ui = { path = "../../crates/ss-console-ui", optional = true }
+ss-client-core = { path = "../../crates/ss-client-core", default-features = false }
 slipstream-core = { path = "../../crates/slipstream-core", features = ["quic"] }
 # The fake-library dev hook (`SLIPSTREAM_FAKE_LIBRARY`, browse mode) parses GameEntry JSON.
 serde_json = { version = "1", optional = true }

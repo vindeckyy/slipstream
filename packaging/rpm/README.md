@@ -4,7 +4,7 @@
 org (stable groups `bazzite`/`fedora-44`, canary groups `bazzite-canary`/`fedora-44-canary`), so
 Bazzite / Fedora Atomic hosts layer and update it with `rpm-ostree`. CI (`.github/workflows/rpm.yml`)
 builds and publishes on every push to `main` (a rolling `<next-minor>-0.ciN.g<sha>` build — the base
-is derived from the latest stable tag by `scripts/ci/pf-version.sh` — to the `*-canary`
+is derived from the latest stable tag by `scripts/ci/ss-version.sh` — to the `*-canary`
 groups) and on `vX.Y.Z` tags (a clean `X.Y.Z-1` to the base groups, plus attached to the unified
 GitHub Release) — separate repos, so a stable box never jumps to a canary build (see
 [Release Channels](https://slipstream.unom.io/docs/channels)). The `baseurl` below subscribes to the
@@ -105,9 +105,9 @@ ujust add-user-to-input-group           # virtual gamepads need /dev/uinput (re-
 mkdir -p ~/.config/slipstream
 cp /usr/share/slipstream/host.env.bazzite ~/.config/slipstream/host.env   # gamescope defaults
 systemctl --user enable --now slipstream-host
-# Web console — enable it and read the auto-generated login password (then open https://<host-ip>:47992):
+# Web console — enable it, then choose a login password in the browser:
 systemctl --user enable --now slipstream-web
-journalctl --user -u slipstream-web-init | sed -n 's/.*password generated: //p'
+# open https://<host-ip>:47992
 ```
 
 (See [`../bazzite/README.md`](../bazzite/README.md) for the full appliance walkthrough —
@@ -141,7 +141,7 @@ docker run --rm -v "$PWD:/src" -w /src slipstream-fedora-rpm \
   bash -lc 'git config --global --add safe.directory /src && PF_VERSION=0.0.1 bash packaging/rpm/build-rpm.sh'
 ```
 
-A plain `rpmbuild`/COPR build with no `pf_version`/`pf_release` defines produces `0.3.0-1` (the
+A plain `rpmbuild`/COPR build with no `ss_version`/`ss_release` defines produces `0.3.0-1` (the
 spec defaults).
 
 ### aarch64 — the client RPM

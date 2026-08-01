@@ -28,38 +28,51 @@ export const SectionSettings: FC = () => {
 	return (
 		<Section maxWidth={false}>
 			<div className="flex flex-col gap-card">
-				<h1 className="text-2xl font-semibold">{m.settings_title()}</h1>
+				<header className="space-y-1.5 border-b border-border/60 pb-4">
+					<h1 className="text-2xl font-semibold tracking-tight">
+						{m.settings_title()}
+					</h1>
+				</header>
 
-				<Card className="max-w-lg">
-					<CardHeader>
-						<CardTitle>{m.settings_language()}</CardTitle>
-					</CardHeader>
-					<CardContent className="flex gap-2">
-						{locales.map((l: Locale) => (
-							<Button
-								key={l}
-								variant={l === current ? "default" : "outline"}
-								size="sm"
-								className="uppercase"
-								onClick={() => changeLocale(l)}
-							>
-								{l}
+				<div className="grid max-w-2xl gap-card">
+					<Card>
+						<CardHeader className="space-y-1">
+							<CardTitle className="text-base tracking-tight">
+								{m.settings_language()}
+							</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<div className="inline-flex flex-wrap rounded-lg border border-border/70 bg-muted/30 p-0.5">
+								{locales.map((l: Locale) => (
+									<Button
+										key={l}
+										variant={l === current ? "secondary" : "ghost"}
+										size="sm"
+										className="h-8 uppercase"
+										aria-pressed={l === current}
+										onClick={() => changeLocale(l)}
+									>
+										{l}
+									</Button>
+								))}
+							</div>
+						</CardContent>
+					</Card>
+
+					<Card>
+						<CardHeader className="space-y-1">
+							<CardTitle className="text-base tracking-tight">
+								{m.nav_settings()}
+							</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<Button variant="outline" onClick={onLogout}>
+								<LogOut className="size-4" />
+								{m.action_logout()}
 							</Button>
-						))}
-					</CardContent>
-				</Card>
-
-				<Card className="max-w-lg">
-					<CardHeader>
-						<CardTitle>{m.nav_settings()}</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<Button variant="outline" onClick={onLogout}>
-							<LogOut className="size-4" />
-							{m.action_logout()}
-						</Button>
-					</CardContent>
-				</Card>
+						</CardContent>
+					</Card>
+				</div>
 			</div>
 		</Section>
 	);

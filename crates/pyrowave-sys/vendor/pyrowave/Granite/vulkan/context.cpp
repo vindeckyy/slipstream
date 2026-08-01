@@ -2123,39 +2123,39 @@ bool Context::create_device(VkPhysicalDevice gpu_, VkSurfaceKHR surface,
 	// device-create loop below downgrades on NOT_PERMITTED, so a refused class NEVER fails the
 	// encoder — it just runs at default priority. Only the fresh encoder device (no inherit_info)
 	// is affected; this Granite copy is vendored solely for the PyroWave codec.
-	Util::SmallVector<VkQueueGlobalPriorityKHR> pf_priority_candidates;
-	Util::SmallVector<VkDeviceQueueGlobalPriorityCreateInfoKHR> pf_global_priority_infos;
+	Util::SmallVector<VkQueueGlobalPriorityKHR> ss_priority_candidates;
+	Util::SmallVector<VkDeviceQueueGlobalPriorityCreateInfoKHR> ss_global_priority_infos;
 	if (!inherit_info)
 	{
-		const char *pf_gp_ext = nullptr;
+		const char *ss_gp_ext = nullptr;
 		if (has_extension(VK_KHR_GLOBAL_PRIORITY_EXTENSION_NAME))
-			pf_gp_ext = VK_KHR_GLOBAL_PRIORITY_EXTENSION_NAME;
+			ss_gp_ext = VK_KHR_GLOBAL_PRIORITY_EXTENSION_NAME;
 		else if (has_extension(VK_EXT_GLOBAL_PRIORITY_EXTENSION_NAME))
-			pf_gp_ext = VK_EXT_GLOBAL_PRIORITY_EXTENSION_NAME;
-		std::string pf_prio;
-		if (!Util::get_environment("PYROWAVE_QUEUE_PRIORITY", pf_prio))
-			pf_prio = "realtime";
-		for (auto &pf_ch : pf_prio)
-			if (pf_ch >= 'A' && pf_ch <= 'Z')
-				pf_ch = char(pf_ch + 32);
-		if (pf_gp_ext && pf_prio != "off")
+			ss_gp_ext = VK_EXT_GLOBAL_PRIORITY_EXTENSION_NAME;
+		std::string ss_prio;
+		if (!Util::get_environment("PYROWAVE_QUEUE_PRIORITY", ss_prio))
+			ss_prio = "realtime";
+		for (auto &ss_ch : ss_prio)
+			if (ss_ch >= 'A' && ss_ch <= 'Z')
+				ss_ch = char(ss_ch + 32);
+		if (ss_gp_ext && ss_prio != "off")
 		{
-			if (pf_prio == "high")
+			if (ss_prio == "high")
 			{
-				pf_priority_candidates.push_back(VK_QUEUE_GLOBAL_PRIORITY_HIGH_KHR);
+				ss_priority_candidates.push_back(VK_QUEUE_GLOBAL_PRIORITY_HIGH_KHR);
 			}
 			else
 			{
-				pf_priority_candidates.push_back(VK_QUEUE_GLOBAL_PRIORITY_REALTIME_KHR);
-				pf_priority_candidates.push_back(VK_QUEUE_GLOBAL_PRIORITY_HIGH_KHR);
+				ss_priority_candidates.push_back(VK_QUEUE_GLOBAL_PRIORITY_REALTIME_KHR);
+				ss_priority_candidates.push_back(VK_QUEUE_GLOBAL_PRIORITY_HIGH_KHR);
 			}
-			enabled_extensions.push_back(pf_gp_ext);
-			pf_global_priority_infos.resize(queue_infos.size());
-			for (size_t pf_i = 0; pf_i < queue_infos.size(); pf_i++)
+			enabled_extensions.push_back(ss_gp_ext);
+			ss_global_priority_infos.resize(queue_infos.size());
+			for (size_t ss_i = 0; ss_i < queue_infos.size(); ss_i++)
 			{
-				pf_global_priority_infos[pf_i] = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO_KHR };
-				pf_global_priority_infos[pf_i].globalPriority = pf_priority_candidates.front();
-				queue_infos[pf_i].pNext = &pf_global_priority_infos[pf_i];
+				ss_global_priority_infos[ss_i] = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO_KHR };
+				ss_global_priority_infos[ss_i].globalPriority = ss_priority_candidates.front();
+				queue_infos[ss_i].pNext = &ss_global_priority_infos[ss_i];
 			}
 		}
 	}
@@ -2193,35 +2193,35 @@ bool Context::create_device(VkPhysicalDevice gpu_, VkSurfaceKHR surface,
 		{
 			// SLIPSTREAM: try the requested global-priority class, downgrade through the
 			// candidate list on NOT_PERMITTED, then finally create with no global priority.
-			VkResult pf_res;
-			if (pf_priority_candidates.empty())
+			VkResult ss_res;
+			if (ss_priority_candidates.empty())
 			{
-				pf_res = vkCreateDevice(gpu, &device_info, nullptr, &device);
+				ss_res = vkCreateDevice(gpu, &device_info, nullptr, &device);
 			}
 			else
 			{
-				pf_res = VK_ERROR_NOT_PERMITTED_KHR;
-				for (size_t pf_a = 0; pf_a < pf_priority_candidates.size(); pf_a++)
+				ss_res = VK_ERROR_NOT_PERMITTED_KHR;
+				for (size_t ss_a = 0; ss_a < ss_priority_candidates.size(); ss_a++)
 				{
-					for (auto &pf_gp : pf_global_priority_infos)
-						pf_gp.globalPriority = pf_priority_candidates[pf_a];
-					pf_res = vkCreateDevice(gpu, &device_info, nullptr, &device);
-					if (pf_res != VK_ERROR_NOT_PERMITTED_KHR)
+					for (auto &ss_gp : ss_global_priority_infos)
+						ss_gp.globalPriority = ss_priority_candidates[ss_a];
+					ss_res = vkCreateDevice(gpu, &device_info, nullptr, &device);
+					if (ss_res != VK_ERROR_NOT_PERMITTED_KHR)
 						break;
 					LOGW("PyroWave: global queue priority %u not permitted; downgrading.\n",
-						unsigned(pf_priority_candidates[pf_a]));
+						unsigned(ss_priority_candidates[ss_a]));
 				}
-				if (pf_res == VK_ERROR_NOT_PERMITTED_KHR)
+				if (ss_res == VK_ERROR_NOT_PERMITTED_KHR)
 				{
-					for (auto &pf_qi : queue_infos)
-						pf_qi.pNext = nullptr;
-					pf_res = vkCreateDevice(gpu, &device_info, nullptr, &device);
+					for (auto &ss_qi : queue_infos)
+						ss_qi.pNext = nullptr;
+					ss_res = vkCreateDevice(gpu, &device_info, nullptr, &device);
 					LOGW("PyroWave: all global queue priorities refused; default priority.\n");
 				}
 				else
 					LOGI("PyroWave: encode device created with an elevated global queue priority.\n");
 			}
-			if (pf_res != VK_SUCCESS)
+			if (ss_res != VK_SUCCESS)
 				return false;
 		}
 	}

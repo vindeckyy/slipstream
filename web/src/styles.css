@@ -5,69 +5,89 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Pull @unom/ui's compiled component classes (bg-neutral,
-   rounded-card, p-padding-card, ring-accent, h-input-height, material…) into the
+   rounded-card, p-padding-card, ring-accent, h-input-height, material...) into the
    Tailwind 4 scan so their utilities aren't purged. */
 @source "../node_modules/@unom/ui/dist/**/*.{js,mjs}";
 
-/* ── slipstream brand · violet product chrome ────────────────────────────────
-   Two themes on one violet identity: LIGHT (lavender docs surface — the same
-   palette the design/Scalar reference uses: white bg, faint-violet cards/borders,
-   #6c5bf3 brand) is the :root default; DARK (the violet-tinted app-icon chrome
-   #141019 / #1c1530, #a79ff8 brand) is the `.dark` override. The live console
-   pins `<html class="dark">` so it stays dark by default — removing or toggling
-   that class (e.g. Storybook's theme switch) yields light. The token set feeds
-   BOTH @unom/ui's semantic contract (--brand/--primary/--accent/--neutral/
-   --main…) and the shadcn-style tokens the console's primitives + routes use
-   (--background/--card/--muted…), mapped onto one palette so both render the
-   same identity.
-
-   Brand constants and the surface tokens that are pure indirections
-   (--main, --neutral*, --error → other tokens) live in :root only — CSS resolves
-   var() per-theme at use time, so .dark overrides just the raw values. */
+/* Slipstream console: cyan stream on cool slate, Material 3 tonal surfaces,
+   Google Cloud operator density. Dark-first; light tokens kept for parity. */
 :root {
-	--radius: 0.625rem;
+	color-scheme: light;
+	--radius: 0.5rem;
 
-	/* Brand — the violet lens mark (from the slipstream app icon). Theme-independent. */
-	--pf-brand: #6c5bf3; /* deep violet — primary on light */
-	--pf-brand-light: #a79ff8; /* light violet — primary on dark */
-	--pf-highlight: #d2c9fb; /* lens highlight */
+	/* Brand - cyan stream from the Slipstream logo. */
+	--ss-brand: #0891b2;
+	--ss-brand-light: #22d3ee;
+	--ss-highlight: #a5f3fc;
 
-	/* Surfaces — light · lavender (white bg, faint-violet cards/borders). */
-	--background: #ffffff;
-	--foreground: #1b1430;
-	--card: #f6f2ff;
-	--card-foreground: #1b1430;
+	/* Surfaces - light / cool slate with a cyan tint. */
+	--background: #eef3f6;
+	--foreground: #0a1620;
+	--card: #ffffff;
+	--card-foreground: #0a1620;
 	--popover: #ffffff;
-	--popover-foreground: #1b1430;
-	--muted: #f1ecfd;
-	--muted-foreground: #6f6a86;
-	--secondary: #ece6fb;
-	--secondary-foreground: #1b1430;
-	/* shadcn `accent` = subtle hover surface; also @unom/ui's card ring colour,
-     so we tint it toward the brand violet (the same in both themes). */
-	--accent: var(--pf-brand);
+	--popover-foreground: #0a1620;
+	--muted: #e2ebf0;
+	--muted-foreground: #4d6672;
+	--secondary: #d3e2e9;
+	--secondary-foreground: #0a1620;
+	--accent: var(--ss-brand);
 	--accent-foreground: #ffffff;
-	--border: #e4dcf7;
-	--input: #e4dcf7;
-	--ring: var(--pf-brand);
+	/* ~3:1 against white for UI chrome (WCAG 1.4.11). */
+	--border: #849098;
+	--input: #849098;
+	--ring: var(--ss-brand);
+	--focus-ring: var(--ring);
+	--focus-ring-offset: var(--card);
+	--focus-ring-width: 2px;
+	--focus-ring-offset-size: 2px;
+
+	/* Surface roles keep canvas, panels, wells, and overlays distinct without
+	   introducing a separate palette for every component. */
+	--surface-canvas: var(--background);
+	--surface-panel: var(--card);
+	--surface-overlay: var(--popover);
+	--surface-inset: var(--muted);
+	--surface-selected: var(--secondary);
+	--surface-hover: color-mix(in oklab, var(--card) 92%, var(--foreground));
+	--surface-pressed: color-mix(in oklab, var(--card) 86%, var(--foreground));
+	--surface-disabled: color-mix(
+		in oklab,
+		var(--card) 88%,
+		var(--muted-foreground)
+	);
+	--outline-subtle: color-mix(in oklab, var(--border) 55%, transparent);
+	--outline-strong: color-mix(in oklab, var(--border) 85%, var(--foreground));
 
 	/* Primary = the brand (buttons, active nav, default badges). */
-	--primary: var(--pf-brand);
+	--primary: var(--ss-brand);
 	--primary-foreground: #ffffff;
 
-	--success: oklch(0.6 0.14 160);
-	/* Amber — "needs your attention but nothing is broken" (unsaved edits), the badge
+	--success: oklch(0.54 0.14 160);
+	--success-foreground: #ffffff;
+	/* Amber - "needs your attention but nothing is broken" (unsaved edits), the badge
 	   counterpart of the inline amber warning text. */
-	--warning: oklch(0.72 0.15 75);
-	--destructive: oklch(0.55 0.22 18);
+	--warning: oklch(0.57 0.14 75);
+	--warning-foreground: #17120a;
+	--info: oklch(0.54 0.14 230);
+	--info-foreground: #ffffff;
+	--destructive: oklch(0.52 0.2 18);
 	--destructive-foreground: #ffffff;
+	--success-subtle: color-mix(in oklab, var(--success) 14%, var(--card));
+	--warning-subtle: color-mix(in oklab, var(--warning) 14%, var(--card));
+	--info-subtle: color-mix(in oklab, var(--info) 14%, var(--card));
+	--destructive-subtle: color-mix(
+		in oklab,
+		var(--destructive) 14%,
+		var(--card)
+	);
 
 	/* ── @unom/ui semantic token contract (its components read these names). ──
-     These are indirections — they follow the raw tokens above per-theme. */
+     These are indirections - they follow the raw tokens above per-theme. */
 	--main: var(--foreground);
-	--brand: var(--pf-brand);
-	--brand-light: var(--pf-brand-light);
-	--highlight: var(--pf-highlight);
+	--brand: var(--ss-brand);
+	--brand-light: var(--ss-brand-light);
+	--highlight: var(--ss-highlight);
 	--neutral: var(--card); /* @unom card default surface (bg-neutral) */
 	--neutral-accent: var(
 		--secondary
@@ -77,56 +97,99 @@
 
 	--font-display: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
 	--font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+	--font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+		"Liberation Mono", "Courier New", monospace;
+
+	/* Type scale - operator hierarchy (page title -> section -> body -> meta). */
+	--text-page: 1.5rem;
+	--text-section: 1.125rem;
+	--text-body: 0.875rem;
+	--text-meta: 0.75rem;
+	--leading-tight: 1.25;
+	--leading-body: 1.5;
+	--tracking-display: -0.02em;
+	--tracking-body: -0.011em;
 
 	/* @unom/ui radius/spacing contract (pill buttons, rounded cards, tall inputs). */
-	--radius-card-min: var(--radius);
+	--radius-card-min: 0.375rem;
 }
 
-/* Dark · the violet-tinted app-icon chrome. Overrides only the raw values —
-   the indirection tokens in :root resolve to these automatically. */
+/* Dark / Material surface ladder on cool near-black. Overrides only the raw
+   values - the indirection tokens in :root resolve to these automatically. */
 .dark {
-	--background: #141019;
-	--foreground: oklch(0.985 0 0);
-	--card: #1c1530;
-	--card-foreground: oklch(0.985 0 0);
-	--popover: #1c1530;
-	--popover-foreground: oklch(0.985 0 0);
-	--muted: #1f1830;
-	--muted-foreground: oklch(0.728 0.03 286);
-	--secondary: #241c3d;
-	--secondary-foreground: oklch(0.985 0 0);
-	--border: #2a2148;
-	--input: #2a2148;
-	--ring: var(--pf-brand-light);
+	color-scheme: dark;
 
-	/* Lighter violet reads better against the dark surface. */
-	--primary: var(--pf-brand-light);
-	--primary-foreground: #141019;
+	/* surface / canvas */
+	--background: #060a0f;
+	--foreground: #e8eef2;
 
-	--success: oklch(0.7 0.15 160);
-	--warning: oklch(0.78 0.16 75);
-	--destructive: oklch(0.62 0.21 18);
-	--destructive-foreground: oklch(0.985 0 0);
+	/* surface-container */
+	--card: #0d141c;
+	--card-foreground: #e8eef2;
+
+	/* surface-container-high (menus, dialogs) */
+	--popover: #121a24;
+	--popover-foreground: #e8eef2;
+
+	/* surface-container-low (wells, chips) */
+	--muted: #111820;
+	--muted-foreground: #93a7b5;
+
+	/* surface-container-highest (selected / nested accent) */
+	--secondary: #18222d;
+	--secondary-foreground: #e8eef2;
+
+	/* Outline ~3:1 against card for operator borders + inputs. */
+	--border: #526472;
+	--input: #526472;
+	--ring: var(--ss-brand-light);
+	--focus-ring: var(--ring);
+	--focus-ring-offset: var(--card);
+
+	--accent: var(--ss-brand-light);
+	--accent-foreground: #060a0f;
+
+	--primary: var(--ss-brand-light);
+	--primary-foreground: #060a0f;
+
+	--success: oklch(0.54 0.14 160);
+	--success-foreground: #ffffff;
+	--warning: oklch(0.8 0.14 75);
+	--warning-foreground: #161008;
+	--info: oklch(0.7 0.14 230);
+	--info-foreground: #061017;
+	--destructive: oklch(0.68 0.19 18);
+	--destructive-foreground: #060a0f;
 }
 
-/* Map the palette to Tailwind colour/util tokens — both the shadcn vocabulary
+/* Map the palette to Tailwind colour/util tokens - both the shadcn vocabulary
    and @unom/ui's, resolved to one set of values. */
 @theme inline {
-	--radius-sm: calc(var(--radius) - 4px);
-	--radius-md: calc(var(--radius) - 2px);
-	--radius-lg: var(--radius);
+	/* Density-tuned radii: Material medium, not balloon cards. */
+	--radius-sm: calc(var(--radius) - 2px);
+	--radius-md: var(--radius);
+	--radius-lg: calc(var(--radius) + 2px);
 	--radius-xl: calc(var(--radius) + 4px);
+	--radius-2xl: calc(var(--radius) + 8px);
 	--radius-button: 9999px;
-	--radius-card: calc(var(--radius) * 2);
-	--radius-main: calc(var(--radius) * 2);
+	--radius-card: calc(var(--radius) * 1.5);
+	--radius-main: calc(var(--radius) * 1.5);
 
-	--spacing-input-height: 3rem;
-	--spacing-padding-card: 1.25rem;
-	--spacing-card: 1.5rem;
-	--spacing-main: 15px;
+	/* Cloud-console control density. */
+	--spacing-input-height: 2.5rem;
+	--spacing-control-xs: 1.75rem;
+	--spacing-control-sm: 2rem;
+	--spacing-control: 2.5rem;
+	--spacing-control-lg: 2.75rem;
+	--spacing-panel-compact: 0.75rem;
+	--spacing-panel: 1rem;
+	--spacing-padding-card: 1rem;
+	--spacing-card: 1.25rem;
+	--spacing-main: 12px;
 
 	--font-sans: var(--font-sans);
 	--font-display: var(--font-display);
+	--font-mono: var(--font-mono);
 
 	/* shadcn-style colour tokens. */
 	--color-background: var(--background);
@@ -146,10 +209,30 @@
 	--color-destructive: var(--destructive);
 	--color-destructive-foreground: var(--destructive-foreground);
 	--color-success: var(--success);
+	--color-success-foreground: var(--success-foreground);
+	--color-success-subtle: var(--success-subtle);
 	--color-warning: var(--warning);
+	--color-warning-foreground: var(--warning-foreground);
+	--color-warning-subtle: var(--warning-subtle);
+	--color-info: var(--info);
+	--color-info-foreground: var(--info-foreground);
+	--color-info-subtle: var(--info-subtle);
+	--color-destructive-subtle: var(--destructive-subtle);
 	--color-border: var(--border);
 	--color-input: var(--input);
 	--color-ring: var(--ring);
+	--color-focus: var(--focus-ring);
+	--color-focus-offset: var(--focus-ring-offset);
+	--color-surface-canvas: var(--surface-canvas);
+	--color-surface-panel: var(--surface-panel);
+	--color-surface-overlay: var(--surface-overlay);
+	--color-surface-inset: var(--surface-inset);
+	--color-surface-selected: var(--surface-selected);
+	--color-surface-hover: var(--surface-hover);
+	--color-surface-pressed: var(--surface-pressed);
+	--color-surface-disabled: var(--surface-disabled);
+	--color-outline-subtle: var(--outline-subtle);
+	--color-outline-strong: var(--outline-strong);
 
 	/* @unom/ui colour tokens. */
 	--color-main: var(--main);
@@ -162,12 +245,17 @@
 	--color-error: var(--error);
 }
 
-/* Accordion / collapsible keyframes @unom/ui's interactive surfaces animate to. */
+/* Accordion / collapsible keyframes @unom/ui's interactive surfaces animate to.
+   Durations stay short so motion supports hierarchy instead of decorating it. */
 @theme {
-	--animate-accordion-down: accordion-down 0.4s var(--ease-out-quart);
-	--animate-accordion-up: accordion-up 0.4s var(--ease-out-quart);
-	--animate-collapsible-down: collapsible-down 0.4s var(--ease-out-quart);
-	--animate-collapsible-up: collapsible-up 0.4s var(--ease-out-quart);
+	--animate-accordion-down: accordion-down var(--duration-emphasized)
+		var(--ease-emphasized);
+	--animate-accordion-up: accordion-up var(--duration-emphasized)
+		var(--ease-emphasized);
+	--animate-collapsible-down: collapsible-down var(--duration-emphasized)
+		var(--ease-emphasized);
+	--animate-collapsible-up: collapsible-up var(--duration-emphasized)
+		var(--ease-emphasized);
 
 	@keyframes accordion-down {
 		from {
@@ -209,14 +297,134 @@
 
 @layer base {
 	* {
-		border-color: var(--border);
+		border-color: var(--outline-subtle);
 	}
+
+	html {
+		text-size-adjust: 100%;
+		-webkit-text-size-adjust: 100%;
+	}
+
 	body {
-		background-color: var(--background);
+		background-color: var(--surface-canvas);
+		/* Subtle page atmosphere: a single low-chroma wash, not glass or neon. */
+		background-image: radial-gradient(
+			ellipse 110% 70% at 50% -25%,
+			color-mix(in oklab, var(--ss-brand) 11%, transparent),
+			transparent 58%
+		);
+		background-attachment: fixed;
 		color: var(--foreground);
 		font-family: var(--font-sans);
+		font-size: var(--text-body);
+		line-height: var(--leading-body);
+		letter-spacing: var(--tracking-body);
 		font-feature-settings:
 			"rlig" 1,
 			"calt" 1;
+		font-synthesis-weight: none;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+		text-rendering: optimizeLegibility;
+	}
+
+	h1,
+	h2,
+	h3 {
+		font-family: var(--font-display);
+		font-weight: 600;
+		letter-spacing: var(--tracking-display);
+		line-height: var(--leading-tight);
+		text-wrap: balance;
+		color: var(--foreground);
+	}
+
+	h1 {
+		font-size: var(--text-page);
+	}
+
+	h2 {
+		font-size: var(--text-section);
+	}
+
+	h3 {
+		font-size: 1rem;
+	}
+
+	p {
+		text-wrap: pretty;
+	}
+
+	small,
+	.text-meta {
+		font-size: var(--text-meta);
+		line-height: 1.4;
+		color: var(--muted-foreground);
+	}
+
+	/* Focus: offset ring, never a zero-offset colored halo. */
+	:focus-visible {
+		outline: var(--focus-ring-width) solid var(--focus-ring);
+		outline-offset: var(--focus-ring-offset-size);
+	}
+
+	::selection {
+		background-color: color-mix(in oklab, var(--ss-brand) 32%, transparent);
+		color: var(--foreground);
+	}
+
+	/* Thin scrollbars that match tonal chrome. */
+	* {
+		scrollbar-width: thin;
+		scrollbar-color: color-mix(in oklab, var(--border) 80%, transparent)
+			transparent;
+	}
+
+	*::-webkit-scrollbar {
+		width: 10px;
+		height: 10px;
+	}
+
+	*::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	*::-webkit-scrollbar-thumb {
+		background-color: color-mix(in oklab, var(--border) 75%, transparent);
+		border-radius: 9999px;
+		border: 2px solid transparent;
+		background-clip: padding-box;
+	}
+
+	*::-webkit-scrollbar-thumb:hover {
+		background-color: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	:root {
+		--duration-fast: 0ms;
+		--duration-normal: 0ms;
+		--duration-slow: 0ms;
+		--duration-emphasized: 0ms;
+		--duration-panel: 0ms;
+		--duration-stagger: 0ms;
+	}
+
+	html:focus-within {
+		scroll-behavior: auto;
+	}
+
+	body {
+		background-attachment: scroll;
+	}
+
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
 	}
 }

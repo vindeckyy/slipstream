@@ -1,0 +1,310 @@
+#!/usr/bin/env bash
+# slipstream-sysext — install/update the slipstream host on Bazzite / Fedora Atomic as a
+# systemd-sysext, the no-layering path (rpm-ostree layering is a last resort per the Bazzite
+# docs: it slows every update and can block upgrades; a sysext never enters an rpm-ostree
+# transaction, needs no reboot, and is trivially removable).
+#
+# The image overlays /usr from /var/lib/extensions/slipstream.raw with the host, tray and web
+# console + their udev/sysctl/systemd-user payload; the RPMs' two /etc files (gamescope
+# session drop-in, tray autostart) ride inside at /usr/share/slipstream/etc/ and are copied
+# into the real /etc here (a sysext can only carry /usr).
+#
+# Bootstrap (the script also ships inside the image as /usr/bin/slipstream-sysext):
+#   curl -fsSLO https://github.com/vindeckyy/slipstream/slipstream/raw/branch/main/packaging/bazzite/slipstream-sysext.sh
+#   sudo bash slipstream-sysext.sh install            # or: install --channel canary
+# Thereafter:
+#   sudo slipstream-sysext update | status | remove
+#
+# Feed: the GitHub generic package registry, one feed per Fedora major x channel
+# (…/slipstream-sysext/f43/, f43-canary, f44, …), each a SHA256SUMS + SHA256SUMS.asc + versioned
+# .raw files — published by .github/workflows/rpm.yml from the same RPMs the (legacy) layering path
+# uses. The image pins ID=fedora + VERSION_ID, so after a major OS rebase the old image is refused
+# (not merged broken) and `slipstream-sysext update` re-resolves against the new release.
+#
+# Trust: SHA256SUMS carries a detached OpenPGP signature (SHA256SUMS.asc) from packages@unom.io —
+# the same key that signs our RPMs — and this script verifies it before believing a word of the
+# manifest. The checksums alone could never have done that: they live on the same registry as the
+# images they describe, so anything able to replace an image could replace its checksum too. The
+# public key is baked in below rather than fetched, because a key fetched from the thing you are
+# authenticating authenticates nothing.
+set -euo pipefail
+
+REGISTRY="${SLIPSTREAM_SYSEXT_REGISTRY:-https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-sysext}"
+CONF=/etc/slipstream-sysext.conf
+EXT_DIR=/var/lib/extensions
+IMG="$EXT_DIR/slipstream.raw"
+SIDECAR="$EXT_DIR/.slipstream.version"
+MARKER=/usr/lib/extension-release.d/extension-release.slipstream
+ETC_SRC=/usr/share/slipstream/etc
+PF_TMP="$(mktemp -d)"; trap 'rm -rf "$PF_TMP"' EXIT
+
+# The feed's signing key: slipstream packages <packages@unom.io>, AF245C506F4E4763. Identical to
+# packaging/rpm/RPM-GPG-KEY-slipstream — ONE key signs both the RPMs and this feed, so rotating it
+# means updating both copies (the rotation runbook in packaging/rpm/README.md says so, and
+# publish-sysext-feed.sh refuses to sign if the two ever disagree).
+FEED_KEY='-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mDMEai/2eRYJKwYBBAHaRw8BAQdAFxLGvh8wvzES9ylmxT4gy1i58EituotPyZwt
+z+y9rbC0JXB1bmt0ZnVuayBwYWNrYWdlcyA8cGFja2FnZXNAdW5vbS5pbz6IkAQT
+FgoAOBYhBDG6uOY81eoQ6beahK8kXFBvTkdjBQJqL/Z5AhsjBQsJCAcCBhUKCQgL
+AgQWAgMBAh4BAheAAAoJEK8kXFBvTkdj1QsBAM0sI/qUzGEbuC2Zrk36QQBrUu/9
+sy5uhYGZD6lMJ4uZAQC7W81H2gHlTDTA2Nq35HKW9IOU+Ll2c9fqa7fAIKf9Bg==
+=e4Az
+-----END PGP PUBLIC KEY BLOCK-----'
+
+usage() {
+  sed -n 's/^#\( \|$\)//p' "$0" | sed -n '1,20p'
+  echo "usage: slipstream-sysext install [--channel stable|canary] [--from-file X.raw]"
+  echo "       slipstream-sysext update [--from-file X.raw] | status | remove"
+  exit "${1:-0}"
+}
+need_root() { [ "$(id -u)" = 0 ] || { echo "run as root (sudo)" >&2; exit 1; }; }
+
+os_version_id() { . /etc/os-release; echo "${VERSION_ID%%.*}"; }
+channel() { # shellcheck disable=SC1090
+  [ -f "$CONF" ] && . "$CONF"; echo "${CHANNEL:-stable}"; }
+feed_url() {
+  local suffix=""
+  [ "$(channel)" = canary ] && suffix="-canary"
+  echo "$REGISTRY/f$(os_version_id)$suffix"
+}
+
+# verify_manifest SUMS SIG -> 0 iff SIG is a good detached signature over SUMS by FEED_KEY.
+#   A throwaway keyring holding exactly our one key, so "good signature" and "signed by us" are the
+#   same statement — any other signer comes back NO_PUBKEY, and gpg exits non-zero.
+#   Spelled out with plain `if`s rather than `cond && action`: under `set -e` a failing test at the
+#   end of an && list is a trap that only bites on the path nobody exercises (here: a corrupt
+#   FEED_KEY), and this function must never abort the script — its whole job is to return a verdict.
+verify_manifest() {
+  local home rc=1
+  home="$(mktemp -d)"; chmod 700 "$home"
+  if printf '%s\n' "$FEED_KEY" | GNUPGHOME="$home" gpg --batch --quiet --import 2>/dev/null; then
+    if GNUPGHOME="$home" gpg --batch --quiet --verify "$2" "$1" 2>/dev/null; then rc=0; fi
+  fi
+  rm -rf "$home"
+  return "$rc"
+}
+
+# fetch_manifest -> download the feed's SHA256SUMS into $PF_TMP and verify its signature.
+#   Returns non-zero (having said why) rather than exiting, so `status` can report a bad feed
+#   instead of dying on it; install/update turn that into a hard stop.
+fetch_manifest() {
+  local feed sums sig
+  feed="$(feed_url)"
+  sums="$PF_TMP/SHA256SUMS"; sig="$PF_TMP/SHA256SUMS.asc"
+  curl -fsSL -o "$sums" "$feed/SHA256SUMS" || { echo "cannot reach the feed $feed" >&2; return 1; }
+  if [ "${SLIPSTREAM_SYSEXT_ALLOW_UNSIGNED:-0}" = 1 ]; then
+    echo "!! SLIPSTREAM_SYSEXT_ALLOW_UNSIGNED=1 — the feed manifest is NOT being verified." >&2
+    return 0
+  fi
+  # curl's own "404"/"could not open file" is noise here — a missing signature is an expected
+  # state with a much better explanation below, so swallow it and say the useful thing instead.
+  if ! curl -fsSL -o "$sig" "$feed/SHA256SUMS.asc" 2>/dev/null; then
+    echo "!! the feed $feed has no SHA256SUMS.asc — refusing to install from an unsigned feed." >&2
+    echo "!! (a feed published before signing existed; it is sealed on the next publish. To install" >&2
+    echo "!!  from it anyway, knowing the images are unauthenticated: SLIPSTREAM_SYSEXT_ALLOW_UNSIGNED=1)" >&2
+    return 1
+  fi
+  if ! command -v gpg >/dev/null 2>&1; then
+    echo "!! gpg not found — cannot verify the feed signature. Install gnupg2." >&2
+    return 1
+  fi
+  if ! verify_manifest "$sums" "$sig"; then
+    echo "!! the feed's SHA256SUMS is NOT signed by packages@unom.io (AF245C506F4E4763)." >&2
+    echo "!! Someone has tampered with the feed, or the signing key was rotated and this script is" >&2
+    echo "!! older than the rotation. Do not install; re-download slipstream-sysext.sh and retry." >&2
+    return 1
+  fi
+  return 0
+}
+
+# latest -> "VERSION FILENAME SHA256" for the newest image in the VERIFIED manifest (version sort).
+#   Call fetch_manifest first — reading $PF_TMP/SHA256SUMS directly is what keeps the signature
+#   check off the subshell path, where an `exit` would have vanished into a command substitution.
+latest() {
+  awk '$2 ~ /^slipstream-.*-x86-64\.raw$/ { v=$2; sub(/^slipstream-/,"",v); sub(/-x86-64\.raw$/,"",v); print v, $2, $1 }' \
+    "$PF_TMP/SHA256SUMS" | sort -V | tail -n1
+}
+
+installed_version() {
+  if [ -f "$MARKER" ]; then
+    sed -n 's/^SYSEXT_VERSION_ID=//p' "$MARKER"
+  elif [ -f "$SIDECAR" ]; then
+    cat "$SIDECAR"
+  fi
+}
+merged() { [ -f "$MARKER" ]; }
+
+post_merge() {
+  if ! merged; then
+    echo "!! image installed but NOT merged — 'systemd-sysext status' / 'journalctl -u systemd-sysext'" >&2
+    echo "!! (an OS release the image doesn't match? 'slipstream-sysext update' fetches the right one)" >&2
+    return 1
+  fi
+  # What the RPM scriptlets would have done: pick up the uinput/uhid rule + the UDP buffer
+  # sysctl now, no reboot (both also auto-apply at boot once merged — the files live in /usr/lib).
+  udevadm control --reload 2>/dev/null || :
+  udevadm trigger --subsystem-match=misc 2>/dev/null || :
+  for f in /usr/lib/sysctl.d/99-slipstream-net.conf /usr/lib/sysctl.d/99-slipstream-client-net.conf; do
+    [ -f "$f" ] && sysctl -q -p "$f" 2>/dev/null || :
+  done
+  # vhci-hcd: the usbip transport that makes the virtual Steam Deck pad a real USB device Steam
+  # Input adopts. Without it the pad falls back to plain UHID hid-steam, which Steam Input won't
+  # promote (Interface: -1) — so on a host in Game Mode the controller never appears and you can't
+  # navigate. Two things must be true at boot: the module loaded, and the vhci `attach`/`detach`
+  # sysfs files opened to the `input` group (the host runs unprivileged and can't modprobe/chown).
+  #
+  # A sysext CANNOT rely on its own /usr/lib/modules-load.d + /usr/lib/udev files for this: the
+  # image merges (systemd-sysext.service) AFTER systemd-modules-load and early udev have already
+  # run, so at a plain reboot vhci-hcd is never loaded and its rule never applied. Mirror BOTH into
+  # real /etc (read at the normal early-boot time, and shadowing the /usr copies by filename) so the
+  # module loads early and udev's coldplug trigger grants the group access. Refreshed every merge so
+  # a rule/module change in a new image propagates (neither is user-editable config). Then load +
+  # (re)apply now, no reboot, for this session.
+  install -Dm0644 /usr/lib/modules-load.d/slipstream.conf /etc/modules-load.d/slipstream.conf 2>/dev/null || :
+  install -Dm0644 /usr/lib/udev/rules.d/60-slipstream.rules /etc/udev/rules.d/60-slipstream.rules 2>/dev/null || :
+  udevadm control --reload 2>/dev/null || :
+  # The (empty) opt-in group for web-console-triggered updates (the sysext ships the ss-update
+  # helper + unit + polkit rule in its /usr; the group can't ride an image) — nobody is auto-added.
+  getent group slipstream-update >/dev/null 2>&1 || groupadd --system slipstream-update 2>/dev/null || :
+  modprobe vhci-hcd 2>/dev/null || :
+  # Re-fire the vhci rule against the (possibly already-present) controller so attach/detach pick up
+  # the input-group ownership even when the module's original add event predated the reloaded rule.
+  udevadm trigger --subsystem-match=platform --sysname-match='vhci_hcd.*' 2>/dev/null || :
+  # The /etc payload a sysext can't carry. The gamescope-session drop-in is %config(noreplace):
+  # only seed it, never clobber a local edit. The tray autostart entry is not user config.
+  if [ -f "$ETC_SRC/gamescope-session-plus/sessions.d/steam" ] \
+     && [ ! -e /etc/gamescope-session-plus/sessions.d/steam ]; then
+    install -Dm0644 "$ETC_SRC/gamescope-session-plus/sessions.d/steam" \
+      /etc/gamescope-session-plus/sessions.d/steam
+  fi
+  if [ -f "$ETC_SRC/xdg/autostart/io.slipstream.Tray.desktop" ]; then
+    install -Dm0644 "$ETC_SRC/xdg/autostart/io.slipstream.Tray.desktop" \
+      /etc/xdg/autostart/io.slipstream.Tray.desktop
+  fi
+}
+
+# do_install VERSION FILENAME SHA256 | do_install --from-file X.raw
+do_install() {
+  need_root
+  mkdir -p "$EXT_DIR"
+  local tmp="$EXT_DIR/.slipstream.raw.new" ver
+  if [ "$1" = --from-file ]; then
+    ver="(local: $(basename "$2"))"
+    cp -f "$2" "$tmp"
+  else
+    ver="$1"
+    echo "downloading slipstream $ver ($(channel), fedora $(os_version_id))…"
+    curl -fL --progress-bar -o "$tmp" "$(feed_url)/$2"
+    echo "$3  $tmp" | sha256sum -c --quiet
+  fi
+  mv -f "$tmp" "$IMG"          # marker inside is extension-release.slipstream — name must match
+  echo "$ver" > "$SIDECAR"
+  systemctl enable --now systemd-sysext.service >/dev/null 2>&1 || :
+  systemd-sysext refresh
+  post_merge
+  echo "slipstream $ver merged into /usr."
+}
+
+layering_hint() {
+  if command -v rpm-ostree >/dev/null 2>&1 \
+     && rpm-ostree status 2>/dev/null | grep -q 'LayeredPackages:.*slipstream'; then
+    cat >&2 <<'EOF'
+!! slipstream is ALSO layered via rpm-ostree. The sysext now shadows it, but remove the
+!! layer so it stops slowing/blocking OS updates (the reason this sysext exists):
+!!     sudo rpm-ostree uninstall slipstream slipstream-web && systemctl reboot
+EOF
+  fi
+}
+
+cmd_install() {
+  need_root
+  local from_file=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --channel)   printf 'CHANNEL=%s\n' "${2:?}" > "$CONF"; shift 2 ;;
+      --from-file) from_file="${2:?}"; shift 2 ;;
+      *) usage 1 ;;
+    esac
+  done
+  if [ -n "$from_file" ]; then
+    do_install --from-file "$from_file"
+  else
+    fetch_manifest || exit 1
+    local l; l="$(latest)"
+    [ -n "$l" ] || { echo "no image in the feed $(feed_url)" >&2; exit 1; }
+    # shellcheck disable=SC2086
+    do_install $l
+  fi
+  layering_hint
+  cat <<'EOF'
+
+First-run (once):
+  ujust add-user-to-input-group        # virtual gamepads; then log out + back in
+  mkdir -p ~/.config/slipstream
+  cp /usr/share/slipstream/host.env.bazzite ~/.config/slipstream/host.env
+  systemctl --user daemon-reload && systemctl --user enable --now slipstream-host
+Updates:  sudo slipstream-sysext update
+EOF
+}
+
+cmd_update() {
+  need_root
+  if [ "${1:-}" = --from-file ]; then do_install --from-file "${2:?}"; return; fi
+  local cur l ver
+  cur="$(installed_version)"
+  fetch_manifest || exit 1
+  l="$(latest)"
+  [ -n "$l" ] || { echo "no image in the feed $(feed_url)" >&2; exit 1; }
+  ver="${l%% *}"
+  if [ "$ver" = "$cur" ] && merged; then
+    echo "already on $cur (channel $(channel)) — nothing to do."
+    return
+  fi
+  echo "updating: ${cur:-<none>} -> $ver"
+  # shellcheck disable=SC2086
+  do_install $l
+  echo "restart the host to pick up the new binary:  systemctl --user restart slipstream-host"
+}
+
+cmd_status() {
+  echo "channel:    $(channel)"
+  echo "feed:       $(feed_url)"
+  echo "image:      $([ -f "$IMG" ] && du -h "$IMG" | cut -f1 || echo '(not installed)')"
+  echo "merged:     $(merged && echo yes || echo no)"
+  echo "installed:  $(installed_version || true)"
+  # Say WHY the feed is unreadable rather than printing a blank: unreachable and
+  # "signature does not verify" want very different reactions from whoever ran this.
+  if fetch_manifest 2>"$PF_TMP/status.err"; then
+    echo "latest:     $(latest | cut -d' ' -f1)"
+  else
+    echo "latest:     (unavailable)"
+  fi
+  # Unconditionally — fetch_manifest also warns on SUCCESS (ALLOW_UNSIGNED), and a status command
+  # that hides "this feed is not being verified" is worse than one that prints nothing at all.
+  [ -s "$PF_TMP/status.err" ] && sed 's/^/            /' "$PF_TMP/status.err" >&2
+  return 0
+}
+
+cmd_remove() {
+  need_root
+  # /etc cleanup needs the /usr payload for the unmodified-compare — do it BEFORE unmerging.
+  if merged; then
+    if cmp -s "$ETC_SRC/gamescope-session-plus/sessions.d/steam" \
+              /etc/gamescope-session-plus/sessions.d/steam 2>/dev/null; then
+      rm -f /etc/gamescope-session-plus/sessions.d/steam
+    fi
+  fi
+  rm -f /etc/xdg/autostart/io.slipstream.Tray.desktop
+  rm -f "$IMG" "$SIDECAR" "$CONF"
+  systemd-sysext refresh 2>/dev/null || :
+  echo "slipstream sysext removed (user config in ~/.config/slipstream is untouched)."
+}
+
+case "${1:-}" in
+  install) shift; cmd_install "$@" ;;
+  update)  shift; cmd_update "$@" ;;
+  status)  shift; cmd_status ;;
+  remove)  shift; cmd_remove ;;
+  *) usage ;;
+esac

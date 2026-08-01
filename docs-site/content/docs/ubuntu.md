@@ -174,7 +174,7 @@ sudo firewall-cmd --permanent --add-service=slipstream-web && sudo firewall-cmd 
 ```
 
 Full port lists are in
-[`packaging/debian/README.md`](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/debian/README.md#firewall).
+[`packaging/debian/README.md`](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/debian/README.md#firewall).
 
 ## Configure your desktop
 
@@ -221,7 +221,7 @@ Install Rust if you don't have it, then build:
 
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-git clone https://github.com/vindeckyy/slipstream.git && cd slipstream
+git clone https://github.com/vindeckyy/slipstream/slipstream.git && cd slipstream
 cargo build --release --locked \
   --features slipstream-host/nvenc,slipstream-host/vulkan-encode \
   -p slipstream-host

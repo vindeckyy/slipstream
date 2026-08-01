@@ -1,5 +1,6 @@
-/* Penner easing tokens — shared with the slipstream marketing site + @unom/ui.
-   @unom/ui's accordion/collapsible/material animations resolve these by name. */
+/* Penner easing tokens - shared with the slipstream marketing site + @unom/ui.
+   @unom/ui's accordion/collapsible/material animations resolve these by name.
+   Duration + Material motion aliases sit alongside them for console chrome. */
 @theme {
 	--ease-in-sine: cubic-bezier(0.47, 0, 0.745, 0.715);
 	--ease-out-sine: cubic-bezier(0.39, 0.575, 0.565, 1);
@@ -22,4 +23,22 @@
 	--ease-in-circ: cubic-bezier(0.6, 0.04, 0.98, 0.335);
 	--ease-out-circ: cubic-bezier(0.075, 0.82, 0.165, 1);
 	--ease-in-out-circ: cubic-bezier(0.785, 0.135, 0.15, 0.86);
+
+	/* Material 3 motion roles - restrained console pacing. */
+	--ease-linear: linear;
+	--ease-standard: cubic-bezier(0.2, 0, 0, 1);
+	--ease-standard-decelerate: cubic-bezier(0, 0, 0.2, 1);
+	--ease-standard-accelerate: cubic-bezier(0.4, 0, 1, 1);
+	--ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+	--ease-emphasized-accel: cubic-bezier(0.3, 0, 0.8, 0.15);
+	--ease-emphasized-decelerate: var(--ease-emphasized);
+	--ease-emphasized-accelerate: var(--ease-emphasized-accel);
+
+	--duration-instant: 0ms;
+	--duration-fast: 120ms;
+	--duration-normal: 200ms;
+	--duration-slow: 240ms;
+	--duration-emphasized: 280ms;
+	--duration-panel: 320ms;
+	--duration-stagger: 40ms;
 }

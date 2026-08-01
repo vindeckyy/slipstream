@@ -4,6 +4,7 @@ import type { GameEntry } from "@/api/gen/model/gameEntry";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages";
 
 /**
@@ -55,7 +56,12 @@ export const GameCard: FC<GameCardProps> = ({
 	const src = candidates[0];
 
 	return (
-		<Card className="group relative overflow-hidden">
+		<Card
+			className={cn(
+				"group relative overflow-hidden transition-[box-shadow,transform] duration-200",
+				"hover:ring-accent/70 focus-within:ring-accent/70",
+			)}
+		>
 			<div className="relative aspect-[2/3] bg-muted">
 				{src ? (
 					<img
@@ -66,38 +72,44 @@ export const GameCard: FC<GameCardProps> = ({
 						onError={() => setFailed((prev) => ({ ...prev, [src]: true }))}
 					/>
 				) : (
-					<div className="flex size-full items-center justify-center p-3 text-center text-sm font-medium text-muted-foreground">
+					<div className="flex size-full items-center justify-center bg-secondary/40 p-3 text-center text-sm font-medium text-muted-foreground">
 						{game.title}
 					</div>
 				)}
-				<div className="absolute left-2 top-2 flex flex-wrap gap-1">
+				<div className="absolute left-2 top-2 flex max-w-[calc(100%-1rem)] flex-wrap gap-1">
 					<Badge
 						variant={isCustom ? "secondary" : "outline"}
-						className="bg-background/80 backdrop-blur"
+						className="bg-background/85 backdrop-blur-sm"
 					>
 						{storeLabel(game.store)}
 					</Badge>
 					{/* Platform badge — "PC" is implied by every installed store, so only
 					    non-PC platforms (the emulation case) earn a second badge. */}
 					{game.platform && game.platform.toUpperCase() !== "PC" && (
-						<Badge variant="outline" className="bg-background/80 backdrop-blur">
+						<Badge
+							variant="outline"
+							className="bg-background/85 backdrop-blur-sm"
+						>
 							{game.platform}
 						</Badge>
 					)}
 					{/* Who owns this entry, when it isn't the operator — the reason the edit/delete
 					    buttons are absent here and present on the card next to it. */}
 					{game.provider && (
-						<Badge variant="outline" className="bg-background/80 backdrop-blur">
+						<Badge
+							variant="outline"
+							className="bg-background/85 backdrop-blur-sm"
+						>
 							{m.library_owned_by({ provider: game.provider })}
 						</Badge>
 					)}
 				</div>
 				{isCustom && (
-					<div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+					<div className="absolute right-2 top-2 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
 						<Button
 							variant="secondary"
 							size="icon"
-							className="size-7 bg-background/80 backdrop-blur"
+							className="size-8 bg-background/85 backdrop-blur-sm sm:size-7"
 							aria-label={m.library_edit()}
 							onClick={onEdit}
 						>
@@ -106,7 +118,7 @@ export const GameCard: FC<GameCardProps> = ({
 						<Button
 							variant="secondary"
 							size="icon"
-							className="size-7 bg-background/80 backdrop-blur"
+							className="size-8 bg-background/85 backdrop-blur-sm sm:size-7"
 							aria-label={m.library_delete()}
 							disabled={deleting}
 							onClick={onDelete}
@@ -116,15 +128,17 @@ export const GameCard: FC<GameCardProps> = ({
 					</div>
 				)}
 			</div>
-			<div
-				className="truncate px-card pb-card pt-4 text-sm font-medium"
-				title={game.title}
-			>
-				{game.title}
+			<div className="border-t border-border/60 px-3 py-2.5">
+				<div
+					className="truncate text-sm font-medium tracking-tight"
+					title={game.title}
+				>
+					{game.title}
+				</div>
 				{game.release_year != null && (
-					<span className="ml-1.5 font-normal text-muted-foreground">
+					<div className="mt-0.5 text-xs tabular-nums text-muted-foreground">
 						{game.release_year}
-					</span>
+					</div>
 				)}
 			</div>
 		</Card>

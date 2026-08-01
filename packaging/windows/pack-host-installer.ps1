@@ -9,7 +9,7 @@
        ephemeral fallback is for canary/CI/dev ONLY: on a v* tag build a missing cert (or -NoSign)
        is a hard failure, never a silent downgrade to a throwaway cert - see -RequireSignedCert,
     2. signs the inner slipstream-host.exe,
-    3. stages the pf-vdisplay virtual-display driver bundle (unless -NoDriver),
+    3. stages the ss-vdisplay virtual-display driver bundle (unless -NoDriver),
     4. runs ISCC to build slipstream-host-setup-<ver>.exe,
     5. signs the setup.exe (timestamp best-effort),
     6. emits HOST_SETUP_PATH / HOST_CER_PATH to GITHUB_ENV for the publish step.
@@ -32,7 +32,7 @@ param(
     [string]$ScriptingBundle = $env:SCRIPTING_BUNDLE,              # built runner-cli.js -> bundle the plugin/script runner
     [string]$BunExe = $env:BUN_EXE,                                # portable bun.exe runtime for the console + runner
     [string]$VbCableDir = $env:VBCABLE_DIR,                         # official base VB-CABLE package -> bundle the virtual mic
-    [switch]$NoDriver,                                              # build without the bundled pf-vdisplay driver
+    [switch]$NoDriver,                                              # build without the bundled ss-vdisplay driver
     [switch]$NoSign,                                                # skip signing (local debug)
     # 'auto' (default) = required iff this is a v* tag build; 'true'/'false' to force. See below.
     [ValidateSet('auto', 'true', 'false')][string]$RequireSignedCert = 'auto'
@@ -185,32 +185,32 @@ $defines = @(
     "/DLicensesDir=$licStage"
 )
 
-# --- build (from source) + stage the pf-vdisplay virtual-display driver -----------------------
-# pf-vdisplay is our all-Rust IddCx driver (packaging/windows/drivers/). It is now BUILT FROM SOURCE
-# every release (build-pf-vdisplay.ps1) instead of shipping a checked-in prebuilt binary: the vendored
+# --- build (from source) + stage the ss-vdisplay virtual-display driver -----------------------
+# ss-vdisplay is our all-Rust IddCx driver (packaging/windows/drivers/). It is now BUILT FROM SOURCE
+# every release (build-ss-vdisplay.ps1) instead of shipping a checked-in prebuilt binary: the vendored
 # binary went stale (its .cat stopped covering an edited .inf -> pnputil SPAPI_E_FILE_HASH_NOT_IN_CATALOG
 # on every box, and it predated IOCTL_SET_RENDER_ADAPTER the host needs on hybrid/Optimus GPUs). Building
-# here keeps the .dll/.inf/.cat in lockstep + ships current driver features. stage-pf-vdisplay.ps1 then
+# here keeps the .dll/.inf/.cat in lockstep + ships current driver features. stage-ss-vdisplay.ps1 then
 # adds the fetched nefcon device tool. (Needs the WDK build env; -NoDriver skips it for a WDK-less pack.)
 if (-not $NoDriver) {
     $built = Join-Path $OutDir 'pfvd-built'
-    & (Join-Path $here 'build-pf-vdisplay.ps1') -Out $built
+    & (Join-Path $here 'build-ss-vdisplay.ps1') -Out $built
     $stage = Join-Path $OutDir 'stage'
-    & (Join-Path $here 'stage-pf-vdisplay.ps1') -OutDir $stage -VendorDir $built
+    & (Join-Path $here 'stage-ss-vdisplay.ps1') -OutDir $stage -VendorDir $built
     # The installer runs `slipstream-host.exe driver install --dir {tmp}\pfvdisplay` (not a staged .ps1).
     $defines += "/DStageDir=$stage"
 }
-else { Write-Host "-NoDriver: building installer WITHOUT the bundled pf-vdisplay driver" }
+else { Write-Host "-NoDriver: building installer WITHOUT the bundled ss-vdisplay driver" }
 
 # --- build (from source) + stage the slipstream virtual-gamepad UMDF drivers --------------------
-# pf-gamepad (DualSense / DS4 / Edge / Deck) + pf-xusb (Xbox 360 / XInput) are members of the same drivers
-# workspace as pf-vdisplay, built from source per release (build-gamepad-drivers.ps1) - same anti-stale
-# reasoning as pf-vdisplay; the prior checked-in binaries under gamepad-drivers/ are retired. The
+# ss-gamepad (DualSense / DS4 / Edge / Deck) + ss-xusb (Xbox 360 / XInput) are members of the same drivers
+# workspace as ss-vdisplay, built from source per release (build-gamepad-drivers.ps1) - same anti-stale
+# reasoning as ss-vdisplay; the prior checked-in binaries under gamepad-drivers/ are retired. The
 # installer adds each to the store via `slipstream-host.exe driver install --gamepad` (the host
 # SwDeviceCreate's the per-session devnodes).
 if (-not $NoDriver) {
     $gpBuilt = Join-Path $OutDir 'gamepad-built'
-    # -SkipBuild: build-pf-vdisplay.ps1 above already `cargo build`s the WHOLE drivers workspace (incl.
+    # -SkipBuild: build-ss-vdisplay.ps1 above already `cargo build`s the WHOLE drivers workspace (incl.
     # the gamepad cdylibs), so just sign+stage them here - no redundant second full build.
     & (Join-Path $here 'build-gamepad-drivers.ps1') -Out $gpBuilt -SkipBuild
     $gpStage = Join-Path $OutDir 'gamepad'
@@ -321,17 +321,17 @@ if ($wantScripting) {
 }
 else { Write-Host "no -ScriptingBundle/-BunExe -> installer built WITHOUT the plugin/script runner" }
 
-# --- build + stage the HDR Vulkan layer (pf-vkhdr-layer) --------------------------------------
+# --- build + stage the HDR Vulkan layer (ss-vkhdr-layer) --------------------------------------
 # A tiny always-on Vulkan implicit layer (cdylib) that advertises HDR10/scRGB surface formats on the
 # virtual display so Vulkan games (Doom: The Dark Ages, etc.) can enable HDR while streaming - the
 # NVIDIA/AMD ICDs hide HDR formats on an indirect display even though they accept+present a forced HDR
 # swapchain there. Self-gated on the display's actual advanced-color state, so it's a no-op on SDR.
 # Standalone crate (own [workspace]); built here and registered by the installer. Skipped if cargo
 # is unavailable or the build fails -> installer is produced WITHOUT the layer (non-fatal).
-$layerSrc = Join-Path $here 'pf-vkhdr-layer'
+$layerSrc = Join-Path $here 'ss-vkhdr-layer'
 if (Test-Path (Join-Path $layerSrc 'Cargo.toml')) {
     $layerTarget = Join-Path $OutDir 'vklayer-target'
-    Write-Host "==> building pf-vkhdr-layer (cdylib)"
+    Write-Host "==> building ss-vkhdr-layer (cdylib)"
     $prevTarget = $env:CARGO_TARGET_DIR
     $env:CARGO_TARGET_DIR = $layerTarget
     Push-Location $layerSrc
@@ -339,19 +339,19 @@ if (Test-Path (Join-Path $layerSrc 'Cargo.toml')) {
     $layerExit = $LASTEXITCODE
     Pop-Location
     if ($prevTarget) { $env:CARGO_TARGET_DIR = $prevTarget } else { Remove-Item Env:\CARGO_TARGET_DIR -ErrorAction SilentlyContinue }
-    $layerDll = Join-Path $layerTarget 'release\pf_vkhdr_layer.dll'
+    $layerDll = Join-Path $layerTarget 'release\ss_vkhdr_layer.dll'
     if ($layerExit -eq 0 -and (Test-Path $layerDll)) {
         $layerStage = Join-Path $OutDir 'vklayer'
         New-Item -ItemType Directory -Force -Path $layerStage | Out-Null
-        Copy-Item $layerDll (Join-Path $layerStage 'pf_vkhdr_layer.dll') -Force
-        Copy-Item (Join-Path $layerSrc 'pf_vkhdr_layer.json') (Join-Path $layerStage 'pf_vkhdr_layer.json') -Force
-        Sign-File (Join-Path $layerStage 'pf_vkhdr_layer.dll')
+        Copy-Item $layerDll (Join-Path $layerStage 'ss_vkhdr_layer.dll') -Force
+        Copy-Item (Join-Path $layerSrc 'ss_vkhdr_layer.json') (Join-Path $layerStage 'ss_vkhdr_layer.json') -Force
+        Sign-File (Join-Path $layerStage 'ss_vkhdr_layer.dll')
         $defines += "/DVkLayerDir=$layerStage"
-        Write-Host "==> staged pf-vkhdr-layer -> $layerStage"
+        Write-Host "==> staged ss-vkhdr-layer -> $layerStage"
     }
-    else { Write-Warning "pf-vkhdr-layer build failed ($layerExit) - installer built WITHOUT the HDR Vulkan layer" }
+    else { Write-Warning "ss-vkhdr-layer build failed ($layerExit) - installer built WITHOUT the HDR Vulkan layer" }
 }
-else { Write-Host "no pf-vkhdr-layer crate -> installer built WITHOUT the HDR Vulkan layer" }
+else { Write-Host "no ss-vkhdr-layer crate -> installer built WITHOUT the HDR Vulkan layer" }
 
 # --- build the installer (from the non-redirected copy under C:\t) -----------------------------
 Write-Host "==> ISCC $($defines -join ' ') $issLocal"

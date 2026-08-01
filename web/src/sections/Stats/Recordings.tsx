@@ -108,8 +108,10 @@ export const RecordingsCard: FC<{
 	const rows = recordings.data ?? [];
 	return (
 		<Card>
-			<CardHeader>
-				<h2 className="text-lg font-medium">{m.stats_recordings_title()}</h2>
+			<CardHeader className="space-y-1">
+				<h2 className="text-base font-semibold tracking-tight">
+					{m.stats_recordings_title()}
+				</h2>
 			</CardHeader>
 			<QueryState
 				isLoading={recordings.isLoading}
@@ -117,98 +119,100 @@ export const RecordingsCard: FC<{
 				refetch={recordings.refetch}
 			>
 				{rows.length === 0 ? (
-					<CardContent
-						flush
-						className="p-8 text-center text-sm text-muted-foreground"
-					>
-						{m.stats_recordings_empty()}
+					<CardContent className="pt-0">
+						<p className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
+							{m.stats_recordings_empty()}
+						</p>
 					</CardContent>
 				) : (
 					<CardContent flush>
-						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>{m.stats_col_time()}</TableHead>
-									<TableHead>{m.stats_col_kind()}</TableHead>
-									<TableHead>{m.stats_col_resolution()}</TableHead>
-									<TableHead>{m.stats_col_codec()}</TableHead>
-									<TableHead className="text-right">
-										{m.stats_col_duration()}
-									</TableHead>
-									<TableHead className="text-right">
-										{m.stats_col_samples()}
-									</TableHead>
-									<TableHead className="w-32" />
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{rows.map((r) => (
-									<TableRow
-										key={r.id}
-										data-state={selectedId === r.id ? "selected" : undefined}
-									>
-										<TableCell className="whitespace-nowrap font-medium">
-											{fmtTimestamp(r.started_unix_ms)}
-										</TableCell>
-										<TableCell>
-											<Badge
-												variant={
-													r.kind === "gamestream" ? "secondary" : "default"
-												}
-											>
-												{kindLabel(r.kind)}
-											</Badge>
-										</TableCell>
-										<TableCell className="tabular-nums text-muted-foreground">
-											{r.width}×{r.height}@{r.fps}
-										</TableCell>
-										<TableCell className="uppercase text-muted-foreground">
-											{r.codec}
-										</TableCell>
-										<TableCell className="text-right tabular-nums">
-											{fmtDuration(r.duration_ms)}
-										</TableCell>
-										<TableCell className="text-right tabular-nums">
-											{r.sample_count}
-										</TableCell>
-										<TableCell>
-											<div className="flex justify-end gap-1">
-												<Button
-													variant="ghost"
-													size="icon"
-													aria-label={m.stats_view()}
-													title={m.stats_view()}
-													onClick={() =>
-														onSelect(selectedId === r.id ? null : r.id)
+						<div className="overflow-x-auto">
+							<Table>
+								<TableHeader>
+									<TableRow className="hover:bg-transparent">
+										<TableHead>{m.stats_col_time()}</TableHead>
+										<TableHead>{m.stats_col_kind()}</TableHead>
+										<TableHead>{m.stats_col_resolution()}</TableHead>
+										<TableHead>{m.stats_col_codec()}</TableHead>
+										<TableHead className="text-right">
+											{m.stats_col_duration()}
+										</TableHead>
+										<TableHead className="text-right">
+											{m.stats_col_samples()}
+										</TableHead>
+										<TableHead className="w-32" />
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{rows.map((r) => (
+										<TableRow
+											key={r.id}
+											data-state={selectedId === r.id ? "selected" : undefined}
+											className="data-[state=selected]:bg-primary/10"
+										>
+											<TableCell className="whitespace-nowrap text-sm font-medium">
+												{fmtTimestamp(r.started_unix_ms)}
+											</TableCell>
+											<TableCell>
+												<Badge
+													variant={
+														r.kind === "gamestream" ? "secondary" : "default"
 													}
 												>
-													<Eye className="size-4" />
-												</Button>
-												<Button
-													variant="ghost"
-													size="icon"
-													aria-label={m.stats_download()}
-													title={m.stats_download()}
-													onClick={() => onDownload(r.id)}
-												>
-													<Download className="size-4" />
-												</Button>
-												<Button
-													variant="ghost"
-													size="icon"
-													aria-label={m.stats_delete()}
-													title={m.stats_delete()}
-													disabled={isDeleting}
-													onClick={() => onDelete(r.id)}
-												>
-													<Trash2 className="size-4 text-destructive" />
-												</Button>
-											</div>
-										</TableCell>
-									</TableRow>
-								))}
-							</TableBody>
-						</Table>
+													{kindLabel(r.kind)}
+												</Badge>
+											</TableCell>
+											<TableCell className="tabular-nums text-muted-foreground">
+												{r.width}×{r.height}@{r.fps}
+											</TableCell>
+											<TableCell className="uppercase text-muted-foreground">
+												{r.codec}
+											</TableCell>
+											<TableCell className="text-right tabular-nums">
+												{fmtDuration(r.duration_ms)}
+											</TableCell>
+											<TableCell className="text-right tabular-nums">
+												{r.sample_count}
+											</TableCell>
+											<TableCell>
+												<div className="flex justify-end gap-0.5">
+													<Button
+														variant="ghost"
+														size="icon"
+														aria-label={m.stats_view()}
+														title={m.stats_view()}
+														onClick={() =>
+															onSelect(selectedId === r.id ? null : r.id)
+														}
+													>
+														<Eye className="size-4" />
+													</Button>
+													<Button
+														variant="ghost"
+														size="icon"
+														aria-label={m.stats_download()}
+														title={m.stats_download()}
+														onClick={() => onDownload(r.id)}
+													>
+														<Download className="size-4" />
+													</Button>
+													<Button
+														variant="ghost"
+														size="icon"
+														aria-label={m.stats_delete()}
+														title={m.stats_delete()}
+														disabled={isDeleting}
+														onClick={() => onDelete(r.id)}
+													>
+														<Trash2 className="size-4 text-destructive" />
+													</Button>
+												</div>
+											</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						</div>
 					</CardContent>
 				)}
 			</QueryState>

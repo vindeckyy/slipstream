@@ -16,12 +16,12 @@ On **Windows**, the host ships as a signed installer instead — see [Windows](#
 
 | Distro | Package manager | One-command happy path | Guide |
 |--------|-----------------|------------------------|-------|
-| **Ubuntu** | apt | `sudo apt install slipstream-host` | [Ubuntu](/docs/ubuntu) · [packaging/debian](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/debian/README.md) |
-| **Bazzite / Fedora Atomic** | systemd-sysext | `curl -fsSLO https://github.com/vindeckyy/slipstream.git/raw/branch/main/packaging/bazzite/slipstream-sysext.sh && sudo bash slipstream-sysext.sh install` (no layering, no reboot) | [Bazzite](/docs/bazzite) · [packaging/bazzite](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/bazzite/README.md) |
-| **Fedora (dnf)** | dnf / rpm-ostree | `sudo dnf install slipstream` | [Fedora](/docs/fedora) · [packaging/rpm](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/rpm/README.md) |
-| **Arch** | pacman | `sudo pacman -Syu slipstream-host` (binary repo — always a full `-Syu`, never `-Sy`) | [Arch Linux](/docs/arch) · [packaging/arch](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/arch/README.md) |
+| **Ubuntu** | apt | `sudo apt install slipstream-host` | [Ubuntu](/docs/ubuntu) · [packaging/debian](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/debian/README.md) |
+| **Bazzite / Fedora Atomic** | systemd-sysext | `curl -fsSLO https://github.com/vindeckyy/slipstream/slipstream/raw/branch/main/packaging/bazzite/slipstream-sysext.sh && sudo bash slipstream-sysext.sh install` (no layering, no reboot) | [Bazzite](/docs/bazzite) · [packaging/bazzite](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/bazzite/README.md) |
+| **Fedora (dnf)** | dnf / rpm-ostree | `sudo dnf install slipstream` | [Fedora](/docs/fedora) · [packaging/rpm](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/rpm/README.md) |
+| **Arch** | pacman | `sudo pacman -Syu slipstream-host` (binary repo — always a full `-Syu`, never `-Sy`) | [Arch Linux](/docs/arch) · [packaging/arch](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/arch/README.md) |
 | **SteamOS (host)** | on-device script | clone the repo, then `bash ~/slipstream/scripts/steamdeck/install.sh` (builds on-device) | [SteamOS (Host)](/docs/steamos-host) |
-| **NixOS / Nix** | nix flake | `nix run git+https://github.com/vindeckyy/slipstream.git#slipstream-host -- serve --gamestream` | [NixOS](#nixos) · [packaging/nix](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/nix/README.md) |
+| **NixOS / Nix** | nix flake | `nix run git+https://github.com/vindeckyy/slipstream/slipstream#slipstream-host -- serve --gamestream` | [NixOS](#nixos) · [packaging/nix](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/nix/README.md) |
 
 Each registry is public — no auth, you just trust the repo's signing key. Adding the repo is a
 one-time step covered in the linked guide; after that, normal `apt upgrade` / `dnf upgrade` /
@@ -48,10 +48,10 @@ In an **admin** PowerShell, register the Slipstream source once, then install:
 
 ```powershell
 winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest
-winget install unom.SlipstreamHost
+winget install vindeckyy.SlipstreamHost
 ```
 
-Later, `winget upgrade unom.SlipstreamHost` updates it in place. Add `--interactive` to get the full
+Later, `winget upgrade vindeckyy.SlipstreamHost` updates it in place. Add `--interactive` to get the full
 wizard instead (the optional task checkboxes, the web-console password page). winget carries
 **stable** releases only — canary builds are not published there.
 
@@ -90,7 +90,7 @@ You can run it straight from the flake without NixOS (on other distros, wrap it 
 [nixGL](https://github.com/nix-community/nixGL) so the GPU drivers resolve):
 
 ```sh
-nix run git+https://github.com/vindeckyy/slipstream.git#slipstream-host -- serve --gamestream
+nix run git+https://github.com/vindeckyy/slipstream/slipstream#slipstream-host -- serve --gamestream
 ```
 
 On NixOS, add the flake as an input, add `slipstream.nixosModules.default` to your system's modules,
@@ -117,7 +117,7 @@ systemctl --user enable --now slipstream-host slipstream-web
 
 The full option reference (client, console and scripting options, GPU driver notes, headless
 appliance setup) is in
-[packaging/nix](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/nix/README.md). To
+[packaging/nix](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/nix/README.md). To
 update, run `nix flake update slipstream` in your flake directory, then `sudo nixos-rebuild switch`.
 
 ## What the packages are
@@ -132,7 +132,7 @@ update, run `nix flake update slipstream` in your flake directory, then `sudo ni
   `/usr` is read-only, so the native package isn't the path there:
 
   ```sh
-  flatpak install --user https://flatpak.unom.io/io.unom.Slipstream.flatpakref
+  flatpak install --user https://flatpak.unom.io/io.slipstream.flatpakref
   ```
 
   For Gaming Mode, add the [Decky plugin](/docs/steam-deck) on top of it. Full client instructions

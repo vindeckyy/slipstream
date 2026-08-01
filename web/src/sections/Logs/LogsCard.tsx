@@ -220,13 +220,14 @@ export const LogsCard: FC<{
 			    desktop, with the filter row touching the card's edge. (Same trap the `p-0` note in
 			    components/ui/card.tsx describes, in the other direction.) */}
 			<CardContent className="flex flex-col gap-3 pt-4 sm:pt-6">
-				<div className="flex flex-wrap items-center gap-2">
-					<div className="flex items-center gap-1">
+				<div className="flex flex-col gap-3 border-b border-border/60 pb-3 sm:flex-row sm:flex-wrap sm:items-center">
+					<div className="inline-flex w-fit flex-wrap rounded-lg border border-border/70 bg-muted/30 p-0.5">
 						{LEVELS.map((l) => (
 							<Button
 								key={l}
 								size="sm"
 								variant={minLevel === l ? "secondary" : "ghost"}
+								className="h-7 px-2.5 text-xs"
 								onClick={() => setMinLevel(l)}
 							>
 								{l}
@@ -237,9 +238,9 @@ export const LogsCard: FC<{
 						value={search}
 						onChange={(e) => setSearch(e.target.value)}
 						placeholder={m.logs_search()}
-						className="max-w-xs"
+						className="w-full max-w-xs sm:flex-1"
 					/>
-					<div className="ml-auto flex items-center gap-2">
+					<div className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
 						{dropped && <Badge variant="secondary">{m.logs_dropped()}</Badge>}
 						<Button
 							size="icon"
@@ -300,12 +301,12 @@ export const LogsCard: FC<{
 
 				<div
 					ref={listRef}
-					className="max-h-[65vh] overflow-auto rounded-md border bg-card/40 p-2 font-mono text-xs leading-5"
+					className="max-h-[65vh] min-h-[12rem] overflow-auto rounded-lg border border-border/70 bg-muted/20 p-2 font-mono text-xs leading-5 sm:p-3"
 				>
 					{visible.length === 0 ? (
 						// An empty list has three quite different causes and used to render one sentence
 						// for all of them: the host is quiet, the request failed, or it hasn't answered yet.
-						<div className="p-2">
+						<div className="flex min-h-[10rem] items-center justify-center p-4 text-center">
 							{error ? (
 								<div className="space-y-2 font-sans">
 									<p className="text-destructive">{m.common_error()}</p>
@@ -316,14 +317,17 @@ export const LogsCard: FC<{
 									)}
 								</div>
 							) : (
-								<p className="text-muted-foreground">
+								<p className="max-w-sm font-sans text-sm text-muted-foreground">
 									{isLoading ? m.common_loading() : m.logs_empty()}
 								</p>
 							)}
 						</div>
 					) : (
 						visible.map((e) => (
-							<div key={e.seq} className="whitespace-pre-wrap break-words">
+							<div
+								key={e.seq}
+								className="rounded-sm px-1.5 py-0.5 whitespace-pre-wrap break-words hover:bg-muted/40"
+							>
 								<span className="text-muted-foreground">
 									{fmtTime(e.ts_ms)}{" "}
 								</span>

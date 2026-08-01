@@ -2,7 +2,13 @@ import { Check, Copy, Smartphone } from "lucide-react";
 import { type FC, useState } from "react";
 import type { HostInfo } from "@/api/gen/model/hostInfo";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import { m } from "@/paraglide/messages";
 
 /**
@@ -22,15 +28,15 @@ export const ConnectCard: FC<{ host: HostInfo }> = ({ host }) => {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle className="flex items-center gap-2">
-					<Smartphone className="size-4" />
+				<CardTitle className="flex items-center gap-2 tracking-tight">
+					<Smartphone className="size-4 text-muted-foreground" />
 					{m.connect_title()}
 				</CardTitle>
+				<CardDescription className="max-w-prose leading-relaxed">
+					{m.connect_help()}
+				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-4">
-				<p className="max-w-prose text-sm text-muted-foreground">
-					{m.connect_help()}
-				</p>
 				<CopyRow label={m.connect_address()} value={host.local_ip} />
 				<CopyRow label={m.connect_link()} value={deepLink} />
 			</CardContent>
@@ -54,10 +60,10 @@ const CopyRow: FC<{ label: string; value: string }> = ({ label, value }) => {
 		}
 	};
 	return (
-		<div className="space-y-1">
-			<p className="text-xs text-muted-foreground">{label}</p>
+		<div className="space-y-1.5">
+			<p className="text-xs font-medium text-muted-foreground">{label}</p>
 			<div className="flex items-center gap-2">
-				<code className="min-w-0 flex-1 truncate rounded-md bg-muted px-3 py-2 font-mono text-xs">
+				<code className="min-w-0 flex-1 truncate rounded-md border border-border/60 bg-muted/50 px-3 py-2.5 font-mono text-xs">
 					{value}
 				</code>
 				<Button
@@ -65,6 +71,7 @@ const CopyRow: FC<{ label: string; value: string }> = ({ label, value }) => {
 					size="icon"
 					aria-label={m.connect_copy()}
 					onClick={copy}
+					className="shrink-0"
 				>
 					{copied ? (
 						<Check className="size-4 text-[var(--success)]" />

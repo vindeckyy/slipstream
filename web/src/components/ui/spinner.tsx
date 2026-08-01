@@ -84,14 +84,14 @@ export function Spinner({
 			<motion.div
 				className="absolute left-1/2 top-1/2 rounded-full"
 				style={{
-					...lobe("var(--pf-brand-light)"),
+					...lobe("var(--ss-brand-light)"),
 					transform: tLight,
 					zIndex: zLight,
 				}}
 			/>
 			<motion.div
 				className="absolute left-1/2 top-1/2 rounded-full"
-				style={{ ...lobe("var(--pf-brand)"), transform: tDeep, zIndex: zDeep }}
+				style={{ ...lobe("var(--ss-brand)"), transform: tDeep, zIndex: zDeep }}
 			/>
 		</div>
 	);

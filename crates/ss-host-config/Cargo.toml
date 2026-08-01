@@ -1,0 +1,15 @@
+# The process-wide host configuration global (HostConfig + the config() OnceLock), extracted into a
+# leaf crate so every subsystem crate (ss-encode, ss-capture, ss-vdisplay, ss-gpu) can read config
+# WITHOUT depending on the orchestrator (plan §W6 — config parked above its consumers). Pure std.
+[package]
+name = "ss-host-config"
+version.workspace = true
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Process-wide slipstream host configuration (env-parsed HostConfig behind a OnceLock)."
+publish = false
+
+[dependencies]
+
+[lints]
+workspace = true

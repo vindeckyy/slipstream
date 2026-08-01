@@ -5,7 +5,7 @@ The native Linux **client** — the shell (crate `slipstream-client-linux`, bina
 `slipstream-client-session`, binary `slipstream-session`) — is
 published two ways by CI (`.github/workflows/flatpak.yml`), on every push to `main` (a rolling
 `<next-minor>-ciN.g<sha>` build, base derived from the latest stable tag by
-`scripts/ci/pf-version.sh`) and on `v*` tags (a clean `X.Y.Z`):
+`scripts/ci/ss-version.sh`) and on `v*` tags (a clean `X.Y.Z`):
 
 1. **Hosted OSTree repo at `https://flatpak.unom.io`** (recommended) — a GPG-signed Flatpak
    remote served by a static Caddy container on github-actions, so users **install once and then
@@ -26,7 +26,7 @@ is the Deck's native, update-survivable app path (the user already runs Moonligh
 as flatpaks), and the bundle carries libadwaita (from `org.gnome.Platform//50`) + a bundled SDL3,
 with HEVC-capable FFmpeg supplied automatically by the runtime's `codecs-extra` extension.
 
-App id: **`io.unom.Slipstream`** (matches the Apple bundle id family and the Decky plugin's
+App id: **`io.slipstream`** (matches the Apple bundle id family and the Decky plugin's
 flatpak fallback).
 
 ## Install (recommended): the hosted repo
@@ -35,21 +35,21 @@ One command adds the signed `unom` remote and installs the client; it auto-adds 
 GNOME runtime, and `flatpak update` tracks new builds from then on:
 
 ```sh
-flatpak install --user https://flatpak.unom.io/io.unom.Slipstream.flatpakref
-flatpak run io.unom.Slipstream
+flatpak install --user https://flatpak.unom.io/io.slipstream.flatpakref
+flatpak run io.slipstream
 ```
 
 Equivalent two-step (add the whole remote, then install by app id):
 
 ```sh
 flatpak remote-add --user --if-not-exists unom https://flatpak.unom.io/unom.flatpakrepo
-flatpak install --user unom io.unom.Slipstream
+flatpak install --user unom io.slipstream
 ```
 
 Updates — the whole point of the hosted repo:
 
 ```sh
-flatpak update                    # or: flatpak update io.unom.Slipstream
+flatpak update                    # or: flatpak update io.slipstream
 ```
 
 ## Install on the Deck via the bundle (no-remote fallback)
@@ -73,11 +73,11 @@ flatpak install --user --bundle /tmp/slipstream-client.flatpak
 Run it:
 
 ```sh
-flatpak run io.unom.Slipstream                 # GUI host list (mDNS)
-flatpak run io.unom.Slipstream --connect HOST:PORT
+flatpak run io.slipstream                 # GUI host list (mDNS)
+flatpak run io.slipstream --connect HOST:PORT
 ```
 
-The **Decky plugin** launches exactly this (`flatpak run io.unom.Slipstream --connect …`) once
+The **Decky plugin** launches exactly this (`flatpak run io.slipstream --connect …`) once
 installed — see [`../../clients/decky/README.md`](../../clients/decky/README.md).
 
 ## Updating the bundle install
@@ -153,7 +153,7 @@ has been built.
 
 ## Manifest
 
-[`io.unom.Slipstream.yml`](io.unom.Slipstream.yml). Runtime `org.gnome.Platform//50`
+[`io.slipstream.yml`](io.slipstream.yml). Runtime `org.gnome.Platform//50`
 (GTK 4.20 + libadwaita 1.8 ≥ the crate floors of v4_16 / v1_5), built on freedesktop-sdk 25.08,
 with two build-time SDK extensions: `org.freedesktop.Sdk.Extension.rust-stable` (→ //25.08,
 **rustc 1.96** — the GTK4 dep chain, e.g. pango-sys 0.22, needs ≥ 1.92, which the EOL GNOME-48 /
@@ -164,14 +164,14 @@ extension point (auto-downloaded with the runtime; no app-side codec declaration
 **SDL3 3.4.10** module (pinned to match `sdl3-sys 0.6.6+SDL-3.4.10`), and finish-args for Wayland +
 `--device=all` (GPU/VAAPI render node + evdev + the hidraw char-devices SDL3 needs for DualSense)
 + `--socket=pulseaudio` (PipeWire-pulse: playback + mic) + `--share=network`. Alongside it:
-`io.unom.Slipstream.desktop`, `io.unom.Slipstream.metainfo.xml`, `io.unom.Slipstream.svg` (all
+`io.slipstream.desktop`, `io.slipstream.metainfo.xml`, `io.slipstream.svg` (all
 installed by the manifest). A `vulkan-headers` module supplies what the session binary's ash/Vulkan
 build needs. `cargo-sources.json` (the offline crate cache) is a pure function of
 `Cargo.lock`; CI regenerates it each build and it is **gitignored** — generate it on any box with
 network + `python3`/`aiohttp`/`tomlkit` (`build-flatpak.sh` does this automatically) and, for a
 build host that lacks those (the Deck), rsync the generated file in alongside the manifest.
 
-**Offline Skia:** the session binary's Skia console UI (`pf-console-ui` → `skia-safe`) normally
+**Offline Skia:** the session binary's Skia console UI (`ss-console-ui` → `skia-safe`) normally
 downloads prebuilt `libskia` binaries at build time, which is dead in the offline sandbox — so the
 manifest pins a `skia-binaries-….tar.gz` source and points the build at it with
 `SKIA_BINARIES_URL: file://…`. When bumping the `skia-safe`/`skia-bindings` crate version, update
@@ -182,7 +182,7 @@ offline.
 
 The OSTree repo flatpak-builder produces is GPG-signed in CI and rsynced to github-actions, where a tiny
 static **Caddy container** (`server/compose.production.yml` + `server/Caddyfile`, port **3230**)
-serves the `./site` tree (`repo/` + `unom.flatpakrepo` + `io.unom.Slipstream.flatpakref` +
+serves the `./site` tree (`repo/` + `unom.flatpakrepo` + `io.slipstream.flatpakref` +
 `index.html`). The edge Caddy on github-pages-1 fronts it at `https://flatpak.unom.io`.
 The CI deploy step **no-ops until the secret + infra exist**, so it won't redden builds mid-setup.
 

@@ -1,84 +1,253 @@
 @import 'tailwindcss';
-@import 'fumadocs-ui/css/purple.css';
+@import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 
-/* Pull Fumadocs UI's own classes — and @unom/ui's compiled components — into
+/* Pull Fumadocs UI's own classes and @unom/ui's compiled components into
    the Tailwind 4 scan so their utilities aren't purged. @unom/ui is the shared
    design-token system the slipstream marketing site also builds on. */
 @source '../../node_modules/fumadocs-ui/dist/**/*.js';
 @source '../../node_modules/@unom/ui/dist/**/*.{js,mjs}';
 @source '../../node_modules/@unom/app-ui/dist/**/*.{js,mjs}';
 
-/* ── slipstream brand ────────────────────────────────────────────────────────
-   The brand colour is the violet lens mark. (The marketing site's blue is just
-   a page background, not the brand.) These values feed both @unom/ui's semantic
-   token contract (--brand/--primary/--accent/--highlight) and the Fumadocs
-   --color-fd-* chrome, so the docs carry the same identity in light and dark. */
+/* Slipstream observatory theme: cyan signals on cool slate surfaces. */
 :root {
-  --pf-brand: #6c5bf3; /* deep violet — primary */
-  --pf-brand-light: #a79ff8; /* light violet */
-  --pf-highlight: #d2c9fb; /* lens highlight */
+  color-scheme: light;
+  --radius: 0.5rem;
 
-  /* @unom/ui token contract. */
-  --brand: var(--pf-brand);
-  --primary: var(--pf-brand);
-  --accent: var(--pf-brand);
-  --highlight: var(--pf-highlight);
-  --radius: 0.625rem;
+  /* Shared brand tokens. */
+  --ss-brand: #0891b2;
+  --ss-brand-light: #22d3ee;
+  --ss-highlight: #a5f3fc;
 
-  /* Fumadocs accent → brand violet (light mode). */
-  --color-fd-primary: var(--pf-brand);
-  --color-fd-ring: var(--pf-brand);
+  /* Shared light surface ladder. */
+  --background: #eef3f6;
+  --foreground: #0a1620;
+  --card: #ffffff;
+  --card-foreground: #0a1620;
+  --popover: #ffffff;
+  --popover-foreground: #0a1620;
+  --muted: #e2ebf0;
+  --muted-foreground: #4d6672;
+  --secondary: #d3e2e9;
+  --secondary-foreground: #0a1620;
+  --border: #849098;
+  --input: #849098;
+  --accent: var(--ss-brand);
+  --accent-foreground: #ffffff;
+  --ring: var(--ss-brand);
+  --primary: var(--ss-brand);
+  --primary-foreground: #ffffff;
+  --ss-accent-surface: color-mix(
+    in oklab,
+    var(--ss-brand) 10%,
+    var(--background)
+  );
+  --ss-accent-surface-strong: color-mix(
+    in oklab,
+    var(--ss-brand) 18%,
+    var(--background)
+  );
 
-  /* The /api Scalar reference injects a *global* `body { background-color:
-     var(--scalar-background-1) }` (via its own stylesheet + a runtime
-     <style id="scalar-style">) that TanStack does NOT remove on a client-side
-     route change. Give that variable a fallback = the docs surface so every
-     non-API page still paints correctly while Scalar's sheet lingers (without
-     this the docs body went gray, or transparent once the body mode-class was
-     stripped). On /api itself the reference's body.{dark,light}-mode rule
-     (higher specificity) overrides this back to the brand chrome. */
+  /* @unom/ui semantic token contract. */
+  --brand: var(--ss-brand);
+  --brand-light: var(--ss-brand-light);
+  --highlight: var(--ss-highlight);
+  --main: var(--foreground);
+  --neutral: var(--card);
+  --neutral-accent: var(--secondary);
+  --neutral-highlight: var(--border);
+  --error: var(--destructive);
+  --destructive: #b91c1c;
+  --destructive-foreground: #ffffff;
+
+  /* Fumadocs uses the same semantic surface and text tokens. */
+  --color-fd-background: var(--background);
+  --color-fd-foreground: var(--foreground);
+  --color-fd-muted: var(--muted);
+  --color-fd-muted-foreground: var(--muted-foreground);
+  --color-fd-popover: var(--popover);
+  --color-fd-popover-foreground: var(--popover-foreground);
+  --color-fd-card: var(--card);
+  --color-fd-card-foreground: var(--card-foreground);
+  --color-fd-border: var(--border);
+  --color-fd-primary: var(--primary);
+  --color-fd-primary-foreground: var(--primary-foreground);
+  --color-fd-secondary: var(--secondary);
+  --color-fd-secondary-foreground: var(--secondary-foreground);
+  --color-fd-accent: var(--ss-accent-surface);
+  --color-fd-accent-foreground: var(--foreground);
+  --color-fd-ring: var(--ring);
+
+  /*
+   * Scalar injects a global body background rule and can leave that rule in
+   * place during client-side navigation. Keep its fallback tied to the docs
+   * surface so leaving /api cannot repaint a docs page with Scalar's default.
+   */
   --scalar-background-1: var(--color-fd-background);
+
+  /* Readable syntax colors for the Scalar reference. */
+  --ss-code-green: #15803d;
+  --ss-code-red: #b91c1c;
+  --ss-code-yellow: #a16207;
+  --ss-code-blue: #1d4ed8;
+  --ss-code-orange: #c2410c;
 }
 
 .dark {
-  /* Lighter violet reads better against the dark surface. */
-  --primary: var(--pf-brand-light);
-  --accent: var(--pf-brand-light);
+  color-scheme: dark;
 
-  --color-fd-primary: var(--pf-brand-light);
-  --color-fd-ring: var(--pf-brand-light);
+  /* Shared dark surface ladder. */
+  --background: #060a0f;
+  --foreground: #e8eef2;
+  --card: #0d141c;
+  --card-foreground: #e8eef2;
+  --popover: #121a24;
+  --popover-foreground: #e8eef2;
+  --muted: #111820;
+  --muted-foreground: #93a7b5;
+  --secondary: #18222d;
+  --secondary-foreground: #e8eef2;
+  --border: #526472;
+  --input: #526472;
+  --accent: var(--ss-brand-light);
+  --accent-foreground: #060a0f;
+  --ring: var(--ss-brand-light);
+  --primary: var(--ss-brand-light);
+  --primary-foreground: #060a0f;
+  --ss-accent-surface: color-mix(
+    in oklab,
+    var(--ss-brand-light) 14%,
+    var(--background)
+  );
+  --ss-accent-surface-strong: color-mix(
+    in oklab,
+    var(--ss-brand-light) 24%,
+    var(--background)
+  );
 
-  /* Tint Fumadocs' dark chrome toward the brand's violet-dark (the app-icon
-     surface #1c1530) instead of the default neutral-dark. */
-  --color-fd-background: #141019;
-  --color-fd-card: #1c1530;
-  --color-fd-popover: #1c1530;
-  --color-fd-secondary: #221a36;
-  --color-fd-muted: #1f1830;
-  --color-fd-accent: #241c3d;
-  --color-fd-border: #2a2148;
+  /* Fumadocs follows the dark semantic tokens above. */
+  --color-fd-background: var(--background);
+  --color-fd-foreground: var(--foreground);
+  --color-fd-muted: var(--muted);
+  --color-fd-muted-foreground: var(--muted-foreground);
+  --color-fd-popover: var(--popover);
+  --color-fd-popover-foreground: var(--popover-foreground);
+  --color-fd-card: var(--card);
+  --color-fd-card-foreground: var(--card-foreground);
+  --color-fd-border: var(--border);
+  --color-fd-primary: var(--primary);
+  --color-fd-primary-foreground: var(--primary-foreground);
+  --color-fd-secondary: var(--secondary);
+  --color-fd-secondary-foreground: var(--secondary-foreground);
+  --color-fd-accent: var(--ss-accent-surface);
+  --color-fd-accent-foreground: var(--foreground);
+  --color-fd-ring: var(--ring);
+
+  /* Brighter syntax colors keep code legible on dark surfaces. */
+  --ss-code-green: #4ade80;
+  --ss-code-red: #f87171;
+  --ss-code-yellow: #fbbf24;
+  --ss-code-blue: #60a5fa;
+  --ss-code-orange: #fb923c;
+}
+
+/*
+ * Scalar's route stylesheet is injected after this file and scopes its
+ * variables to body.light-mode/body.dark-mode. The html theme class makes
+ * this bridge more specific, so both surfaces consume the same tokens.
+ */
+html.dark body.dark-mode,
+html:not(.dark) body.light-mode {
+  --scalar-font: var(--font-sans);
+  --scalar-font-code: var(--font-mono);
+  --scalar-radius: 0.5rem;
+  --scalar-radius-lg: 0.75rem;
+  --scalar-radius-xl: 0.875rem;
+
+  --scalar-background-1: var(--color-fd-background);
+  --scalar-background-2: var(--color-fd-card);
+  --scalar-background-3: var(--color-fd-secondary);
+  --scalar-background-accent: var(--ss-accent-surface);
+  --scalar-border-color: var(--color-fd-border);
+
+  --scalar-color-1: var(--color-fd-foreground);
+  --scalar-color-2: var(--color-fd-muted-foreground);
+  --scalar-color-3: var(--color-fd-muted-foreground);
+  --scalar-color-accent: var(--color-fd-primary);
+  --scalar-link-color: var(--color-fd-primary);
+  --scalar-link-color-hover: var(--color-fd-primary);
+
+  --scalar-button-1: var(--color-fd-primary);
+  --scalar-button-1-color: var(--color-fd-primary-foreground);
+  --scalar-button-1-hover: var(--color-fd-primary);
+
+  --scalar-sidebar-background-1: var(--color-fd-card);
+  --scalar-sidebar-color-1: var(--color-fd-foreground);
+  --scalar-sidebar-color-2: var(--color-fd-muted-foreground);
+  --scalar-sidebar-color-active: var(--color-fd-primary);
+  --scalar-sidebar-item-hover-background: var(--ss-accent-surface);
+  --scalar-sidebar-item-hover-color: var(--color-fd-foreground);
+  --scalar-sidebar-item-active-background: var(--ss-accent-surface-strong);
+  --scalar-sidebar-border-color: var(--color-fd-border);
+  --scalar-sidebar-search-background: var(--color-fd-card);
+  --scalar-sidebar-search-border-color: var(--color-fd-border);
+  --scalar-sidebar-search-color: var(--color-fd-muted-foreground);
+  --scalar-sidebar-indent-border: var(--color-fd-border);
+  --scalar-sidebar-indent-border-active: var(--color-fd-primary);
+  --scalar-sidebar-indent-border-hover: var(--color-fd-primary);
+
+  --scalar-header-background-1: var(--color-fd-background);
+  --scalar-header-color-1: var(--color-fd-foreground);
+  --scalar-header-border-color: var(--color-fd-border);
+  --scalar-scrollbar-color: var(--color-fd-border);
+  --scalar-scrollbar-color-active: var(--color-fd-primary);
+
+  --scalar-color-green: var(--ss-code-green);
+  --scalar-color-red: var(--ss-code-red);
+  --scalar-color-yellow: var(--ss-code-yellow);
+  --scalar-color-blue: var(--ss-code-blue);
+  --scalar-color-orange: var(--ss-code-orange);
+  --scalar-color-purple: var(--color-fd-primary);
 }
 
 @theme {
-  /* Geist — the slipstream brand typeface, same as the marketing site
+  /* Geist, the slipstream brand typeface, matches the marketing site
      (the @fontsource-variable/geist face is loaded in __root.tsx). */
   --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
 }
 
-/* Expose the shared brand + surface tokens as Tailwind colours (bg-brand,
-   text-primary, bg-neutral…), mirroring @unom/ui's own @theme mapping so its
+/* Expose the shared brand and surface tokens as Tailwind colors (bg-brand,
+   text-primary, bg-neutral), mirroring @unom/ui's own @theme mapping so its
    utilities resolve to the docs' current (light/dark) surfaces. */
 @theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-secondary-foreground: var(--secondary-foreground);
   --color-brand: var(--brand);
+  --color-brand-light: var(--brand-light);
   --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
   --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --color-highlight: var(--highlight);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --color-main: var(--color-fd-foreground);
   --color-secondary: var(--color-fd-muted-foreground);
   --color-neutral: var(--color-fd-background);
   --color-neutral-accent: var(--color-fd-secondary);
+  --color-neutral-highlight: var(--neutral-highlight);
+  --color-error: var(--error);
 }
 
 @layer base {

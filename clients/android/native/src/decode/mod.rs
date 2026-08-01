@@ -121,7 +121,7 @@ pub(crate) struct DecodeOptions {
     pub panel_hz: i32,
 }
 
-/// The decode entry point on the `pf-decode` thread: dispatches to the async or synchronous loop.
+/// The decode entry point on the `ss-decode` thread: dispatches to the async or synchronous loop.
 /// Both run until `shutdown` is set or the session closes.
 pub fn run(
     client: Arc<NativeClient>,

@@ -15,8 +15,8 @@ from pathlib import Path
 
 # ---- stub the decky module before importing main.py ------------------------------------
 decky = types.ModuleType("decky")
-decky.DECKY_USER_HOME = "/tmp/pf-test-home"
-decky.DECKY_PLUGIN_DIR = "/tmp/pf-test-plugin"
+decky.DECKY_USER_HOME = "/tmp/ss-test-home"
+decky.DECKY_PLUGIN_DIR = "/tmp/ss-test-plugin"
 
 
 class _Log:

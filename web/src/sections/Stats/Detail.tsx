@@ -28,32 +28,33 @@ export const DetailCard: FC<{
 	const samples = cap?.samples ?? [];
 	return (
 		<Card>
-			<CardHeader>
-				<CardTitle className="flex items-center justify-between gap-3">
-					<span>
+			<CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+				<div className="min-w-0 space-y-1">
+					<CardTitle className="text-base tracking-tight">
 						{m.stats_detail_title()}
-						{cap && (
-							// Encoder + GPU ride along with the mode: the stage split below can't be
-							// read without knowing which backend produced it (a 10 ms `submit` means
-							// very different things on NVENC and on Vulkan). Older recordings predate
-							// the fields and simply omit them.
-							<span className="ml-2 text-sm font-normal text-muted-foreground">
-								{cap.meta.width}×{cap.meta.height}@{cap.meta.fps} ·{" "}
-								{cap.meta.codec.toUpperCase()}
-								{cap.meta.encoder_backend && ` · ${cap.meta.encoder_backend}`}
-								{cap.meta.gpu && ` · ${cap.meta.gpu}`}
-							</span>
-						)}
-					</span>
-					<Button
-						variant="ghost"
-						size="icon"
-						aria-label={m.stats_close()}
-						onClick={onClose}
-					>
-						<X className="size-4" />
-					</Button>
-				</CardTitle>
+					</CardTitle>
+					{cap && (
+						// Encoder + GPU ride along with the mode: the stage split below can't be
+						// read without knowing which backend produced it (a 10 ms `submit` means
+						// very different things on NVENC and on Vulkan). Older recordings predate
+						// the fields and simply omit them.
+						<p className="truncate text-xs text-muted-foreground sm:text-sm">
+							{cap.meta.width}×{cap.meta.height}@{cap.meta.fps} ·{" "}
+							{cap.meta.codec.toUpperCase()}
+							{cap.meta.encoder_backend && ` · ${cap.meta.encoder_backend}`}
+							{cap.meta.gpu && ` · ${cap.meta.gpu}`}
+						</p>
+					)}
+				</div>
+				<Button
+					variant="ghost"
+					size="icon"
+					className="shrink-0"
+					aria-label={m.stats_close()}
+					onClick={onClose}
+				>
+					<X className="size-4" />
+				</Button>
 			</CardHeader>
 			<CardContent>
 				<QueryState
@@ -62,11 +63,11 @@ export const DetailCard: FC<{
 					refetch={detail.refetch}
 				>
 					{samples.length === 0 ? (
-						<p className="py-8 text-center text-sm text-muted-foreground">
+						<p className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
 							{m.stats_no_samples()}
 						</p>
 					) : (
-						<div className="space-y-8">
+						<div className="space-y-6">
 							<ChartBlock
 								title={m.stats_latency_title()}
 								desc={m.stats_latency_desc()}

@@ -344,7 +344,7 @@ themselves within a minute. The service commands need an **elevated** PowerShell
 
 ## Windows: "Slipstream Virtual Display" shows Code 10 in Device Manager
 
-Sessions end with *"pf-vdisplay driver interface not found"* and Device Manager shows the
+Sessions end with *"ss-vdisplay driver interface not found"* and Device Manager shows the
 **Slipstream Virtual Display** device failed with **Code 10** (`STATUS_DEVICE_POWER_FAILURE`).
 (Installs older than 0.22.2 spell that device name in lower case.)
 

@@ -50,13 +50,13 @@ const fixtureEntries: LogEntry[] = [
 		6,
 		"WARN",
 		"slipstream_host::inject",
-		"gamepad driver not attached to Global\\pfxusb-shm-0 after 3s — is the pf_xusb driver installed? (slipstream-host.exe driver install --gamepad)",
+		"gamepad driver not attached to Global\\pfxusb-shm-0 after 3s — is the ss_xusb driver installed? (slipstream-host.exe driver install --gamepad)",
 	),
 	entry(
 		7,
 		"ERROR",
 		"slipstream_host::inject",
-		"virtual Xbox 360 creation failed — controller input disabled (is the pf_xusb driver installed?)",
+		"virtual Xbox 360 creation failed — controller input disabled (is the ss_xusb driver installed?)",
 	),
 	entry(
 		8,

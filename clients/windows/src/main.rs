@@ -144,11 +144,11 @@ fn main() {
         tracing::error!(error = %e, "Windows App SDK bootstrap failed");
         std::process::exit(1);
     }
-    // The shared SDL gamepad service (pf-client-core). The shell only enumerates pads (Settings
+    // The shared SDL gamepad service (ss-client-core). The shell only enumerates pads (Settings
     // list) and persists the pin; the spawned slipstream-session runs the SAME service and does the
     // actual forwarding — so, unlike the old shell fork, we never `attach()` here. Idle it stays
     // hands-off the hardware (id-getter metadata, no device open, Valve HIDAPI drivers off).
-    let gamepad = pf_client_core::gamepad::GamepadService::start();
+    let gamepad = ss_client_core::gamepad::GamepadService::start();
     // From here this process IS the shell: queue the link it was launched with (the router
     // picks it up once the window is live) and start listening for links from later instances.
     if let Some(url) = link {
@@ -165,7 +165,7 @@ fn main() {
     }
 }
 
-/// Tag unpackaged (dev) runs with the explicit AppUserModelID that `pf-presenter`'s
+/// Tag unpackaged (dev) runs with the explicit AppUserModelID that `ss-presenter`'s
 /// session window also adopts, so the shell and the stream window group as ONE taskbar
 /// app across the shell⇄session visibility handoff. MSIX runs already carry the package
 /// identity — overriding it would detach the window from the Start-menu pin, so packaged
@@ -184,7 +184,7 @@ fn set_app_user_model_id() {
         if GetCurrentPackageFullName(&mut len, None) != APPMODEL_ERROR_NO_PACKAGE {
             return; // packaged (or indeterminate) — leave the identity alone
         }
-        // Must stay in sync with pf-presenter's win32.rs, or the windows stop grouping.
+        // Must stay in sync with ss-presenter's win32.rs, or the windows stop grouping.
         let _ = SetCurrentProcessExplicitAppUserModelID(windows::core::w!("unom.slipstream.client"));
     }
 }

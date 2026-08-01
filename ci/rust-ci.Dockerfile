@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl-dev libegl-dev libgbm-dev \
     # slipstream-client-linux (GTK4/libadwaita shell, SDL3 gamepads)
     libgtk-4-dev libadwaita-1-dev libsdl3-dev \
-    # pf-ffvk (bindgen over libavutil/hwcontext_vulkan.h needs <vulkan/vulkan.h>)
+    # ss-ffvk (bindgen over libavutil/hwcontext_vulkan.h needs <vulkan/vulkan.h>)
     libvulkan-dev \
     && rm -rf /var/lib/apt/lists/*
 

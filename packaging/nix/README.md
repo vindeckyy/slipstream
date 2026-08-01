@@ -32,12 +32,12 @@ NVIDIA (zero-copy dmabuf → CUDA → NVENC), AMD/Intel (raw Vulkan-Video HEVC /
 
 ```sh
 # Build
-nix build git+https://github.com/vindeckyy/slipstream.git#slipstream-host
-nix build git+https://github.com/vindeckyy/slipstream.git#slipstream-client
+nix build git+https://github.com/vindeckyy/slipstream/slipstream#slipstream-host
+nix build git+https://github.com/vindeckyy/slipstream/slipstream#slipstream-client
 
 # Run
-nix run git+https://github.com/vindeckyy/slipstream.git#slipstream-host -- serve --gamestream
-nix run git+https://github.com/vindeckyy/slipstream.git#slipstream-client
+nix run git+https://github.com/vindeckyy/slipstream/slipstream#slipstream-host -- serve --gamestream
+nix run git+https://github.com/vindeckyy/slipstream/slipstream#slipstream-client
 ```
 
 GPU drivers are resolved at runtime from `/run/opengl-driver/lib`. On non-NixOS distros use
@@ -52,7 +52,7 @@ Add the flake and enable the host and/or client:
 
 ```nix
 {
-  inputs.slipstream.url = "git+https://github.com/vindeckyy/slipstream.git";
+  inputs.slipstream.url = "git+https://github.com/vindeckyy/slipstream/slipstream";
   # (optional) share your nixpkgs: inputs.slipstream.inputs.nixpkgs.follows = "nixpkgs";
 
   outputs = { self, nixpkgs, slipstream, ... }: {
@@ -120,8 +120,7 @@ mirroring the RPM's `Recommends: slipstream-web`):
 The console is **auto-wired** to the host on the same box: it reads the host's per-user
 `~/.config/slipstream/{mgmt-token,cert.pem,key.pem}` (written by `serve`), serves HTTPS with the
 host's own identity cert, and proxies the loopback mgmt API with the bearer token injected
-server-side (never sent to the browser). A login password is generated on first start — read it
-with `journalctl --user -u slipstream-web-init` (or `~/.config/slipstream/web-password`). Then open
+server-side (never sent to the browser). Choose a login password in the browser on first start. Then open
 `https://<host-ip>:47992` and trust the self-signed host cert once. Enable it (with the host) via
 `systemctl --user enable --now slipstream-web`.
 
@@ -201,7 +200,7 @@ cargo build --release -p slipstream-host -p slipstream-client-linux -p slipstrea
 cargo build --release -p slipstream-tray
 ```
 
-The shell exports `PF_FFVK_VULKAN_INCLUDE` (Vulkan headers for pf-ffvk bindgen) and an
+The shell exports `PF_FFVK_VULKAN_INCLUDE` (Vulkan headers for ss-ffvk bindgen) and an
 `LD_LIBRARY_PATH` that includes `/run/opengl-driver/lib` so `cargo run` finds the GPU driver.
 `nix fmt` formats the `.nix` files.
 

@@ -14,7 +14,7 @@ import {
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	Table,
 	TableBody,
@@ -124,56 +124,64 @@ export const PairedDevices: FC<{
 }> = ({ rows, isLoading, error, refetch, onUnpair, pendingFingerprint }) => (
 	<Card>
 		<CardHeader>
-			<h2 className="text-lg font-medium">{m.pairing_native_devices()}</h2>
+			<CardTitle className="tracking-tight">
+				{m.pairing_native_devices()}
+			</CardTitle>
 		</CardHeader>
 
-		<CardContent className="p-6">
+		<CardContent flush>
 			<QueryState isLoading={isLoading} error={error} refetch={refetch}>
 				{rows.length === 0 ? (
-					m.pairing_native_empty()
+					<p className="mx-4 mb-4 rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground sm:mx-6 sm:mb-6">
+						{m.pairing_native_empty()}
+					</p>
 				) : (
-					<Table>
-						<TableHeader>
-							<TableRow>
-								<TableHead>{m.clients_name()}</TableHead>
-								<TableHead>{m.pairing_protocol()}</TableHead>
-								<TableHead>{m.clients_fingerprint()}</TableHead>
-								<TableHead className="w-12" />
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{rows.map((r) => (
-								<TableRow key={`${r.protocol}:${r.fingerprint}`}>
-									<TableCell className="font-medium">{r.name || "—"}</TableCell>
-									<TableCell>
-										<Badge
-											variant={
-												r.protocol === "native" ? "default" : "secondary"
-											}
-										>
-											{r.protocol === "native"
-												? m.pairing_protocol_native()
-												: m.pairing_protocol_moonlight()}
-										</Badge>
-									</TableCell>
-									<TableCell className="font-mono text-xs text-muted-foreground">
-										{r.fingerprint.slice(0, 16)}…
-									</TableCell>
-									<TableCell>
-										<Button
-											variant="ghost"
-											size="icon"
-											aria-label={m.action_unpair()}
-											disabled={pendingFingerprint === r.fingerprint}
-											onClick={() => onUnpair(r.protocol, r.fingerprint)}
-										>
-											<Trash2 className="size-4 text-destructive" />
-										</Button>
-									</TableCell>
+					<div className="overflow-x-auto">
+						<Table>
+							<TableHeader>
+								<TableRow className="hover:bg-transparent">
+									<TableHead>{m.clients_name()}</TableHead>
+									<TableHead>{m.pairing_protocol()}</TableHead>
+									<TableHead>{m.clients_fingerprint()}</TableHead>
+									<TableHead className="w-12" />
 								</TableRow>
-							))}
-						</TableBody>
-					</Table>
+							</TableHeader>
+							<TableBody>
+								{rows.map((r) => (
+									<TableRow key={`${r.protocol}:${r.fingerprint}`}>
+										<TableCell className="font-medium">
+											{r.name || "—"}
+										</TableCell>
+										<TableCell>
+											<Badge
+												variant={
+													r.protocol === "native" ? "default" : "secondary"
+												}
+											>
+												{r.protocol === "native"
+													? m.pairing_protocol_native()
+													: m.pairing_protocol_moonlight()}
+											</Badge>
+										</TableCell>
+										<TableCell className="font-mono text-xs text-muted-foreground">
+											{r.fingerprint.slice(0, 16)}…
+										</TableCell>
+										<TableCell>
+											<Button
+												variant="ghost"
+												size="icon"
+												aria-label={m.action_unpair()}
+												disabled={pendingFingerprint === r.fingerprint}
+												onClick={() => onUnpair(r.protocol, r.fingerprint)}
+											>
+												<Trash2 className="size-4 text-destructive" />
+											</Button>
+										</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
+					</div>
 				)}
 			</QueryState>
 		</CardContent>

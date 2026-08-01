@@ -36,15 +36,15 @@ builds. One command adds the signed `unom` remote, pulls the GNOME runtime from 
 automatically, and installs the client:
 
 ```sh
-flatpak install --user https://flatpak.unom.io/io.unom.Slipstream.flatpakref
-flatpak run io.unom.Slipstream
+flatpak install --user https://flatpak.unom.io/io.slipstream.flatpakref
+flatpak run io.slipstream
 ```
 
 Updates, from then on — **without `sudo`** (this is a `--user` install; `sudo flatpak update` only
 touches the *system* scope and silently skips it):
 
 ```sh
-flatpak update                       # or: flatpak update --user io.unom.Slipstream
+flatpak update                       # or: flatpak update --user io.slipstream
 ```
 
 Prefer your native package manager? The client also ships as real packages (add the repo once —
@@ -54,9 +54,9 @@ see the linked guide — then it tracks updates with your normal `apt upgrade` /
 
 | Distro | Install | Guide |
 |--------|---------|-------|
-| **Ubuntu 26.04 or newer** | `sudo apt install slipstream-client` | [packaging/debian](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/debian/README.md) |
-| **Fedora** | `sudo dnf install slipstream-client` | [Fedora](/docs/fedora) for the `/etc/yum.repos.d/slipstream.repo` block (pick the group matching your release), then [packaging/rpm](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/rpm/README.md) |
-| **Fedora Atomic / Bazzite** | The Flatpak above — no layering. `rpm-ostree install slipstream-client` only if you already layer packages | [Bazzite](/docs/bazzite) for why layering is a last resort; [packaging/rpm](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/rpm/README.md) for the `bazzite` group repo block |
+| **Ubuntu 26.04 or newer** | `sudo apt install slipstream-client` | [packaging/debian](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/debian/README.md) |
+| **Fedora** | `sudo dnf install slipstream-client` | [Fedora](/docs/fedora) for the `/etc/yum.repos.d/slipstream.repo` block (pick the group matching your release), then [packaging/rpm](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/rpm/README.md) |
+| **Fedora Atomic / Bazzite** | The Flatpak above — no layering. `rpm-ostree install slipstream-client` only if you already layer packages | [Bazzite](/docs/bazzite) for why layering is a last resort; [packaging/rpm](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/rpm/README.md) for the `bazzite` group repo block |
 | **Arch** | `sudo pacman -Syu slipstream-client` (signed binary repo) | [Arch Linux](/docs/arch) |
 
 > **The client `.deb` needs SDL3 and GTK4 ≥ 4.20**, which Ubuntu 24.04 LTS doesn't ship, so
@@ -72,7 +72,7 @@ slipstream hosts list --probe    # saved hosts, each with a live reachability ch
 slipstream launch <host-ref>     # stream to one, waking it first if it's asleep
 ```
 
-Under the Flatpak, reach it as `flatpak run --command=slipstream io.unom.Slipstream hosts list`.
+Under the Flatpak, reach it as `flatpak run --command=slipstream io.slipstream hosts list`.
 The older `slipstream-client --connect <host>:9777` still works for existing scripts. Full verb
 list: [Clients → the `slipstream` CLI](/docs/clients#scripting-the-slipstream-cli).
 
@@ -94,10 +94,10 @@ Flatpak exactly as [above](#linux-desktop-flatpak) — it carries its own libadw
 survives SteamOS updates:
 
 ```sh
-flatpak install --user https://flatpak.unom.io/io.unom.Slipstream.flatpakref
+flatpak install --user https://flatpak.unom.io/io.slipstream.flatpakref
 ```
 
-See [packaging/flatpak](https://github.com/vindeckyy/slipstream.git/src/branch/main/packaging/flatpak/README.md).
+See [packaging/flatpak](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/flatpak/README.md).
 
 ## Windows
 
@@ -113,7 +113,7 @@ certificate, so you import that certificate once before Windows will install the
    ```
 
    Swap `_x64` for `_arm64` on an Arm device, and `latest` for `canary` to track `main`. The same
-   two files are attached to every [release](https://github.com/vindeckyy/slipstream.git/releases), and every
+   two files are attached to every [release](https://github.com/vindeckyy/slipstream/slipstream/releases), and every
    build is also kept under its own version on the
    [packages page](https://github.com/vindeckyy/slipstream/unom/-/packages) (generic group, `slipstream-client-windows`).
 2. **Trust the publisher certificate**, then install. The MSIX won't install until the certificate is
@@ -141,7 +141,7 @@ certificate, so you import that certificate once before Windows will install the
 
 ## macOS
 
-Download the notarized disk image from the [releases page](https://github.com/vindeckyy/slipstream.git/releases)
+Download the notarized disk image from the [releases page](https://github.com/vindeckyy/slipstream/slipstream/releases)
 — `Slipstream-<version>.dmg`. It's Developer-ID signed, notarized, and stapled, so Gatekeeper opens
 it without warnings:
 
@@ -170,7 +170,7 @@ for stable releases, **internal testing** for canary builds. To join, request a 
 
 Once you're added, install it from Google Play, then open the app and pick your host:
 
-**[Get Slipstream on Google Play →](https://play.google.com/store/apps/details?id=io.unom.slipstream)**
+**[Get Slipstream on Google Play →](https://play.google.com/store/apps/details?id=io.slipstream)**
 _(only resolves once your account is on the tester list)_
 
 **Prefer not to wait for an invite?** The signed APK is published publicly on every build, so you can
@@ -181,14 +181,14 @@ https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-and
 ```
 
 Swap `latest` for `canary` to track `main`. Release APKs are also attached to each
-[release](https://github.com/vindeckyy/slipstream.git/releases). Android asks you to allow installs from your
+[release](https://github.com/vindeckyy/slipstream/slipstream/releases). Android asks you to allow installs from your
 browser or file manager the first time.
 
 ## LG webOS TV (community)
 
-> **Community project.** [`pf-webos`](https://github.com/dyptan-io/pf-webos) is built and maintained
+> **Community project.** [`ss-webos`](https://github.com/dyptan-io/ss-webos) is built and maintained
 > by [dyptan-io](https://github.com/dyptan-io), not the Slipstream team — file issues and bugs on
-> [its own repo](https://github.com/dyptan-io/pf-webos/issues).
+> [its own repo](https://github.com/dyptan-io/ss-webos/issues).
 
 LG's webOS doesn't allow apps outside the LG Content Store without sideloading, so install needs
 **Developer Mode** and the **Homebrew Channel** once:
@@ -197,7 +197,7 @@ LG's webOS doesn't allow apps outside the LG Content Store without sideloading, 
    follow its [install guide](https://www.webosbrew.org/guide/getting-started.html) if you haven't
    done this before.
 2. Grab the latest `.ipk` from the
-   [pf-webos releases page](https://github.com/dyptan-io/pf-webos/releases/latest).
+   [ss-webos releases page](https://github.com/dyptan-io/ss-webos/releases/latest).
 3. Install it: either sideload with `ares-install` / the project's `task deploy TV_HOST=root@<tv-ip>`
    (see the repo's README), or side-copy the `.ipk` onto the TV and install it from the Homebrew
    Channel's app.
@@ -218,7 +218,7 @@ but keeping them close is the least surprising. (Updating the **host** is its ow
 
 | Client | How it updates |
 |---|---|
-| **Linux Flatpak** | `flatpak update --user io.unom.Slipstream` — **without `sudo`** (see the [Flatpak section](#linux-desktop-flatpak)) |
+| **Linux Flatpak** | `flatpak update --user io.slipstream` — **without `sudo`** (see the [Flatpak section](#linux-desktop-flatpak)) |
 | **Linux apt / dnf / pacman** | your normal `sudo apt upgrade` / `sudo dnf upgrade` / `sudo pacman -Syu`, or the app's own updater below |
 | **Fedora Atomic (layered)** | `rpm-ostree upgrade` on its own is not enough — see the note below the table |
 | **Windows MSIX** | no self-update — download the newer `.msix` as in [Windows](#windows) and re-run `Add-AppxPackage`. The certificate is the same every release, so you don't import it again |

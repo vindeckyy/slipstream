@@ -2,7 +2,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
 import { Button } from "@unom/ui/button";
 import { toast } from "@unom/ui/toast";
-import { Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import {
+	LayoutDashboard,
+	Monitor,
+	Pencil,
+	Plus,
+	Radio,
+	RefreshCw,
+	SlidersHorizontal,
+	Trash2,
+} from "lucide-react";
 import {
 	type FC,
 	type MouseEvent,
@@ -170,20 +179,24 @@ export const DisplaySection: FC = () => {
 	});
 
 	return (
-		<div className="flex flex-col gap-card">
-			<Card>
-				<CardHeader>
-					<div className="flex flex-wrap items-center justify-between gap-2">
-						<CardTitle>{m.display_config_title()}</CardTitle>
+		<div className="flex flex-col gap-5">
+			<Card className="overflow-hidden border-primary/20">
+				<CardHeader className="border-b border-border/60 bg-muted/15">
+					<div className="flex flex-wrap items-start justify-between gap-3">
+						<div className="flex items-center gap-2.5">
+							<span className="flex size-8 items-center justify-center rounded-lg border border-primary/30 bg-primary/10 text-primary">
+								<SlidersHorizontal className="size-4" aria-hidden />
+							</span>
+							<CardTitle className="tracking-tight">
+								{m.display_config_title()}
+							</CardTitle>
+						</div>
 						{/* Visible without scrolling to the save button — the card is taller than the
 						    viewport, which is exactly how the pending edits went unnoticed. */}
 						{dirty && <Badge variant="warning">{m.display_unsaved()}</Badge>}
 					</div>
 				</CardHeader>
-				<CardContent className="space-y-4">
-					<p className="max-w-prose text-sm text-muted-foreground">
-						{m.host_displays_help()}
-					</p>
+				<CardContent className="space-y-5 pt-5 sm:pt-5">
 					{/* Once the form is on screen, a FAILED BACKGROUND POLL must not replace it — the
 					    operator may be mid-edit, and swapping the card for an error box throws the
 					    draft away to report a refetch we could simply retry. Only a failure with
@@ -196,7 +209,7 @@ export const DisplaySection: FC = () => {
 						{draft && q.error && (
 							<p
 								role="status"
-								className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm"
+								className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
 							>
 								{m.display_refresh_failed()}
 							</p>
@@ -206,7 +219,7 @@ export const DisplaySection: FC = () => {
 								draft={draft}
 								setDraft={setDraft}
 								presets={q.data.presets}
-								customPresets={q.data.custom_presets}
+								customPresets={q.data.custom_presets ?? []}
 								serverEffective={q.data.effective}
 								serverCaptureMonitor={serverCaptureMonitor}
 								apply={apply}
@@ -221,11 +234,14 @@ export const DisplaySection: FC = () => {
 					</QueryState>
 				</CardContent>
 			</Card>
-			<Card>
-				<CardHeader>
-					<CardTitle>{m.display_live()}</CardTitle>
+			<Card className="overflow-hidden">
+				<CardHeader className="border-b border-border/60 bg-muted/15">
+					<CardTitle className="flex items-center gap-2 tracking-tight">
+						<Monitor className="size-4 text-primary" aria-hidden />
+						{m.display_live()}
+					</CardTitle>
 				</CardHeader>
-				<CardContent>
+				<CardContent className="pt-5 sm:pt-5">
 					<LiveDisplays />
 				</CardContent>
 			</Card>
@@ -425,13 +441,18 @@ const DisplayForm: FC<{
 	);
 
 	return (
-		<div className="space-y-6">
-			{/* One-click presets — a 2-up grid so each has room to breathe */}
-			<div className="space-y-4">
-				<Label className="mb-1 block text-base font-semibold">
-					{m.display_preset()}
-				</Label>
-				<div className="grid gap-3 sm:grid-cols-2">
+		<div className="space-y-5">
+			{/* One-click presets stay in a compact grid so each has room to breathe. */}
+			<div className="space-y-4 rounded-xl border border-border/70 bg-muted/10 p-4 sm:p-5">
+				<div className="flex items-center gap-2">
+					<span className="flex size-7 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary">
+						<SlidersHorizontal className="size-3.5" aria-hidden />
+					</span>
+					<Label className="block text-base font-semibold">
+						{m.display_preset()}
+					</Label>
+				</div>
+				<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
 					{PRESET_ORDER.map((id) => {
 						const p = presets.find((x) => x.id === id);
 						const fields = id === "custom" ? undefined : p?.fields;
@@ -462,9 +483,11 @@ const DisplayForm: FC<{
 									}
 								}}
 								className={cn(
-									"flex h-full flex-col p-4",
+									"flex h-full min-h-32 flex-col border-border/70 bg-card/70 p-4 transition-colors",
 									disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
-									selected && "ring-2 ring-primary",
+									selected
+										? "ring-2 ring-primary bg-primary/5"
+										: "hover:bg-muted/30",
 								)}
 							>
 								<div className="flex items-center justify-between gap-2">
@@ -511,11 +534,16 @@ const DisplayForm: FC<{
 
 			{/* Custom presets — the operator's saved field-bundles, rendered like the built-ins but
 			    editable/deletable, plus a "Save as preset" that captures the current effective behavior. */}
-			<div className="space-y-4">
+			<div className="space-y-4 rounded-xl border border-border/70 bg-muted/10 p-4 sm:p-5">
 				<div className="flex flex-wrap items-center justify-between gap-2">
-					<Label className="text-base font-semibold">
-						{m.display_preset_custom_label()}
-					</Label>
+					<div className="flex items-center gap-2">
+						<span className="flex size-7 items-center justify-center rounded-md border border-border/70 bg-muted/40 text-muted-foreground">
+							<Radio className="size-3.5" aria-hidden />
+						</span>
+						<Label className="text-base font-semibold">
+							{m.display_preset_custom_label()}
+						</Label>
+					</div>
 					<Button
 						size="sm"
 						variant="outline"
@@ -543,9 +571,7 @@ const DisplayForm: FC<{
 					</div>
 				)}
 				{presetError && (
-					<p className="text-sm text-amber-600 dark:text-amber-500">
-						{presetError}
-					</p>
+					<p className="text-sm text-[var(--warning)]">{presetError}</p>
 				)}
 			</div>
 
@@ -554,14 +580,19 @@ const DisplayForm: FC<{
 			{isCustom && (
 				<div
 					className={cn(
-						"space-y-6 rounded-lg border p-5",
-						dirty && "border-[var(--warning)]",
+						"space-y-6 rounded-xl border border-l-2 border-border/70 border-l-primary/50 bg-muted/10 p-5",
+						dirty && "border-[var(--warning)] bg-warning/5",
 					)}
 				>
 					<div className="flex flex-wrap items-center justify-between gap-2">
-						<h3 className="text-base font-semibold">
-							{m.display_custom_title()}
-						</h3>
+						<div className="flex items-center gap-2">
+							<span className="flex size-7 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary">
+								<LayoutDashboard className="size-3.5" aria-hidden />
+							</span>
+							<h3 className="text-base font-semibold">
+								{m.display_custom_title()}
+							</h3>
+						</div>
 						{dirty && <Badge variant="warning">{m.display_unsaved()}</Badge>}
 					</div>
 
@@ -634,73 +665,75 @@ const DisplayForm: FC<{
 						</div>
 					</Field>
 
-					<Choice
-						label={m.display_topology()}
-						help={m.display_topology_help()}
-						value={customFields.topology}
-						options={["auto", "extend", "primary", "exclusive"]}
-						labels={TOPOLOGY_LABEL}
-						disabled={busy}
-						onPick={(v) => setDraft({ ...draft, topology: v as Topology })}
-					/>
-					<Choice
-						label={m.display_conflict()}
-						help={m.display_conflict_help()}
-						value={customFields.mode_conflict}
-						options={["separate", "steal", "join", "reject"]}
-						labels={CONFLICT_LABEL}
-						disabled={busy}
-						onPick={(v) =>
-							setDraft({ ...draft, mode_conflict: v as ModeConflict })
-						}
-					/>
-					<Choice
-						label={m.display_identity()}
-						help={m.display_identity_help()}
-						value={customFields.identity}
-						options={["shared", "per-client", "per-client-mode"]}
-						labels={IDENTITY_LABEL}
-						disabled={busy}
-						onPick={(v) => setDraft({ ...draft, identity: v as Identity })}
-					/>
-					<Choice
-						label={m.display_layout_mode()}
-						help={m.display_layout_help()}
-						value={customFields.layout.mode ?? "auto-row"}
-						options={["auto-row", "manual"]}
-						labels={LAYOUT_LABEL}
-						disabled={busy}
-						onPick={(v) =>
-							setDraft({
-								...draft,
-								layout: {
-									mode: v as LayoutMode,
-									positions: draft.layout?.positions ?? {},
-								},
-							})
-						}
-					/>
-
-					<Field label={m.display_max()} htmlFor="display-max">
-						<Input
-							id="display-max"
-							type="number"
-							min={1}
-							max={16}
-							className="w-24"
-							value={draft.max_displays ?? 4}
+					<div className="grid gap-5 lg:grid-cols-2">
+						<Choice
+							label={m.display_topology()}
+							help={m.display_topology_help()}
+							value={customFields.topology}
+							options={["auto", "extend", "primary", "exclusive"]}
+							labels={TOPOLOGY_LABEL}
 							disabled={busy}
-							onChange={(e) =>
+							onPick={(v) => setDraft({ ...draft, topology: v as Topology })}
+						/>
+						<Choice
+							label={m.display_conflict()}
+							help={m.display_conflict_help()}
+							value={customFields.mode_conflict}
+							options={["separate", "steal", "join", "reject"]}
+							labels={CONFLICT_LABEL}
+							disabled={busy}
+							onPick={(v) =>
+								setDraft({ ...draft, mode_conflict: v as ModeConflict })
+							}
+						/>
+						<Choice
+							label={m.display_identity()}
+							help={m.display_identity_help()}
+							value={customFields.identity}
+							options={["shared", "per-client", "per-client-mode"]}
+							labels={IDENTITY_LABEL}
+							disabled={busy}
+							onPick={(v) => setDraft({ ...draft, identity: v as Identity })}
+						/>
+						<Choice
+							label={m.display_layout_mode()}
+							help={m.display_layout_help()}
+							value={customFields.layout.mode ?? "auto-row"}
+							options={["auto-row", "manual"]}
+							labels={LAYOUT_LABEL}
+							disabled={busy}
+							onPick={(v) =>
 								setDraft({
 									...draft,
-									max_displays: Math.min(
-										16,
-										Math.max(1, Number(e.target.value) || 1),
-									),
+									layout: {
+										mode: v as LayoutMode,
+										positions: draft.layout?.positions ?? {},
+									},
 								})
 							}
 						/>
-					</Field>
+
+						<Field label={m.display_max()} htmlFor="display-max">
+							<Input
+								id="display-max"
+								type="number"
+								min={1}
+								max={16}
+								className="w-24"
+								value={draft.max_displays ?? 4}
+								disabled={busy}
+								onChange={(e) =>
+									setDraft({
+										...draft,
+										max_displays: Math.min(
+											16,
+											Math.max(1, Number(e.target.value) || 1),
+										),
+									})
+								}
+							/>
+						</Field>
+					</div>
 
 					{/* Sticky: the Custom block is taller than most viewports, and a save button parked
 					    at its bottom edge is invisible until you scroll all the way down — people
@@ -708,8 +741,8 @@ const DisplayForm: FC<{
 					    while any part of the block is on screen, and it settles into place at the end. */}
 					<div
 						className={cn(
-							"sticky bottom-0 z-10 -mx-5 -mb-5 flex flex-wrap items-center justify-end gap-3 rounded-b-lg border-t px-5 py-3 backdrop-blur",
-							dirty ? "bg-[var(--warning)]/10" : "bg-neutral/80",
+							"sticky bottom-0 z-10 -mx-5 -mb-5 flex flex-wrap items-center justify-end gap-3 rounded-b-lg border-t border-border/70 px-5 py-3 backdrop-blur",
+							dirty ? "bg-[var(--warning)]/10" : "bg-card/90",
 						)}
 					>
 						<span
@@ -734,44 +767,46 @@ const DisplayForm: FC<{
 
 			{/* Game-session routing — orthogonal to the preset/lifecycle axes, so it lives outside the
 			    Custom block and applies immediately on change (like a preset click). */}
-			<div className="border-t pt-4">
-				<Choice
-					label={m.display_game_session()}
-					help={m.display_game_session_help()}
-					value={draft.game_session ?? "auto"}
-					options={["auto", "dedicated"]}
-					labels={GAME_SESSION_LABEL}
-					disabled={busy}
-					onPick={(v) => applyAxis({ game_session: v as GameSession })}
+			<div className="grid gap-4 border-t border-border/60 pt-5 lg:grid-cols-2">
+				<div className="rounded-lg border border-border/70 bg-muted/10 p-4">
+					<Choice
+						label={m.display_game_session()}
+						help={m.display_game_session_help()}
+						value={draft.game_session ?? "auto"}
+						options={["auto", "dedicated"]}
+						labels={GAME_SESSION_LABEL}
+						disabled={busy}
+						onPick={(v) => applyAxis({ game_session: v as GameSession })}
+					/>
+				</div>
+
+				{/* EXPERIMENTAL toggles — orthogonal like game-session (survive preset switches, apply
+				    immediately). Windows-only in effect, acted on at the Exclusive isolate. */}
+				<ExperimentalToggle
+					label={m.display_ddc()}
+					help={m.display_ddc_help()}
+					value={draft.ddc_power_off ?? false}
+					offLabel={m.display_ddc_disabled()}
+					onLabel={m.display_ddc_enabled()}
+					busy={busy}
+					onSet={(on) => applyAxis({ ddc_power_off: on })}
+				/>
+				<ExperimentalToggle
+					label={m.display_pnp()}
+					help={m.display_pnp_help()}
+					value={draft.pnp_disable_monitors ?? false}
+					offLabel={m.display_pnp_disabled()}
+					onLabel={m.display_pnp_enabled()}
+					busy={busy}
+					onSet={(on) => applyAxis({ pnp_disable_monitors: on })}
 				/>
 			</div>
-
-			{/* EXPERIMENTAL toggles — orthogonal like game-session (survive preset switches, apply
-			    immediately). Windows-only in effect, acted on at the Exclusive isolate. */}
-			<ExperimentalToggle
-				label={m.display_ddc()}
-				help={m.display_ddc_help()}
-				value={draft.ddc_power_off ?? false}
-				offLabel={m.display_ddc_disabled()}
-				onLabel={m.display_ddc_enabled()}
-				busy={busy}
-				onSet={(on) => applyAxis({ ddc_power_off: on })}
-			/>
-			<ExperimentalToggle
-				label={m.display_pnp()}
-				help={m.display_pnp_help()}
-				value={draft.pnp_disable_monitors ?? false}
-				offLabel={m.display_pnp_disabled()}
-				onLabel={m.display_pnp_enabled()}
-				busy={busy}
-				onSet={(on) => applyAxis({ pnp_disable_monitors: on })}
-			/>
 
 			{/* What's in force right now — read from the API's `effective`, not from the local draft.
 			    Deriving it from the draft meant the row restated the operator's unsaved edits back to
 			    them as though the host had already adopted them. */}
-			<div className="flex flex-wrap items-center gap-2 border-t pt-3">
-				<span className="text-sm text-muted-foreground">
+			<div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
+				<span className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
 					{m.display_effective()}:
 				</span>
 				<Badge variant="secondary">
@@ -806,9 +841,7 @@ const DisplayForm: FC<{
 			<p className="max-w-prose text-xs text-muted-foreground">
 				{m.display_pending_note()}
 			</p>
-			{error && (
-				<p className="text-sm text-amber-600 dark:text-amber-500">{error}</p>
-			)}
+			{error && <p className="text-sm text-[var(--warning)]">{error}</p>}
 		</div>
 	);
 };
@@ -869,7 +902,7 @@ const ExperimentalToggle: FC<{
 	busy: boolean;
 	onSet: (v: boolean) => void;
 }> = ({ label, help, value, offLabel, onLabel, busy, onSet }) => (
-	<div className="border-t pt-4">
+	<div className="rounded-lg border border-border/70 bg-muted/10 p-4">
 		{/* A labelled group: the pair of buttons is one control, and the label belongs to both. */}
 		<fieldset className="space-y-3">
 			<legend className="mb-3 flex items-center gap-2 text-sm font-medium leading-none">
@@ -968,9 +1001,9 @@ const CustomPresetCard: FC<{
 				}
 			}}
 			className={cn(
-				"flex h-full flex-col p-4",
+				"flex h-full min-h-32 flex-col border-border/70 bg-card/70 p-4 transition-colors",
 				busy ? "cursor-not-allowed opacity-60" : "cursor-pointer",
-				selected && "ring-2 ring-primary",
+				selected ? "ring-2 ring-primary bg-primary/5" : "hover:bg-muted/30",
 			)}
 		>
 			<div className="flex items-start justify-between gap-2">
@@ -1061,7 +1094,7 @@ const LiveDisplays: FC = () => {
 		);
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-4">
 			{/* Wrap in QueryState (like the settings card) so a failed/in-flight `/display/state`
 			    fetch surfaces as loading/error instead of masquerading as "no live displays". */}
 			<QueryState
@@ -1082,11 +1115,11 @@ const LiveDisplays: FC = () => {
 					</div>
 				)}
 				{displays.length === 0 ? (
-					<p className="text-sm text-muted-foreground">
+					<p className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
 						{m.display_none_live()}
 					</p>
 				) : (
-					<ul className="divide-y rounded-md border">
+					<ul className="overflow-hidden rounded-lg border border-border/70 bg-muted/15 divide-y divide-border/60">
 						{displays.map((d) => (
 							<DisplayRow
 								key={d.slot}
@@ -1116,7 +1149,7 @@ const DisplayArrangement: FC<{ displays: ApiDisplayInfo[] }> = ({
 	const saveLayout = useSetDisplayLayout();
 	const settings = useGetDisplaySettings();
 	// Every position the host has on file — including devices that are not connected right now.
-	// `PUT /display/layout` REPLACES the whole map (`with_manual_layout` in pf-vdisplay builds a
+	// `PUT /display/layout` REPLACES the whole map (`with_manual_layout` in ss-vdisplay builds a
 	// fresh `Layout`), so anything missing from our payload is deleted. Seeding only from the live
 	// displays therefore wiped the saved placement of every device that happened to be offline.
 	const saved = settings.data?.settings.layout?.positions;
@@ -1178,23 +1211,28 @@ const DisplayArrangement: FC<{ displays: ApiDisplayInfo[] }> = ({
 		);
 
 	return (
-		<div className="space-y-2 border-t pt-4">
-			<h4 className="text-sm font-medium">{m.display_arrange()}</h4>
-			<p className="text-xs text-muted-foreground">
+		<div className="space-y-4 border-t border-border/60 pt-5">
+			<h4 className="flex items-center gap-2 text-sm font-medium tracking-tight">
+				<LayoutDashboard className="size-4 text-primary" aria-hidden />
+				{m.display_arrange()}
+			</h4>
+			<p className="text-xs leading-relaxed text-muted-foreground">
 				{m.display_arrange_help()}
 			</p>
-			<div className="space-y-2">
+			<div className="overflow-hidden rounded-lg border border-border/70 bg-muted/15">
 				{arrangeable.map((d) => {
 					const slot = d.identity_slot as number;
 					const p = cur[String(slot)] ?? { x: d.x, y: d.y };
 					return (
 						<div
 							key={d.slot}
-							className="flex flex-wrap items-center gap-2 text-sm"
+							className="flex flex-wrap items-center gap-2 border-b border-border/60 px-3 py-2.5 text-sm last:border-b-0"
 						>
-							<span className="w-44 truncate">
+							<span className="w-44 truncate font-medium">
 								{d.mode}{" "}
-								<code className="text-xs text-muted-foreground">#{slot}</code>
+								<code className="text-xs font-normal text-muted-foreground">
+									#{slot}
+								</code>
 							</span>
 							<Label className="text-xs" htmlFor={`disp-x-${slot}`}>
 								X
@@ -1227,7 +1265,7 @@ const DisplayArrangement: FC<{ displays: ApiDisplayInfo[] }> = ({
 				})}
 			</div>
 			{saveLayout.error && (
-				<p className="text-sm text-amber-600 dark:text-amber-500">
+				<p className="text-sm text-[var(--warning)]">
 					{apiErrorMessage(saveLayout.error)}
 				</p>
 			)}
@@ -1251,26 +1289,48 @@ const DisplayRow: FC<{
 				? m.display_state_pinned()
 				: m.display_state_lingering();
 	return (
-		<li className="flex items-center justify-between gap-4 px-4 py-3">
-			<div className="min-w-0">
-				<div className="flex flex-wrap items-center gap-2">
-					<span className="font-medium">{d.mode}</span>
-					<Badge variant={active ? "success" : "secondary"}>{stateLabel}</Badge>
-					{active && d.sessions > 0 && (
-						<Badge variant="outline">
-							{m.display_sessions({ count: d.sessions })}
-						</Badge>
+		<li
+			className={cn(
+				"flex flex-col gap-3 border-l-2 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4",
+				active ? "border-l-[var(--success)]" : "border-l-border",
+			)}
+		>
+			<div className="flex min-w-0 items-start gap-3">
+				<span
+					aria-hidden
+					className={cn(
+						"mt-1.5 size-2 shrink-0 rounded-full",
+						active ? "bg-[var(--success)]" : "bg-muted-foreground/50",
 					)}
+				/>
+				<div className="min-w-0">
+					<div className="flex flex-wrap items-center gap-2">
+						<span className="font-medium">{d.mode}</span>
+						<Badge variant={active ? "success" : "secondary"}>
+							{stateLabel}
+						</Badge>
+						{active && d.sessions > 0 && (
+							<Badge variant="outline">
+								{m.display_sessions({ count: d.sessions })}
+							</Badge>
+						)}
+					</div>
+					<code className="text-xs text-muted-foreground">
+						{d.backend}
+						{d.expires_in_ms != null
+							? ` · ${m.display_expires_in({ sec: Math.ceil(d.expires_in_ms / 1000) })}`
+							: ""}
+					</code>
 				</div>
-				<code className="text-xs text-muted-foreground">
-					{d.backend}
-					{d.expires_in_ms != null
-						? ` · ${m.display_expires_in({ sec: Math.ceil(d.expires_in_ms / 1000) })}`
-						: ""}
-				</code>
 			</div>
 			{!active && (
-				<Button size="sm" variant="outline" disabled={busy} onClick={onRelease}>
+				<Button
+					size="sm"
+					variant="outline"
+					disabled={busy}
+					onClick={onRelease}
+					className="shrink-0 self-start sm:self-center"
+				>
 					{m.display_release_btn()}
 				</Button>
 			)}

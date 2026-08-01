@@ -7,7 +7,7 @@ and manages your settings and library — the stream itself runs in the sibling
 spawns, putting the picture on glass at your display's own resolution and refresh rate.
 
 Built in Rust end to end (no C ABI): the shell shares its plumbing with the session binary through
-**`crates/pf-client-core`**, which links the **`slipstream-core`** protocol crate and speaks the fast
+**`crates/ss-client-core`**, which links the **`slipstream-core`** protocol crate and speaks the fast
 **`slipstream/1`** protocol — QUIC control plane, GF(2¹⁶) FEC + AES-GCM data plane.
 
 ## Features
@@ -40,7 +40,7 @@ Most people should install a package rather than build from source:
 
 | Distro | Install |
 |--------|---------|
-| **Flatpak** (any distro, Steam Deck) | `io.unom.Slipstream` — see [`packaging/flatpak`](../../packaging/flatpak/README.md) |
+| **Flatpak** (any distro, Steam Deck) | `io.slipstream` — see [`packaging/flatpak`](../../packaging/flatpak/README.md) |
 | **Ubuntu / Debian** (apt) | `sudo apt install slipstream-client` *(after adding the repo)* |
 | **Fedora / Bazzite** (rpm) | `rpm-ostree install slipstream-client` |
 | **Arch** (PKGBUILD) | see [`packaging/arch`](../../packaging/arch/README.md) |
@@ -87,7 +87,7 @@ tools/screenshots.sh      store screenshot capture (app self-capture; Xvfb fallb
 
 The UI-agnostic plumbing — session pump, FFmpeg decode, PipeWire audio, SDL3 gamepads +
 keymap, trust store, mDNS discovery, library client, Wake-on-LAN — lives in
-`crates/pf-client-core`, shared with the Vulkan session binary.
+`crates/ss-client-core`, shared with the Vulkan session binary.
 
 ## Related
 

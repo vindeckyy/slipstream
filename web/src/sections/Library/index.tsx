@@ -26,10 +26,17 @@ export const SectionLibrary: FC = () => {
 	return (
 		<Section maxWidth={false}>
 			<div className="flex flex-col gap-card">
-				<div className="flex items-center justify-between gap-4">
-					<h1 className="text-2xl font-semibold">{m.library_title()}</h1>
+				<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+					<div className="space-y-1">
+						<h1 className="text-2xl font-semibold tracking-tight">
+							{m.library_title()}
+						</h1>
+					</div>
 					{target === null && (
-						<Button onClick={() => setTarget("new")}>
+						<Button
+							className="self-start sm:self-auto"
+							onClick={() => setTarget("new")}
+						>
 							<Plus className="size-4" />
 							{m.library_add_button()}
 						</Button>

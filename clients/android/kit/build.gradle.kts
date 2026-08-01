@@ -10,7 +10,7 @@ plugins {
 val ndkVer = "30.0.14904198" // r30-beta1 — matches the SDK NDK installed for cargo-ndk
 
 android {
-    namespace = "io.unom.slipstream.kit"
+    namespace = "io.slipstream.kit"
     compileSdk = 37 // Android 17 — align with :app (androidx.core 1.19.0 requires it)
     ndkVersion = ndkVer
 

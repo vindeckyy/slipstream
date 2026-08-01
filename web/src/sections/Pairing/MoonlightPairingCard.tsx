@@ -10,7 +10,12 @@ import {
 } from "@/api/gen/pairing/pairing";
 import { QueryState } from "@/components/query-state";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Loadable } from "@/lib/query";
@@ -93,16 +98,18 @@ export const MoonlightPairing: FC<{
 			error={pairing.error}
 			refetch={pairing.refetch}
 		>
-			<Card>
+			<Card className="h-full">
 				<CardHeader>
-					<CardTitle className="flex items-center gap-2">
-						<KeyRound className="size-4" />
+					<CardTitle className="flex items-center gap-2 tracking-tight">
+						<KeyRound className="size-4 text-muted-foreground" />
 						{m.pairing_moonlight_title()}
 					</CardTitle>
 				</CardHeader>
 				<CardContent>
 					{!pending ? (
-						<p className="text-sm text-muted-foreground">{m.pairing_idle()}</p>
+						<p className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+							{m.pairing_idle()}
+						</p>
 					) : (
 						<form
 							onSubmit={(e) => {
@@ -111,7 +118,7 @@ export const MoonlightPairing: FC<{
 							}}
 							className="space-y-4"
 						>
-							<p className="text-sm">{m.pairing_waiting()}</p>
+							<p className="text-sm font-medium">{m.pairing_waiting()}</p>
 							<div className="space-y-2">
 								<Label htmlFor="pin">{m.pairing_pin_label()}</Label>
 								<Input
@@ -134,8 +141,8 @@ export const MoonlightPairing: FC<{
 							    succeeded — the ceremony verifies it out-of-band. So report "sent", not
 							    "paired", and let the operator confirm via the Paired devices list. */}
 							{isSuccess && (
-								<p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-									<Info className="size-4" />
+								<p className="flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+									<Info className="size-4 shrink-0" />
 									{m.pairing_pin_sent()}
 								</p>
 							)}

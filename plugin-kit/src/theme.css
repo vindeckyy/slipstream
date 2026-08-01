@@ -1,9 +1,8 @@
-/* slipstream plugin-UI theme — the console's violet identity, packaged so plugin UIs
- * render indistinguishably from the console they're embedded in.
+/* Slipstream plugin UI theme. Import this before the app-specific Tailwind rules so
+ * embedded plugin surfaces share the console's observatory palette.
  *
- * Extracted from the console's web/src/styles.css + timing-functions.css (keep in sync —
- * console/theme unification is a tracked follow-up). Consume as the FIRST import of the
- * plugin UI's Tailwind entry, then add the app-specific lines yourself:
+ * Consume this as the first import of the plugin UI's Tailwind entry, then add the
+ * app-specific lines:
  *
  *   @import "tailwindcss";
  *   @import "tw-animate-css";
@@ -11,10 +10,10 @@
  *   @custom-variant dark (&:is(.dark *));
  *   @source "../node_modules/@unom/ui/dist/**\/*.{js,mjs}";
  *
- * Pin `<html class="dark">` (the console does) — removing the class yields light.
+ * Pin `<html class="dark">` for dark mode. Removing the class yields light mode.
  */
 
-/* ── Penner easing tokens — @unom/ui's accordion/collapsible/material resolve these. ── */
+/* Easing and timing tokens shared by plugin observatory surfaces. */
 @theme {
 	--ease-in-sine: cubic-bezier(0.47, 0, 0.745, 0.715);
 	--ease-out-sine: cubic-bezier(0.39, 0.575, 0.565, 1);
@@ -37,117 +36,144 @@
 	--ease-in-circ: cubic-bezier(0.6, 0.04, 0.98, 0.335);
 	--ease-out-circ: cubic-bezier(0.075, 0.82, 0.165, 1);
 	--ease-in-out-circ: cubic-bezier(0.785, 0.135, 0.15, 0.86);
+
+	--ease-standard: cubic-bezier(0.2, 0, 0, 1);
+	--ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+	--ease-emphasized-accel: cubic-bezier(0.3, 0, 0.8, 0.15);
+
+	--duration-fast: 120ms;
+	--duration-normal: 200ms;
+	--duration-emphasized: 280ms;
+	--duration-panel: 320ms;
+	--duration-reduced-motion: 0.01ms;
 }
 
-/* ── slipstream brand · violet product chrome ────────────────────────────────
-   Light (lavender) is the :root default; dark (violet-tinted app-icon chrome) is the
-   `.dark` override. The token set feeds BOTH @unom/ui's semantic contract
-   (--brand/--main/--neutral…) and the shadcn-style vocabulary (--background/--card/…),
-   mapped onto one palette. Indirection tokens live in :root only — CSS resolves var()
-   per-theme at use time, so .dark overrides just the raw values. */
+/* The light palette is the default. The dark class overrides raw values while
+   semantic aliases continue to resolve per theme. */
 :root {
-	--radius: 0.625rem;
+	color-scheme: light;
+	--radius: 0.5rem;
 
-	/* Brand — the violet lens mark (from the slipstream app icon). Theme-independent. */
-	--pf-brand: #6c5bf3; /* deep violet — primary on light */
-	--pf-brand-light: #a79ff8; /* light violet — primary on dark */
-	--pf-highlight: #d2c9fb; /* lens highlight */
+	/* Cyan Slipstream brand. */
+	--ss-brand: #0891b2;
+	--ss-brand-light: #22d3ee;
+	--ss-highlight: #a5f3fc;
 
-	/* Surfaces — light · lavender (white bg, faint-violet cards/borders). */
-	--background: #ffffff;
-	--foreground: #1b1430;
-	--card: #f6f2ff;
-	--card-foreground: #1b1430;
+	/* Light observatory surfaces. */
+	--background: #eef3f6;
+	--foreground: #0a1620;
+	--card: #ffffff;
+	--card-foreground: #0a1620;
 	--popover: #ffffff;
-	--popover-foreground: #1b1430;
-	--muted: #f1ecfd;
-	--muted-foreground: #6f6a86;
-	--secondary: #ece6fb;
-	--secondary-foreground: #1b1430;
-	/* shadcn `accent` = subtle hover surface; also @unom/ui's card ring colour,
-     so we tint it toward the brand violet (the same in both themes). */
-	--accent: var(--pf-brand);
+	--popover-foreground: #0a1620;
+	--muted: #e2ebf0;
+	--muted-foreground: #4d6672;
+	--secondary: #d3e2e9;
+	--secondary-foreground: #0a1620;
+	--accent: var(--ss-brand);
 	--accent-foreground: #ffffff;
-	--border: #e4dcf7;
-	--input: #e4dcf7;
-	--ring: var(--pf-brand);
+	--border: #849098;
+	--input: #849098;
+	--ring: var(--ss-brand);
 
-	/* Primary = the brand (buttons, active nav, default badges). */
-	--primary: var(--pf-brand);
+	/* Primary brand controls. */
+	--primary: var(--ss-brand);
 	--primary-foreground: #ffffff;
 
-	--success: oklch(0.6 0.14 160);
-	--warn: oklch(0.84 0.16 84);
-	--destructive: oklch(0.55 0.22 18);
+	/* Semantic state colors. */
+	--success: oklch(0.55 0.14 160);
+	--success-foreground: #ffffff;
+	--warning: oklch(0.68 0.14 75);
+	--warning-foreground: #0a1620;
+	--offline: oklch(0.52 0.04 245);
+	--offline-foreground: #ffffff;
+	--destructive: oklch(0.52 0.2 18);
 	--destructive-foreground: #ffffff;
 
-	/* ── @unom/ui semantic token contract (its components read these names). ──
-     These are indirections — they follow the raw tokens above per-theme. */
+	/* @unom/ui semantic aliases. */
 	--main: var(--foreground);
-	--brand: var(--pf-brand);
-	--brand-light: var(--pf-brand-light);
-	--highlight: var(--pf-highlight);
+	--brand: var(--ss-brand);
+	--brand-light: var(--ss-brand-light);
+	--highlight: var(--ss-highlight);
 	--neutral: var(--card); /* @unom card default surface (bg-neutral) */
-	--neutral-accent: var(
-		--secondary
-	); /* accent / nested surface (bg-neutral-accent) */
+	--neutral-accent: var(--secondary); /* nested surface (bg-neutral-accent) */
 	--neutral-highlight: var(--border);
 	--error: var(--destructive);
+	--error-foreground: var(--destructive-foreground);
 
 	--font-display: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
 	--font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+	--font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+		"Liberation Mono", "Courier New", monospace;
 
-	/* @unom/ui radius/spacing contract (pill buttons, rounded cards, tall inputs). */
-	--radius-card-min: var(--radius);
+	/* Observatory type scale. */
+	--text-page: 1.5rem;
+	--text-section: 1.125rem;
+	--text-body: 0.875rem;
+	--text-meta: 0.75rem;
+	--leading-tight: 1.25;
+	--leading-body: 1.5;
+	--tracking-display: -0.02em;
+	--tracking-body: -0.011em;
+
+	/* @unom/ui radius contract. */
+	--radius-card-min: 0.375rem;
 }
 
-/* Dark · the violet-tinted app-icon chrome. Overrides only the raw values —
-   the indirection tokens in :root resolve to these automatically. */
+/* Dark observatory surfaces. */
 .dark {
-	--background: #141019;
-	--foreground: oklch(0.985 0 0);
-	--card: #1c1530;
-	--card-foreground: oklch(0.985 0 0);
-	--popover: #1c1530;
-	--popover-foreground: oklch(0.985 0 0);
-	--muted: #1f1830;
-	--muted-foreground: oklch(0.728 0.03 286);
-	--secondary: #241c3d;
-	--secondary-foreground: oklch(0.985 0 0);
-	--border: #2a2148;
-	--input: #2a2148;
-	--ring: var(--pf-brand-light);
+	color-scheme: dark;
 
-	/* Lighter violet reads better against the dark surface. */
-	--primary: var(--pf-brand-light);
-	--primary-foreground: #141019;
+	--background: #050a0f;
+	--foreground: #e8eef2;
+	--card: #0d141c;
+	--card-foreground: #e8eef2;
+	--popover: #121a24;
+	--popover-foreground: #e8eef2;
+	--muted: #111820;
+	--muted-foreground: #93a7b5;
+	--secondary: #18222d;
+	--secondary-foreground: #e8eef2;
+	--border: #526472;
+	--input: #526472;
+	--ring: var(--ss-brand-light);
 
-	--success: oklch(0.7 0.15 160);
-	--warn: oklch(0.87 0.15 84);
-	--destructive: oklch(0.62 0.21 18);
-	--destructive-foreground: oklch(0.985 0 0);
+	--accent: var(--ss-brand-light);
+	--accent-foreground: #060a0f;
+	--primary: var(--ss-brand-light);
+	--primary-foreground: #060a0f;
+
+	--success: oklch(0.72 0.14 160);
+	--success-foreground: #060a0f;
+	--warning: oklch(0.8 0.14 75);
+	--warning-foreground: #060a0f;
+	--offline: oklch(0.68 0.04 245);
+	--offline-foreground: #060a0f;
+	--destructive: oklch(0.68 0.19 18);
+	--destructive-foreground: #060a0f;
 }
 
-/* Map the palette to Tailwind colour/util tokens — both the shadcn vocabulary
-   and @unom/ui's, resolved to one set of values. */
+/* Map semantic aliases to Tailwind color and utility tokens. */
 @theme inline {
-	--radius-sm: calc(var(--radius) - 4px);
-	--radius-md: calc(var(--radius) - 2px);
-	--radius-lg: var(--radius);
+	--radius-sm: calc(var(--radius) - 2px);
+	--radius-md: var(--radius);
+	--radius-lg: calc(var(--radius) + 2px);
 	--radius-xl: calc(var(--radius) + 4px);
+	--radius-2xl: calc(var(--radius) + 8px);
 	--radius-button: 9999px;
-	--radius-card: calc(var(--radius) * 2);
-	--radius-main: calc(var(--radius) * 2);
+	--radius-card: calc(var(--radius) * 1.5);
+	--radius-main: calc(var(--radius) * 1.5);
 
-	--spacing-input-height: 3rem;
-	--spacing-padding-card: 1.25rem;
-	--spacing-card: 1.5rem;
-	--spacing-main: 15px;
+	--spacing-input-height: 2.5rem;
+	--spacing-padding-card: 1rem;
+	--spacing-card: 1.25rem;
+	--spacing-main: 12px;
 
 	--font-sans: var(--font-sans);
 	--font-display: var(--font-display);
+	--font-mono: var(--font-mono);
 
-	/* shadcn-style colour tokens. */
+	/* shadcn-style color tokens. */
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	--color-card: var(--card);
@@ -165,12 +191,16 @@
 	--color-destructive: var(--destructive);
 	--color-destructive-foreground: var(--destructive-foreground);
 	--color-success: var(--success);
-	--color-warn: var(--warn);
+	--color-success-foreground: var(--success-foreground);
+	--color-warning: var(--warning);
+	--color-warning-foreground: var(--warning-foreground);
+	--color-offline: var(--offline);
+	--color-offline-foreground: var(--offline-foreground);
 	--color-border: var(--border);
 	--color-input: var(--input);
 	--color-ring: var(--ring);
 
-	/* @unom/ui colour tokens. */
+	/* @unom/ui color tokens. */
 	--color-main: var(--main);
 	--color-brand: var(--brand);
 	--color-brand-light: var(--brand-light);
@@ -179,14 +209,15 @@
 	--color-neutral-highlight: var(--neutral-highlight);
 	--color-highlight: var(--highlight);
 	--color-error: var(--error);
+	--color-error-foreground: var(--error-foreground);
 }
 
-/* Accordion / collapsible keyframes @unom/ui's interactive surfaces animate to. */
+/* Accordion and collapsible keyframes used by @unom/ui. */
 @theme {
-	--animate-accordion-down: accordion-down 0.4s var(--ease-out-quart);
-	--animate-accordion-up: accordion-up 0.4s var(--ease-out-quart);
-	--animate-collapsible-down: collapsible-down 0.4s var(--ease-out-quart);
-	--animate-collapsible-up: collapsible-up 0.4s var(--ease-out-quart);
+	--animate-accordion-down: accordion-down 0.28s var(--ease-out-quart);
+	--animate-accordion-up: accordion-up 0.28s var(--ease-out-quart);
+	--animate-collapsible-down: collapsible-down 0.28s var(--ease-out-quart);
+	--animate-collapsible-up: collapsible-up 0.28s var(--ease-out-quart);
 
 	@keyframes accordion-down {
 		from {
@@ -230,35 +261,134 @@
 	* {
 		border-color: var(--border);
 	}
+
+	html {
+		text-size-adjust: 100%;
+		-webkit-text-size-adjust: 100%;
+	}
+
 	body {
 		background-color: var(--background);
+		background-image: radial-gradient(
+			ellipse 110% 70% at 50% -25%,
+			color-mix(in oklab, var(--ss-brand) 11%, transparent),
+			transparent 58%
+		);
+		background-attachment: fixed;
 		color: var(--foreground);
 		font-family: var(--font-sans);
+		font-size: var(--text-body);
+		line-height: var(--leading-body);
+		letter-spacing: var(--tracking-body);
 		font-feature-settings:
 			"rlig" 1,
 			"calt" 1;
+		font-synthesis-weight: none;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+		text-rendering: optimizeLegibility;
+	}
+
+	h1,
+	h2,
+	h3 {
+		font-family: var(--font-display);
+		font-weight: 600;
+		letter-spacing: var(--tracking-display);
+		line-height: var(--leading-tight);
+		text-wrap: balance;
+		color: var(--foreground);
+	}
+
+	h1 {
+		font-size: var(--text-page);
+	}
+
+	h2 {
+		font-size: var(--text-section);
+	}
+
+	h3 {
+		font-size: 1rem;
+	}
+
+	p {
+		text-wrap: pretty;
+	}
+
+	small,
+	.text-meta {
+		font-size: var(--text-meta);
+		line-height: 1.4;
+		color: var(--muted-foreground);
+	}
+
+	:focus-visible {
+		outline: 2px solid var(--ring);
+		outline-offset: 2px;
+	}
+
+	::selection {
+		background-color: color-mix(in oklab, var(--ss-brand) 32%, transparent);
+		color: var(--foreground);
+	}
+
+	* {
+		scrollbar-width: thin;
+		scrollbar-color: color-mix(in oklab, var(--border) 80%, transparent)
+			transparent;
+	}
+
+	*::-webkit-scrollbar {
+		width: 10px;
+		height: 10px;
+	}
+
+	*::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	*::-webkit-scrollbar-thumb {
+		background-color: color-mix(in oklab, var(--border) 75%, transparent);
+		border-radius: 9999px;
+		border: 2px solid transparent;
+		background-clip: padding-box;
+	}
+
+	*::-webkit-scrollbar-thumb:hover {
+		background-color: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
 	}
 }
 
-/* ── Two vocabulary collisions, resolved ─────────────────────────────────────
-   Both come from @unom/ui's own palette meaning something different by the same
-   token name than this (console) palette does. Unlayered on purpose: unlayered
-   rules beat Tailwind's layered utilities of equal specificity.
+@media (prefers-reduced-motion: reduce) {
+	html:focus-within {
+		scroll-behavior: auto;
+	}
 
-   1. `--secondary` is muted TEXT to @unom/ui (its theme sets a mid-grey, used for
-      EmptyState captions, badge text, table headers) but a dark SURFACE here
-      (`bg-secondary`). Tailwind derives both utilities from one token, so the
-      text lane is re-pointed or every caption renders dark-on-dark. */
+	body {
+		background-attachment: scroll;
+	}
+
+	*,
+	*::before,
+	*::after {
+		animation-duration: var(--duration-reduced-motion) !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: var(--duration-reduced-motion) !important;
+		scroll-behavior: auto !important;
+	}
+}
+
+/* Resolve two @unom/ui vocabulary collisions outside Tailwind's layers.
+
+   @unom/ui uses secondary for muted text, while this theme uses it as a surface.
+   Keep the text utility readable on either surface. */
 .text-secondary {
 	color: var(--muted-foreground);
 }
 
-/* 2. @unom/ui's Card rings `ring-2 ring-accent`, sized for its subtle accent;
-      here `--accent` IS the brand violet, so an unsoftened ring shouts. The
-      console solves this in its own Card wrapper ("2px ring → subtle 1px brand
-      tint"); plugin UIs get the same result without wrapping anything. Scoped to
-      `rounded-card.ring-2` so only @unom/ui card surfaces are affected, and
-      explicit `ring-accent/NN` utilities keep their own value. */
+/* @unom/ui cards use ring-2 ring-accent. Soften the brand ring for plugin cards
+   while leaving explicit ring-accent opacity utilities untouched. */
 .rounded-card.ring-2 {
 	--tw-ring-color: color-mix(in oklch, var(--accent) 35%, transparent);
 }

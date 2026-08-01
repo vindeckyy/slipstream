@@ -12,7 +12,13 @@ import {
 import type { ApiMonitorInfo } from "@/api/gen/model";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages";
 
@@ -87,8 +93,12 @@ export const MonitorCard: FC = () => {
 			onClick={onSelect}
 			aria-pressed={selected}
 			className={cn(
-				"flex w-full items-start justify-between gap-4 rounded-md border p-3 text-left transition-colors",
-				selected ? "border-primary bg-primary/5" : "hover:bg-muted/50",
+				"flex w-full items-start justify-between gap-4 px-3 py-3 text-left transition-colors sm:px-4",
+				selected
+					? "bg-primary/10"
+					: onSelect && !busy && !locked
+						? "hover:bg-muted/40"
+						: undefined,
 				// `!onSelect` is a row that cannot be picked at all — a disabled head, or one of our own
 				// virtual displays. It was styled exactly like a selectable row and silently swallowed
 				// every click; it is listed so "why isn't my monitor here?" has an answer, so it has to
@@ -97,7 +107,7 @@ export const MonitorCard: FC = () => {
 			)}
 		>
 			<span className="flex flex-col gap-1">
-				<span className="flex items-center gap-2 font-medium">
+				<span className="flex flex-wrap items-center gap-2 font-medium">
 					{title}
 					{tags}
 				</span>
@@ -122,7 +132,7 @@ export const MonitorCard: FC = () => {
 		return row(
 			mon.connector,
 			pinned?.toLowerCase() === mon.connector.toLowerCase(),
-			`${mon.connector} — ${mon.description}`,
+			`${mon.connector} · ${mon.description}`,
 			`${mon.mode} · ${m.display_monitor_mirror_hint()}`,
 			tags,
 			// A disabled head cannot be streamed (the host refuses with that reason), so don't
@@ -134,19 +144,21 @@ export const MonitorCard: FC = () => {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>{m.display_monitor_title()}</CardTitle>
+				<CardTitle className="tracking-tight">
+					{m.display_monitor_title()}
+				</CardTitle>
+				<CardDescription className="max-w-prose leading-relaxed">
+					{m.display_monitor_intro()}
+				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-4">
-				<p className="max-w-prose text-sm text-muted-foreground">
-					{m.display_monitor_intro()}
-				</p>
 				{!pinSupported && (
-					<p className="text-sm text-amber-600 dark:text-amber-500">
+					<p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-[var(--warning)]">
 						{m.display_monitor_unsupported()}
 					</p>
 				)}
 				{pinSupported && envLocked && (
-					<p className="text-sm text-amber-600 dark:text-amber-500">
+					<p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-[var(--warning)]">
 						{m.display_monitor_env_locked()}
 					</p>
 				)}
@@ -155,7 +167,7 @@ export const MonitorCard: FC = () => {
 					error={monitors.error}
 					refetch={monitors.refetch}
 				>
-					<div className="flex flex-col gap-2">
+					<div className="overflow-hidden rounded-lg border border-border/70 bg-muted/15 divide-y divide-border/60">
 						{row(
 							"__virtual__",
 							!pinned,
@@ -165,14 +177,14 @@ export const MonitorCard: FC = () => {
 							() => choose(null),
 						)}
 						{rows.map(monitorRow)}
-						{rows.length === 0 && (
-							<p className="text-sm text-muted-foreground">
-								{monitors.data?.error
-									? m.display_monitor_unavailable()
-									: m.display_monitor_none()}
-							</p>
-						)}
 					</div>
+					{rows.length === 0 && (
+						<p className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
+							{monitors.data?.error
+								? m.display_monitor_unavailable()
+								: m.display_monitor_none()}
+						</p>
+					)}
 				</QueryState>
 				{error && <p className="text-sm text-destructive">{error}</p>}
 			</CardContent>

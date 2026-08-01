@@ -32,23 +32,23 @@ slipstream-core = { path = "../../crates/slipstream-core", features = ["quic"] }
 # shell and the spawned session binary — src/trust.rs re-exports it) and the game-library
 # data model (fetch + art pipeline) behind the library page.
 #
-# `default-features = false` drops pf-client-core's default `pyrowave`, which would otherwise
+# `default-features = false` drops ss-client-core's default `pyrowave`, which would otherwise
 # build the vendored PyroWave C++ INTO THE SHELL — dead weight here (the shell never decodes;
 # it only offers "pyrowave" as a codec preference string the session binary acts on) and fatal
 # on ARM64, where Granite's math falls back to x86 SSE intrinsics and stops at
 # `simd.hpp: #error "Implement me."`. This does NOT drop PyroWave from the Windows client:
 # decode lives in the spawned slipstream-session binary, whose own default enables the feature,
-# and cargo's feature unification turns it back on for the shared pf-client-core whenever that
+# and cargo's feature unification turns it back on for the shared ss-client-core whenever that
 # binary is in the same build (x64). On the ARM64 leg both are built --no-default-features, so
 # nothing enables it and the C++ is never compiled.
-pf-client-core = { path = "../../crates/pf-client-core", default-features = false }
+ss-client-core = { path = "../../crates/ss-client-core", default-features = false }
 
 # WinUI 3 UI via windows-reactor (a declarative React-like framework backed by WinUI).
 # Unpublished (version 0.0.0) and fast-moving, so pinned to a verified commit. Pin bumped
 # 2026-07-29 (from the 2026-07-01 rev) for: reconciler keyed-child-order fix (#4728), widget
 # validation (#4727), DPI collision fix (#4751), icon elements (#4736), multi-window (#4730),
 # scroll virtualization (#4710). All three windows-rs deps here MUST share this rev, and it
-# must match pf-client-core's `windows` pin, so the workspace builds ONE windows-rs.
+# must match ss-client-core's `windows` pin, so the workspace builds ONE windows-rs.
 windows-reactor = { git = "https://github.com/microsoft/windows-rs", rev = "acb5a1a7441033d9312b16842af02eb0c2b403dc" }
 # Win32 / DXGI for the GPU picker and the shell's window plumbing. Pulled from the SAME
 # windows-rs commit as windows-reactor so their `windows-core` unifies — the `IDXGISwapChain1`
@@ -83,10 +83,10 @@ windows = { git = "https://github.com/microsoft/windows-rs", rev = "acb5a1a74410
 # decode + present live in the spawned slipstream-session binary.)
 ffmpeg-next = "8"
 
-# Gamepad enumeration + pin persistence for Settings runs on pf-client-core's shared SDL service
+# Gamepad enumeration + pin persistence for Settings runs on ss-client-core's shared SDL service
 # (see the `gamepad` field in app/); the spawned slipstream-session does the actual forwarding. SDL3
 # itself (built from source via the bundled CMake on Windows) is pulled transitively by
-# pf-client-core with the same `build-from-source,hidapi` features, so it is not a direct dep here.
+# ss-client-core with the same `build-from-source,hidapi` features, so it is not a direct dep here.
 mdns-sd = "0.20"
 async-channel = "2"
 serde = { version = "1", features = ["derive"] }

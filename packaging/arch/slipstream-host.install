@@ -1,0 +1,60 @@
+# pacman install scriptlet — mirrors the RPM %post / deb postinst.
+_ensure_update_group() {
+  # The (empty) opt-in group for web-console-triggered updates — nobody is auto-added.
+  getent group slipstream-update >/dev/null 2>&1 || groupadd --system slipstream-update 2>/dev/null || true
+}
+
+post_install() {
+  _ensure_update_group
+  udevadm control --reload-rules 2>/dev/null || true
+  udevadm trigger --subsystem-match=misc 2>/dev/null || true
+  # Apply the UDP socket-buffer tuning now (also auto-applied at boot by systemd-sysctl).
+  sysctl -p /usr/lib/sysctl.d/99-slipstream-net.conf >/dev/null 2>&1 || true
+  cat <<'MSG'
+slipstream-host installed.
+  1. Add yourself to the 'input' group for virtual gamepads:
+       sudo usermod -aG input "$USER"     # then re-login
+  2. Pick a backend config (gamescope is the no-desktop default on SteamOS/Deck):
+       mkdir -p ~/.config/slipstream
+       cp /usr/share/slipstream/host.env.bazzite ~/.config/slipstream/host.env
+  3. Enable the host:
+       systemctl --user enable --now slipstream-host
+
+NOTE: encode is NVENC-only. Install 'nvidia-utils' on an NVIDIA host. An AMD Steam Deck is NOT
+      yet supported — it needs a VAAPI (hevc_vaapi) encoder backend (see packaging/arch/README.md).
+MSG
+  # Firewall: stock Arch ships none (ports already open); CachyOS ships ufw; some spins (EndeavourOS)
+  # enable firewalld. We install a ufw app profile AND firewalld service definitions but never touch
+  # the running firewall — just point the way for whichever is active.
+  if command -v ufw >/dev/null 2>&1; then
+    cat <<'MSG'
+
+  4. ufw is installed — open the streaming ports once (native-only host shown; add
+     'slipstream-gamestream' as well for Moonlight compat):
+       sudo ufw allow slipstream-native
+MSG
+  fi
+  if command -v firewall-cmd >/dev/null 2>&1; then
+    cat <<'MSG'
+
+  4. firewalld is active — open the streaming ports once (native-only host shown; add
+     'slipstream-gamestream' as well for Moonlight compat):
+       sudo firewall-cmd --reload                                     # load the new service def
+       sudo firewall-cmd --permanent --add-service=slipstream-native
+       sudo firewall-cmd --reload
+MSG
+  fi
+  # Conflicting Moonlight-compatible host (Sunshine/Apollo/...): reuse the host's own detector so
+  # the warning lives in one place. Exit 1 = found; never fail the install on it.
+  if command -v slipstream-host >/dev/null 2>&1; then
+    if ! conflict="$(slipstream-host detect-conflicts 2>/dev/null)"; then
+      printf '\n%s\n' "$conflict"
+    fi
+  fi
+}
+
+post_upgrade() {
+  _ensure_update_group
+  udevadm control --reload-rules 2>/dev/null || true
+  sysctl -p /usr/lib/sysctl.d/99-slipstream-net.conf >/dev/null 2>&1 || true
+}

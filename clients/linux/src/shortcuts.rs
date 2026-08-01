@@ -35,7 +35,7 @@ pub fn write_desktop_entry(label: &str, url: &str) -> Result<PathBuf, String> {
          Name={name}\n\
          Comment=Stream from this Slipstream host\n\
          Exec=slipstream-client \"{url}\"\n\
-         Icon=io.unom.Slipstream\n\
+         Icon=io.slipstream\n\
          Terminal=false\n\
          Categories=Game;Network;\n\
          StartupNotify=true\n"

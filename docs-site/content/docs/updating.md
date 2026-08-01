@@ -24,8 +24,8 @@ The console shows the right one of these automatically; for reference:
 
 | How you installed | How to update |
 |---|---|
-| Windows installer | download the newer `slipstream-host-setup-<version>.exe` from the [releases page](https://github.com/vindeckyy/slipstream.git/releases) and run it — it upgrades in place, keeping your settings, console password and paired devices |
-| Windows via winget | `winget upgrade unom.SlipstreamHost` — **register the Slipstream source once first**, in an elevated terminal: `winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest` |
+| Windows installer | download the newer `slipstream-host-setup-<version>.exe` from the [releases page](https://github.com/vindeckyy/slipstream/slipstream/releases) and run it — it upgrades in place, keeping your settings, console password and paired devices |
+| Windows via winget | `winget upgrade vindeckyy.SlipstreamHost` — **register the Slipstream source once first**, in an elevated terminal: `winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest` |
 | Ubuntu (apt) | `sudo apt update && sudo apt install --only-upgrade slipstream-host` |
 | Fedora (dnf) | `sudo dnf upgrade slipstream` |
 | Bazzite sysext (recommended) | `sudo slipstream-sysext update` |
@@ -109,7 +109,7 @@ not on a dead host. That rollback writes
 ## One-click updating (Linux — opt-in)
 
 The apt, dnf, Bazzite-sysext, and rpm-ostree installs can one-click update too, via a small
-root helper the packages ship (`pf-update` + a `slipstream-update.service` oneshot). It's **off
+root helper the packages ship (`ss-update` + a `slipstream-update.service` oneshot). It's **off
 until you opt in**, because a web button that ends in root deserves an explicit decision:
 
 ```bash
@@ -167,7 +167,7 @@ Windows or Linux; the card shows the manual command instead.
 ## If the card says the feed is stale
 
 "Feed hasn't changed in over 45 days" means checks *succeed* but nothing new arrives. Usually
-that just means no release happened for a while; if the [releases page](https://github.com/vindeckyy/slipstream.git/releases)
+that just means no release happened for a while; if the [releases page](https://github.com/vindeckyy/slipstream/slipstream/releases)
 shows something newer than the card does, something between this host and the feed is pinning old
 data — worth a look at proxies or DNS on the way to `github.com/vindeckyy/slipstream`. That comparison only works on a
 **stable** host: the releases page is stable-only, so a canary host being "behind" it means

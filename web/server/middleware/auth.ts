@@ -1,7 +1,7 @@
 // The single server-side gate. Runs for EVERY request to the deployed Bun/Nitro server
 // (pages, the /api proxy, everything) before routing. Unauthenticated requests are
-// redirected to /login (page navigations) or rejected 401 (/api). Fails CLOSED if
-// SLIPSTREAM_UI_PASSWORD is unset, so a misconfigured LAN-exposed server admits no one.
+// redirected to /login (or /setup on first run) or rejected 401 (/api). An unconfigured
+// console serves only the password setup screen and keeps the API closed.
 import {
 	defineEventHandler,
 	getRequestHeader,
@@ -56,12 +56,29 @@ export default defineEventHandler(async (event) => {
 		}
 	}
 
+	const configured = Boolean(uiPassword());
+	if (pathname === "/setup") {
+		if (!configured) return;
+		return sendRedirect(event, "/login", 302);
+	}
+	if (pathname === "/login") {
+		if (configured) return;
+		return sendRedirect(event, "/setup", 302);
+	}
 	if (isPublicPath(pathname)) return;
 
-	// Misconfigured: refuse everything rather than serve open on the LAN.
-	if (!uiPassword()) {
-		setResponseStatus(event, 503);
-		return { error: "auth not configured: set SLIPSTREAM_UI_PASSWORD" };
+	// An unconfigured console may serve only the setup page. Keep the API closed until a password
+	// exists, even though the setup route itself is public.
+	if (!configured) {
+		if (pathname.startsWith("/api")) {
+			setResponseStatus(event, 503);
+			return { error: "auth not configured: choose a console password at /setup" };
+		}
+		return sendRedirect(
+			event,
+			`/setup?next=${encodeURIComponent(pathname)}`,
+			302,
+		);
 	}
 
 	const session = await useSession<SessionData>(event, sessionConfig());

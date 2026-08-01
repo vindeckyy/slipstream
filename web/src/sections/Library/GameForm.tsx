@@ -212,9 +212,9 @@ export const GameForm: FC<{
 	};
 
 	return (
-		<Card className="max-w-xl">
-			<CardHeader className="flex-row items-center justify-between space-y-0">
-				<CardTitle>
+		<Card className="max-w-xl ring-accent/50">
+			<CardHeader className="flex-row items-center justify-between space-y-0 pb-3">
+				<CardTitle className="text-base tracking-tight">
 					{mode === "edit" ? m.library_edit_title() : m.library_add_title()}
 				</CardTitle>
 				<Button
@@ -270,11 +270,11 @@ export const GameForm: FC<{
 						onChange={set("command")}
 						help={m.library_field_command_help()}
 					/>
-					<fieldset className="space-y-4 border-t pt-2">
+					<fieldset className="space-y-4 rounded-lg border border-border/70 bg-muted/20 p-3 sm:p-4">
 						<legend className="sr-only">{m.library_details_legend()}</legend>
 						<p
 							aria-hidden
-							className="text-sm font-medium text-muted-foreground"
+							className="text-sm font-medium tracking-tight text-foreground"
 						>
 							{m.library_details_legend()}
 						</p>
@@ -291,7 +291,7 @@ export const GameForm: FC<{
 							value={form.description}
 							onChange={set("description")}
 						/>
-						<div className="grid grid-cols-2 gap-4">
+						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 							<Field
 								id="developer"
 								label={m.library_field_developer()}
@@ -305,7 +305,7 @@ export const GameForm: FC<{
 								onChange={set("publisher")}
 							/>
 						</div>
-						<div className="grid grid-cols-2 gap-4">
+						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 							<Field
 								id="releaseYear"
 								label={m.library_field_release_year()}
@@ -351,19 +351,19 @@ export const GameForm: FC<{
 					by a save it did not intend to touch. The real fix is host-side (expose `detect`
 					and `prep` on the read model); until then, say so before the operator finds out. */}
 					{mode === "edit" && (
-						<p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+						<p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-700 dark:text-amber-400">
 							{m.library_edit_overwrites()}
 						</p>
 					)}
 					{error && (
 						<p
 							role="alert"
-							className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+							className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
 						>
 							{error}
 						</p>
 					)}
-					<div className="flex gap-2">
+					<div className="flex flex-wrap gap-2">
 						<Button type="submit" disabled={isSaving || !form.title.trim()}>
 							{mode === "edit" ? m.library_save() : m.library_create()}
 						</Button>

@@ -1,0 +1,49 @@
+# slipstream plugin/script runner — systemd USER unit (bun runtime, OPT-IN).
+#
+# Runs the operator's automation under supervision: loose files in ~/.config/slipstream/scripts/ and
+# installed `slipstream-plugin-*` packages under ~/.config/slipstream/plugins/. Each unit is an Effect
+# fiber (a plugin restarts on failure with capped-jittered backoff; a bare script is one-shot).
+# SIGTERM interrupts the whole tree STRUCTURALLY, so every plugin's scoped finalizers run before
+# exit (clean deregister / preset release) — hence the generous stop timeout below.
+#
+# OPT-IN — unlike slipstream-web, the package does NOT auto-enable this: the runner does nothing until
+# you add scripts or install plugins. Turn it on once you have automation to run:
+#   systemctl --user enable --now slipstream-scripting
+#
+# Auto-wired like the console: a plugin's connect() reads the host's SCOPED plugin token + identity
+# cert from ~/.config/slipstream/{plugin-token,cert.pem} (written by the host's `serve`) — no env
+# editing. The plugin token authorizes the plugin surface but not hook registration or pairing
+# administration; a script that needs the admin surface sets SLIPSTREAM_MGMT_TOKEN explicitly.
+[Unit]
+Description=slipstream plugin/script runner
+Documentation=https://github.com/vindeckyy/slipstream/slipstream
+# Plugins talk to the host's loopback mgmt API; order after it. Soft (ordering only, no Requires):
+# the runner supervises each unit with backoff, so a plugin started before the host simply retries.
+After=slipstream-host.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/slipstream-scripting
+Restart=on-failure
+RestartSec=2
+# Deliver the stop signal to the runner process itself (it orchestrates the structural shutdown of
+# its unit fibers), and give it room to run their finalizers before the cgroup is reaped.
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+# Sandbox: free hardening for well-behaved plugins. The filesystem is read-only outside the home
+# directory (ReadWritePaths keeps plugin state, download dirs, and ~/.config/slipstream writable);
+# /tmp is private; no setuid re-escalation; sockets limited to what automation actually uses
+# (loopback mgmt API, LAN/IPv6 webhooks, unix sockets). A plugin that must write OUTSIDE $HOME
+# (e.g. a library on another mount) gets a drop-in:
+#   systemctl --user edit slipstream-scripting   →   [Service]\nReadWritePaths=/mnt/games
+# NOTE: the mount-namespace options (ProtectSystem/PrivateTmp) need unprivileged user namespaces
+# for a *user* unit; on kernels/distros that restrict those, drop them via the same drop-in.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=%h
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=default.target

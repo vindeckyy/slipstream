@@ -15,8 +15,8 @@
 
 use crate::trust::Settings;
 use adw::prelude::*;
-use pf_client_core::profiles::{ProfilesFile, SettingsOverlay, StreamProfile};
-use pf_client_core::trust::StatsVerbosity;
+use ss_client_core::profiles::{ProfilesFile, SettingsOverlay, StreamProfile};
+use ss_client_core::trust::StatsVerbosity;
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -163,15 +163,15 @@ mod index {
 /// small set of legible, contrast-checked colours does better than free choice — and the
 /// schema's `#RRGGBB` still accepts anything a future picker or a hand-edit writes.
 const SWATCHES: &[(&str, &str, &str)] = &[
-    ("", "pf-swatch-none", "No colour"),
-    ("#e01b24", "pf-swatch-red", "Red"),
-    ("#ff7800", "pf-swatch-orange", "Orange"),
-    ("#f6d32d", "pf-swatch-yellow", "Yellow"),
-    ("#33d17a", "pf-swatch-green", "Green"),
-    ("#3584e4", "pf-swatch-blue", "Blue"),
-    ("#9141ac", "pf-swatch-purple", "Purple"),
-    ("#d16d9e", "pf-swatch-pink", "Pink"),
-    ("#77767b", "pf-swatch-slate", "Slate"),
+    ("", "ss-swatch-none", "No colour"),
+    ("#e01b24", "ss-swatch-red", "Red"),
+    ("#ff7800", "ss-swatch-orange", "Orange"),
+    ("#f6d32d", "ss-swatch-yellow", "Yellow"),
+    ("#33d17a", "ss-swatch-green", "Green"),
+    ("#3584e4", "ss-swatch-blue", "Blue"),
+    ("#9141ac", "ss-swatch-purple", "Purple"),
+    ("#d16d9e", "ss-swatch-pink", "Pink"),
+    ("#77767b", "ss-swatch-slate", "Slate"),
 ];
 
 /// A colour picker as its own full-width row: the caption above, the swatches on their own
@@ -225,21 +225,21 @@ fn swatch_row(current: Option<&str>, on_pick: impl Fn(String) + 'static) -> gtk:
     let buttons: Rc<RefCell<Vec<(String, gtk::Button)>>> = Rc::default();
     for (hex, class, name) in SWATCHES {
         let b = gtk::Button::builder()
-            .css_classes(["pf-swatch", class, "circular"])
+            .css_classes(["ss-swatch", class, "circular"])
             .tooltip_text(*name)
             .valign(gtk::Align::Center)
             .build();
         if current.unwrap_or("") == *hex {
-            b.add_css_class("pf-swatch-on");
+            b.add_css_class("ss-swatch-on");
         }
         {
             let (on_pick, buttons, hex) = (on_pick.clone(), buttons.clone(), hex.to_string());
             b.connect_clicked(move |me| {
                 // The selection ring is exclusive, so clear every sibling before setting ours.
                 for (_, other) in buttons.borrow().iter() {
-                    other.remove_css_class("pf-swatch-on");
+                    other.remove_css_class("ss-swatch-on");
                 }
-                me.add_css_class("pf-swatch-on");
+                me.add_css_class("ss-swatch-on");
                 on_pick(hex.clone());
             });
         }
@@ -730,7 +730,7 @@ pub fn show_about(parent: &impl IsA<gtk::Widget>) {
         .application_icon(crate::app::APP_ID)
         .developer_name("unom")
         .version(env!("CARGO_PKG_VERSION"))
-        .website("https://github.com/vindeckyy/slipstream.git")
+        .website("https://github.com/vindeckyy/slipstream/slipstream")
         .license_type(gtk::License::Custom)
         .license(license.as_str())
         .build();
@@ -1034,8 +1034,8 @@ fn page(title: &str, icon: &str) -> adw::PreferencesPage {
 #[derive(Default)]
 pub struct DeviceProbes {
     pub adapters: Vec<String>,
-    pub speakers: Vec<pf_client_core::audio::AudioDevice>,
-    pub mics: Vec<pf_client_core::audio::AudioDevice>,
+    pub speakers: Vec<ss_client_core::audio::AudioDevice>,
+    pub mics: Vec<ss_client_core::audio::AudioDevice>,
 }
 
 /// A titled group of rows; `description` (may be empty) is the one form-level note —
@@ -1314,7 +1314,7 @@ pub fn show_scoped(
     // stored value is the node name. Hidden when the probe found nothing; a saved
     // device that's gone keeps a revertable "(not detected)" entry, like the GPU row.
     let dev_row = |saved: String,
-                   devs: &[pf_client_core::audio::AudioDevice],
+                   devs: &[ss_client_core::audio::AudioDevice],
                    title: &str,
                    subtitle: &str| {
         let mut names = vec!["System default".to_string()];
@@ -1525,7 +1525,7 @@ pub fn show_scoped(
                         return;
                     }
                     let dot = gtk::Box::builder()
-                        .css_classes(["pf-override-dot"])
+                        .css_classes(["ss-override-dot"])
                         .valign(gtk::Align::Center)
                         .build();
                     let reset = gtk::Button::builder()

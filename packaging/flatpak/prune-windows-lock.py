@@ -3,7 +3,7 @@
 
 The slipstream workspace lockfile includes the windows-rs git dependencies — the whole
 microsoft/windows-rs tree (windows-reactor + ~13 `windows-*` crates, all pinned to one git
-rev) declared by `slipstream-client-windows` and `pf-client-core` (D3D11VA). The flatpak
+rev) declared by `slipstream-client-windows` and `ss-client-core` (D3D11VA). The flatpak
 builds ONLY the Linux binaries, which never compile them, but `flatpak-cargo-generator.py`
 walks the whole lock and emits a `type: git` source for windows-rs; `flatpak-builder` then
 FULL-clones that multi-GB repo at "Downloading sources" → "No space left on device",

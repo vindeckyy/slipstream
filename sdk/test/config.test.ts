@@ -15,15 +15,15 @@ describe("pluginStateDir", () => {
 	});
 
 	test("resolves <config_dir>/plugin-state[/name] and honors the config-dir override", () => {
-		process.env.SLIPSTREAM_CONFIG_DIR = path.join("/tmp", "pf-cfg");
-		expect(pluginStateDir()).toBe(path.join("/tmp", "pf-cfg", "plugin-state"));
+		process.env.SLIPSTREAM_CONFIG_DIR = path.join("/tmp", "ss-cfg");
+		expect(pluginStateDir()).toBe(path.join("/tmp", "ss-cfg", "plugin-state"));
 		expect(pluginStateDir("rom-manager")).toBe(
-			path.join("/tmp", "pf-cfg", "plugin-state", "rom-manager"),
+			path.join("/tmp", "ss-cfg", "plugin-state", "rom-manager"),
 		);
 	});
 
 	test("the per-plugin dir is nested under the shared root", () => {
-		process.env.SLIPSTREAM_CONFIG_DIR = path.join("/tmp", "pf-cfg2");
+		process.env.SLIPSTREAM_CONFIG_DIR = path.join("/tmp", "ss-cfg2");
 		expect(pluginStateDir("x").startsWith(pluginStateDir())).toBe(true);
 	});
 });
@@ -39,10 +39,10 @@ describe("pluginIngestDir", () => {
 	});
 
 	test("resolves <config_dir>/ingest[/name], distinct from plugin-state", () => {
-		process.env.SLIPSTREAM_CONFIG_DIR = path.join("/tmp", "pf-cfg3");
-		expect(pluginIngestDir()).toBe(path.join("/tmp", "pf-cfg3", "ingest"));
+		process.env.SLIPSTREAM_CONFIG_DIR = path.join("/tmp", "ss-cfg3");
+		expect(pluginIngestDir()).toBe(path.join("/tmp", "ss-cfg3", "ingest"));
 		expect(pluginIngestDir("playnite")).toBe(
-			path.join("/tmp", "pf-cfg3", "ingest", "playnite"),
+			path.join("/tmp", "ss-cfg3", "ingest", "playnite"),
 		);
 		// the inbox (Users-write) is a different tree from state (LocalService-write)
 		expect(pluginIngestDir("playnite")).not.toBe(pluginStateDir("playnite"));

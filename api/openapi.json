@@ -138,6 +138,76 @@
         }
       }
     },
+    "/api/v1/compositors/headless": {
+      "get": {
+        "tags": [
+          "host"
+        ],
+        "summary": "Available headless compositor backends",
+        "description": "Lists backends `SLIPSTREAM_HEADLESS_COMPOSITOR` / host-config `headless_compositor` can select.\n`available` is a PATH probe (`labwc`, `krfb-virtualmonitor`, `gamescope`); `auto` is available\nwhen any concrete backend is.",
+        "operationId": "listHeadlessCompositors",
+        "responses": {
+          "200": {
+            "description": "Headless compositor backends with availability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AvailableHeadlessCompositor"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/capture/methods": {
+      "get": {
+        "tags": [
+          "host"
+        ],
+        "summary": "Available desktop capture methods",
+        "description": "Lists every SolarFlare-shaped desktop-mirror backend the host knows (no hermes-kms), with a\nbest-effort availability probe. Pass an `id` as `SLIPSTREAM_CAPTURE_METHOD` / the host-config\n`capture_method` field. `auto` walks the preference order at session open.",
+        "operationId": "listCaptureMethods",
+        "responses": {
+          "200": {
+            "description": "Desktop capture methods with availability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AvailableCaptureMethod"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/display/layout": {
       "put": {
         "tags": [
@@ -3568,6 +3638,104 @@
           }
         }
       }
+    },
+    "/api/v1/host/config": {
+      "get": {
+        "tags": [
+          "host"
+        ],
+        "operationId": "getHostConfig",
+        "responses": {
+          "200": {
+            "description": "Stored host configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostConfigState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "host"
+        ],
+        "operationId": "setHostConfig",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HostConfigFile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Configuration stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostConfigState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Could not persist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -3695,7 +3863,7 @@
         "properties": {
           "backend": {
             "type": "string",
-            "description": "Backend name (`pf-vdisplay`, `kwin`, …)."
+            "description": "Backend name (`ss-vdisplay`, `kwin`, …)."
           },
           "client": {
             "type": [
@@ -3981,6 +4149,29 @@
           }
         }
       },
+      "AvailableCaptureMethod": {
+        "type": "object",
+        "description": "A desktop-mirror capture method the host can use, and whether it's usable now.",
+        "required": [
+          "id",
+          "label",
+          "available"
+        ],
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "description": "Best-effort: env / binary / protocol looks usable on this host right now."
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable identifier (`\"auto\"` | `\"portal\"` | `\"kwin\"` | `\"wlr\"` | `\"kms\"` | `\"x11\"` | `\"nvfbc\"`)."
+          },
+          "label": {
+            "type": "string",
+            "description": "Human-readable label for UIs."
+          }
+        }
+      },
       "AvailableCompositor": {
         "type": "object",
         "description": "A compositor backend the host can drive a virtual output on, and whether it's usable now.",
@@ -4002,6 +4193,29 @@
           "id": {
             "type": "string",
             "description": "Stable identifier (`\"kwin\"` | `\"wlroots\"` | `\"mutter\"` | `\"gamescope\"`) — pass this to a\nclient's `--compositor` flag."
+          },
+          "label": {
+            "type": "string",
+            "description": "Human-readable label for UIs."
+          }
+        }
+      },
+      "AvailableHeadlessCompositor": {
+        "type": "object",
+        "description": "A headless compositor the host can spawn when no live session is present.",
+        "required": [
+          "id",
+          "label",
+          "available"
+        ],
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "description": "True when the matching binary is on `PATH`."
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable identifier (`\"auto\"` | `\"labwc\"` | `\"krfb\"` | `\"gamescope\"`)."
           },
           "label": {
             "type": "string",
@@ -4059,7 +4273,7 @@
           },
           "encoder_backend": {
             "type": "string",
-            "description": "The encode backend that ACTUALLY opened for this session — `\"nvenc\"`, `\"vaapi\"`,\n`\"vulkan\"`, `\"amf\"`, `\"qsv\"`, `\"software\"`, … — and the GPU it runs on.\n\nRecorded because the stage split alone can't be read without them. A p50 `submit` of 10 ms\nmeans \"the GPU's CSC+encode throughput is the ceiling\" on one backend and something else\nentirely on another, and every fps-shortfall report so far has cost a round-trip asking\nwhich one it was. Both come from `pf_gpu::active()`, the record the encoder open itself\nwrites, so they name the branch that really opened rather than a re-derived guess.\n\n`\"\"` when nothing was streaming at registration (or on a build without the record)."
+            "description": "The encode backend that ACTUALLY opened for this session — `\"nvenc\"`, `\"vaapi\"`,\n`\"vulkan\"`, `\"amf\"`, `\"qsv\"`, `\"software\"`, … — and the GPU it runs on.\n\nRecorded because the stage split alone can't be read without them. A p50 `submit` of 10 ms\nmeans \"the GPU's CSC+encode throughput is the ceiling\" on one backend and something else\nentirely on another, and every fps-shortfall report so far has cost a round-trip asking\nwhich one it was. Both come from `ss_gpu::active()`, the record the encoder open itself\nwrites, so they name the branch that really opened rather than a re-derived guess.\n\n`\"\"` when nothing was streaming at registration (or on a build without the record)."
           },
           "fps": {
             "type": "integer",
@@ -6075,7 +6289,7 @@
           },
           "pin_supported": {
             "type": "boolean",
-            "description": "Whether this build can actually STREAM one of these monitors.\n\nEnumeration and capture are separate capabilities, and on Windows only the first exists: the\nheads below are real and worth showing (they explain the topology, and `/display/state`\ncross-references them), but `pf-capture`'s sole Windows entry point is `open_idd_push` — a\nframe channel pushed by our OWN IddCx virtual display. There is no desktop-duplication\ncapturer to point at a chosen head (DXGI Desktop Duplication was deliberately removed), so\n`vdisplay::open` has no mirror arm outside Linux and a pin could not be honored.\n\nThe console renders the picker read-only on `false`. Reported as a capability rather than\nsniffed client-side from the OS so the answer comes from the build that would have to honor\nit — when a Windows mirror backend lands, this flips and the UI needs no change."
+            "description": "Whether this build can actually STREAM one of these monitors.\n\nEnumeration and capture are separate capabilities, and on Windows only the first exists: the\nheads below are real and worth showing (they explain the topology, and `/display/state`\ncross-references them), but `ss-capture`'s sole Windows entry point is `open_idd_push` — a\nframe channel pushed by our OWN IddCx virtual display. There is no desktop-duplication\ncapturer to point at a chosen head (DXGI Desktop Duplication was deliberately removed), so\n`vdisplay::open` has no mirror arm outside Linux and a pin could not be honored.\n\nThe console renders the picker read-only on `false`. Reported as a capability rather than\nsniffed client-side from the OS so the answer comes from the build that would have to honor\nit — when a Windows mirror backend lands, this flips and the UI needs no change."
           },
           "pinned": {
             "type": [
@@ -7463,6 +7677,170 @@
               "null"
             ],
             "description": "This install could one-click apply, but the operator hasn't opted in yet — the\ncommand to run (Linux: join the `slipstream-update` group)."
+          }
+        }
+      },
+      "GeneralConfig": {
+        "type": "object",
+        "properties": {
+          "host_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "perf": {
+            "type": "boolean"
+          }
+        }
+      },
+      "InputConfig": {
+        "type": "object",
+        "properties": {
+          "gamepad": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gamescope_grab_cursor": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AudioVideoConfig": {
+        "type": "object",
+        "properties": {
+          "video_source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "capture_method": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "auto | portal | kwin | wlr | kms | x11 | nvfbc"
+          },
+          "compositor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "kwin | mutter | wlroots | hyprland | gamescope"
+          },
+          "headless_compositor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "off | auto | labwc | krfb | gamescope"
+          },
+          "max_fps": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "ten_bit": {
+            "type": "boolean"
+          },
+          "four_four_four": {
+            "type": "boolean"
+          },
+          "gamescope_hdr": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NetworkConfig": {
+        "type": "object",
+        "properties": {
+          "chacha20": {
+            "type": "boolean"
+          },
+          "mdns": {
+            "type": "boolean"
+          },
+          "fec_pct": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        }
+      },
+      "EncoderConfig": {
+        "type": "object",
+        "required": [
+          "encoder"
+        ],
+        "properties": {
+          "encoder": {
+            "type": "string"
+          },
+          "render_adapter": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zerocopy": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      },
+      "HostConfigFile": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "general": {
+            "$ref": "#/components/schemas/GeneralConfig"
+          },
+          "input": {
+            "$ref": "#/components/schemas/InputConfig"
+          },
+          "audio_video": {
+            "$ref": "#/components/schemas/AudioVideoConfig"
+          },
+          "network": {
+            "$ref": "#/components/schemas/NetworkConfig"
+          },
+          "encoders": {
+            "$ref": "#/components/schemas/EncoderConfig"
+          }
+        }
+      },
+      "HostConfigState": {
+        "type": "object",
+        "required": [
+          "settings",
+          "configured",
+          "requires_restart",
+          "env_path"
+        ],
+        "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/HostConfigFile"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "requires_restart": {
+            "type": "boolean"
+          },
+          "env_path": {
+            "type": "string"
           }
         }
       }

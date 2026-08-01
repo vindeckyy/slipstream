@@ -10,7 +10,13 @@ import {
 } from "@/api/gen/library/library";
 import type { ScannerInfo } from "@/api/gen/model/scannerInfo";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import { m } from "@/paraglide/messages";
 
 /**
@@ -60,9 +66,13 @@ export const SourceToggles: FC<{
 	<Card>
 		<CardHeader className="pb-3">
 			<CardTitle className="text-base">{m.library_sources_title()}</CardTitle>
+			<CardDescription>{m.library_sources_help()}</CardDescription>
 		</CardHeader>
-		<CardContent className="space-y-3">
-			<div className="flex flex-wrap gap-2">
+		<CardContent>
+			<fieldset
+				aria-label={m.library_sources_title()}
+				className="m-0 flex min-w-0 flex-wrap gap-2 rounded-lg border border-border/70 bg-muted/30 p-3"
+			>
 				{scanners.map((scanner) => (
 					<Button
 						key={scanner.id}
@@ -76,10 +86,7 @@ export const SourceToggles: FC<{
 						{scanner.label}
 					</Button>
 				))}
-			</div>
-			<p className="max-w-prose text-xs text-muted-foreground">
-				{m.library_sources_help()}
-			</p>
+			</fieldset>
 		</CardContent>
 	</Card>
 );

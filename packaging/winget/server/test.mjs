@@ -48,7 +48,7 @@ const post = (p, body) =>
   check("search substring 'slipstream': 200", res.status === 200, `got ${res.status}`);
   check("search: Data is a non-empty array", Array.isArray(body.Data) && body.Data.length > 0);
   const hit = body.Data?.[0];
-  check("search: PackageIdentifier present", hit?.PackageIdentifier === "unom.SlipstreamHost");
+  check("search: PackageIdentifier present", hit?.PackageIdentifier === "vindeckyy.SlipstreamHost");
   check("search: PackageName + Publisher present (schema-required)", !!hit?.PackageName && !!hit?.Publisher);
   check("search: Versions non-empty (minItems 1)", Array.isArray(hit?.Versions) && hit.Versions.length > 0);
   check("search: version carries ProductCodes for ARP correlation", Array.isArray(hit?.Versions?.[0]?.ProductCodes) && hit.Versions[0].ProductCodes.length > 0);
@@ -64,7 +64,7 @@ const post = (p, body) =>
 }
 {
   const res = await post("manifestSearch", {
-    Inclusions: [{ PackageMatchField: "PackageIdentifier", RequestMatch: { KeyWord: "unom.SlipstreamHost", MatchType: "CaseInsensitive" } }],
+    Inclusions: [{ PackageMatchField: "PackageIdentifier", RequestMatch: { KeyWord: "vindeckyy.SlipstreamHost", MatchType: "CaseInsensitive" } }],
   });
   check("Inclusions on PackageIdentifier match", res.status === 200);
 }
@@ -89,7 +89,7 @@ const post = (p, body) =>
 
 // ── /packageManifests/{id} ──────────────────────────────────────────────────────────────────────
 {
-  const res = await get("packageManifests/unom.SlipstreamHost");
+  const res = await get("packageManifests/vindeckyy.SlipstreamHost");
   const body = await res.json();
   check("manifest: 200", res.status === 200, `got ${res.status}`);
   const v = body.Data?.Versions?.[0];
@@ -120,7 +120,7 @@ const post = (p, body) =>
   check("manifest: unknown id -> 404", res.status === 404, `got ${res.status}`);
 }
 {
-  const res = await get("packageManifests/unom.SlipstreamHost?Version=0.0.0-nope");
+  const res = await get("packageManifests/vindeckyy.SlipstreamHost?Version=0.0.0-nope");
   check("manifest: unknown ?Version -> 404", res.status === 404, `got ${res.status}`);
 }
 {

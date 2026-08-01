@@ -129,7 +129,7 @@ pub(super) fn run_sync(
         );
     }
 
-    // ADPF: hint the platform that the whole video pipeline — this pf-decode feed/drain/present
+    // ADPF: hint the platform that the whole video pipeline — this ss-decode feed/drain/present
     // loop, the core's data-plane pump (UDP receive + FEC reassembly), and the audio thread — runs a
     // per-frame real-time workload, so the CPU governor keeps those threads on fast cores at high
     // clocks instead of down-clocking between frames or parking them on a little core. Snapdragon's

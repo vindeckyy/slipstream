@@ -1,13 +1,28 @@
+import { Link } from "@tanstack/react-router";
 import Section from "@unom/ui/section";
-import { MonitorPlay, RefreshCw, Video, Volume2, ZapOff } from "lucide-react";
-import type { FC, ReactNode } from "react";
+import {
+	ArrowRight,
+	KeyRound,
+	MonitorPlay,
+	Users,
+	Video,
+	Volume2,
+} from "lucide-react";
+import type { FC } from "react";
 import type { ActiveGame } from "@/api/gen/model/activeGame";
 import type { GameEntry } from "@/api/gen/model/gameEntry";
 import type { RuntimeStatus } from "@/api/gen/model/runtimeStatus";
+import type { ActivityEntry } from "@/api/events";
+import { MetricCard, PageHeader } from "@/components/observatory";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardFooter,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import { fmtNumber } from "@/lib/format";
 import type { Loadable } from "@/lib/query";
 import { m } from "@/paraglide/messages";
@@ -23,21 +38,27 @@ export const DashboardView: FC<{
 	isStopping: boolean;
 	isRequestingIdr: boolean;
 	isEndingGame: boolean;
-}> = ({
-	status,
-	library,
-	onStopSession,
-	onRequestIdr,
-	onEndGame,
-	isStopping,
-	isRequestingIdr,
-	isEndingGame,
-}) => {
+	/** Optional event data keeps the view easy to compose with deterministic stories. */
+	activity?: ActivityEntry[];
+}> = ({ status, library, onEndGame, isEndingGame, activity }) => {
 	const s = status.data;
 	return (
 		<Section maxWidth={false}>
 			<div className="flex flex-col gap-card">
-				<h1 className="text-2xl font-semibold">{m.status_title()}</h1>
+				<PageHeader
+					title={m.status_title()}
+					actions={
+						<Link
+							to="/sessions"
+							className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-border bg-background/70 px-3 py-2 text-sm font-medium shadow-none transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+						>
+							<MonitorPlay className="size-4" />
+							{m.status_session()}
+							<ArrowRight className="size-3.5" />
+						</Link>
+					}
+				/>
+
 				<QueryState
 					isLoading={status.isLoading}
 					error={status.error}
@@ -45,146 +66,17 @@ export const DashboardView: FC<{
 				>
 					{s && (
 						<div className="flex flex-col gap-card">
-							<div className="grid gap-card sm:grid-cols-2 lg:grid-cols-4">
-								<StatCard
-									icon={<Video className="size-4" />}
-									label={m.status_video()}
-									on={s.video_streaming}
-								/>
-								<StatCard
-									icon={<Volume2 className="size-4" />}
-									label={m.status_audio()}
-									on={s.audio_streaming}
-								/>
-								{/* Both planes. GameStream and native (slipstream/1) devices pair
-								    into SEPARATE stores, and native is the DEFAULT one — counting
-								    only the GameStream certs read as "0 paired" on a host every
-								    one of whose clients was in fact paired. */}
-								<Card>
-									<CardContent className="flex flex-1 items-center justify-between p-4 sm:pt-6">
-										<span className="text-sm text-muted-foreground">
-											{m.status_paired_count()}
-										</span>
-										<span className="text-2xl font-semibold tabular-nums">
-											{s.paired_clients + s.native_paired_clients}
-										</span>
-									</CardContent>
-								</Card>
-								<Card>
-									<CardContent className="flex flex-1 items-center justify-between p-4 sm:pt-6">
-										<span className="text-sm text-muted-foreground">
-											{m.status_pin_pending()}
-										</span>
-										{/* The whole value used to be "●" or "—": no text, no state, colour
-										    doing all the work — nothing for a screen reader to read out and
-										    nothing for anyone who can't tell the two badges apart. */}
-										<Badge variant={s.pin_pending ? "default" : "outline"}>
-											{s.pin_pending
-												? m.status_pin_waiting()
-												: m.status_pin_none()}
-										</Badge>
-									</CardContent>
-								</Card>
+							<div className="grid gap-card xl:grid-cols-[minmax(0,1.15fr)_minmax(21rem,0.85fr)]">
+								<OverviewMetrics status={s} />
+								<SessionSummaryCard status={s} />
 							</div>
-
-							{/* Above the session card: a game the host is about to close is the most
-							    time-sensitive thing on this page. */}
 							<RunningGames
-								games={s.games}
+								games={s.games ?? []}
 								library={library}
 								onEnd={onEndGame}
 								isEnding={isEndingGame}
 							/>
-
-							<Card>
-								<CardHeader className="flex flex-col items-start gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
-									<CardTitle className="flex items-center gap-2">
-										<MonitorPlay className="size-4" />
-										{m.status_session()}
-										{s.active_sessions > 1 && (
-											<Badge variant="secondary">
-												{m.status_sessions_active({ count: s.active_sessions })}
-											</Badge>
-										)}
-									</CardTitle>
-									<div className="flex flex-wrap gap-2">
-										<Button
-											variant="outline"
-											size="sm"
-											disabled={!s.video_streaming || isRequestingIdr}
-											onClick={onRequestIdr}
-										>
-											<RefreshCw className="size-3.5" />
-											{m.action_request_idr()}
-										</Button>
-										<Button
-											variant={s.session ? "destructive" : "secondary"}
-											size="sm"
-											disabled={!s.session || isStopping}
-											onClick={onStopSession}
-										>
-											<ZapOff className="size-3.5" />
-											{m.action_stop_session()}
-										</Button>
-									</div>
-								</CardHeader>
-								<CardContent>
-									{s.stream ? (
-										<dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-											<Field
-												label={m.stream_codec()}
-												value={s.stream.codec.toUpperCase()}
-											/>
-											<Field
-												label={m.stream_resolution()}
-												value={`${s.stream.width}×${s.stream.height}`}
-											/>
-											<Field
-												label={m.stream_fps()}
-												value={`${s.stream.fps} fps`}
-											/>
-											<Field
-												label={m.stream_bitrate()}
-												value={`${fmtNumber(s.stream.bitrate_kbps / 1000, 1)} Mbps`}
-											/>
-											{/* Bring-up and reconfigure cost, the parity floor and the packet
-											    size: the host has reported all four for as long as this
-											    endpoint has existed and the console showed none of them, so
-											    "it takes ages to start" and "it hitches when I resize" had no
-											    number attached anywhere. Native-plane only — null on
-											    GameStream and null until the first frame lands, so the two
-											    timings appear only once they mean something. */}
-											{s.stream.time_to_first_frame_ms != null && (
-												<Field
-													label={m.stream_first_frame()}
-													value={`${fmtNumber(s.stream.time_to_first_frame_ms)} ms`}
-												/>
-											)}
-											{s.stream.last_resize_ms != null && (
-												<Field
-													label={m.stream_last_resize()}
-													value={`${fmtNumber(s.stream.last_resize_ms)} ms`}
-												/>
-											)}
-											<Field
-												label={m.stream_packet_size()}
-												value={`${fmtNumber(s.stream.packet_size)} B`}
-											/>
-											<Field
-												label={m.stream_min_fec()}
-												value={fmtNumber(s.stream.min_fec)}
-											/>
-										</dl>
-									) : (
-										<p className="text-sm text-muted-foreground">
-											{m.status_no_session()}
-										</p>
-									)}
-								</CardContent>
-							</Card>
-
-							{/* Below the session card: the past, under the present. */}
-							<ActivityCard />
+							<ActivityCard entries={activity} limit={8} />
 						</div>
 					)}
 				</QueryState>
@@ -193,27 +85,102 @@ export const DashboardView: FC<{
 	);
 };
 
-const StatCard: FC<{ icon: ReactNode; label: string; on: boolean }> = ({
-	icon,
-	label,
-	on,
-}) => (
-	<Card>
-		<CardContent className="flex flex-1 items-center justify-between p-4 sm:pt-6">
-			<span className="flex items-center gap-2 text-sm text-muted-foreground">
-				{icon}
-				{label}
-			</span>
-			<Badge variant={on ? "success" : "outline"}>
-				{on ? m.status_streaming() : m.status_idle()}
-			</Badge>
+const OverviewMetrics: FC<{ status: RuntimeStatus }> = ({ status }) => {
+	const paired = status.paired_clients + (status.native_paired_clients ?? 0);
+	return (
+		<div className="grid content-start gap-card sm:grid-cols-2">
+			<MetricCard
+				title={m.status_session()}
+				value={fmtNumber(status.active_sessions)}
+				description={
+					status.active_sessions > 0
+						? m.status_sessions_active({ count: status.active_sessions })
+						: m.status_no_session()
+				}
+				icon={<MonitorPlay className="size-4" />}
+			/>
+			<MetricCard
+				title={m.status_paired_count()}
+				value={fmtNumber(paired)}
+				icon={<Users className="size-4" />}
+			/>
+			<MetricCard
+				title={m.status_video()}
+				value={status.video_streaming ? m.status_streaming() : m.status_idle()}
+				icon={<Video className="size-4" />}
+			/>
+			<MetricCard
+				title={m.status_audio()}
+				value={status.audio_streaming ? m.status_streaming() : m.status_idle()}
+				icon={<Volume2 className="size-4" />}
+			/>
+			<MetricCard
+				title={m.status_pin_pending()}
+				value={
+					status.pin_pending ? m.status_pin_waiting() : m.status_pin_none()
+				}
+				icon={<KeyRound className="size-4" />}
+			/>
+		</div>
+	);
+};
+
+const SessionSummaryCard: FC<{ status: RuntimeStatus }> = ({ status }) => (
+	<Card className="flex flex-col">
+		<CardHeader className="pb-3 sm:pb-3">
+			<CardTitle className="flex flex-wrap items-center gap-2">
+				<MonitorPlay className="size-4 shrink-0 text-muted-foreground" />
+				{m.status_session()}
+				<Badge
+					variant={status.active_sessions > 0 ? "success" : "outline"}
+				>
+					{status.active_sessions > 0
+						? m.status_sessions_active({ count: status.active_sessions })
+						: m.status_no_session()}
+				</Badge>
+			</CardTitle>
+		</CardHeader>
+		<CardContent className="flex-1">
+			{status.stream ? (
+				<dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 xl:grid-cols-2">
+					<Field
+						label={m.stream_codec()}
+						value={status.stream.codec.toUpperCase()}
+					/>
+					<Field
+						label={m.stream_resolution()}
+						value={`${status.stream.width}×${status.stream.height}`}
+					/>
+					<Field
+						label={m.stream_fps()}
+						value={`${status.stream.fps} fps`}
+					/>
+					<Field
+						label={m.stream_bitrate()}
+						value={`${fmtNumber(status.stream.bitrate_kbps / 1000, 1)} Mbps`}
+					/>
+				</dl>
+			) : (
+				<p className="text-sm text-muted-foreground">{m.status_no_session()}</p>
+			)}
 		</CardContent>
+		<CardFooter className="border-t border-border/60 pt-4">
+			<Link
+				to="/sessions"
+				className="inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+			>
+				{m.status_session()}
+				<ArrowRight className="size-3.5" />
+			</Link>
+		</CardFooter>
 	</Card>
 );
 
 const Field: FC<{ label: string; value: string }> = ({ label, value }) => (
-	<div>
-		<dt className="text-xs text-muted-foreground">{label}</dt>
-		<dd className="mt-0.5 font-medium tabular-nums">{value}</dd>
+	<div className="min-w-0">
+		<dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+		<dd className="mt-1 text-sm font-semibold tabular-nums tracking-tight">
+			{value}
+		</dd>
 	</div>
 );

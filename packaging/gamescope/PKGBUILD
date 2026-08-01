@@ -23,7 +23,7 @@ pkgver="${_gsver}.pfhdr2"
 pkgrel=1
 pkgdesc="gamescope with 10-bit BT.2020/PQ PipeWire capture, for slipstream HDR streaming"
 arch=('x86_64' 'aarch64')
-url="https://github.com/vindeckyy/slipstream.git"
+url="https://github.com/vindeckyy/slipstream/slipstream"
 license=('BSD-2-Clause')
 # NOT a `provides`/`conflicts` of gamescope: this ships a differently-named binary and is meant to
 # sit BESIDE the distro package (a Steam Deck's gaming session keeps using its own gamescope).

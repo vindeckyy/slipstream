@@ -14,11 +14,11 @@ repository.workspace = true
 name = "slipstream"
 path = "src/main.rs"
 
-# Console subsystem, no GUI toolkit: this links `pf-client-core` (the brain) and nothing else
+# Console subsystem, no GUI toolkit: this links `ss-client-core` (the brain) and nothing else
 # UI-shaped, which is what lets it ship in every client package without dragging GTK, WinUI or
 # Skia along (design/client-architecture-split.md §4).
 [target.'cfg(any(target_os = "linux", windows))'.dependencies]
-pf-client-core = { path = "../../crates/pf-client-core", default-features = false }
+ss-client-core = { path = "../../crates/ss-client-core", default-features = false }
 slipstream-core = { path = "../../crates/slipstream-core", features = ["quic"] }
 serde_json = "1"
 tracing = "0.1"

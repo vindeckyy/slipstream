@@ -1,0 +1,187 @@
+//! Shared UDP socket tuning for the media planes: send/recv buffer growth + best-effort link-layer
+//! QoS.
+//!
+//! [`grow_socket_buffers`] is the `SO_SNDBUF`/`SO_RCVBUF` growth the native data plane applies; the
+//! GameStream video/audio sockets reuse it so they don't go ENOBUFS-bound at high bitrate.
+//!
+//! [`set_media_qos`] DSCP-tags the latency-sensitive video/audio traffic (+ Linux `SO_PRIORITY`) so a
+//! QoS-aware path (Wi-Fi WMM access categories, a managed switch, a shaped uplink) can prioritize it
+//! over bulk flows. Mirrors what Apollo/Sunshine tag — DSCP **CS5** for video, **CS6** for audio. It
+//! is **opt-in** (`SLIPSTREAM_DSCP=1`, or [`set_dscp_default`] from an embedder — the Android client
+//! ties it to its experimental low-latency mode): DSCP can interact badly with some consumer
+//! ISPs/routers. On Windows a plain `IP_TOS` is silently stripped from the wire, so the marking
+//! goes through qWAVE flows instead (see [`super::qos_windows`]) — the caller holds the returned
+//! [`QosFlow`] guard for as long as the socket sends media.
+
+use std::net::UdpSocket;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// Target kernel socket-buffer size (`SO_SNDBUF`/`SO_RCVBUF`). A high-resolution frame is a burst (a
+/// 5120×1440 keyframe is ~130 packets the send thread hands to `sendmmsg` at once); the default UDP
+/// buffer (~208 KB on Linux) overflows on it, which EAGAINs the host send (dropping packets) or drops
+/// on the client recv — and with infinite-GOP a single lost frame freezes the decode until the next
+/// RFI refresh. Requested large; the OS clamps to `net.core.{wmem,rmem}_max` (Linux) /
+/// `kern.ipc.maxsockbuf` (macOS).
+///
+/// Sized for 1 Gbps+: at ~1.2 Gbps on the wire an 8 MB buffer is only ~49 ms of steady state, and a
+/// single multi-MB IDR keyframe (~4 MB ≈ 3300 packets) instantly fills most of it. 32 MB gives ~200 ms
+/// of headroom and absorbs a keyframe burst without EAGAIN/ENOBUFS drops. (Paced sending —
+/// `native.rs::paced_submit` — spreads a big frame's overflow, so this buffer mostly absorbs the
+/// immediate microburst rather than a whole unpaced frame.)
+pub(crate) const TARGET_SOCKBUF: usize = 32 * 1024 * 1024;
+
+/// Best-effort grow of `SO_SNDBUF`/`SO_RCVBUF` to [`TARGET_SOCKBUF`]. A failure isn't fatal (the
+/// stream just runs lossier); a grant far below the request means the OS cap is too low for clean
+/// 4K/5K streaming, so warn with the knob to raise.
+pub fn grow_socket_buffers(socket: &UdpSocket) {
+    let sock = socket2::SockRef::from(socket);
+    let _ = sock.set_send_buffer_size(TARGET_SOCKBUF);
+    let _ = sock.set_recv_buffer_size(TARGET_SOCKBUF);
+    // The kernel reports back the (possibly clamped, Linux-doubled) granted size.
+    let granted = sock
+        .send_buffer_size()
+        .unwrap_or(0)
+        .min(sock.recv_buffer_size().unwrap_or(0));
+    if granted < TARGET_SOCKBUF / 4 {
+        tracing::warn!(
+            granted_kb = granted / 1024,
+            "UDP socket buffer capped well below target — high-resolution streaming may drop \
+             frames; raise net.core.wmem_max / net.core.rmem_max (Linux) for clean 4K/5K"
+        );
+    }
+}
+
+/// Media class of a socket — selects the DSCP code point (and Linux `SO_PRIORITY`), matching Apollo's
+/// mapping: video = CS5, audio = CS6.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MediaClass {
+    Video,
+    Audio,
+}
+
+impl MediaClass {
+    /// DSCP code point (the high 6 bits of the IPv4 TOS / IPv6 traffic-class byte).
+    pub(super) const fn dscp(self) -> u32 {
+        match self {
+            MediaClass::Video => 40, // CS5
+            MediaClass::Audio => 48, // CS6
+        }
+    }
+}
+
+/// Runtime default for DSCP marking when `SLIPSTREAM_DSCP` is unset (see [`set_dscp_default`]).
+/// Off unless an embedder opts in — on Wi-Fi, access points commonly map DSCP to WMM access
+/// categories (a real airtime-priority win), but wired paths rarely honour it and some bleach or
+/// reject marked packets, so it never turns on by itself.
+static DSCP_DEFAULT: AtomicBool = AtomicBool::new(false);
+
+/// Opt in to (or back out of) DSCP marking for sockets created from now on. Must be called BEFORE
+/// connecting — the tag is applied at socket creation. The Android client ties this to its
+/// experimental low-latency mode; `SLIPSTREAM_DSCP` still overrides in either direction.
+pub fn set_dscp_default(enabled: bool) {
+    DSCP_DEFAULT.store(enabled, Ordering::Relaxed);
+}
+
+/// Whether DSCP/QoS marking is enabled: `SLIPSTREAM_DSCP` when set (`1`/`true`/`on` forces it on,
+/// `0`/`false`/`off` forces it off — e.g. to rule QoS out while debugging a flaky AP), else the
+/// [`set_dscp_default`] runtime default.
+pub(crate) fn dscp_enabled() -> bool {
+    match std::env::var("SLIPSTREAM_DSCP").as_deref() {
+        Ok("1") | Ok("true") | Ok("on") => true,
+        Ok("0") | Ok("false") | Ok("off") => false,
+        _ => DSCP_DEFAULT.load(Ordering::Relaxed),
+    }
+}
+
+/// RAII token for a socket's QoS marking. On Windows it is the qWAVE flow membership
+/// ([`super::qos_windows::QosFlow`]) — dropping it removes the marking, so hold it for as long
+/// as the socket sends media. Elsewhere DSCP rides the socket option itself and the token is
+/// inert (and never constructed — [`set_media_qos`] returns `None`).
+#[cfg(windows)]
+pub use super::qos_windows::QosFlow;
+#[cfg(not(windows))]
+pub struct QosFlow {
+    _never: std::convert::Infallible,
+}
+
+/// Best-effort: tag `socket`'s outgoing packets for prioritized delivery of its media class. A no-op
+/// unless `SLIPSTREAM_DSCP=1`. Every step is best-effort (failures logged at debug, never fatal) — QoS
+/// is a nicety, not required for correctness.
+///
+/// The socket must already be `connect`ed (Windows derives the qWAVE flow from the connected
+/// 5-tuple). IPv4 only (all current media sockets bind `0.0.0.0`); a v6 socket simply isn't
+/// tagged. Returns the [`QosFlow`] guard on Windows — keep it alive with the socket; `None`
+/// elsewhere (the marking is a plain socket option) and whenever a step refused.
+pub fn set_media_qos(socket: &UdpSocket, class: MediaClass) -> Option<QosFlow> {
+    if !dscp_enabled() {
+        return None;
+    }
+    #[cfg(windows)]
+    {
+        super::qos_windows::add_media_flow(socket, class)
+    }
+    #[cfg(not(windows))]
+    {
+        apply_media_qos(socket, class);
+        None
+    }
+}
+
+/// The unconditional QoS application, factored out of [`set_media_qos`] so it is directly testable
+/// without touching the process-global `SLIPSTREAM_DSCP` env. Best-effort (every step logs-and-continues).
+#[cfg_attr(windows, allow(dead_code))]
+fn apply_media_qos(socket: &UdpSocket, class: MediaClass) {
+    let sock = socket2::SockRef::from(socket);
+    // DSCP occupies the high 6 bits of the TOS byte → shift left 2.
+    if let Err(e) = sock.set_tos_v4(class.dscp() << 2) {
+        tracing::debug!(error = %e, ?class, "set IP_TOS (DSCP) failed — QoS marking skipped");
+    }
+    // SO_PRIORITY must be set AFTER IP_TOS (setting TOS resets SO_PRIORITY to 0 on Linux). Linux-only;
+    // 6 is the highest priority allowed without CAP_NET_ADMIN, so video=5 / audio=6 (Apollo's scheme).
+    #[cfg(target_os = "linux")]
+    {
+        let prio = match class {
+            MediaClass::Video => 5,
+            MediaClass::Audio => 6,
+        };
+        if let Err(e) = sock.set_priority(prio) {
+            tracing::debug!(error = %e, "set SO_PRIORITY failed");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dscp_code_points_match_apollo() {
+        // CS5 video / CS6 audio, shifted into the TOS byte (high 6 bits).
+        assert_eq!(MediaClass::Video.dscp(), 40);
+        assert_eq!(MediaClass::Audio.dscp(), 48);
+        assert_eq!(MediaClass::Video.dscp() << 2, 0xA0);
+        assert_eq!(MediaClass::Audio.dscp() << 2, 0xC0);
+    }
+
+    #[test]
+    fn qos_and_buffer_growth_are_best_effort_and_never_panic() {
+        let sock = UdpSocket::bind("127.0.0.1:0").unwrap();
+        // No SLIPSTREAM_DSCP in the test env → early return; must not panic regardless.
+        assert!(set_media_qos(&sock, MediaClass::Video).is_none());
+        assert!(set_media_qos(&sock, MediaClass::Audio).is_none());
+        grow_socket_buffers(&sock);
+    }
+
+    #[test]
+    fn apply_qos_tags_the_socket() {
+        // Exercise the enabled path directly (no env), and read the options back where we can.
+        let sock = UdpSocket::bind("127.0.0.1:0").unwrap();
+        apply_media_qos(&sock, MediaClass::Video);
+        #[cfg(target_os = "linux")]
+        {
+            let s = socket2::SockRef::from(&sock);
+            assert_eq!(s.tos_v4().unwrap(), 0xA0, "video → CS5 in the TOS byte");
+            assert_eq!(s.priority().unwrap(), 5, "video → SO_PRIORITY 5");
+        }
+    }
+}

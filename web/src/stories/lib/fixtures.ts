@@ -1,6 +1,5 @@
 // Mock API payloads for the page stories — typed against the generated models so
 // they stay honest if the OpenAPI schema changes.
-import type { AvailableCompositor } from "@/api/gen/model/availableCompositor";
 import type { Capture } from "@/api/gen/model/capture";
 import type { CaptureMeta } from "@/api/gen/model/captureMeta";
 import type { GameEntry } from "@/api/gen/model/gameEntry";
@@ -36,13 +35,6 @@ export const hostInfo: HostInfo = {
 	uniqueid: "0f8a1c3e9b7d4a62",
 	version: "0.2.0",
 };
-
-export const compositors: AvailableCompositor[] = [
-	{ id: "kwin", label: "KWin (Plasma)", available: true, default: true },
-	{ id: "gamescope", label: "gamescope", available: true, default: false },
-	{ id: "mutter", label: "Mutter (GNOME)", available: false, default: false },
-	{ id: "wlroots", label: "Sway / wlroots", available: false, default: false },
-];
 
 export const statusActive: RuntimeStatus = {
 	video_streaming: true,

@@ -1,5 +1,5 @@
 //! Client identity, the known-hosts (pinned fingerprint) store, and app settings —
-//! re-exported from `pf-client-core` so the shell and the spawned `slipstream-session`
+//! re-exported from `ss-client-core` so the shell and the spawned `slipstream-session`
 //! binary share ONE `Settings`/`KnownHosts` shape over the same files
 //! (`%APPDATA%\slipstream\client-windows-settings.json` / `client-known-hosts.json`).
 //!
@@ -7,7 +7,7 @@
 //! former private `Settings` copy (≤ 0.8.4: `show_hud`, `engine`) is gone — old files
 //! still load via a serde alias in core.
 
-pub use pf_client_core::trust::{
+pub use ss_client_core::trust::{
     hex, learn_mac, learn_os, load_or_create_identity, pair_error_message, parse_hex32, KnownHost,
     KnownHosts, Settings,
 };

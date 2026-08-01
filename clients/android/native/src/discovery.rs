@@ -1,5 +1,5 @@
 //! LAN host discovery over mDNS, in Rust via `mdns-sd` — the same crate + service type the
-//! Linux/Windows clients use (`crates/pf-client-core/src/discovery.rs`), exposed to Kotlin over JNI.
+//! Linux/Windows clients use (`crates/ss-client-core/src/discovery.rs`), exposed to Kotlin over JNI.
 //!
 //! Why not `NsdManager`: that API delegates to a per-OEM system mDNS daemon whose reliability
 //! varies wildly (the Android client's discovery was "mostly broken"). Browsing in our own Rust
@@ -102,7 +102,7 @@ impl Discovery {
         let hosts: Arc<Mutex<HashMap<String, Host>>> = Arc::new(Mutex::new(HashMap::new()));
         let map = hosts.clone();
         let spawned = std::thread::Builder::new()
-            .name("pf-mdns".into())
+            .name("ss-mdns".into())
             .spawn(move || {
                 // Exits when the daemon is shut down (the browse channel closes → recv errors).
                 while let Ok(event) = rx.recv() {

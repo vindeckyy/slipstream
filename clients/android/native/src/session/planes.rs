@@ -80,7 +80,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeStartVideo
         panel_hz: panel_fps,
     };
     let join = std::thread::Builder::new()
-        .name("pf-decode".into())
+        .name("ss-decode".into())
         .spawn(move || crate::decode::run(client, window, sd, st, opts))
         .ok();
     *guard = Some(VideoThread { shutdown, join });

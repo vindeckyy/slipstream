@@ -49,9 +49,9 @@ TRAY_BIN="target/release/slipstream-tray"
 # when the existing artifact was already resolved that way, and rebuilds it when it wasn't.
 echo "==> building slipstream-tray (release, own invocation — see comment above)"
 cargo build --release -p slipstream-tray --locked
-# The web-console-update root helper (dep-free; see crates/pf-update).
-echo "==> building pf-update (release)"
-cargo build --release -p pf-update --locked
+# The web-console-update root helper (dep-free; see crates/ss-update).
+echo "==> building ss-update (release)"
+cargo build --release -p ss-update --locked
 
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
@@ -63,7 +63,7 @@ install -Dm0755 "$BIN"                              "$STAGE/usr/bin/$PKG"
 # Web-console-triggered updates (host-update-from-web-console.md §7): root helper + its
 # oneshot unit + the polkit rule scoping `systemctl start slipstream-update.service` to the
 # (shipped-empty) slipstream-update group. Opt-in = joining the group; postinst creates it.
-install -Dm0755 target/release/pf-update           "$STAGE/usr/libexec/slipstream/pf-update"
+install -Dm0755 target/release/ss-update           "$STAGE/usr/libexec/slipstream/ss-update"
 install -Dm0644 packaging/linux/slipstream-update.service \
                                                    "$STAGE/usr/lib/systemd/system/slipstream-update.service"
 install -Dm0644 packaging/linux/49-slipstream-update.rules \
@@ -71,9 +71,9 @@ install -Dm0644 packaging/linux/49-slipstream-update.rules \
 install -Dm0644 scripts/60-slipstream.rules         "$STAGE/usr/lib/udev/rules.d/60-slipstream.rules"
 # Managed gamescope takeover on DM-autologin boxes: root helper + polkit action so the host can
 # stop/restore the display manager for the stream (the helper derives the DM unit itself).
-install -Dm0755 scripts/pf-dm-helper               "$STAGE/usr/libexec/slipstream/pf-dm-helper"
-install -Dm0644 scripts/io.unom.slipstream.dm-helper.policy \
-                                                   "$STAGE/usr/share/polkit-1/actions/io.unom.slipstream.dm-helper.policy"
+install -Dm0755 scripts/ss-dm-helper               "$STAGE/usr/libexec/slipstream/ss-dm-helper"
+install -Dm0644 scripts/io.slipstream.dm-helper.policy \
+                                                   "$STAGE/usr/share/polkit-1/actions/io.slipstream.dm-helper.policy"
 # vhci-hcd autoload — usbip transport for the virtual Steam Deck pad (Steam only adopts USB pads).
 install -Dm0644 scripts/slipstream-modules.conf     "$STAGE/usr/lib/modules-load.d/slipstream.conf"
 # UDP socket-buffer tuning (32 MB) — without it the kernel clamps the host's SO_SNDBUF to ~416 KB
@@ -95,10 +95,10 @@ install -Dm0644 scripts/slipstream-host-desktop-session.conf \
 # /usr/share/slipstream/, not this package's slipstream-host/ data dir. A canary version
 # carries `~ciN`; anything else is stable.
 case "$VERSION" in
-  *~ci*) _pf_update_channel=canary ;;
-  *)     _pf_update_channel=stable ;;
+  *~ci*) _ss_update_channel=canary ;;
+  *)     _ss_update_channel=stable ;;
 esac
-printf 'apt %s\n' "$_pf_update_channel" | \
+printf 'apt %s\n' "$_ss_update_channel" | \
     install -Dm0644 /dev/stdin "$STAGE/usr/share/slipstream/install-kind"
 # Optional headless KWin session unit (the kwin --virtual appliance), as the RPM/Arch ship.
 # Repoint its ExecStart from the dev source tree to the packaged script. NOT enabled by default.
@@ -110,13 +110,13 @@ sed -i 's#%h/slipstream/scripts/headless/run-headless-kde.sh#/usr/share/slipstre
 # host bind KWin's restricted zkde_screencast (virtual output) + fake_input globals on an
 # interactive Plasma session. Must ship with the host — KWin caches the per-exe grant on first
 # connect, so it has to be present before the host ever connects. See the file's header comment.
-install -Dm0644 packaging/linux/io.unom.Slipstream.Host.desktop \
-    "$STAGE/usr/share/applications/io.unom.Slipstream.Host.desktop"
+install -Dm0644 packaging/linux/io.slipstream.Host.desktop \
+    "$STAGE/usr/share/applications/io.slipstream.Host.desktop"
 # Status tray: the per-user SNI icon + its XDG autostart entry (self-gating: --autostart exits
 # silently for users who don't run a host) + the hicolor status icons it names.
 install -Dm0755 "$TRAY_BIN"                        "$STAGE/usr/bin/slipstream-tray"
-install -Dm0644 packaging/linux/io.unom.Slipstream.Tray.desktop \
-    "$STAGE/etc/xdg/autostart/io.unom.Slipstream.Tray.desktop"
+install -Dm0644 packaging/linux/io.slipstream.Tray.desktop \
+    "$STAGE/etc/xdg/autostart/io.slipstream.Tray.desktop"
 for sz in 22x22 48x48; do
   for png in packaging/linux/icons/hicolor/$sz/apps/*.png; do
     install -Dm0644 "$png" "$STAGE/usr/share/icons/hicolor/$sz/apps/$(basename "$png")"
@@ -155,7 +155,7 @@ fi
 cat > "$DOCDIR/copyright" <<EOF
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: slipstream
-Source: https://github.com/vindeckyy/slipstream.git
+Source: https://github.com/vindeckyy/slipstream/slipstream
 
 Files: *
 Copyright: unom and the slipstream contributors
@@ -265,7 +265,7 @@ Maintainer: unom <packages@unom.io>
 Installed-Size: $INSTALLED_KB
 Section: net
 Priority: optional
-Homepage: https://github.com/vindeckyy/slipstream.git
+Homepage: https://github.com/vindeckyy/slipstream/slipstream
 Depends: $DEPENDS
 Recommends: $RECOMMENDS
 Suggests: $SUGGESTS

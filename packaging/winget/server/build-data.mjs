@@ -21,7 +21,7 @@ import { parse as parseYaml } from "yaml";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const API = process.env.SLIPSTREAM_RELEASE_API ?? "https://github.com/vindeckyy/slipstream/api/v1";
 const REPO = process.env.SLIPSTREAM_RELEASE_REPO ?? "unom/slipstream";
-const PACKAGE_ID = "unom.SlipstreamHost";
+const PACKAGE_ID = "vindeckyy.SlipstreamHost";
 const SOURCE_IDENTIFIER = process.env.SLIPSTREAM_SOURCE_ID ?? "unom.slipstream";
 // The API contract this source implements. Advertised via /information so a future client can
 // negotiate; bump only alongside a real change to the response shapes.

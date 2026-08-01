@@ -47,7 +47,7 @@ const hostUrl = `http://127.0.0.1:${host.port}`;
 // A built SPA on disk: an index and one asset.
 let staticDir: string;
 beforeAll(() => {
-	staticDir = fs.mkdtempSync(path.join(os.tmpdir(), "pf-ui-"));
+	staticDir = fs.mkdtempSync(path.join(os.tmpdir(), "ss-ui-"));
 	fs.writeFileSync(path.join(staticDir, "index.html"), "INDEX");
 	fs.writeFileSync(path.join(staticDir, "app.js"), "ASSET");
 });

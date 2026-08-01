@@ -1,28 +1,28 @@
 <#
 .SYNOPSIS
-  Stage the pf-vdisplay driver bundle the installer ships into -OutDir: the freshly-built signed
-  pf-vdisplay driver (from -VendorDir) + the fetched nefcon device tool.
+  Stage the ss-vdisplay driver bundle the installer ships into -OutDir: the freshly-built signed
+  ss-vdisplay driver (from -VendorDir) + the fetched nefcon device tool.
 
 .DESCRIPTION
-  pf-vdisplay (our all-Rust IddCx virtual display) is BUILT FROM SOURCE per release by
-  build-pf-vdisplay.ps1 (packaging/windows/drivers/), which emits the signed pf_vdisplay.{dll,inf,cat}
+  ss-vdisplay (our all-Rust IddCx virtual display) is BUILT FROM SOURCE per release by
+  build-ss-vdisplay.ps1 (packaging/windows/drivers/), which emits the signed ss_vdisplay.{dll,inf,cat}
   + slipstream-driver.cer into a build-output dir. pack-host-installer.ps1 passes that dir here as
   -VendorDir; we copy it + add the nefcon tool. (The old checked-in binaries under
-  packaging/windows/pf-vdisplay/ were retired - building from source keeps the .dll/.inf/.cat in
+  packaging/windows/ss-vdisplay/ were retired - building from source keeps the .dll/.inf/.cat in
   lockstep; see design/windows-build-and-packaging.md.) nefcon publishes a pinned release, so we fetch +
   SHA-256-verify it (it provides nefconc.exe, used to create the root-enumerated device node - pnputil
   can't).
 
-  Output (consumed by slipstream-host.iss): -OutDir gets pf_vdisplay.inf/.cat/.dll + slipstream-driver.cer
+  Output (consumed by slipstream-host.iss): -OutDir gets ss_vdisplay.inf/.cat/.dll + slipstream-driver.cer
   and nefconc.exe (x64).
 
 .EXAMPLE
-  pwsh -File stage-pf-vdisplay.ps1 -OutDir C:\t\out\stage
+  pwsh -File stage-ss-vdisplay.ps1 -OutDir C:\t\out\stage
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$OutDir,
-    [Parameter(Mandatory = $true)][string]$VendorDir,   # the build-pf-vdisplay.ps1 output dir
+    [Parameter(Mandatory = $true)][string]$VendorDir,   # the build-ss-vdisplay.ps1 output dir
     # PINNED nefcon release (https://github.com/nefarius/nefcon/releases). MIT-licensed.
     [string]$NefconUrl = 'https://github.com/nefarius/nefcon/releases/download/v1.17.40/nefcon_v1.17.40.zip',
     [string]$NefconSha256 = '812bae7ed7dfb7d6d2284bc7de2f8ccebc92ed2a0b1ae893c53b337096e50c1a'
@@ -34,11 +34,11 @@ $PSNativeCommandUseErrorActionPreference = $false
 if (Test-Path $OutDir) { Remove-Item -Recurse -Force $OutDir }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
-# --- built pf-vdisplay driver -----------------------------------------------------------------
-$inf = Get-ChildItem -Path $VendorDir -Filter pf_vdisplay.inf -ErrorAction SilentlyContinue | Select-Object -First 1
-if (-not $inf) { throw "no pf_vdisplay.inf under $VendorDir - did build-pf-vdisplay.ps1 run?" }
+# --- built ss-vdisplay driver -----------------------------------------------------------------
+$inf = Get-ChildItem -Path $VendorDir -Filter ss_vdisplay.inf -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $inf) { throw "no ss_vdisplay.inf under $VendorDir - did build-ss-vdisplay.ps1 run?" }
 Copy-Item (Join-Path $VendorDir '*') $OutDir -Force
-Write-Host "==> pf-vdisplay staged from $VendorDir"
+Write-Host "==> ss-vdisplay staged from $VendorDir"
 
 # --- nefcon (fetched + verified) --------------------------------------------------------------
 $work = Join-Path ([IO.Path]::GetTempPath()) ('nefcon-' + [IO.Path]::GetRandomFileName())
@@ -54,7 +54,7 @@ try {
         }
         Write-Host "    sha256 ok ($got)"
     }
-    else { Write-Warning "no pinned nefcon SHA-256 - computed $got (PIN THIS in stage-pf-vdisplay.ps1)" }
+    else { Write-Warning "no pinned nefcon SHA-256 - computed $got (PIN THIS in stage-ss-vdisplay.ps1)" }
     Expand-Archive -Path $zip -DestinationPath $work -Force
     $nefc = Get-ChildItem -Path $work -Recurse -Filter 'nefconc.exe' |
         Where-Object { $_.FullName -match '(?i)\\x64\\' } | Select-Object -First 1

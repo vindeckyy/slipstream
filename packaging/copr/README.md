@@ -4,7 +4,7 @@ COPR builds the RPM from this git repo (no manual SRPM upload). Configure the pr
 once in the COPR web UI (or with `copr-cli`):
 
 **Project → New Build → SCM**
-- Clone URL:      `https://github.com/vindeckyy/slipstream.git`
+- Clone URL:      `https://github.com/vindeckyy/slipstream/slipstream`
 - Committish:     `main` (or a release tag)
 - Subdirectory:   *(repo root)*
 - Spec File:      `packaging/rpm/slipstream.spec`
@@ -26,7 +26,7 @@ copr-cli create slipstream --chroot fedora-44-x86_64 \
   --repo 'https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$releasever.noarch.rpm' \
   --repo 'https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$releasever.noarch.rpm'
 copr-cli buildscm slipstream \
-  --clone-url https://github.com/vindeckyy/slipstream.git \
+  --clone-url https://github.com/vindeckyy/slipstream/slipstream \
   --commit main --spec packaging/rpm/slipstream.spec --method rpkg
 ```
 

@@ -7,7 +7,7 @@ use super::style::*;
 use super::{AppCtx, Screen, Svc, Target};
 use crate::discovery::DiscoveredHost;
 use crate::trust::{self, KnownHost, KnownHosts};
-use pf_client_core::orchestrate::{WakeOutcome, WakeWait};
+use ss_client_core::orchestrate::{WakeOutcome, WakeWait};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;

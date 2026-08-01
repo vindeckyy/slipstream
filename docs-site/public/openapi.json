@@ -10,7 +10,7 @@
       "name": "MIT OR Apache-2.0",
       "identifier": "MIT OR Apache-2.0"
     },
-    "version": "0.21.0"
+    "version": "0.22.3"
   },
   "paths": {
     "/api/v1/clients": {
@@ -120,6 +120,76 @@
                   "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/AvailableCompositor"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/compositors/headless": {
+      "get": {
+        "tags": [
+          "host"
+        ],
+        "summary": "Available headless compositor backends",
+        "description": "Lists backends `SLIPSTREAM_HEADLESS_COMPOSITOR` / host-config `headless_compositor` can select.\n`available` is a PATH probe (`labwc`, `krfb-virtualmonitor`, `gamescope`); `auto` is available\nwhen any concrete backend is.",
+        "operationId": "listHeadlessCompositors",
+        "responses": {
+          "200": {
+            "description": "Headless compositor backends with availability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AvailableHeadlessCompositor"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/capture/methods": {
+      "get": {
+        "tags": [
+          "host"
+        ],
+        "summary": "Available desktop capture methods",
+        "description": "Lists every SolarFlare-shaped desktop-mirror backend the host knows (no hermes-kms), with a\nbest-effort availability probe. Pass an `id` as `SLIPSTREAM_CAPTURE_METHOD` / the host-config\n`capture_method` field. `auto` walks the preference order at session open.",
+        "operationId": "listCaptureMethods",
+        "responses": {
+          "200": {
+            "description": "Desktop capture methods with availability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AvailableCaptureMethod"
                   }
                 }
               }
@@ -3432,6 +3502,240 @@
           }
         }
       }
+    },
+    "/api/v1/update/apply": {
+      "post": {
+        "tags": [
+          "update"
+        ],
+        "summary": "Apply the available update",
+        "description": "Starts the one-click apply for install kinds that support it (Windows installer). The\nrequest carries no version or URL — the host installs exactly what its verified manifest\nannounced. Progress is polled via `GET /update/status` (`job`); the host restarts as part\nof the apply, and the outcome lands in `last_result` after it comes back.",
+        "operationId": "applyUpdate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Apply started — poll `GET /update/status`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Refused: unsupported install kind, apply disabled (SLIPSTREAM_UPDATE_APPLY=0), a job already running, an active streaming session without `force`, or nothing newer to apply",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/update/check": {
+      "post": {
+        "tags": [
+          "update"
+        ],
+        "summary": "Check for updates now",
+        "description": "Forces a manifest fetch + verification and returns the refreshed state. Rate-limited to\none forced check per 30 s.",
+        "operationId": "forceUpdateCheck",
+        "responses": {
+          "200": {
+            "description": "Refreshed update-check state (`last_error` carries a failed check; `not_published` an empty channel, which is not one)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Update checks are disabled on this host",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "A forced check ran less than 30 s ago",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/update/status": {
+      "get": {
+        "tags": [
+          "update"
+        ],
+        "summary": "Update-check status",
+        "description": "How this host was installed, which channel it follows, whether a newer release is known,\nand how to update. Reading this may kick a background refresh when the cached check is\nolder than 6 h; the response never blocks on the network.",
+        "operationId": "getUpdateStatus",
+        "responses": {
+          "200": {
+            "description": "Current update-check state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/host/config": {
+      "get": {
+        "tags": [
+          "host"
+        ],
+        "operationId": "getHostConfig",
+        "responses": {
+          "200": {
+            "description": "Stored host configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostConfigState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "host"
+        ],
+        "operationId": "setHostConfig",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HostConfigFile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Configuration stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostConfigState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Could not persist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -3559,7 +3863,7 @@
         "properties": {
           "backend": {
             "type": "string",
-            "description": "Backend name (`pf-vdisplay`, `kwin`, …)."
+            "description": "Backend name (`ss-vdisplay`, `kwin`, …)."
           },
           "client": {
             "type": [
@@ -3764,6 +4068,15 @@
           }
         }
       },
+      "ApplyRequest": {
+        "type": "object",
+        "properties": {
+          "force": {
+            "type": "boolean",
+            "description": "Proceed even while a streaming session is live (the stream will drop when the host\nrestarts — the console warns before sending this)."
+          }
+        }
+      },
       "ApprovePending": {
         "type": "object",
         "description": "Approve-pending-device request body. Send `{}` to keep the device's own name.",
@@ -3836,6 +4149,29 @@
           }
         }
       },
+      "AvailableCaptureMethod": {
+        "type": "object",
+        "description": "A desktop-mirror capture method the host can use, and whether it's usable now.",
+        "required": [
+          "id",
+          "label",
+          "available"
+        ],
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "description": "Best-effort: env / binary / protocol looks usable on this host right now."
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable identifier (`\"auto\"` | `\"portal\"` | `\"kwin\"` | `\"wlr\"` | `\"kms\"` | `\"x11\"` | `\"nvfbc\"`)."
+          },
+          "label": {
+            "type": "string",
+            "description": "Human-readable label for UIs."
+          }
+        }
+      },
       "AvailableCompositor": {
         "type": "object",
         "description": "A compositor backend the host can drive a virtual output on, and whether it's usable now.",
@@ -3857,6 +4193,29 @@
           "id": {
             "type": "string",
             "description": "Stable identifier (`\"kwin\"` | `\"wlroots\"` | `\"mutter\"` | `\"gamescope\"`) — pass this to a\nclient's `--compositor` flag."
+          },
+          "label": {
+            "type": "string",
+            "description": "Human-readable label for UIs."
+          }
+        }
+      },
+      "AvailableHeadlessCompositor": {
+        "type": "object",
+        "description": "A headless compositor the host can spawn when no live session is present.",
+        "required": [
+          "id",
+          "label",
+          "available"
+        ],
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "description": "True when the matching binary is on `PATH`."
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable identifier (`\"auto\"` | `\"labwc\"` | `\"krfb\"` | `\"gamescope\"`)."
           },
           "label": {
             "type": "string",
@@ -3914,7 +4273,7 @@
           },
           "encoder_backend": {
             "type": "string",
-            "description": "The encode backend that ACTUALLY opened for this session — `\"nvenc\"`, `\"vaapi\"`,\n`\"vulkan\"`, `\"amf\"`, `\"qsv\"`, `\"software\"`, … — and the GPU it runs on.\n\nRecorded because the stage split alone can't be read without them. A p50 `submit` of 10 ms\nmeans \"the GPU's CSC+encode throughput is the ceiling\" on one backend and something else\nentirely on another, and every fps-shortfall report so far has cost a round-trip asking\nwhich one it was. Both come from `pf_gpu::active()`, the record the encoder open itself\nwrites, so they name the branch that really opened rather than a re-derived guess.\n\n`\"\"` when nothing was streaming at registration (or on a build without the record)."
+            "description": "The encode backend that ACTUALLY opened for this session — `\"nvenc\"`, `\"vaapi\"`,\n`\"vulkan\"`, `\"amf\"`, `\"qsv\"`, `\"software\"`, … — and the GPU it runs on.\n\nRecorded because the stage split alone can't be read without them. A p50 `submit` of 10 ms\nmeans \"the GPU's CSC+encode throughput is the ceiling\" on one backend and something else\nentirely on another, and every fps-shortfall report so far has cost a round-trip asking\nwhich one it was. Both come from `ss_gpu::active()`, the record the encoder open itself\nwrites, so they name the branch that really opened rather than a re-derived guess.\n\n`\"\"` when nothing was streaming at registration (or on a build without the record)."
           },
           "fps": {
             "type": "integer",
@@ -4796,6 +5155,59 @@
               "source": {
                 "type": "string",
                 "description": "What mutated the library: `\"manual\"` today; a provider id once the provider\nAPI (RFC §8) lands."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A verified update manifest announced a release newer than the running host. Emitted\nonce per discovered version (a steady-state \"newer exists\" doesn't re-fire on every\nrefresh).",
+            "required": [
+              "version",
+              "channel",
+              "install_kind",
+              "kind"
+            ],
+            "properties": {
+              "channel": {
+                "type": "string",
+                "description": "The channel it was announced on (`stable` | `canary`)."
+              },
+              "install_kind": {
+                "type": "string",
+                "description": "This host's install kind (`apt`, `windows-installer`, …) — lets a hook or the\ntray render the right \"how to update\" hint without a second call."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "update.available"
+                ]
+              },
+              "version": {
+                "type": "string",
+                "description": "The newer release's version string."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A host update completed: emitted by boot-time reconciliation, i.e. by the NEW binary's\nfirst start after a successful apply.",
+            "required": [
+              "from",
+              "to",
+              "kind"
+            ],
+            "properties": {
+              "from": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "update.applied"
+                ]
+              },
+              "to": {
+                "type": "string"
               }
             }
           },
@@ -5877,7 +6289,7 @@
           },
           "pin_supported": {
             "type": "boolean",
-            "description": "Whether this build can actually STREAM one of these monitors.\n\nEnumeration and capture are separate capabilities, and on Windows only the first exists: the\nheads below are real and worth showing (they explain the topology, and `/display/state`\ncross-references them), but `pf-capture`'s sole Windows entry point is `open_idd_push` — a\nframe channel pushed by our OWN IddCx virtual display. There is no desktop-duplication\ncapturer to point at a chosen head (DXGI Desktop Duplication was deliberately removed), so\n`vdisplay::open` has no mirror arm outside Linux and a pin could not be honored.\n\nThe console renders the picker read-only on `false`. Reported as a capability rather than\nsniffed client-side from the OS so the answer comes from the build that would have to honor\nit — when a Windows mirror backend lands, this flips and the UI needs no change."
+            "description": "Whether this build can actually STREAM one of these monitors.\n\nEnumeration and capture are separate capabilities, and on Windows only the first exists: the\nheads below are real and worth showing (they explain the topology, and `/display/state`\ncross-references them), but `ss-capture`'s sole Windows entry point is `open_idd_push` — a\nframe channel pushed by our OWN IddCx virtual display. There is no desktop-duplication\ncapturer to point at a chosen head (DXGI Desktop Duplication was deliberately removed), so\n`vdisplay::open` has no mirror arm outside Linux and a pin could not be honored.\n\nThe console renders the picker read-only on `false`. Reported as a capability rather than\nsniffed client-side from the OS so the answer comes from the build that would have to honor\nit — when a Windows mirror backend lands, this flips and the UI needs no change."
           },
           "pinned": {
             "type": [
@@ -7040,6 +7452,397 @@
             "type": "string"
           }
         }
+      },
+      "UpdateJobInfo": {
+        "type": "object",
+        "description": "A running apply job (or a spawned installer that hasn't resolved yet).",
+        "required": [
+          "target_version",
+          "stage",
+          "received_bytes",
+          "started_unix"
+        ],
+        "properties": {
+          "received_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "stage": {
+            "type": "string",
+            "description": "`downloading` | `verifying` | `applying` | `restarting`."
+          },
+          "started_unix": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "target_version": {
+            "type": "string",
+            "description": "The version being installed."
+          },
+          "total_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "UpdateManifestInfo": {
+        "type": "object",
+        "description": "One channel's manifest facts, as much as the console renders.",
+        "required": [
+          "version",
+          "serial",
+          "published_at",
+          "notes_url",
+          "stale"
+        ],
+        "properties": {
+          "notes_url": {
+            "type": "string",
+            "description": "Release-notes link (pinned to our forge by the manifest validator)."
+          },
+          "published_at": {
+            "type": "string",
+            "description": "RFC-3339 publish time (display only)."
+          },
+          "serial": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Publish serial (unix seconds) — monotonic per channel.",
+            "minimum": 0
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "The last verified manifest is suspiciously old (>45 days) — the freeze/stale hint."
+          },
+          "version": {
+            "type": "string",
+            "description": "The released version this manifest announces."
+          }
+        }
+      },
+      "UpdateResultInfo": {
+        "type": "object",
+        "description": "Durable outcome of the most recent apply attempt (survives the host's own restart).",
+        "required": [
+          "ok",
+          "from",
+          "to",
+          "finished_unix"
+        ],
+        "properties": {
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_unix": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "from": {
+            "type": "string"
+          },
+          "log_path": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The installer's own log file on this host, for diagnosis."
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "stage": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The stage that failed; absent on success."
+          },
+          "staged": {
+            "type": "boolean",
+            "description": "Applied but activates on the next reboot (rpm-ostree)."
+          },
+          "to": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateStatus": {
+        "type": "object",
+        "description": "The full update-check state for this host.",
+        "required": [
+          "install_kind",
+          "channel",
+          "current_version",
+          "apply",
+          "channel_hint",
+          "check_disabled",
+          "available",
+          "not_published"
+        ],
+        "properties": {
+          "apply": {
+            "type": "string",
+            "description": "What the console may offer for this install: `notify` (show the command) — later\nphases add `full` (one-click apply) and `staged` (apply + reboot to finish)."
+          },
+          "available": {
+            "type": "boolean",
+            "description": "A newer release than `current_version` exists for this channel (definitive\ncomparisons only — an unparseable version pair never flags)."
+          },
+          "channel": {
+            "type": "string",
+            "description": "Release channel this install follows: `stable` | `canary`."
+          },
+          "channel_hint": {
+            "type": "string",
+            "description": "The copy-pastable update command for this install kind."
+          },
+          "check_disabled": {
+            "type": "boolean",
+            "description": "Update checks are disabled on this host (`SLIPSTREAM_UPDATE_CHECK=0`)."
+          },
+          "current_version": {
+            "type": "string",
+            "description": "The running host version."
+          },
+          "install_kind": {
+            "type": "string",
+            "description": "How this host was installed: `windows-installer` | `sysext` | `rpm-ostree` | `apt` |\n`dnf` | `pacman` | `steamos-source` | `nix` | `source`."
+          },
+          "job": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/UpdateJobInfo",
+                "description": "The apply in flight, if any."
+              }
+            ]
+          },
+          "last_checked_unix": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "When the last successful check happened (unix seconds).",
+            "minimum": 0
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the last check failed, verbatim, if it did."
+          },
+          "last_result": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/UpdateResultInfo",
+                "description": "Outcome of the most recent apply attempt."
+              }
+            ]
+          },
+          "manifest": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/UpdateManifestInfo",
+                "description": "The last verified manifest, if any check has succeeded."
+              }
+            ]
+          },
+          "not_published": {
+            "type": "boolean",
+            "description": "The check reached the feed and found this channel has **no release published yet** —\nan expected state (a channel nobody has announced to answers with a 404), not a\nfailure. Mutually exclusive with `last_error`, so a UI can say \"nothing published yet\"\ninstead of painting an empty feed as a broken host. Never set once a manifest has been\nseen for this channel: a feed that loses a document it used to serve stays an error."
+          },
+          "opt_in_hint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "This install could one-click apply, but the operator hasn't opted in yet — the\ncommand to run (Linux: join the `slipstream-update` group)."
+          }
+        }
+      },
+      "GeneralConfig": {
+        "type": "object",
+        "properties": {
+          "host_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "perf": {
+            "type": "boolean"
+          }
+        }
+      },
+      "InputConfig": {
+        "type": "object",
+        "properties": {
+          "gamepad": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gamescope_grab_cursor": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AudioVideoConfig": {
+        "type": "object",
+        "properties": {
+          "video_source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "capture_method": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "auto | portal | kwin | wlr | kms | x11 | nvfbc"
+          },
+          "compositor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "kwin | mutter | wlroots | hyprland | gamescope"
+          },
+          "headless_compositor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "off | auto | labwc | krfb | gamescope"
+          },
+          "max_fps": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "ten_bit": {
+            "type": "boolean"
+          },
+          "four_four_four": {
+            "type": "boolean"
+          },
+          "gamescope_hdr": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NetworkConfig": {
+        "type": "object",
+        "properties": {
+          "chacha20": {
+            "type": "boolean"
+          },
+          "mdns": {
+            "type": "boolean"
+          },
+          "fec_pct": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        }
+      },
+      "EncoderConfig": {
+        "type": "object",
+        "required": [
+          "encoder"
+        ],
+        "properties": {
+          "encoder": {
+            "type": "string"
+          },
+          "render_adapter": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zerocopy": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      },
+      "HostConfigFile": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "general": {
+            "$ref": "#/components/schemas/GeneralConfig"
+          },
+          "input": {
+            "$ref": "#/components/schemas/InputConfig"
+          },
+          "audio_video": {
+            "$ref": "#/components/schemas/AudioVideoConfig"
+          },
+          "network": {
+            "$ref": "#/components/schemas/NetworkConfig"
+          },
+          "encoders": {
+            "$ref": "#/components/schemas/EncoderConfig"
+          }
+        }
+      },
+      "HostConfigState": {
+        "type": "object",
+        "required": [
+          "settings",
+          "configured",
+          "requires_restart",
+          "env_path"
+        ],
+        "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/HostConfigFile"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "requires_restart": {
+            "type": "boolean"
+          },
+          "env_path": {
+            "type": "string"
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -7110,6 +7913,10 @@
     {
       "name": "store",
       "description": "Plugin store: browse signed catalogs (verified first-party entries, attributed third-party sources), install/uninstall as tracked jobs, and switch the plugin runner on"
+    },
+    {
+      "name": "update",
+      "description": "Host update check: install kind + channel, the last verified release manifest, and whether a newer host exists (admin lane only)"
     }
   ]
 }

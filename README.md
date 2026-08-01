@@ -1,22 +1,21 @@
 <p align="center">
-  <img src="assets/slipstream-logo.svg" alt="Slipstream" width="320" />
+  <img src="assets/slipstream-logo.png" alt="Slipstream" width="420" />
 </p>
 
 <p align="center"><b>Low-latency desktop and game streaming with first-class Linux and Windows hosts.</b></p>
+
+Slipstream is a private fork of [unom/slipstream](https://github.com/vindeckyy/slipstream.git). Upstream licenses
+and copyright notices are preserved. The host console UX takes inspiration from
+[Sunshine](https://github.com/LizardByte/Sunshine)'s web UI (workflows and controls, not copied assets).
 
 Run the host on a Linux machine or a Windows PC, connect from a Mac, PC, phone, tablet, or TV, and
 stream your desktop or games — each device at its **own native resolution and refresh rate**, over
 your local network.
 
-📖 **Documentation: [docs.slipstream.unom.io](https://docs.slipstream.unom.io)** — start with
-[How It Works](https://docs.slipstream.unom.io/docs/how-it-works) or the
-[Quick Start](https://docs.slipstream.unom.io/docs/quickstart).
+📖 **Docs:** see [`docs-site/`](docs-site/) in this repo (no public docs host yet).
 
-💬 **Community: [Discord](https://discord.gg/kaPNvzMuGU)** — chat, support, and **Android beta
-access** · **[r/Slipstream](https://www.reddit.com/r/Slipstream/)**.
-
-🔒 **Security:** found a vulnerability? Report it privately to **security@slipstream.com** — see
-[SECURITY.md](SECURITY.md). Please don't open a public issue.
+🔒 **Security:** report vulnerabilities privately per [SECURITY.md](SECURITY.md). Please don't open a
+public issue for security reports.
 
 Slipstream pairs a **virtual-display streaming host** with native clients on every platform. It speaks
 the existing **GameStream** protocol, so any [Moonlight](https://moonlight-stream.org/) client works
@@ -72,7 +71,7 @@ on Linux and Windows, and over a stable C ABI from the Apple and Android apps.
 
 Every native client also ships a tiered **stats overlay** (Compact / Normal / Detailed) with a
 shared vocabulary across platforms, and the session client carries a full gamepad-driven **console
-shell** (`pf-console-ui`): host list, PIN pairing, settings, and an on-screen keyboard.
+shell** (`ss-console-ui`): host list, PIN pairing, settings, and an on-screen keyboard.
 
 The **GameStream host works with a stock Moonlight client** — validated live on NVIDIA hardware
 (RTX 5070 Ti, RTX 4090): PIN pairing that persists across restarts, an app catalog, RTSP/ENet/audio,
@@ -99,11 +98,11 @@ installer (all-vendor: NVIDIA, AMD, Intel).
 | Platform | Install | Guide |
 |--------|---------|-------|
 | **Ubuntu / Debian** (apt) | `sudo apt install slipstream-host` *(after adding the repo)* | [Ubuntu / Debian](https://docs.slipstream.unom.io/docs/ubuntu) · [packaging/debian](packaging/debian/README.md) |
-| **Bazzite / Fedora Atomic** (systemd-sysext) | `curl -fsSLO https://github.com/vindeckyy/slipstream.git/raw/branch/main/packaging/bazzite/slipstream-sysext.sh && sudo bash slipstream-sysext.sh install` *(no layering, no reboot; rpm-ostree + bootc also supported)* | [Bazzite](https://docs.slipstream.unom.io/docs/bazzite) |
+| **Bazzite / Fedora Atomic** (systemd-sysext) | `curl -fsSLO https://github.com/vindeckyy/slipstream/slipstream/raw/branch/main/packaging/bazzite/slipstream-sysext.sh && sudo bash slipstream-sysext.sh install` *(no layering, no reboot; rpm-ostree + bootc also supported)* | [Bazzite](https://docs.slipstream.unom.io/docs/bazzite) |
 | **Fedora** (dnf) | `sudo dnf install slipstream` *(after adding the repo; the console comes with it)* | [Fedora](https://docs.slipstream.unom.io/docs/fedora) · [packaging/rpm](packaging/rpm/README.md) |
 | **Arch / CachyOS** (pacman) | `sudo pacman -Syu slipstream-host` *(binary repo — always a full `-Syu`)* | [Arch Linux](https://docs.slipstream.unom.io/docs/arch) · [packaging/arch](packaging/arch/README.md) |
 | **SteamOS / Steam Deck** (on-device build) | `bash ~/slipstream/scripts/steamdeck/install.sh` *(after cloning this repo to `~/slipstream`)* | [SteamOS (Host)](https://docs.slipstream.unom.io/docs/steamos-host) |
-| **Windows** (11 22H2+, x64) | `winget install unom.SlipstreamHost` *(after `winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest`)* · or the signed `setup.exe` from the package registry | [Windows Host](https://docs.slipstream.unom.io/docs/windows-host) · [packaging/winget](packaging/winget/README.md) |
+| **Windows** (11 22H2+, x64) | `winget install vindeckyy.SlipstreamHost` *(after `winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest`)* · or the signed `setup.exe` from the package registry | [Windows Host](https://docs.slipstream.unom.io/docs/windows-host) · [packaging/winget](packaging/winget/README.md) |
 
 `slipstream-host` is the streaming host; `slipstream-web` is the browser console (pairing + status).
 
@@ -135,7 +134,7 @@ How the virtual display and input are wired up depends on your desktop — see
 **Windows:** the installer registers and starts the host as a `LocalSystem` service, so there is
 nothing to run by hand — open the web console and pair. Use
 `slipstream-host service start|stop|restart|status` if you need to control it. Upgrades happen in
-place — the console's **Updates** card, `winget upgrade unom.SlipstreamHost`, or the newer
+place — the console's **Updates** card, `winget upgrade vindeckyy.SlipstreamHost`, or the newer
 `setup.exe` over the old install; uninstall from Add/Remove Programs.
 
 Full instructions: **[docs.slipstream.unom.io/docs/install](https://docs.slipstream.unom.io/docs/install)**.
@@ -187,11 +186,11 @@ and the [docs site](https://docs.slipstream.unom.io).
 crates/
   slipstream-core/   protocol · FEC · pacing · crypto · QUIC control plane — the C ABI (lib + cdylib + staticlib)
   slipstream-host/   the host (Linux + Windows): virtual displays · capture · encode · input · GameStream · slipstream/1 · mgmt
-  pf-client-core/   shared client plumbing (Linux + Windows): session pump · FFmpeg decode · audio · SDL3 gamepads · trust · discovery
-  pf-presenter/     Vulkan session presenter: SDL3 window · ash swapchain · frame present · input capture
-  pf-console-ui/    Skia console UI for the session client: gamepad shell · stats OSD · pairing · on-screen keyboard
-  pf-ffvk/          FFmpeg Vulkan hwcontext bindings (AVVkFrame) for Vulkan Video decode on the presenter's device
-  pf-driver-proto/  host ↔ pf-vdisplay driver contract: control IOCTLs + IDD-push frame transport (no_std)
+  ss-client-core/   shared client plumbing (Linux + Windows): session pump · FFmpeg decode · audio · SDL3 gamepads · trust · discovery
+  ss-presenter/     Vulkan session presenter: SDL3 window · ash swapchain · frame present · input capture
+  ss-console-ui/    Skia console UI for the session client: gamepad shell · stats OSD · pairing · on-screen keyboard
+  ss-ffvk/          FFmpeg Vulkan hwcontext bindings (AVVkFrame) for Vulkan Video decode on the presenter's device
+  ss-driver-proto/  host ↔ ss-vdisplay driver contract: control IOCTLs + IDD-push frame transport (no_std)
   slipstream-tray/   host tray icon (Windows notification area / Linux StatusNotifierItem)
 clients/
   apple/    macOS / iOS / tvOS app (Swift · VideoToolbox · Metal · GameController)

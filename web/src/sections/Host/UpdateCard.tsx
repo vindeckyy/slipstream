@@ -113,10 +113,10 @@ export const UpdateCard: FC<{
 	const snapshotStale = Boolean(state.error);
 	return (
 		<Card>
-			<CardHeader className="flex flex-row items-center justify-between">
-				<CardTitle>{m.update_title()}</CardTitle>
+			<CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+				<CardTitle className="tracking-tight">{m.update_title()}</CardTitle>
 				{s?.available && !inFlight && (
-					<Badge>{m.update_available_badge()}</Badge>
+					<Badge className="shrink-0">{m.update_available_badge()}</Badge>
 				)}
 			</CardHeader>
 			<CardContent className="space-y-4">
@@ -130,11 +130,11 @@ export const UpdateCard: FC<{
 				>
 					{s && (
 						<>
-							<dl className="grid grid-cols-1 gap-3">
+							<dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 								<UpdateRow
 									label={m.update_current()}
 									value={
-										<span className="flex items-center gap-2 font-medium">
+										<span className="flex flex-wrap items-center gap-2 font-medium">
 											{s.current_version}
 											<Badge variant="secondary">{s.channel}</Badge>
 											<Badge variant="outline" title={m.update_install_kind()}>
@@ -147,14 +147,14 @@ export const UpdateCard: FC<{
 									label={m.update_latest()}
 									value={
 										s.manifest ? (
-											<span className="flex items-center gap-2 font-medium">
+											<span className="flex flex-wrap items-center gap-2 font-medium">
 												{s.manifest.version}
 												{s.manifest.notes_url && (
 													<a
 														href={s.manifest.notes_url}
 														target="_blank"
 														rel="noreferrer"
-														className="text-sm font-normal underline underline-offset-2"
+														className="text-sm font-normal text-primary underline underline-offset-2"
 													>
 														{m.update_notes()}
 													</a>
@@ -183,11 +183,11 @@ export const UpdateCard: FC<{
 								s.apply === "full" || s.apply === "staged" ? (
 									<ApplyPanel status={s} onApplied={onApplied} />
 								) : (
-									<div className="space-y-2 rounded-md border p-4">
+									<div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-4">
 										<p className="text-sm">{m.update_how()}</p>
 										<CommandLine command={s.channel_hint} />
 										{s.opt_in_hint && (
-											<div className="space-y-1 border-t pt-2">
+											<div className="space-y-1.5 border-t border-border/60 pt-3">
 												<p className="text-sm text-muted-foreground">
 													{m.update_opt_in()}
 												</p>
@@ -209,7 +209,7 @@ export const UpdateCard: FC<{
 							)}
 
 							{s.manifest?.stale && (
-								<p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+								<p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-[var(--warning)]">
 									{m.update_stale()}
 								</p>
 							)}
@@ -313,10 +313,12 @@ const ApplyPanel: FC<{
 	};
 
 	return (
-		<div className="space-y-2 rounded-md border p-4">
-			<p className="text-sm">{m.update_apply_ready({ version: target })}</p>
-			<div className="flex items-center gap-3">
-				<Button size="sm" onClick={() => setOpen(true)}>
+		<div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-4">
+			<p className="text-sm font-medium">
+				{m.update_apply_ready({ version: target })}
+			</p>
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+				<Button size="sm" onClick={() => setOpen(true)} className="shrink-0">
 					{m.update_apply_button()}
 				</Button>
 				<CommandLine command={status.channel_hint} />
@@ -414,7 +416,7 @@ const ApplyProgress: FC<{
 		}
 	})();
 	return (
-		<div className="space-y-3 rounded-md border p-4">
+		<div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-4">
 			<div className="flex items-center gap-3">
 				<Spinner className="size-4" />
 				<p className="text-sm font-medium">
@@ -425,9 +427,9 @@ const ApplyProgress: FC<{
 			</div>
 			<p className="text-sm text-muted-foreground">{stageLabel}</p>
 			{job?.stage === "downloading" && pct !== null && (
-				<div className="h-1.5 w-full overflow-hidden rounded bg-muted">
+				<div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
 					<div
-						className="h-full rounded bg-primary transition-all"
+						className="h-full rounded-full bg-primary transition-all"
 						style={{ width: `${pct}%` }}
 					/>
 				</div>
@@ -436,7 +438,7 @@ const ApplyProgress: FC<{
 			    not "timed out" — the warning is for the host being GONE longer than a restart
 			    explains. A stale snapshot's job does not count as seeing one. */}
 			{timedOut && (!job || snapshotStale) && (
-				<div className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+				<div className="space-y-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
 					<p>{m.update_apply_timeout()}</p>
 					{/* Without this the card sits in "applying" forever and the operator cannot even
 					    re-check — the state was only ever cleared by a status that never arrives. */}
@@ -454,7 +456,7 @@ const LastResult: FC<{
 	result: NonNullable<UpdateStatus["last_result"]>;
 }> = ({ result }) =>
 	result.ok ? (
-		<p className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm">
+		<p className="rounded-md border border-[var(--success)]/40 bg-[var(--success)]/10 p-3 text-sm">
 			{result.staged
 				? m.update_result_staged({ to: result.to })
 				: result.from === result.to
@@ -479,9 +481,9 @@ const UpdateRow: FC<{ label: string; value: ReactNode }> = ({
 	label,
 	value,
 }) => (
-	<div className="flex items-baseline justify-between gap-4">
-		<dt className="text-sm text-muted-foreground">{label}</dt>
-		<dd>{value}</dd>
+	<div className="min-w-0">
+		<dt className="text-xs text-muted-foreground">{label}</dt>
+		<dd className="mt-0.5">{value}</dd>
 	</div>
 );
 
@@ -501,10 +503,10 @@ const CommandLine: FC<{ command: string }> = ({ command }) => {
 	};
 	return (
 		<div className="flex min-w-0 flex-1 items-center gap-2">
-			<code className="min-w-0 flex-1 overflow-x-auto rounded bg-muted px-2 py-1.5 text-xs">
+			<code className="min-w-0 flex-1 overflow-x-auto rounded-md border border-border/60 bg-muted/50 px-2.5 py-1.5 text-xs">
 				{command}
 			</code>
-			<Button variant="ghost" size="sm" onClick={copy}>
+			<Button variant="ghost" size="sm" onClick={copy} className="shrink-0">
 				{copied ? m.update_copied() : m.update_copy()}
 			</Button>
 		</div>

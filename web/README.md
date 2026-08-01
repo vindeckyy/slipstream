@@ -7,7 +7,7 @@ clients, the pairing-PIN flow, and session controls.
 Stack: **TanStack Start** (full SSR) on **Bun** via **Nitro v2** (`bun` preset) · **React
 Query** through **orval** codegen from the OpenAPI spec · **[`@unom/ui`](https://github.com/vindeckyy/slipstream/unom/ui)**
 — the shared slipstream/unom design system the marketing site + docs are built on (Tailwind v4,
-animated components on the violet brand over dark chrome) ·
+animated components on a cyan observatory palette over dark chrome) ·
 **Paraglide** i18n (en/de). Package manager + runtime: **Bun**.
 
 The `@unom` registry mapping lives in [`.npmrc`](.npmrc); the auth token comes from

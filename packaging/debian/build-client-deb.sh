@@ -45,15 +45,15 @@ CLI_BIN="$OUTDIR/slipstream"
 # satisfied the guard, skipped this build, and then died on `install: No such file or directory`
 # for $CLI_BIN — a confusing way to say "the CLI was never built". The arm64 leg never hit it
 # because it pre-builds nothing, so the guard always fired there and built all three.
-# pf-update joins the list: the client ships its own copy of the root helper for one-tap
+# ss-update joins the list: the client ships its own copy of the root helper for one-tap
 # updates (`slipstream-client --apply-update`). Same guard rule as above — every binary this
 # script installs is tested here, so a pre-built subset can't skip the build and then die on
 # `install: No such file or directory`.
-UPDATE_BIN="$OUTDIR/pf-update"
+UPDATE_BIN="$OUTDIR/ss-update"
 if [ ! -x "$BIN" ] || [ ! -x "$SESSION_BIN" ] || [ ! -x "$CLI_BIN" ] || [ ! -x "$UPDATE_BIN" ]; then
-  echo "==> building $CRATE + slipstream-client-session + slipstream-cli + pf-update (release${TARGET:+ for $TARGET})"
+  echo "==> building $CRATE + slipstream-client-session + slipstream-cli + ss-update (release${TARGET:+ for $TARGET})"
   cargo build --release --locked "${CARGO_TARGET_ARGS[@]}" -p "$CRATE" -p slipstream-client-session \
-    -p slipstream-cli -p pf-update
+    -p slipstream-cli -p ss-update
 fi
 
 STAGE="$(mktemp -d)"
@@ -64,12 +64,12 @@ DOCDIR="$STAGE/usr/share/doc/$PKG"
 install -Dm0755 "$BIN"                                   "$STAGE/usr/bin/$PKG"
 install -Dm0755 "$SESSION_BIN"                           "$STAGE/usr/bin/slipstream-session"
 install -Dm0755 "$CLI_BIN"                               "$STAGE/usr/bin/slipstream"
-install -Dm0644 packaging/linux/io.unom.Slipstream.desktop \
-                "$STAGE/usr/share/applications/io.unom.Slipstream.desktop"
+install -Dm0644 packaging/linux/io.slipstream.desktop \
+                "$STAGE/usr/share/applications/io.slipstream.desktop"
 # The app icon the desktop entry (and the About dialog) name. Without it the launcher falls
 # back to a generic monitor glyph, which is what shipped until now.
-install -Dm0644 packaging/linux/icons/hicolor/scalable/apps/io.unom.Slipstream.svg \
-                "$STAGE/usr/share/icons/hicolor/scalable/apps/io.unom.Slipstream.svg"
+install -Dm0644 packaging/linux/icons/hicolor/scalable/apps/io.slipstream.svg \
+                "$STAGE/usr/share/icons/hicolor/scalable/apps/io.slipstream.svg"
 # DualSense hidraw access (full pad fidelity through SDL's HIDAPI driver).
 install -Dm0644 scripts/70-slipstream-client.rules \
                 "$STAGE/usr/lib/udev/rules.d/70-slipstream-client.rules"
@@ -83,10 +83,10 @@ install -Dm0644 scripts/99-slipstream-client-net.conf \
 # unit and polkit rule. Separate paths because dpkg refuses two packages owning one file, and a
 # client-only box must be able to install this without slipstream-host. Opt-in = joining the
 # (shipped-empty) slipstream-update group; postinst creates it.
-install -Dm0755 "$UPDATE_BIN"                      "$STAGE/usr/libexec/slipstream/pf-update-client"
+install -Dm0755 "$UPDATE_BIN"                      "$STAGE/usr/libexec/slipstream/ss-update-client"
 install -Dm0644 packaging/linux/slipstream-client-update.service \
                 "$STAGE/usr/lib/systemd/system/slipstream-client-update.service"
-sed -i 's#/usr/libexec/slipstream/pf-update#/usr/libexec/slipstream/pf-update-client#' \
+sed -i 's#/usr/libexec/slipstream/ss-update#/usr/libexec/slipstream/ss-update-client#' \
        "$STAGE/usr/lib/systemd/system/slipstream-client-update.service"
 install -Dm0644 packaging/linux/49-slipstream-client-update.rules \
                 "$STAGE/usr/share/polkit-1/rules.d/49-slipstream-client-update.rules"
@@ -110,7 +110,7 @@ fi
 cat > "$DOCDIR/copyright" <<EOF
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: slipstream
-Source: https://github.com/vindeckyy/slipstream.git
+Source: https://github.com/vindeckyy/slipstream/slipstream
 
 Files: *
 Copyright: unom and the slipstream contributors
@@ -161,7 +161,7 @@ Maintainer: unom <packages@unom.io>
 Installed-Size: $INSTALLED_KB
 Section: net
 Priority: optional
-Homepage: https://github.com/vindeckyy/slipstream.git
+Homepage: https://github.com/vindeckyy/slipstream/slipstream
 Depends: $SHDEPS
 Recommends: $RECOMMENDS
 Description: Low-latency desktop/game streaming client (slipstream/1, GTK4)

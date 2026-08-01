@@ -1,3 +1,24 @@
+import {
+	createHash,
+	timingSafeEqual as nodeTimingSafeEqual,
+} from "node:crypto";
+import {
+	chmodSync,
+	closeSync,
+	mkdirSync,
+	openSync,
+	readFileSync,
+	writeFileSync,
+} from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+import {
+	getRequestHeader,
+	getRequestIP,
+	type H3Event,
+	type SessionConfig,
+} from "h3";
+
 /**
  * A revocation marker for issued sessions, PERSISTED across restarts.
  *
@@ -18,7 +39,8 @@
 const EPOCH_FILE = (): string =>
 	process.env.SLIPSTREAM_UI_EPOCH_FILE ??
 	join(
-		process.env.SLIPSTREAM_CONFIG_DIR ?? join(homedir(), ".config", "slipstream"),
+		process.env.SLIPSTREAM_CONFIG_DIR ??
+			join(homedir(), ".config", "slipstream"),
 		"web-session-epoch",
 	);
 
@@ -50,31 +72,12 @@ export function revokeAllSessions(): void {
 	}
 }
 
-// Shared auth helpers for the Nitro server (the deployed Bun server). Single-user,
-// shared-password gate: the user logs in with SLIPSTREAM_UI_PASSWORD, which sets a SEALED
-// (h3 useSession — AES-GCM) cookie; every request is gated by server/middleware/auth.ts.
-//
-// The management token never reaches the browser: server/routes/api/[...].ts injects it
-// server-side when proxying to the loopback management API.
-import {
-	createHash,
-	timingSafeEqual as nodeTimingSafeEqual,
-} from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
-import {
-	getRequestHeader,
-	getRequestIP,
-	type H3Event,
-	type SessionConfig,
-} from "h3";
-
-export const SESSION_NAME = "pf_session";
+export const SESSION_NAME = "ss_session";
+export const MIN_UI_PASSWORD_LENGTH = 8;
 
 /** Set by the Bun entry (nitro-entry/bun-https.mjs) to the real socket peer, after deleting any
  * inbound copy. Keep the name in sync with that file. */
-const PEER_IP_HEADER = "x-pf-peer-ip";
+const PEER_IP_HEADER = "x-ss-peer-ip";
 
 /**
  * The requesting peer, as the key for every per-peer budget (currently the login throttle).
@@ -95,9 +98,67 @@ export function peerAddress(event: H3Event): string {
 	return getRequestIP(event) ?? "unknown";
 }
 
-/** The login password. Empty string ⇒ auth is MISCONFIGURED (the gate fails closed). */
+/** The login password file used by the packaged console and the browser setup flow. */
+function uiPasswordFile(): string {
+	if (process.env.SLIPSTREAM_UI_PASSWORD_FILE) {
+		return process.env.SLIPSTREAM_UI_PASSWORD_FILE;
+	}
+	const configDir =
+		process.env.SLIPSTREAM_CONFIG_DIR ||
+		(process.platform === "win32"
+			? join(process.env.ProgramData || homedir(), "slipstream")
+			: join(
+					process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
+					"slipstream",
+				));
+	return join(configDir, "web-password");
+}
+
+/** Read a password written as a one-line `KEY=VALUE` environment file. */
+function storedUiPassword(): string {
+	try {
+		const line = readFileSync(uiPasswordFile(), "utf8")
+			.split(/\r?\n/)
+			.find((entry) => entry.startsWith("SLIPSTREAM_UI_PASSWORD="));
+		return line?.slice("SLIPSTREAM_UI_PASSWORD=".length) ?? "";
+	} catch {
+		return "";
+	}
+}
+
+/** The login password. Empty string means first-run setup is still required. */
 export function uiPassword(): string {
-	return process.env.SLIPSTREAM_UI_PASSWORD ?? "";
+	return process.env.SLIPSTREAM_UI_PASSWORD || storedUiPassword();
+}
+
+/**
+ * Persist the first browser-selected password and make it available to this process.
+ *
+ * The exclusive file create is intentional. Two first visitors cannot replace each other's
+ * password, and an existing configured password file is never overwritten. An empty legacy file
+ * can be repaired because it contains no credential. The config directory is private in packaged
+ * installs; the file mode protects it on Unix as well.
+ */
+export function configureUiPassword(password: string): boolean {
+	if (!password || /[\r\n]/.test(password) || uiPassword()) return false;
+	const path = uiPasswordFile();
+	mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+	let fd: number | undefined;
+	try {
+		try {
+			fd = openSync(path, "wx", 0o600);
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+			if (uiPassword()) return false;
+			fd = openSync(path, "w", 0o600);
+		}
+		writeFileSync(fd, `SLIPSTREAM_UI_PASSWORD=${password}\n`);
+		chmodSync(path, 0o600);
+	} finally {
+		if (fd !== undefined) closeSync(fd);
+	}
+	process.env.SLIPSTREAM_UI_PASSWORD = password;
+	return true;
 }
 
 /** The management API the proxy forwards to (loopback by default — never LAN-exposed). It serves
@@ -189,8 +250,8 @@ export function timingSafeEqual(a: string, b: string): boolean {
 	return nodeTimingSafeEqual(ab, bb);
 }
 
-/** Paths reachable WITHOUT a session: the login page, the auth endpoints, and the build's
- * static assets (the login page needs its own CSS/JS, all of which live under /assets/).
+/** Paths reachable WITHOUT a session: the login and setup pages, the auth endpoints, and the
+ * build's static assets (the auth pages need their own CSS/JS, all of which live under /assets/).
  * Everything else — crucially ALL of /api — is gated.
  *
  * Note: do NOT allowlist by file extension. The client assets are all under /assets/, and a
@@ -198,7 +259,7 @@ export function timingSafeEqual(a: string, b: string): boolean {
  * `.json`/`.png` management route) through the proxy unauthenticated. */
 export function isPublicPath(pathname: string): boolean {
 	if (pathname === "/api" || pathname.startsWith("/api/")) return false; // always gated
-	if (pathname === "/login") return true;
+	if (pathname === "/login" || pathname === "/setup") return true;
 	if (pathname.startsWith("/_auth/")) return true;
 	if (pathname.startsWith("/assets/")) return true;
 	if (pathname === "/favicon.ico" || pathname === "/robots.txt") return true;

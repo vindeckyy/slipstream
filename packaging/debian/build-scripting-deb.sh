@@ -84,7 +84,7 @@ install -Dm0644 sdk/README.md  "$DOCDIR/README.md"
 cat > "$DOCDIR/copyright" <<EOF
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: slipstream
-Source: https://github.com/vindeckyy/slipstream.git
+Source: https://github.com/vindeckyy/slipstream/slipstream
 
 Files: *
 Copyright: slipstream contributors
@@ -107,7 +107,7 @@ Maintainer: unom <packages@unom.io>
 Installed-Size: $INSTALLED_KB
 Section: net
 Priority: optional
-Homepage: https://github.com/vindeckyy/slipstream.git
+Homepage: https://github.com/vindeckyy/slipstream/slipstream
 Description: slipstream plugin/script runner (Effect SDK on bun)
  Runs a slipstream host's automation: loose scripts in ~/.config/slipstream/scripts and installed
  slipstream-plugin-* packages under ~/.config/slipstream/plugins, each supervised (Effect fibers with

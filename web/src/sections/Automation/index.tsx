@@ -94,16 +94,20 @@ export const SectionAutomation: FC = () => {
 	return (
 		<Section maxWidth={false}>
 			<div className="flex flex-col gap-card">
-				<div className="space-y-1">
-					<h1 className="text-2xl font-semibold">{m.automation_title()}</h1>
+				<header className="space-y-1.5 border-b border-border/60 pb-4">
+					<h1 className="text-2xl font-semibold tracking-tight">
+						{m.automation_title()}
+					</h1>
 					<p className="max-w-prose text-sm text-muted-foreground">
 						{m.automation_subtitle()}
 					</p>
-				</div>
+				</header>
 
 				<Card>
-					<CardHeader className="flex-row items-center justify-between space-y-0">
-						<CardTitle>{m.automation_hooks_title()}</CardTitle>
+					<CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+						<CardTitle className="text-base tracking-tight">
+							{m.automation_hooks_title()}
+						</CardTitle>
 						<Button
 							size="sm"
 							variant="outline"
@@ -125,7 +129,7 @@ export const SectionAutomation: FC = () => {
 							refetch={query.refetch}
 						>
 							{list.length === 0 ? (
-								<p className="text-sm text-muted-foreground">
+								<p className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
 									{m.automation_empty()}
 								</p>
 							) : (
@@ -135,15 +139,15 @@ export const SectionAutomation: FC = () => {
 											// The list is operator-ordered and has no ids; the index IS the identity
 											// here, and rows only move when the operator moves them.
 											key={`${h.on}:${hookAction(h)}:${i}`}
-											className="flex items-start gap-3 rounded-lg border p-3"
+											className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/15 p-3 transition-colors hover:bg-muted/30"
 										>
 											{h.webhook ? (
 												<Webhook className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
 											) : (
 												<Terminal className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
 											)}
-											<div className="min-w-0 flex-1 space-y-1">
-												<div className="flex flex-wrap items-center gap-2">
+											<div className="min-w-0 flex-1 space-y-1.5">
+												<div className="flex flex-wrap items-center gap-1.5">
 													<Badge variant="secondary">{h.on}</Badge>
 													{hookFilterSummary(h) && (
 														<Badge variant="outline">
@@ -162,22 +166,24 @@ export const SectionAutomation: FC = () => {
 													{hookAction(h)}
 												</p>
 											</div>
-											<Button
-												variant="ghost"
-												size="icon"
-												aria-label={m.automation_edit()}
-												onClick={() => setEditing({ index: i, hook: h })}
-											>
-												<Pencil className="size-4" />
-											</Button>
-											<Button
-												variant="ghost"
-												size="icon"
-												aria-label={m.automation_delete()}
-												onClick={() => remove(i)}
-											>
-												<Trash2 className="size-4 text-destructive" />
-											</Button>
+											<div className="flex shrink-0 gap-0.5">
+												<Button
+													variant="ghost"
+													size="icon"
+													aria-label={m.automation_edit()}
+													onClick={() => setEditing({ index: i, hook: h })}
+												>
+													<Pencil className="size-4" />
+												</Button>
+												<Button
+													variant="ghost"
+													size="icon"
+													aria-label={m.automation_delete()}
+													onClick={() => remove(i)}
+												>
+													<Trash2 className="size-4 text-destructive" />
+												</Button>
+											</div>
 										</li>
 									))}
 								</ul>
@@ -185,7 +191,7 @@ export const SectionAutomation: FC = () => {
 						</QueryState>
 
 						{dirty && (
-							<div className="flex flex-wrap items-center gap-3 rounded-md bg-[var(--warning)]/10 px-3 py-2">
+							<div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-[var(--warning)]/10 px-3 py-2.5 backdrop-blur-sm">
 								<span className="text-sm font-medium">
 									{m.automation_unsaved()}
 								</span>

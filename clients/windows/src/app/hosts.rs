@@ -342,7 +342,7 @@ fn edit_editor(
     // rather than at Save — it is a picker with no draft ref, and the rest of the sheet's
     // fields are text boxes that genuinely need one.
     let profile_picker = {
-        let catalog = pf_client_core::profiles::ProfilesFile::load();
+        let catalog = ss_client_core::profiles::ProfilesFile::load();
         let stored = KnownHosts::load()
             .hosts
             .iter()
@@ -656,7 +656,7 @@ pub(crate) fn hosts_page(props: &HostsProps, cx: &mut RenderCx) -> Element {
         let mut tiles: Vec<Element> = Vec::new();
         // One catalog read per render, shared by every tile's menu and chip.
         let profiles: Vec<(String, String, Option<String>)> =
-            pf_client_core::profiles::ProfilesFile::load()
+            ss_client_core::profiles::ProfilesFile::load()
                 .profiles
                 .into_iter()
                 .map(|p| (p.id, p.name, p.accent))
@@ -795,7 +795,7 @@ pub(crate) fn hosts_page(props: &HostsProps, cx: &mut RenderCx) -> Element {
                             set_hosts_rev.call(hosts_rev + 1);
                         }
                         MENU_SHORTCUT => {
-                            let url = pf_client_core::deeplink::DeepLink::for_host(
+                            let url = ss_client_core::deeplink::DeepLink::for_host(
                                 &shortcut_host,
                                 None,
                                 None,
@@ -807,13 +807,13 @@ pub(crate) fn hosts_page(props: &HostsProps, cx: &mut RenderCx) -> Element {
                             }
                         }
                         MENU_COPY_LINK => {
-                            let url = pf_client_core::deeplink::DeepLink::for_host(
+                            let url = ss_client_core::deeplink::DeepLink::for_host(
                                 &link_host,
                                 None,
                                 link_profile.as_deref(),
                             )
                             .to_url();
-                            pf_client_core::clipboard::set_text(&url);
+                            ss_client_core::clipboard::set_text(&url);
                         }
                         MENU_CONNECT => {
                             initiate(&svc.ctx, target.clone(), &svc.set_screen, &svc.set_status)

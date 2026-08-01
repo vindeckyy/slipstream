@@ -75,7 +75,7 @@ pub fn browse() -> async_channel::Receiver<DiscoveredHost> {
                             .map(|s| s.trim().to_string())
                             .filter(|s| !s.is_empty())
                             .collect(),
-                        os: pf_client_core::os::sanitize_os(&val("os")),
+                        os: ss_client_core::os::sanitize_os(&val("os")),
                     };
                     if tx.send_blocking(host).is_err() {
                         break; // UI gone — stop browsing

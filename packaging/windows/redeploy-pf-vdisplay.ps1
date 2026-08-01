@@ -1,18 +1,18 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-  One-shot DEV redeploy of the pf-vdisplay (slipstream) virtual-display driver on the test box:
+  One-shot DEV redeploy of the ss-vdisplay (slipstream) virtual-display driver on the test box:
   (optional) build -> stop host -> stage+sign+install -> reload the adapter -> start host.
 
 .DESCRIPTION
-  Wraps drivers/deploy-dev.ps1 (which stages the freshly built pf_vdisplay.dll, clears its
+  Wraps drivers/deploy-dev.ps1 (which stages the freshly built ss_vdisplay.dll, clears its
   FORCE_INTEGRITY PE bit, signs it, stamps a STRICTLY-INCREASING DriverVer, builds+signs the catalog,
   and pnputil-installs it) with the two things the dev loop always needs around it:
 
     * The running host service HOLDS the driver's control device, and pnputil can't replace a busy
       DLL - so the host must be stopped across the install. This stops it first and starts it after.
     * pnputil /add-driver /install updates the driver STORE, but the OS keeps the LIVE adapter on the
-      old binary until the device is reloaded - so this cycles the adapter (reset-pf-vdisplay.ps1)
+      old binary until the device is reloaded - so this cycles the adapter (reset-ss-vdisplay.ps1)
       after install, which also clears the ghost monitor nodes for a clean slate.
 
   Run ELEVATED. Use -Build only from an MSVC dev shell (the driver's cargo build needs LIBCLANG_PATH
@@ -28,10 +28,10 @@
 
 .EXAMPLE
   # already built the driver in an MSVC shell -> deploy it cleanly:
-  powershell -ExecutionPolicy Bypass -File redeploy-pf-vdisplay.ps1
+  powershell -ExecutionPolicy Bypass -File redeploy-ss-vdisplay.ps1
 .EXAMPLE
   # build + deploy + verify, from an MSVC dev shell:
-  powershell -ExecutionPolicy Bypass -File redeploy-pf-vdisplay.ps1 -Build -Verify -Probe C:\t-goal1\debug\slipstream-probe.exe
+  powershell -ExecutionPolicy Bypass -File redeploy-ss-vdisplay.ps1 -Build -Verify -Probe C:\t-goal1\debug\slipstream-probe.exe
 #>
 [CmdletBinding()]
 param(
@@ -47,12 +47,12 @@ $ErrorActionPreference = 'Stop'
 $here       = Split-Path -Parent $MyInvocation.MyCommand.Path
 $driversDir = Join-Path $here 'drivers'
 $deploy     = Join-Path $driversDir 'deploy-dev.ps1'
-$reset      = Join-Path $here 'reset-pf-vdisplay.ps1'
+$reset      = Join-Path $here 'reset-ss-vdisplay.ps1'
 foreach ($f in @($deploy, $reset)) { if (-not (Test-Path $f)) { throw "missing helper: $f" } }
 
 # 1) Optional rebuild (MSVC dev shell only).
 if ($Build) {
-    Write-Host "==> cargo build  (pf-vdisplay driver, $driversDir)"
+    Write-Host "==> cargo build  (ss-vdisplay driver, $driversDir)"
     Push-Location $driversDir
     try {
         cargo build
@@ -78,7 +78,7 @@ Write-Host "==> deploy-dev.ps1 -Install"
 
 # 4) Reload the adapter so the OS loads the freshly-installed binary (+ clear ghost nodes). The reset
 #    leaves the host alone (-NoHost) - we own the service lifecycle here.
-Write-Host "==> reloading the pf-vdisplay adapter (clean slate)"
+Write-Host "==> reloading the ss-vdisplay adapter (clean slate)"
 & $reset -NoHost
 
 # 5) Start the host.
@@ -96,4 +96,4 @@ if ($Verify) {
     & $reset @vArgs
 }
 
-Write-Host "pf-vdisplay redeploy done."
+Write-Host "ss-vdisplay redeploy done."

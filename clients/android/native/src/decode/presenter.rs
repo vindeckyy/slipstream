@@ -117,7 +117,7 @@ struct InFlight {
 }
 
 /// Latch samples + display confirms recorded by the `OnFrameRendered` callback thread, drained by
-/// the presenter's 1 Hz `pf-present` line. Always on (independent of the HUD) — this is what makes
+/// the presenter's 1 Hz `ss-present` line. Always on (independent of the HUD) — this is what makes
 /// a HUD-off wireless A/B readable from logcat.
 pub(super) struct PresentMeter {
     inner: Mutex<PresentMeterInner>,
@@ -233,7 +233,7 @@ pub(super) struct Presenter {
     inflight: Option<InFlight>,
     /// A vsync arrived since the last release — the FIFO's one-per-refresh drain pace.
     vsync_tick: bool,
-    // -- 1 Hz pf-present window, always on --
+    // -- 1 Hz ss-present window, always on --
     released: u64,
     paced_drops: u64,
     no_budget: u64,
@@ -430,8 +430,8 @@ impl Presenter {
         self.inflight = None;
     }
 
-    /// The 1 Hz `pf-present` logcat mirror (target `pf.present`) — the Apple client's Console
-    /// `pf-present` line, so a HUD-off on-device A/B is readable wirelessly:
+    /// The 1 Hz `ss-present` logcat mirror (target `pf.present`) — the Apple client's Console
+    /// `ss-present` line, so a HUD-off on-device A/B is readable wirelessly:
     /// `released` (to glass) / `displays` (OnFrameRendered confirms) / `paced` (policy drops) /
     /// `noBudget` (waits on the closed budget) / `forced` (stale force-opens — 0 when healthy) /
     /// `qDry` (FIFO underflows) / `pace` (decoded→release) / `latch` (release→displayed) /

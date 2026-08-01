@@ -11,7 +11,13 @@ import {
 } from "@/api/gen/native/native";
 import { QueryState } from "@/components/query-state";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import type { Loadable } from "@/lib/query";
 import { m } from "@/paraglide/messages";
 
@@ -82,22 +88,22 @@ export const NativePairingCard: FC<{
 			error={status.error}
 			refetch={status.refetch}
 		>
-			<Card>
+			<Card className="h-full">
 				<CardHeader>
-					<CardTitle className="flex items-center gap-2">
-						<Smartphone className="size-4" />
+					<CardTitle className="flex items-center gap-2 tracking-tight">
+						<Smartphone className="size-4 text-muted-foreground" />
 						{m.pairing_native_title()}
 					</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
 					{!d?.enabled ? (
-						<p className="text-sm text-muted-foreground">
+						<p className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
 							{m.pairing_native_disabled()}
 						</p>
 					) : d.armed && d.pin ? (
-						<div className="space-y-3">
+						<div className="space-y-4">
 							<p className="text-sm">{m.pairing_native_enter()}</p>
-							<div className="rounded-lg border bg-muted/40 py-5 text-center font-mono text-4xl font-semibold tracking-[0.3em]">
+							<div className="rounded-xl border border-border/70 bg-muted/30 py-6 text-center font-mono text-4xl font-semibold tracking-[0.3em] tabular-nums">
 								{d.pin}
 							</div>
 							{d.expires_in_secs != null && (
@@ -117,9 +123,9 @@ export const NativePairingCard: FC<{
 						</div>
 					) : (
 						<>
-							<p className="text-sm text-muted-foreground">
+							<CardDescription className="text-sm leading-relaxed text-muted-foreground">
 								{m.pairing_native_desc()}
-							</p>
+							</CardDescription>
 							<Button disabled={isArming} onClick={onArm}>
 								<KeyRound className="size-4" />
 								{m.pairing_native_arm()}

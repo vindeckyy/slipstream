@@ -44,7 +44,7 @@ Run on the Bazzite host:
 ```sh
 # One-time bootstrap; afterwards the tool is on PATH as `slipstream-sysext` (it ships inside
 # the image). `--channel canary` for rolling main-branch builds instead of releases.
-curl -fsSLO https://github.com/vindeckyy/slipstream.git/raw/branch/main/packaging/bazzite/slipstream-sysext.sh
+curl -fsSLO https://github.com/vindeckyy/slipstream/slipstream/raw/branch/main/packaging/bazzite/slipstream-sysext.sh
 sudo bash slipstream-sysext.sh install
 ```
 
@@ -301,9 +301,10 @@ into the user unit directory.
 systemctl --user daemon-reload
 systemctl --user enable --now slipstream-host
 # Management web console (pairing + status), if you installed slipstream-web (it ships in the GitHub
-# RPM registry / bootc image — COPR can't build it; see ../rpm/README.md). Read the login password:
+# RPM registry / bootc image; COPR cannot build it; see ../rpm/README.md). Choose a login password
+# in the browser on first visit:
 systemctl --user enable --now slipstream-web
-journalctl --user -u slipstream-web-init | sed -n 's/.*password generated: //p'   # then open https://<host-ip>:47992
+# then open https://<host-ip>:47992
 ```
 
 Check health and logs:

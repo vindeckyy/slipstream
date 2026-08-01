@@ -262,7 +262,7 @@ Know what this trades away, because the plugin exists to fix exactly these: the 
 hard-coded, so it breaks when the couch reboots or the device moves port; and if the stream ends
 abnormally the `stream.stopped` hook never fires, leaving the device stranded on the host until
 somebody notices. There is also a
-[`virtualhere-dualsense.ts`](https://github.com/vindeckyy/slipstream.git/src/branch/main/sdk/examples/virtualhere-dualsense.ts)
+[`virtualhere-dualsense.ts`](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/sdk/examples/virtualhere-dualsense.ts)
 SDK example if you want a worked script to build your own on.
 
 > VirtualHere is a commercial product, sold separately by VirtualHere Pty. Ltd. — free for one

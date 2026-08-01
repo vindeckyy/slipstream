@@ -1,0 +1,286 @@
+package io.slipstream.kit.security
+
+import android.content.Context
+import java.util.UUID
+import org.json.JSONArray
+import org.json.JSONObject
+
+/**
+ * A host the user has trusted (pinned). [fpHex] is the pinned host-cert SHA-256 (64-hex); [paired]
+ * is true when trust was established via the SPAKE2 PIN ceremony (vs trust-on-first-use).
+ *
+ * [id] is the record's **stable identity** — minted once, never changed, and the key this record is
+ * stored under. Everything that needs to point AT a host (a settings-profile binding, a pinned
+ * card, a `slipstream://` link) points at the id, so renaming a host or moving it to a new address
+ * doesn't strand those references. Mirrors the Apple client's `StoredHost.id` and the Rust
+ * `KnownHost.id`; the shape is a lowercase UUID v4, one grammar on every platform.
+ */
+data class KnownHost(
+    val address: String,
+    val port: Int,
+    val name: String,
+    val fpHex: String,
+    val paired: Boolean,
+    /**
+     * Wake-on-LAN MAC(s) (`aa:bb:cc:dd:ee:ff`) learned from the host's mDNS `mac` TXT while it was
+     * online, so the client can wake it once it sleeps. Empty until first learned.
+     */
+    val mac: List<String> = emptyList(),
+    /**
+     * The host's OS-identity chain (`windows` | `linux/<family>/<id>`, ...) learned from its mDNS
+     * `os` TXT while online, so the card's OS icon survives the host going to sleep. Empty until
+     * first learned (or forever, against an older host).
+     */
+    val os: String = "",
+    /** Stable record identity — see the class doc. Minted here for a genuinely new record. */
+    val id: String = newRecordId(),
+    /**
+     * Sync text copied on this device to this host and back while streaming. **A property of the
+     * host, not of the stream** (design/client-settings-profiles.md §3, tier H): it is a trust
+     * decision about that machine, so it is never in a settings profile and never global — the
+     * work box and the couch box get their own answers. Only effective when the host advertises
+     * the clipboard capability; the protocol is opt-in per session either way.
+     */
+    val clipboardSync: Boolean = true,
+    /**
+     * The settings profile a plain tap on this host connects with — `null` (or an id whose profile
+     * was deleted) means the global defaults, i.e. today's behaviour. A dangling id is never an
+     * error and never blocks a connect.
+     */
+    val profileId: String? = null,
+    /**
+     * Profiles pinned as their own cards for this host (design §5.2a). Presentation only: order is
+     * card order, and this is NOT the default binding ([profileId] is). Duplicates and profiles
+     * that no longer exist are dropped when the cards are rendered.
+     */
+    val pinnedProfileIds: List<String> = emptyList(),
+)
+
+/**
+ * Persists trusted hosts — the pinned-fingerprint store *and* the saved-hosts list — keyed by
+ * [KnownHost.id]. Plain `SharedPreferences` in app-private storage: pinned fingerprints are public
+ * host identities, not secrets; the property we need is integrity, which app sandboxing provides.
+ *
+ * Records used to be keyed by `"address:port"`, which meant editing a host's address had to
+ * re-key its record (delete + write) or leave a ghost behind, and meant nothing could hold a
+ * durable reference to a host. Keying by the minted stable id retires both. [migrate] moves an
+ * existing store over in one pass — see its doc for what else rides along.
+ */
+class KnownHostStore(context: Context) {
+    private val prefs =
+        context.applicationContext.getSharedPreferences(PREFS_HOSTS, Context.MODE_PRIVATE)
+
+    init {
+        migrateIfNeeded(context)
+    }
+
+    /** The trusted record for [address]:[port], or `null` if this host has never been trusted. */
+    fun get(address: String, port: Int): KnownHost? =
+        all().firstOrNull { it.address == address && it.port == port }
+
+    /** The trusted record with this stable [id], or `null` — the lookup a binding or link uses. */
+    fun byId(id: String): KnownHost? = prefs.getString(id, null)?.let(::parse)
+
+    /**
+     * Pin (or update) a trusted host — upsert by [KnownHost.id]. An edit that moves the address or
+     * port is a plain save now: the key is the identity, not the address.
+     */
+    fun save(host: KnownHost) {
+        prefs.edit().putString(host.id, encode(host)).apply()
+    }
+
+    /**
+     * Trust (or re-trust) the host at [address]:[port] with the fingerprint it presented.
+     *
+     * When a record already exists there — a re-pair after the host's identity changed, an
+     * approval that upgrades a TOFU record to paired — it keeps its identity and everything the
+     * user set on it: the stable [KnownHost.id] (so profile bindings, pinned cards and any
+     * `slipstream://` shortcut still point at it), the per-host clipboard decision, the binding,
+     * the pins and the learned MACs. Only the name, pin and paired flag are refreshed. Returns the
+     * stored record.
+     */
+    fun trust(address: String, port: Int, name: String, fpHex: String, paired: Boolean): KnownHost {
+        val existing = get(address, port)
+        val host = existing?.copy(name = name, fpHex = fpHex, paired = paired)
+            ?: KnownHost(address, port, name, fpHex, paired)
+        save(host)
+        return host
+    }
+
+    /**
+     * Learn/refresh a saved host's Wake-on-LAN MAC(s) from its live advert (called while online).
+     * No-op when the host isn't saved, the list is empty, or it's unchanged — so it doesn't churn
+     * prefs on every discovery tick.
+     */
+    fun learnMac(address: String, port: Int, mac: List<String>) {
+        if (mac.isEmpty()) return
+        val h = get(address, port) ?: return
+        if (h.mac == mac) return
+        save(h.copy(mac = mac))
+    }
+
+    /**
+     * Learn/refresh a saved host's OS-identity chain from its live advert — same contract as
+     * [learnMac]: no-op when unsaved, empty, or unchanged.
+     */
+    fun learnOs(address: String, port: Int, os: String) {
+        if (os.isEmpty()) return
+        val h = get(address, port) ?: return
+        if (h.os == os) return
+        save(h.copy(os = os))
+    }
+
+    /** Forget [host] (the next connect re-pairs / re-TOFUs). */
+    fun remove(host: KnownHost) {
+        prefs.edit().remove(host.id).apply()
+    }
+
+    /** All trusted hosts, name-sorted — backs the saved-hosts list. */
+    fun all(): List<KnownHost> = prefs.all
+        .filterKeys { it != K_SCHEMA }
+        .values
+        .mapNotNull { (it as? String)?.let(::parse) }
+        .sortedBy { it.name.lowercase() }
+
+    /**
+     * One-time move from the `"address:port"`-keyed schema to id-keyed records, run on first
+     * construction after the upgrade and never again ([K_SCHEMA] records that it happened).
+     *
+     * It is deliberately ONE pass, not three: the store is being rewritten anyway, and every extra
+     * migration pass is another chance to strand somebody's hosts. So the same pass mints the
+     * stable id, re-keys the record onto it, and copies the retiring GLOBAL clipboard-sync setting
+     * onto every host — behaviour-preserving, since every host was following that one value.
+     */
+    private fun migrateIfNeeded(context: Context) {
+        if (prefs.getInt(K_SCHEMA, 0) >= SCHEMA_VERSION) return
+        val settings =
+            context.applicationContext.getSharedPreferences(PREFS_SETTINGS, Context.MODE_PRIVATE)
+        val result = migrate(prefs.all, settings.getBoolean(K_GLOBAL_CLIPBOARD_SYNC, true))
+        // `commit`, not `apply`: the re-keyed records and the schema flag are one atomic write to
+        // disk, and the global below is only retired once that write has landed. With `apply` a
+        // process death in between could drop the old global while the hosts that were supposed to
+        // inherit it were still only in memory. Once, on one small file, on an upgrade.
+        val written = prefs.edit().apply {
+            result.removals.forEach(::remove)
+            result.writes.forEach { (k, v) -> putString(k, v) }
+            putInt(K_SCHEMA, SCHEMA_VERSION)
+        }.commit()
+        if (written && settings.contains(K_GLOBAL_CLIPBOARD_SYNC)) {
+            settings.edit().remove(K_GLOBAL_CLIPBOARD_SYNC).apply()
+        }
+    }
+
+    private fun parse(s: String): KnownHost? = runCatching {
+        val j = JSONObject(s)
+        KnownHost(
+            address = j.getString("addr"),
+            port = j.getInt("port"),
+            name = j.getString("name"),
+            fpHex = j.getString("fp"),
+            paired = j.optBoolean("paired", false),
+            mac = j.optString("mac", "").split(",").map { it.trim() }.filter { it.isNotEmpty() },
+            os = j.optString("os", ""),
+            // A record without an id can only be one this build wrote before the migration ran, or
+            // a hand-edited file; minting here keeps the parse total rather than dropping a host.
+            id = j.optString("id", "").ifEmpty { newRecordId() },
+            clipboardSync = j.optBoolean("clip", true),
+            profileId = j.optString("profile", "").ifEmpty { null },
+            pinnedProfileIds = stringList(j.optJSONArray("pins")),
+        )
+    }.getOrNull()
+
+    companion object {
+        /** The prefs file holding the host records. */
+        private const val PREFS_HOSTS = "slipstream_hosts"
+
+        /** The app's settings file — read once by [migrate] for the retiring global. */
+        private const val PREFS_SETTINGS = "slipstream_settings"
+
+        /**
+         * The global clipboard-sync key this migration retires. Clipboard sync is a decision about
+         * a HOST (design §3, tier H), so it lives on the record now; the global is read once, to
+         * seed every host, and then deleted.
+         */
+        private const val K_GLOBAL_CLIPBOARD_SYNC = "clipboard_sync"
+
+        /** Schema marker inside the hosts file. Reserved — never a host record. */
+        private const val K_SCHEMA = "__schema"
+
+        /** 1 = id-keyed records with per-host clipboard sync, profile binding and pins. */
+        private const val SCHEMA_VERSION = 1
+
+        /** What [migrate] decided: entries to write, and (old) keys to drop. */
+        data class Migration(val writes: Map<String, String>, val removals: Set<String>)
+
+        /**
+         * The pure half of the store migration, over a raw prefs snapshot ([entries] as returned by
+         * `SharedPreferences.all`) — so it can be tested against a real pre-migration blob without
+         * an Android runtime.
+         *
+         * Every host record survives with its address, port, name, pin, paired flag and MACs
+         * intact, gains a minted [KnownHost.id], moves to that key, and takes
+         * [globalClipboardSync] as its own [KnownHost.clipboardSync]. Entries that aren't parsable
+         * host records are left alone: they were already invisible (`all()` skipped them), and
+         * deleting things we don't understand is not this pass's job.
+         */
+        fun migrate(entries: Map<String, Any?>, globalClipboardSync: Boolean): Migration {
+            val writes = mutableMapOf<String, String>()
+            val removals = mutableSetOf<String>()
+            for ((key, raw) in entries) {
+                if (key == K_SCHEMA) continue
+                val json = (raw as? String)?.let { runCatching { JSONObject(it) }.getOrNull() }
+                    ?: continue
+                if (!json.has("addr") || !json.has("port")) continue
+                val id = json.optString("id", "").ifEmpty { newRecordId() }
+                json.put("id", id)
+                json.put("clip", json.optBoolean("clip", globalClipboardSync))
+                writes[id] = json.toString()
+                if (key != id) removals += key
+            }
+            return Migration(writes, removals)
+        }
+
+        /**
+         * Parse a free-typed Wake-on-LAN field into normalized `aa:bb:cc:dd:ee:ff` entries (comma /
+         * space / newline separated). Anything that isn't six colon-separated hex octets is dropped;
+         * an empty result clears the host's MAC. Mirrors the Apple client's `AddHostSheet.parseMacs`.
+         */
+        fun parseMacs(s: String): List<String> = s
+            .split(',', ';', ' ', '\n', '\t')
+            .map { it.trim().lowercase() }
+            .filter { m ->
+                // Exactly six octets, each two literal hex digits. (Not toIntOrNull(16) — that accepts
+                // a leading +/- sign, so "aa:bb:cc:dd:ee:-1" would wrongly pass.)
+                m.split(":").let { o ->
+                    o.size == 6 && o.all { it.length == 2 && it.all { c -> c in '0'..'9' || c in 'a'..'f' } }
+                }
+            }
+
+        /** The stored JSON for one record — also the shape [migrate] upgrades into. */
+        internal fun encode(host: KnownHost): String = JSONObject()
+            .put("id", host.id)
+            .put("addr", host.address)
+            .put("port", host.port)
+            .put("name", host.name)
+            .put("fp", host.fpHex.lowercase())
+            .put("paired", host.paired)
+            .put("mac", host.mac.joinToString(","))
+            .put("os", host.os)
+            .put("clip", host.clipboardSync)
+            .put("profile", host.profileId ?: "")
+            .put("pins", JSONArray(host.pinnedProfileIds))
+            .toString()
+
+        private fun stringList(a: JSONArray?): List<String> {
+            if (a == null) return emptyList()
+            return (0 until a.length()).mapNotNull { a.optString(it, "").ifEmpty { null } }
+        }
+    }
+}
+
+/**
+ * A fresh stable record identity: a lowercase UUID v4, the shape the Apple client's `StoredHost.id`
+ * and the Rust `KnownHost.id` already use, so a `slipstream://` host reference is one grammar
+ * everywhere.
+ */
+fun newRecordId(): String = UUID.randomUUID().toString()

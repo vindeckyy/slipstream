@@ -24,7 +24,7 @@ const BASE: StoreEntry = {
 		"Scans your ROM directories, maps them to emulators, fetches box art, and reconciles everything into the host game library as a provider.",
 	icon: "gamepad-2",
 	author: "unom",
-	homepage: "https://github.com/vindeckyy/slipstream.git-plugin-rom-manager",
+	homepage: "https://github.com/vindeckyy/slipstream/slipstream-plugin-rom-manager",
 	license: "MIT OR Apache-2.0",
 	version: "0.3.2",
 	source: "unom official",

@@ -4,9 +4,9 @@ description: Where the Slipstream web console login password lives — and how t
 ---
 
 The Slipstream **web console** (status, paired devices, PIN pairing) is protected by a login
-password. That password is generated — or, on Windows, chosen — when the console is first set up, and
-it lives on the **host**. So if you can't get past the login screen, you recover or change it on the
-host machine itself, not from the browser.
+password. New Linux and SteamOS installs ask you to choose it in the browser; Windows asks during
+installation. It lives on the **host**, so if you can't get past the login screen, recover or change
+it on the host machine itself.
 
 New to the console? See [The Web Console](/docs/web-console) to enable it and arm pairing.
 
@@ -20,7 +20,7 @@ Find your host platform for exactly where the password lives, then read it back 
 | Host | Where the password lives | Section |
 |------|--------------------------|---------|
 | **Linux packages (apt / RPM / Arch / Bazzite / NixOS)** | `~/.config/slipstream/web-password` | [Login password](/docs/web-console#login-password) |
-| **SteamOS (host)** | `~/.config/slipstream/web.env` | [Login password](/docs/web-console#login-password) |
+| **SteamOS (host)** | `~/.config/slipstream/web-password` | [Login password](/docs/web-console#login-password) |
 | **Windows host** | `%ProgramData%\slipstream\web-password` | [Login password](/docs/web-console#login-password) · [Windows Host](/docs/windows-host) |
 
 ## Read it back, or set your own
@@ -64,18 +64,15 @@ with the password you typed.
 
   (The PowerShell one is Windows, from an **elevated** prompt — the console runs under the
   Slipstream Host service there.)
-- **No password is configured at all.** If the file is missing or empty, or a line lost its
-  `SLIPSTREAM_UI_PASSWORD=` prefix, the console fails closed and admits nobody — a page you open
-  answers `auth not configured: set SLIPSTREAM_UI_PASSWORD`. Put the line back —
-  `SLIPSTREAM_UI_PASSWORD=<your-password>`, on its own line, nothing else on it — and restart the
-  console as above. On the Linux packages you can instead **delete**
-  `~/.config/slipstream/web-password` and run
+- **No password is configured at all.** If the file is missing or empty, the console shows the
+  first-run setup screen. Choose a password there. On older Linux installs you can intentionally
+  **delete** `~/.config/slipstream/web-password` and restart the console to return to setup:
 
   ```sh
-  systemctl --user restart slipstream-web-init slipstream-web
+  systemctl --user restart slipstream-web
   ```
 
-  which generates a fresh password, prints it to the journal, and starts the console with it —
-  read it back with the command above.
+  If the setup screen cannot save the password, restore the line
+  `SLIPSTREAM_UI_PASSWORD=<your-password>` in the file and restart again.
 
 Still stuck? See [Troubleshooting](/docs/troubleshooting).

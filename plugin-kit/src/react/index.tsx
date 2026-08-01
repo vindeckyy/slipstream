@@ -5,7 +5,7 @@
 // Routing model (fixes the broken deep-link restore of the first-generation UIs): the
 // console pins the iframe src to the deep-linked PATH (`/plugin-ui/<id>/<route>`), so
 // route init must read the last pathname segment — the hash is only a standalone-tab
-// fallback. Navigation posts `pf-ui:navigate` so the console mirrors the route into its
+// fallback. Navigation posts `ss-ui:navigate` so the console mirrors the route into its
 // own URL (replace: true; the iframe src stays pinned — no reload loop).
 import { useEffect, useState, type ReactNode } from "react";
 import { Option, Schema } from "effect";
@@ -25,7 +25,7 @@ export const useIsEmbedded = (): boolean =>
 export const postNavigate = (path: string): void => {
 	try {
 		if (window.parent !== window) {
-			window.parent.postMessage({ type: "pf-ui:navigate", path }, "*");
+			window.parent.postMessage({ type: "ss-ui:navigate", path }, "*");
 		}
 	} catch {
 		// cross-origin parent or detached — deep-link sync is best-effort

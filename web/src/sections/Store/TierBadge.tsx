@@ -38,7 +38,7 @@ export const TierBadge: FC<{ tier: StoreTier; className?: string }> = ({
 				<Badge
 					variant="outline"
 					className={cn(
-						"gap-1 border-amber-600/40 text-amber-600 dark:border-amber-500/40 dark:text-amber-500",
+						"gap-1 border-amber-600/40 text-amber-700 dark:border-amber-500/40 dark:text-amber-400",
 						className,
 					)}
 					title={m.store_tier_external_hint()}

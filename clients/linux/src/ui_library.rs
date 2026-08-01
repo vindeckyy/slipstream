@@ -235,7 +235,7 @@ fn render(state: &Rc<State>, games: &[GameEntry]) {
 /// this title (silent on a pinned host — the normal trust gate applies).
 fn game_card(state: &Rc<State>, game: &GameEntry) -> gtk::FlowBoxChild {
     let monogram = gtk::Label::new(Some(&initials(&game.title)));
-    monogram.add_css_class("pf-poster-monogram");
+    monogram.add_css_class("ss-poster-monogram");
     monogram.set_halign(gtk::Align::Center);
     monogram.set_valign(gtk::Align::Center);
     let placeholder = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -250,8 +250,8 @@ fn game_card(state: &Rc<State>, game: &GameEntry) -> gtk::FlowBoxChild {
     state.pics.borrow_mut().insert(game.id.clone(), pic.clone());
 
     let badge = gtk::Label::new(Some(store_label(&game.store)));
-    badge.add_css_class("pf-pill");
-    badge.add_css_class("pf-store-badge");
+    badge.add_css_class("ss-pill");
+    badge.add_css_class("ss-store-badge");
     badge.set_halign(gtk::Align::Start);
     badge.set_valign(gtk::Align::Start);
     badge.set_margin_start(6);
@@ -261,7 +261,7 @@ fn game_card(state: &Rc<State>, game: &GameEntry) -> gtk::FlowBoxChild {
     poster.set_child(Some(&placeholder));
     poster.add_overlay(&pic);
     poster.add_overlay(&badge);
-    poster.add_css_class("pf-poster");
+    poster.add_css_class("ss-poster");
     poster.set_overflow(gtk::Overflow::Hidden);
     poster.set_size_request(150, 225);
     poster.set_halign(gtk::Align::Center);

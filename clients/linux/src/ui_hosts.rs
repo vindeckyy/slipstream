@@ -228,7 +228,7 @@ impl relm4::factory::FactoryComponent for HostCard {
         }
         let pill = |text: &str, class: &str| {
             let l = gtk::Label::new(Some(text));
-            l.add_css_class("pf-pill");
+            l.add_css_class("ss-pill");
             l.add_css_class(class);
             l
         };
@@ -242,9 +242,9 @@ impl relm4::factory::FactoryComponent for HostCard {
             } => {
                 // Presence pip + spelled-out state, then the trust pill.
                 let pip = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-                pip.add_css_class("pf-pip");
+                pip.add_css_class("ss-pip");
                 if *online {
-                    pip.add_css_class("pf-online");
+                    pip.add_css_class("ss-online");
                 }
                 pip.set_valign(gtk::Align::Center);
                 status.append(&pip);
@@ -253,9 +253,9 @@ impl relm4::factory::FactoryComponent for HostCard {
                 presence.add_css_class("dim-label");
                 status.append(&presence);
                 status.append(&if k.paired {
-                    pill("Paired", "pf-green")
+                    pill("Paired", "ss-green")
                 } else {
-                    pill("Trusted", "pf-accent")
+                    pill("Trusted", "ss-accent")
                 });
                 // The chip says what a plain click on THIS card will do: its own profile on
                 // a pinned card, the host's binding on the primary one. Both resolve through
@@ -273,9 +273,9 @@ impl relm4::factory::FactoryComponent for HostCard {
             }
             CardKind::Discovered(_) => {
                 status.append(&if req.pair_optional {
-                    pill("Open", "pf-neutral")
+                    pill("Open", "ss-neutral")
                 } else {
-                    pill("PIN", "pf-accent")
+                    pill("PIN", "ss-accent")
                 });
             }
         }
@@ -283,7 +283,7 @@ impl relm4::factory::FactoryComponent for HostCard {
 
         overlay.set_child(Some(&content));
         overlay.add_css_class("card");
-        overlay.add_css_class("pf-host-card");
+        overlay.add_css_class("ss-host-card");
         if self.connecting {
             returned.set_sensitive(false);
         }
@@ -298,7 +298,7 @@ impl relm4::factory::FactoryComponent for HostCard {
                 pinned,
             } => {
                 if *recent {
-                    overlay.add_css_class("pf-recent");
+                    overlay.add_css_class("ss-recent");
                 }
                 // Overflow menu (top-right; also on right-click).
                 let actions = gio::SimpleActionGroup::new();
@@ -374,7 +374,7 @@ impl relm4::factory::FactoryComponent for HostCard {
                     let a = gio::SimpleAction::new("copy-link", None);
                     let sender = sender.clone();
                     a.connect_activate(move |_, _| {
-                        let url = pf_client_core::deeplink::DeepLink::for_host(
+                        let url = ss_client_core::deeplink::DeepLink::for_host(
                             &host,
                             None,
                             profile.as_ref().map(|(id, _)| id.as_str()),
@@ -389,7 +389,7 @@ impl relm4::factory::FactoryComponent for HostCard {
                     let a = gio::SimpleAction::new("shortcut", None);
                     let sender = sender.clone();
                     a.connect_activate(move |_, _| {
-                        let url = pf_client_core::deeplink::DeepLink::for_host(
+                        let url = ss_client_core::deeplink::DeepLink::for_host(
                             &host,
                             None,
                             profile.as_ref().map(|(id, _)| id.as_str()),
@@ -557,7 +557,7 @@ impl relm4::factory::FactoryComponent for HostCard {
                 });
             }
             CardKind::Discovered(_) => {
-                overlay.add_css_class("pf-discovered");
+                overlay.add_css_class("ss-discovered");
                 // Tap-to-connect only (parity with Android's discovered cards).
                 let sender = sender.clone();
                 returned.connect_activate(move |_| {
@@ -582,7 +582,7 @@ const PROBE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(12);
 /// for this — without it every profile is the same grey, and telling them apart across a grid
 /// at a glance is the whole reason the chip exists. No colour set keeps the neutral pill, so
 /// the palette stays opt-in.
-/// The OS-icon tokens this shell ships symbolic art for (`data/icons/.../pf-os-<t>-symbolic.svg`,
+/// The OS-icon tokens this shell ships symbolic art for (`data/icons/.../ss-os-<t>-symbolic.svg`,
 /// embedded via gresource): the families a chain can land on, plus the gaming distros that earn
 /// their own mark because "a Bazzite box" and "a Fedora box" are different machines to the person
 /// reading the card. Chains walk most-specific-first, so a distro without a mark of its own still
@@ -599,7 +599,7 @@ fn os_icon_image(chain: &str) -> Option<gtk::Image> {
     let token = crate::os::os_icon_tokens(chain)
         .into_iter()
         .find(|t| OS_ICON_TOKENS.contains(&t.as_str()))?;
-    let img = gtk::Image::from_icon_name(&format!("pf-os-{token}-symbolic"));
+    let img = gtk::Image::from_icon_name(&format!("ss-os-{token}-symbolic"));
     img.set_pixel_size(14);
     img.add_css_class("dim-label");
     img.set_valign(gtk::Align::Center);
@@ -609,9 +609,9 @@ fn os_icon_image(chain: &str) -> Option<gtk::Image> {
 
 fn profile_pill(p: &Profile) -> gtk::Widget {
     let label = gtk::Label::new(Some(&p.name));
-    label.add_css_class("pf-pill");
+    label.add_css_class("ss-pill");
     let Some(hex) = p.accent.as_deref().filter(|h| is_hex_colour(h)) else {
-        label.add_css_class("pf-neutral");
+        label.add_css_class("ss-neutral");
         return label.upcast();
     };
     label.add_css_class(&tint_class(hex));
@@ -629,7 +629,7 @@ fn tint_class(hex: &str) -> String {
     thread_local! {
         static REGISTERED: RefCell<HashMap<String, ()>> = RefCell::new(HashMap::new());
     }
-    let class = format!("pf-tint-{}", &hex[1..]);
+    let class = format!("ss-tint-{}", &hex[1..]);
     REGISTERED.with_borrow_mut(|seen| {
         if seen.contains_key(&class) {
             return;
@@ -637,7 +637,7 @@ fn tint_class(hex: &str) -> String {
         if let Some(display) = gtk::gdk::Display::default() {
             let provider = gtk::CssProvider::new();
             provider.load_from_string(&format!(
-                ".pf-pill.{class} {{ color: {hex}; background: alpha({hex}, 0.18); }}"
+                ".ss-pill.{class} {{ color: {hex}; background: alpha({hex}, 0.18); }}"
             ));
             gtk::style_context_add_provider_for_display(
                 &display,
@@ -746,7 +746,7 @@ impl SimpleComponent for HostsPage {
                 .row_spacing(12)
                 .build();
             // Scopes the concentric hover-highlight radius (see app.rs CSS).
-            f.add_css_class("pf-host-grid");
+            f.add_css_class("ss-host-grid");
             f
         };
         let heading = |text: &str| {
@@ -1044,7 +1044,7 @@ impl HostsPage {
         let library_enabled = self.settings.borrow().library_enabled;
         // One catalog read per refresh, shared by every card's menus and chip.
         let profiles: Rc<Vec<Profile>> = Rc::new(
-            pf_client_core::profiles::ProfilesFile::load()
+            ss_client_core::profiles::ProfilesFile::load()
                 .profiles
                 .into_iter()
                 .map(|p| Profile {
@@ -1232,7 +1232,7 @@ impl HostsPage {
         clipboard_row.set_active(stored.as_ref().is_some_and(|h| h.clipboard_sync));
 
         // Profile picker: "Default settings" plus the catalog, seeded to the current binding.
-        let catalog = pf_client_core::profiles::ProfilesFile::load();
+        let catalog = ss_client_core::profiles::ProfilesFile::load();
         let mut labels = vec!["Default settings".to_string()];
         let mut ids: Vec<String> = vec![String::new()];
         for p in &catalog.profiles {

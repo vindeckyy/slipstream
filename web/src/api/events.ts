@@ -131,11 +131,12 @@ const ACTIVITY_MAX = 200;
 let activity: ActivityEntry[] = [];
 const activityListeners = new Set<() => void>();
 
-function pushActivity(entry: ActivityEntry): void {
+function pushActivity(entry: ActivityEntry): boolean {
 	// Guard against a replayed frame after a reconnect (`Last-Event-ID` can re-deliver the cursor).
-	if (activity.some((e) => e.seq === entry.seq)) return;
+	if (activity.some((e) => e.seq === entry.seq)) return false;
 	activity = [entry, ...activity].slice(0, ACTIVITY_MAX);
 	for (const l of activityListeners) l();
+	return true;
 }
 
 /** The activity tail, newest first. Re-renders as frames arrive. */
@@ -152,6 +153,30 @@ export function useActivity(): ActivityEntry[] {
 }
 
 const EMPTY_ACTIVITY: ActivityEntry[] = [];
+
+/** The externally visible lifecycle of the app-lifetime EventSource. */
+export type HostEventsStatus = "idle" | "connecting" | "open" | "reconnecting" | "closed";
+
+let status: HostEventsStatus = "idle";
+const statusListeners = new Set<() => void>();
+
+function setStatus(next: HostEventsStatus): void {
+	if (status === next) return;
+	status = next;
+	for (const l of statusListeners) l();
+}
+
+/** The app-lifetime stream status. SSR reports `idle` until the browser opens the stream. */
+export function useHostEventsStatus(): HostEventsStatus {
+	return useSyncExternalStore(
+		(cb) => {
+			statusListeners.add(cb);
+			return () => statusListeners.delete(cb);
+		},
+		() => status,
+		() => "idle",
+	);
+}
 
 /** Every kind we act on. A kind the host adds later simply has no listener — never a mis-handle. */
 const KINDS = [
@@ -198,31 +223,96 @@ let client: QueryClient | null = null;
 /** How long the stream survives with no subscribers, so a hydration blip doesn't reconnect. */
 const CLOSE_GRACE_MS = 10_000;
 
+// EventSource can deliver several lifecycle frames for one host transition. Keep a short queue so
+// equivalent query keys are invalidated once, while separate keys still retain their mapping.
+const INVALIDATION_COALESCE_MS = 50;
+const pendingInvalidations = new Map<string, readonly unknown[]>();
+let resyncPending = false;
+let invalidationTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** The keys in this module are static string tuples; value hashing ignores fresh array identities. */
+function queryKeyHash(queryKey: readonly unknown[]): string {
+	return JSON.stringify(queryKey) ?? "";
+}
+
+function flushInvalidations(): void {
+	invalidationTimer = null;
+	const qc = client;
+	if (!qc) {
+		pendingInvalidations.clear();
+		resyncPending = false;
+		return;
+	}
+
+	const fullResync = resyncPending;
+	resyncPending = false;
+	const keys = [...pendingInvalidations.values()];
+	pendingInvalidations.clear();
+
+	// A full resync covers every queued key, so do not issue redundant prefix invalidations.
+	if (fullResync) {
+		resyncAll(qc);
+		return;
+	}
+	for (const key of keys) invalidate(qc, key);
+}
+
+function scheduleInvalidationFlush(): void {
+	if (invalidationTimer !== null) return;
+	invalidationTimer = setTimeout(flushInvalidations, INVALIDATION_COALESCE_MS);
+}
+
+function queueInvalidation(queryKey: readonly unknown[]): void {
+	if (resyncPending) return;
+	pendingInvalidations.set(queryKeyHash(queryKey), queryKey);
+	scheduleInvalidationFlush();
+}
+
+function queueResync(): void {
+	resyncPending = true;
+	pendingInvalidations.clear();
+	scheduleInvalidationFlush();
+}
+
 function attach(): void {
 	if (source) return;
-	source = new EventSource("/api/v1/events");
+	setStatus("connecting");
+	const next = new EventSource("/api/v1/events");
+	source = next;
+	next.addEventListener("open", () => {
+		if (source === next) setStatus("open");
+	});
+	next.addEventListener("error", () => {
+		if (source !== next) return;
+		setStatus(next.readyState === 2 ? "closed" : "reconnecting");
+	});
 	for (const kind of KINDS) {
-		source.addEventListener(kind, (ev) => {
+		next.addEventListener(kind, (ev) => {
+			if (source !== next) return;
 			// Record it first: the feed should show an event even for a kind we invalidate nothing for.
-			recordActivity(kind, ev);
+			const duplicate = recordActivity(kind, ev) === false;
+			// A replayed Last-Event-ID frame is already represented in the cache and activity ring.
+			// Keep host.started exceptional: its full resync is required even if its seq repeats.
+			if (duplicate && kind !== "host.started") return;
 			if (!client) return;
 			// The installed set changed — but the runner is probably still restarting, so keep
 			// checking for a while rather than trusting this one refetch (see boostPluginPolling).
 			if (kind === "plugins.changed" || kind === "store.changed")
 				boostPluginPolling();
-			for (const key of keysFor(kind)) invalidate(client, key);
+			for (const key of keysFor(kind)) queueInvalidation(key);
 			// `host.started` names no keys — the host is NEW, so everything we hold predates it.
-			if (kind === "host.started") resyncAll(client);
+			if (kind === "host.started") queueResync();
 		});
 	}
 	// We fell off the host's ring — every snapshot we hold may be wrong.
-	source.addEventListener("dropped", () => {
-		if (client) resyncAll(client);
+	next.addEventListener("dropped", () => {
+		if (source !== next) return;
+		if (client) queueResync();
 	});
 }
 
 /** Parse one SSE frame into the activity ring. A malformed frame is dropped, never thrown. */
-function recordActivity(kind: string, ev: Event): void {
+function recordActivity(kind: string, ev: Event): boolean | undefined {
 	const raw = (ev as MessageEvent<string>).data;
 	if (typeof raw !== "string") return;
 	try {
@@ -230,7 +320,7 @@ function recordActivity(kind: string, ev: Event): void {
 		const seq = typeof data.seq === "number" ? data.seq : Number.NaN;
 		const ts = typeof data.ts_ms === "number" ? data.ts_ms : Number.NaN;
 		if (!Number.isFinite(seq) || !Number.isFinite(ts)) return;
-		pushActivity({ seq, ts_ms: ts, kind, data });
+		return pushActivity({ seq, ts_ms: ts, kind, data });
 	} catch {
 		// A frame we cannot parse is not worth breaking the stream over.
 	}
@@ -243,8 +333,10 @@ function release(): void {
 	closeTimer = setTimeout(() => {
 		closeTimer = null;
 		if (refs > 0) return; // someone re-subscribed inside the grace window
-		source?.close();
+		const current = source;
 		source = null;
+		current?.close();
+		setStatus("idle");
 	}, CLOSE_GRACE_MS);
 }
 
