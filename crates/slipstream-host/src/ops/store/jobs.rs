@@ -637,11 +637,11 @@ mod tests {
     fn plan_from_entry_pins_version_registry_and_integrity() {
         let idx = super::super::index::Index::parse(
             br#"{"schema":1,"plugins":[{"id":"rom-manager","pkg":"@slipstream/plugin-rom-manager",
-                "registry":"https://github.com/vindeckyy/slipstream/api/packages/unom/npm/","title":"ROM",
+                "registry":"https://example.com/npm/","title":"ROM",
                 "version":"0.3.0","integrity":"sha512-AAAA"}]}"#,
         )
         .unwrap();
-        let plan = Plan::from_entry(&idx.plugins[0], "unom", true).unwrap();
+        let plan = Plan::from_entry(&idx.plugins[0], "slipstream", true).unwrap();
         assert_eq!(plan.spec, "@slipstream/plugin-rom-manager@0.3.0");
         assert_eq!(plan.version.as_deref(), Some("0.3.0"));
         assert_eq!(plan.tier, Tier::Verified);

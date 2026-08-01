@@ -52,7 +52,7 @@ In scope — the code in this repository:
   API.
 
 Known limits — documented behavior, not vulnerabilities (see
-https://docs.slipstream.unom.io/docs/security):
+[docs-site/content/docs/security.md](docs-site/content/docs/security.md)):
 
 - **Admin/SYSTEM already on the host = out of scope.** An attacker who is already administrator or
   SYSTEM on the host owns the machine regardless of slipstream.
@@ -73,12 +73,13 @@ us beyond the download itself.
 - **Release-page downloads** (DMG, MSIX, setup.exe, APK, decky zip, .deb/.rpm) each ship a
   `<file>.sha256` next to them. In your download directory:
   `sha256sum -c slipstream-1.2.3.dmg.sha256` (macOS: `shasum -a 256 -c …`).
-- **RPMs** from the dnf repo are OpenPGP-signed with `packages@unom.io` (`AF245C506F4E4763`); the
-  repo file in [`packaging/rpm/README.md`](packaging/rpm/README.md) sets `gpgcheck=1`, so dnf
-  checks every package for you. `rpmkeys --checksig` on a downloaded RPM verifies it by hand.
-- **The Bazzite sysext feed** carries a detached signature over its `SHA256SUMS`, from that same
-  key. `slipstream-sysext` verifies it before installing and refuses a feed it cannot verify — the
-  public key is baked into the script rather than fetched from the feed.
+- **RPMs** you build locally (or attach to a
+  [GitHub Release](https://github.com/vindeckyy/slipstream/releases)) can be OpenPGP-signed; see
+  [`packaging/rpm/README.md`](packaging/rpm/README.md) for `gpgcheck=1` and how to verify with
+  `rpmkeys --checksig`.
+- **The Bazzite sysext feed** (when you publish one) carries a detached signature over its
+  `SHA256SUMS`. `slipstream-sysext` verifies it before installing and refuses a feed it cannot
+  verify — the public key is baked into the script rather than fetched from the feed.
 - **Windows installers and MSIX packages** are Authenticode-signed; a release build that cannot
   reach its code-signing certificate fails to build rather than falling back to a self-signed one.
   Check with `Get-AuthenticodeSignature slipstream-host-setup-1.2.3.exe`.

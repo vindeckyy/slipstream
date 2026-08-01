@@ -156,7 +156,7 @@ Write-Output "      DRIVER_CERT_PFX_B64   ->  $b64Path"
 Write-Output "      DRIVER_CERT_PASSWORD  ->  $pwPath"
 Write-Output ''
 Write-Output '  Add both as REPO-level secrets at:'
-Write-Output '      https://github.com/vindeckyy/slipstream/slipstream/settings/actions/secrets'
+Write-Output '      https://github.com/vindeckyy/slipstream/settings/secrets/actions'
 Write-Output ''
 Write-Output "  BACK UP $pfxPath + the password somewhere you'd keep a signing key FIRST."
 Write-Output '  Then remove the whole folder:'

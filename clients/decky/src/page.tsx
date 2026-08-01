@@ -443,7 +443,7 @@ const AboutTab: FC<{
     )}
     <Field
       label="Setup guide"
-      description="Hosts, pairing, controllers, and troubleshooting — docs.slipstream.unom.io"
+      description="Hosts, pairing, controllers, and troubleshooting — docs-site Steam Deck guide"
       childrenContainerWidth="max"
     >
       <RowActions>

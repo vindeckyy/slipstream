@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages";
 
 // The trust model, rendered. These badges are the only place the console makes a claim about where
-// a plugin's code came from, so they are deliberately literal: ONLY the built-in `unom` source earns
-// the check mark, everything else says out loud that nobody at unom looked at the code. An entry
+// a plugin's code came from, so they are deliberately literal: ONLY the built-in `slipstream` source earns
+// the check mark, everything else says out loud that Slipstream maintainers have not reviewed the code. An entry
 // from an operator-added source additionally carries a <SourceChip> naming that source — attribution
 // instead of a verification it hasn't got.
 

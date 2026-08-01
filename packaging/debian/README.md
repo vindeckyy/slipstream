@@ -1,13 +1,10 @@
 # slipstream-host — Debian/Ubuntu package (apt)
 
-`slipstream-host` is published as a `.deb` to **GitHub's Debian package registry** in the public
-`unom` org, so the Ubuntu hosts update with plain `apt`. CI (`.github/workflows/deb.yml`) builds
-and publishes on every push to `main` (a rolling `<next-minor>~ciN.g<sha>` build — the base is
-derived from the latest stable tag by `scripts/ci/ss-version.sh` — to the **`canary`** apt
-distribution) and on `vX.Y.Z` tags (a clean `X.Y.Z` to the **`stable`** distribution, plus attached
-to the unified GitHub Release). The two are separate apt distributions, so a stable box never jumps
-to a canary build — see [Release Channels](https://slipstream.unom.io/docs/channels). The repo line
-below subscribes to `stable`; swap `stable` → `canary` for the latest main builds.
+Build `.deb` packages locally with the scripts in this directory, or attach them to a
+[GitHub Release](https://github.com/vindeckyy/slipstream/releases). There is no public apt registry.
+CI (`.github/workflows/deb.yml`) can still produce canary/stable builds when you wire publishing to
+your own feed or to GitHub Releases — keep those channels separate so a stable box never jumps to a
+canary build. See [Release Channels](../../docs-site/content/docs/channels).
 
 The same workflow also publishes **`slipstream-web`** (the browser management console — pairing +
 status) and **`slipstream-client`** (the native GTK4/libadwaita Linux client). `slipstream-host` **Recommends**
@@ -38,19 +35,15 @@ you stream *to*, which is independent of the host's distro.
 
 ## Install on a host (one-time)
 
-The registry is public, so no apt auth is needed — just trust the repo's signing key:
+Build a `.deb` (see [Build a `.deb` locally](#build-a-deb-locally)), download one from
+[GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached, then:
 
 ```sh
-sudo install -d -m 0755 /etc/apt/keyrings
-curl -fsSL https://github.com/vindeckyy/slipstream/api/packages/unom/debian/repository.key \
-  | sudo tee /etc/apt/keyrings/slipstream.asc >/dev/null
-
-echo "deb [signed-by=/etc/apt/keyrings/slipstream.asc] https://github.com/vindeckyy/slipstream/api/packages/unom/debian stable main" \
-  | sudo tee /etc/apt/sources.list.d/slipstream.list
-
-sudo apt update
-sudo apt install slipstream-host
+sudo apt install ./dist/slipstream-host_*.deb
 ```
+
+If you publish your own apt feed, point `/etc/apt/sources.list.d/slipstream.list` at that feed and
+install with `sudo apt install slipstream-host` as usual.
 
 Then, as the desktop user:
 
@@ -145,8 +138,10 @@ udp dport { 47998-48010, 5353 } accept
 
 ## Updates
 
+Rebuild or re-download a newer `.deb`, install it the same way, then restart:
+
 ```sh
-sudo apt update && sudo apt upgrade        # picks up the newest published build
+sudo apt install ./dist/slipstream-host_*.deb
 systemctl --user restart slipstream-host    # if the unit was already running
 ```
 
@@ -174,9 +169,7 @@ which the noble image provides).
 
 ### The arm64 client `.deb`
 
-The **client** also ships for arm64 (`slipstream-client_<version>_arm64.deb`, published to the same
-apt distribution — the registry keys pool entries by architecture, so an arm64 box needs no extra
-configuration). There is no arm64 **host** package: the Linux host encodes with NVENC/QSV/AMF, all
+The **client** also ships for arm64 (`slipstream-client_<version>_arm64.deb`, built the same way for arm64 — an arm64 box installs the `_arm64.deb` directly). There is no arm64 **host** package: the Linux host encodes with NVENC/QSV/AMF, all
 x86.
 
 It is cross-compiled on an ordinary amd64 machine in `ci/rust-ci-arm64cross.Dockerfile` — the

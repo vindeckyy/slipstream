@@ -43,7 +43,7 @@ desktop (UAC prompts, the lock screen).
 ## Install
 
 Download the signed `slipstream-host-setup-<ver>.exe` from the
-[latest release](https://github.com/vindeckyy/slipstream/slipstream/releases) and run it. The installer:
+[latest release](https://github.com/vindeckyy/slipstream/releases) and run it. The installer:
 
 - drops the host into `C:\Program Files\slipstream` and registers + starts the **`SlipstreamHost`**
   service,
@@ -60,15 +60,15 @@ Download the signed `slipstream-host-setup-<ver>.exe` from the
 Prefer the CLI, or want the full service/firewall details? See
 [Running as a Service → Windows](/docs/running-as-a-service#windows).
 Packaging internals live in
-[`packaging/windows`](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/windows/README.md).
+[`packaging/windows`](https://github.com/vindeckyy/slipstream/blob/main/packaging/windows/README.md).
 
 ### Install with winget
 
-Slipstream ships the same signed installer through its own winget source. Register the source once
-per machine, from an **elevated** terminal:
+If you host a private winget REST source (see `packaging/winget/`), register it once per machine from
+an **elevated** terminal, then install. There is no public Slipstream winget source:
 
 ```powershell
-winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest
+# winget source add -n slipstream https://<your-winget-host> -t Microsoft.Rest
 winget install vindeckyy.SlipstreamHost
 ```
 

@@ -6,28 +6,28 @@
 //!
 //! Adding a source is itself a trust decision, made once: a source's entries become installable
 //! on this host. That is why they carry attribution and warning styling in the console but never
-//! the "Verified" badge — verification is unom reviewing a specific tarball, and it is not
-//! transferable to a third-party curator (D6).
+//! the "Verified" badge: verification is Slipstream maintainers reviewing a specific tarball, and
+//! it is not transferable to a third-party curator (D6).
 
 use super::index::PublicKey;
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
 /// The built-in source's slug. Reserved: an operator source may not take this name.
-pub(crate) const OFFICIAL_NAME: &str = "unom";
+pub(crate) const OFFICIAL_NAME: &str = "slipstream";
 
 /// The built-in source's index URL.
 ///
 /// Served straight out of the index repo over GitHub's anonymous raw endpoint: real HTTPS with a
 /// real certificate, no new vhost to stand up, and "merged to main" *is* "published". The document
-/// is signed, so the transport is not what we're trusting — swapping this for a dedicated static
+/// is signed, so the transport is not what we're trusting; swapping this for a dedicated static
 /// host later is a one-constant change with no protocol impact.
 ///
 /// One consequence worth knowing: CI signs *after* the merge, so between a merge and the signature
-/// commit the index is newer than its `.sig`. That window fails **closed** — the signature check
+/// commit the index is newer than its `.sig`. That window fails **closed**: the signature check
 /// rejects the document and hosts keep serving their last good copy, marked stale.
 pub(crate) const OFFICIAL_URL: &str =
-    "https://github.com/vindeckyy/slipstream.git-plugin-index/raw/branch/main/v1/index.json";
+    "https://raw.githubusercontent.com/vindeckyy/slipstream-plugin-index/main/v1/index.json";
 
 /// Pinned signing keys for the built-in source. **Two slots** so a key rotation is "sign with the
 /// new key, ship a host that trusts both, retire the old one" instead of a flag day where old

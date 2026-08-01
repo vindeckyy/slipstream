@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum Tier {
-    /// From the built-in source's index: unom reviewed this exact tarball.
+    /// From the built-in source's index: Slipstream maintainers reviewed this exact tarball.
     Verified,
     /// From an operator-added source's index: pinned and integrity-checked, but curated by
     /// somebody else. Attribution, never the badge (D6).
@@ -169,7 +169,7 @@ mod tests {
     fn rec(tier: Tier) -> Record {
         Record {
             tier,
-            source: Some("unom".into()),
+            source: Some("slipstream".into()),
             entry_id: Some("rom-manager".into()),
             version: Some("0.2.1".into()),
             spec: None,

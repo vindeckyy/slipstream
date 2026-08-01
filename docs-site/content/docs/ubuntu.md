@@ -3,10 +3,12 @@ title: Ubuntu
 description: Install the Slipstream host on Ubuntu with apt.
 ---
 
-Install a Slipstream host on **Ubuntu** (Desktop or Server) from the apt registry. This
-page covers the distro-level setup — GPU driver, package, gamepad access. It works with either GNOME
-or KDE; how the host creates its virtual display and injects input is desktop-specific, so pick your
-desktop on the [configure pages](#configure-your-desktop) afterward rather than here.
+Install a Slipstream host on **Ubuntu** (Desktop or Server) by building a `.deb` from this repo, or by
+installing a release `.deb` from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases)
+when one is attached. There is no public apt registry. This page covers the distro-level setup — GPU
+driver, package, gamepad access. It works with either GNOME or KDE; how the host creates its virtual
+display and injects input is desktop-specific, so pick your desktop on the
+[configure pages](#configure-your-desktop) afterward rather than here.
 
 > New here? Read [Security & Safe Use](/docs/security) first — a streaming host is remote control of
 > the machine, so keep it on a trusted LAN or VPN and require pairing.
@@ -22,7 +24,7 @@ desktop on the [configure pages](#configure-your-desktop) afterward rather than 
 > are resolved against Ubuntu's package names, and nothing in CI builds or tests on Debian. Debian 12
 > (bookworm) is below the glibc floor and cannot install them at all. A newer Debian may work, but
 > it's untested — build from source ([appendix](#appendix--build-from-source)) if you want to try.
-> The `debian` in the repository URL below is the *package format*, not a supported distro.
+> The `debian` packaging tree in the repo is the *package format*, not a supported Debian distro.
 
 ## 1. GPU driver
 
@@ -65,42 +67,40 @@ HEVC and AV1 (`mesa-vulkan-drivers`), with **VAAPI** for H.264 and as the fallba
 package recommends, so apt pulls the right one in with the host. Install `mesa-vulkan-drivers` too
 if it isn't already on the box.
 
-## 2. Install the host (apt)
+## 2. Install the host (local `.deb`)
 
-`slipstream-host` is published as a `.deb` to the public GitHub apt registry, so the box installs and
-updates with plain `apt`. The registry is public — no auth needed, just trust its signing key:
+There is no public apt registry for Slipstream. Build a `.deb` from this repo (see
+[`packaging/debian/README.md`](https://github.com/vindeckyy/slipstream/blob/main/packaging/debian/README.md)),
+or download a `.deb` from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when
+assets are attached, then install it:
 
 ```sh
-sudo install -d -m 0755 /etc/apt/keyrings
-curl -fsSL https://github.com/vindeckyy/slipstream/api/packages/unom/debian/repository.key \
-  | sudo tee /etc/apt/keyrings/slipstream.asc >/dev/null
-
-echo "deb [signed-by=/etc/apt/keyrings/slipstream.asc] https://github.com/vindeckyy/slipstream/api/packages/unom/debian stable main" \
-  | sudo tee /etc/apt/sources.list.d/slipstream.list
-
-sudo apt update
-sudo apt install slipstream-host
+git clone https://github.com/vindeckyy/slipstream.git && cd slipstream
+# Build (needs dpkg-dev). Prefer the noble+BUNDLE_FFMPEG path for a 24.04–26.04-compatible host:
+# VERSION=0.0.1 BUNDLE_FFMPEG=1 bash packaging/debian/build-deb.sh
+# Or follow packaging/debian/README.md for the Docker build that CI uses.
+sudo apt install ./dist/slipstream-host_*.deb
 ```
 
-`slipstream-host` `Recommends` the browser console (`slipstream-web`), so apt pulls it in by default.
-The desktop *client* (`slipstream-client`) is a separate package for the machine you stream *to* — not
-installed on a host. The NVIDIA driver is **not** a dependency — you installed it out of band in
-step 1. Later updates are just `sudo apt update && sudo apt upgrade`, or, to move only Slipstream,
-`sudo apt update && sudo apt install --only-upgrade slipstream-host`. Either way, restart the running
-host afterwards so it picks up the new binary:
+`slipstream-host` `Recommends` the browser console (`slipstream-web`), so apt pulls it in by default
+when that package is available next to the host. The desktop *client* (`slipstream-client`) is a
+separate package for the machine you stream *to* — not installed on a host. The NVIDIA driver is
+**not** a dependency — you installed it out of band in step 1. Later updates: rebuild or download a
+newer `.deb`, install it the same way, then restart the running host so it picks up the new binary:
 
 ```sh
 systemctl --user restart slipstream-host
 ```
 
-A plain `apt upgrade` also moves `slipstream-web` when a new console is out — restart that one too
-(`systemctl --user restart slipstream-web`) if you run it.
+Restart `slipstream-web` too (`systemctl --user restart slipstream-web`) if you run it and installed
+a newer console package.
 
 [Updating the Host](/docs/updating) covers the rest — the web console's **Updates** card, and the
 opt-in one-click update button whose `slipstream-update` group this package creates.
 
-The `stable` component above is the stable channel. To track pre-release builds instead, see
-[Release Channels](/docs/channels).
+Channel notes (stable vs canary) for when you publish your own feeds are in
+[Release Channels](/docs/channels). For day-to-day use, pin a release tag or track `main` when you
+rebuild.
 
 ## 3. Grant gamepad access
 
@@ -174,7 +174,7 @@ sudo firewall-cmd --permanent --add-service=slipstream-web && sudo firewall-cmd 
 ```
 
 Full port lists are in
-[`packaging/debian/README.md`](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/debian/README.md#firewall).
+[`packaging/debian/README.md`](https://github.com/vindeckyy/slipstream/blob/main/packaging/debian/README.md#firewall).
 
 ## Configure your desktop
 
@@ -221,7 +221,7 @@ Install Rust if you don't have it, then build:
 
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-git clone https://github.com/vindeckyy/slipstream/slipstream.git && cd slipstream
+git clone https://github.com/vindeckyy/slipstream.git && cd slipstream
 cargo build --release --locked \
   --features slipstream-host/nvenc,slipstream-host/vulkan-encode \
   -p slipstream-host

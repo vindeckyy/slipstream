@@ -7,8 +7,13 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { configDir } from "./config.js";
 
-/** The `@slipstream` package registry (GitHub's npm registry for the `unom` org). */
-export const REGISTRY = "https://github.com/vindeckyy/slipstream/api/packages/unom/npm/";
+/**
+ * Default `@slipstream` package registry for plugin installs (`bunfig.toml` scope map).
+ * Operators override with `SLIPSTREAM_PLUGIN_REGISTRY` (GitHub Packages, a local verdaccio,
+ * etc.). Placeholder default is GitHub Packages until a public Slipstream feed exists.
+ */
+export const REGISTRY =
+	process.env.SLIPSTREAM_PLUGIN_REGISTRY?.trim() || "https://npm.pkg.github.com";
 
 /** Where plugin packages install: `<config_dir>/plugins` (matches runner.ts discovery). */
 export const pluginsDirDefault = (): string => path.join(configDir(), "plugins");
@@ -16,8 +21,8 @@ export const pluginsDirDefault = (): string => path.join(configDir(), "plugins")
 export interface ResolveOptions {
 	/**
 	 * Allow names that resolve on the PUBLIC npm registry (unscoped `slipstream-plugin-*`, foreign
-	 * scopes, arbitrary paths). Off by default: only the `@slipstream` scope — pinned to the GitHub
-	 * registry by [`ensureBunfig`] — installs without it, so a typo or a squatted look-alike
+	 * scopes, arbitrary paths). Off by default: only the `@slipstream` scope — pinned to
+	 * [`REGISTRY`] by [`ensureBunfig`] — installs without it, so a typo or a squatted look-alike
 	 * package can't silently pull operator-privileged code from npmjs.org (the CLI flag is
 	 * `--allow-public-registry`).
 	 */
@@ -51,7 +56,7 @@ export const resolvePackage = (
 	return n;
 };
 
-/** Does this resolved package name install from Slipstream's own (GitHub) registry? */
+/** Does this resolved package name install from Slipstream's own scoped registry? */
 const isFirstParty = (pkg: string): boolean => pkg.startsWith("@slipstream/");
 
 /**

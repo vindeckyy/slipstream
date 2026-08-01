@@ -58,7 +58,7 @@ Vulkan encode behind that flag, and without it sessions quietly fall back to VAA
 In Desktop Mode open **Konsole** (or ssh in), then:
 
 ```sh
-git clone https://github.com/vindeckyy/slipstream/slipstream ~/slipstream
+git clone https://github.com/vindeckyy/slipstream ~/slipstream
 ```
 
 ## 2. Run the installer
@@ -270,6 +270,6 @@ See [Uninstalling](/docs/uninstall) for the other install methods and what each 
   (`slipstream-rebuild-check`) probes the host binary and re-runs the build only if the new OS
   actually broke its library links — you should never need to intervene. (Re-running `update.sh`
   by hand still works and is harmless.)
-- Deeper reference (services, container, manual steps): [`scripts/steamdeck/README.md`](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/scripts/steamdeck/README.md).
+- Deeper reference (services, container, manual steps): [`scripts/steamdeck/README.md`](https://github.com/vindeckyy/slipstream/blob/main/scripts/steamdeck/README.md).
 
 Trouble? See [Troubleshooting](/docs/troubleshooting) and [Pairing](/docs/pairing).

@@ -46,7 +46,7 @@ serving HTTPS (HTTP/1.1 over TLS) with the host's identity cert), so its service
 | `rebuild-check.sh` | The post-OS-update self-heal (run by `slipstream-rebuild-check.service` before the host at session start): `ldd`-probes the host binary **and the HDR gamescope** — milliseconds when healthy, a full `update.sh` rebuild only when a SteamOS update actually broke library links. |
 
 ```sh
-git clone https://github.com/vindeckyy/slipstream/slipstream ~/slipstream
+git clone https://github.com/vindeckyy/slipstream ~/slipstream
 bash ~/slipstream/scripts/steamdeck/install.sh            # PIN pairing required (secure default)
 bash ~/slipstream/scripts/steamdeck/install.sh --open     # trusted LAN: accept unpaired clients
 bash ~/slipstream/scripts/steamdeck/install.sh --no-web   # host only, no web console

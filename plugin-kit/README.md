@@ -4,7 +4,7 @@ The Effect-based framework slipstream plugins are built on. It owns everything t
 same in every plugin — lifecycle, config/state, the sync engine, UI serving, the CLI
 scaffold, logging — so a plugin is just its domain logic, its HttpApi contract, and its UI.
 The reference consumer (and the blueprint to copy) is
-[`slipstream-plugin-rom-manager`](https://github.com/vindeckyy/slipstream/slipstream-plugin-rom-manager).
+[`slipstream-plugin-rom-manager`](https://github.com/vindeckyy/slipstream-plugin-rom-manager).
 
 Built on [`@slipstream/host`](../sdk) (the SDK stays the low-level host client; the kit is
 the opinionated plugin layer on top). Effect `4.x` and the SDK are peer dependencies —
@@ -77,5 +77,7 @@ what it worked out itself, and never adopts a process that was already running b
 
 ## Publishing
 
-Tag `plugin-kit-vX.Y.Z` (matching `package.json`) — `.github/workflows/plugin-kit-publish.yml`
-typechecks, tests, builds, and publishes to the GitHub registry.
+Publishing is private. Tag `plugin-kit-vX.Y.Z` (matching `package.json`), then build and
+publish to your private registry (`publishConfig.registry` defaults to GitHub Packages).
+In-repo CI that still mentions a GitHub workflow path is historical until that pipeline is
+rewired for the GitHub remote.

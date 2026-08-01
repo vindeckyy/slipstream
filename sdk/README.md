@@ -1,6 +1,6 @@
 # @slipstream/host
 
-TypeScript SDK for the [slipstream](https://github.com/vindeckyy/slipstream/slipstream) streaming host: a typed
+TypeScript SDK for the [Slipstream](https://github.com/vindeckyy/slipstream) streaming host: a typed
 management-API client plus the host's lifecycle **event stream** (client connect/disconnect,
 stream start/stop, pairing, displays, library) — built on [Effect](https://effect.website).
 
@@ -17,14 +17,21 @@ Two surfaces, one core:
 
 ## Install
 
-Published to the unom [GitHub npm registry](https://github.com/vindeckyy/slipstream/unom/-/packages). Point the
-`@slipstream` scope at it once — in your project's `.npmrc` (or `~/.npmrc`):
+The SDK lives in the private [vindeckyy/slipstream](https://github.com/vindeckyy/slipstream) repo.
+Publishing is private (GitHub Packages by default, or a local registry you choose). Point the
+`@slipstream` scope at your registry once — in your project's `.npmrc` (or `~/.npmrc`):
 
 ```ini
-@slipstream:registry=https://github.com/vindeckyy/slipstream/api/packages/unom/npm/
+@slipstream:registry=https://npm.pkg.github.com
 ```
 
-Then install:
+For local development inside this monorepo, prefer a path/link install instead of the registry:
+
+```sh
+bun add @slipstream/host@file:../sdk   # or: npm i ../sdk
+```
+
+Otherwise install from the private registry after authenticating:
 
 ```sh
 bun add @slipstream/host      # or: npm i @slipstream/host
@@ -33,12 +40,14 @@ bun add @slipstream/host      # or: npm i @slipstream/host
 `effect` is a **peer dependency** (auto-installed by bun / npm ≥ 7) — so the SDK and your own
 `@slipstream/host/effect` code share one Effect instance.
 
-If the registry requires authentication (private org, or from CI), add a token line with a GitHub
-PAT that has `read:package`:
+GitHub Packages needs a token with `read:packages` (and `write:packages` to publish). Add:
 
 ```ini
-//github.com/vindeckyy/slipstream/api/packages/unom/npm/:_authToken=${NODE_AUTH_TOKEN}
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
 ```
+
+To point the host plugin runner at a different registry, set `SLIPSTREAM_PLUGIN_REGISTRY` (see
+`sdk/src/plugins.ts`).
 
 ## Quickstart
 

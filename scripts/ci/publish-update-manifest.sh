@@ -2,8 +2,9 @@
 # Build, sign, upload, and self-verify the host UPDATE MANIFEST for one channel
 # (planning: host-update-from-web-console.md §3 — the check truth the console trusts).
 #
-#   https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-update/<channel>/manifest.json
-#   https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-update/<channel>/manifest.json.sig
+# Upload target (operator-provided package registry; no public default):
+#   https://<REGISTRY>/api/packages/<OWNER>/generic/slipstream-update/<channel>/manifest.json
+#   https://<REGISTRY>/api/packages/<OWNER>/generic/slipstream-update/<channel>/manifest.json.sig
 #
 # The signature is a raw 64-byte Ed25519 over the EXACT manifest bytes, base64 in the .sig —
 # the same format the plugin index uses and `store::index::verify_signature` checks. The
@@ -22,16 +23,17 @@
 #   WINDOWS_URL          immutable per-version installer URL               (required for stable)
 #   WINDOWS_SHA256       hex sha256 of that installer                      (paired with WINDOWS_URL)
 #   AUTHENTICODE_SHA256  comma-separated accepted signing-leaf sha256s     (optional)
-#   NOTES_URL            release-notes link (github.com/vindeckyy/slipstream only)             (optional)
+#   NOTES_URL            release-notes link (optional; prefer GitHub blob URLs)
 #   UPDATE_MANIFEST_KEY  PKCS#8 PEM, the Ed25519 private key               (required to sign)
 #   REQUIRE_KEY=1        missing key is a hard failure (announce/stable)   (optional)
-#   REGISTRY_TOKEN       GitHub PAT with write:package                      (required)
-#   REGISTRY / OWNER     default github.com/vindeckyy/slipstream / unom
+#   REGISTRY_TOKEN       package-registry PAT with write:package           (required)
+#   REGISTRY / OWNER     REGISTRY required (no public default); OWNER defaults to unom
+# Docs: https://github.com/vindeckyy/slipstream
 set -euo pipefail
 
 CHANNEL="${CHANNEL:?set CHANNEL=stable|canary}"
 VERSION="${VERSION:?set VERSION}"
-REGISTRY="${REGISTRY:-github.com/vindeckyy/slipstream}"
+REGISTRY="${REGISTRY:?set REGISTRY to your package-registry host}"
 OWNER="${OWNER:-unom}"
 BASE="https://${REGISTRY}/api/packages/${OWNER}/generic/slipstream-update/${CHANNEL}"
 

@@ -36,7 +36,7 @@ Builds and ships for both **x64** and **ARM64** as a signed **MSIX**.
 ## Get it
 
 Install the signed MSIX from the package registry — see
-**[docs.slipstream.unom.io/docs/install-client](https://docs.slipstream.unom.io/docs/install-client)**.
+**[docs-site/content/docs/install-client.md](../../docs-site/content/docs/install-client.md)**.
 A stock [Moonlight](https://moonlight-stream.org/) client also works over GameStream if you prefer.
 
 ## Build from source
@@ -99,5 +99,5 @@ walk this after a reactor bump or a change to the render/state architecture:
 
 ## Related
 
-- **[Documentation](https://docs.slipstream.unom.io)** — quick start, pairing, troubleshooting
+- **[Documentation](../../docs-site/content/docs/)** — quick start, pairing, troubleshooting
 - **[Project README](../../README.md)** — the host, the other clients, and how it all fits together

@@ -728,9 +728,9 @@ pub fn show_about(parent: &impl IsA<gtk::Widget>) {
         // resolves from the installed hicolor icon; an uninstalled dev run simply shows the
         // generic fallback rather than nothing.
         .application_icon(crate::app::APP_ID)
-        .developer_name("unom")
+        .developer_name("Slipstream")
         .version(env!("CARGO_PKG_VERSION"))
-        .website("https://github.com/vindeckyy/slipstream/slipstream")
+        .website("https://github.com/vindeckyy/slipstream")
         .license_type(gtk::License::Custom)
         .license(license.as_str())
         .build();

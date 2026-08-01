@@ -110,7 +110,7 @@ fi
 cat > "$DOCDIR/copyright" <<EOF
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: slipstream
-Source: https://github.com/vindeckyy/slipstream/slipstream
+Source: https://github.com/vindeckyy/slipstream
 
 Files: *
 Copyright: unom and the slipstream contributors
@@ -161,7 +161,7 @@ Maintainer: unom <packages@unom.io>
 Installed-Size: $INSTALLED_KB
 Section: net
 Priority: optional
-Homepage: https://github.com/vindeckyy/slipstream/slipstream
+Homepage: https://github.com/vindeckyy/slipstream
 Depends: $SHDEPS
 Recommends: $RECOMMENDS
 Description: Low-latency desktop/game streaming client (slipstream/1, GTK4)

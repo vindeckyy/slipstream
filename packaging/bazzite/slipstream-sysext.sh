@@ -10,16 +10,18 @@
 # into the real /etc here (a sysext can only carry /usr).
 #
 # Bootstrap (the script also ships inside the image as /usr/bin/slipstream-sysext):
-#   curl -fsSLO https://github.com/vindeckyy/slipstream/slipstream/raw/branch/main/packaging/bazzite/slipstream-sysext.sh
+#   curl -fsSLO https://raw.githubusercontent.com/vindeckyy/slipstream/main/packaging/bazzite/slipstream-sysext.sh
 #   sudo bash slipstream-sysext.sh install            # or: install --channel canary
 # Thereafter:
 #   sudo slipstream-sysext update | status | remove
 #
-# Feed: the GitHub generic package registry, one feed per Fedora major x channel
-# (…/slipstream-sysext/f43/, f43-canary, f44, …), each a SHA256SUMS + SHA256SUMS.asc + versioned
-# .raw files — published by .github/workflows/rpm.yml from the same RPMs the (legacy) layering path
-# uses. The image pins ID=fedora + VERSION_ID, so after a major OS rebase the old image is refused
-# (not merged broken) and `slipstream-sysext update` re-resolves against the new release.
+# Feed: set SLIPSTREAM_SYSEXT_REGISTRY to the base URL of your sysext feed (one feed per
+# Fedora major x channel under that base: …/f43/, f43-canary, f44, …), each a SHA256SUMS +
+# SHA256SUMS.asc + versioned .raw files. There is no baked-in public default; private setups
+# typically point this at a generic package registry or a GitHub Releases-mirrored path.
+# Published historically by .github/workflows/rpm.yml from the same RPMs the (legacy) layering
+# path uses. The image pins ID=fedora + VERSION_ID, so after a major OS rebase the old image is
+# refused (not merged broken) and `slipstream-sysext update` re-resolves against the new release.
 #
 # Trust: SHA256SUMS carries a detached OpenPGP signature (SHA256SUMS.asc) from packages@unom.io —
 # the same key that signs our RPMs — and this script verifies it before believing a word of the
@@ -29,7 +31,11 @@
 # authenticating authenticates nothing.
 set -euo pipefail
 
-REGISTRY="${SLIPSTREAM_SYSEXT_REGISTRY:-https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-sysext}"
+# Operators must set SLIPSTREAM_SYSEXT_REGISTRY (feed base URL). No public default; a wrong
+# baked-in host would 404. Example shapes:
+#   https://<registry>/api/packages/<owner>/generic/slipstream-sysext
+#   https://github.com/vindeckyy/slipstream/releases/download  (if you mirror .raw assets there)
+REGISTRY="${SLIPSTREAM_SYSEXT_REGISTRY:?set SLIPSTREAM_SYSEXT_REGISTRY to your sysext feed base URL}"
 CONF=/etc/slipstream-sysext.conf
 EXT_DIR=/var/lib/extensions
 IMG="$EXT_DIR/slipstream.raw"

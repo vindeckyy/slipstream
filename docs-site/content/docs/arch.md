@@ -1,20 +1,16 @@
 ---
 title: Arch Linux
-description: Install a Slipstream host on Arch (and Arch-derived distros) from the signed pacman binary repo.
+description: Install a Slipstream host on Arch (and Arch-derived distros) with makepkg from this repo.
 ---
 
-Set up a Slipstream host on **Arch Linux** (or an Arch-derived distro like CachyOS/EndeavourOS). The
-host installs from a **signed pacman binary repo**, so it updates with `pacman -Syu` like the rest
-of your system — no building required. Host encode is **NVENC on NVIDIA**; on **AMD/Intel** HEVC
-and AV1 go through **Vulkan Video**, with **VAAPI** for H.264 and as the fallback
-(`SLIPSTREAM_ENCODER=auto` picks per GPU).
+Set up a Slipstream host on **Arch Linux** (or an Arch-derived distro like CachyOS/EndeavourOS).
+There is no public pacman binary repo. Build with the split `PKGBUILD` in `packaging/arch/`, or
+install packages from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when
+attached. Host encode is **NVENC on NVIDIA**; on **AMD/Intel** HEVC and AV1 go through **Vulkan
+Video**, with **VAAPI** for H.264 and as the fallback (`SLIPSTREAM_ENCODER=auto` picks per GPU).
 
 > New here? Read [Security & Safe Use](/docs/security) first — a streaming host is remote control of
 > the machine, so keep it on a trusted LAN or VPN and require pairing.
-
-> Prefer to build it yourself? A split `PKGBUILD` (host + client + optional web console) is in the
-> repo at `packaging/arch/` — see the [appendix](#appendix--build-from-source-pkgbuild). The binary
-> repo below is the supported path.
 
 ## 1. GPU prerequisites
 
@@ -25,56 +21,34 @@ and AV1 go through **Vulkan Video**, with **VAAPI** for H.264 and as the fallbac
   drivers (`libva-mesa-driver` for AMD, `intel-media-driver` for Intel), which carry H.264 and the
   fallback path. Both are usually already installed on a desktop.
 
-## 2. Add the signed repo
-
-The registry **signs its database and every package**, so first trust its key once (after this,
-packages install signature-verified):
+## 2. Build and install
 
 ```sh
-# Trust the registry signing key.
-curl -fsS https://github.com/vindeckyy/slipstream/api/packages/unom/arch/repository.key \
-  | sudo pacman-key --add -
-sudo pacman-key --lsign-key E0CA04465C99C936E0B0C6510A317015A34DDD69
-
-# Add the repo (append to /etc/pacman.conf). No SigLevel line needed — pacman's default
-# verifies signed packages against the key you just trusted. (printf, not a heredoc, so this
-# works in fish too — CachyOS's default shell has no `<<EOF` support.)
-printf '\n[slipstream]\nServer = https://github.com/vindeckyy/slipstream/api/packages/unom/arch/$repo/$arch\n' \
-  | sudo tee -a /etc/pacman.conf >/dev/null
+git clone https://github.com/vindeckyy/slipstream.git && cd slipstream/packaging/arch
+PF_SRCDIR="$(git rev-parse --show-toplevel)" makepkg -si
+# Optional web console (needs bun / bun-bin):
+# PF_WITH_WEB=1 PF_SRCDIR="$(git rev-parse --show-toplevel)" makepkg -si
 ```
 
-> **Stable vs canary.** `[slipstream]` is the **stable** channel — it moves only when a `vX.Y.Z`
-> release is cut. For the latest `main` build, use `[slipstream-canary]` instead (same `Server` line,
-> just the repo name). Enable exactly one. See [Release Channels](/docs/channels).
-
-## 3. Install the host
+That installs `slipstream-host` (and `slipstream-client` from the same split package). Add
+`slipstream-web` when you build with `PF_WITH_WEB=1`. Full PKGBUILD notes:
+[`packaging/arch/README.md`](https://github.com/vindeckyy/slipstream/blob/main/packaging/arch/README.md).
 
 ```sh
-sudo pacman -Syu slipstream-host      # the streaming host
-sudo pacman -Syu slipstream-web       # optional: the browser management console (pairing + status)
-sudo pacman -Syu slipstream-gamescope # optional: HDR (10-bit BT.2020 PQ) off gamescope sessions
-sudo pacman -Syu slipstream-scripting # optional: the plugin/script runner (see below)
 sudo usermod -aG input "$USER"       # /dev/uinput access for virtual gamepads (re-login to apply)
 ```
 
-Each install is a **full** `-Syu`, on purpose: our packages are built against current Arch
-sonames, and `pacman -Sy <pkg>` would drop one onto a system whose other packages are still old —
-the classic partial upgrade that breaks Arch boxes. To take several in one go, name them on a
-single line: `sudo pacman -Syu slipstream-host slipstream-web slipstream-gamescope`.
+`slipstream-scripting` is the runner behind [Plugins](/docs/plugins); enable it when you want it —
+`systemctl --user enable --now slipstream-scripting`. The host package ships the systemd **user**
+units, the udev rule, the UDP socket-buffer sysctl tuning, and example configs.
 
-`slipstream-scripting` is the runner behind [Plugins](/docs/plugins); it isn't started for you —
-`systemctl --user enable --now slipstream-scripting` when you want it. `slipstream-client` (the native
-GTK4 Linux client) is in the same repo if this box is also a client. The host package ships the
-systemd **user** units, the udev rule, the UDP socket-buffer sysctl tuning, and example configs.
+Updates later: rebuild from a newer checkout (or install a newer package from GitHub Releases), then
+`systemctl --user restart slipstream-host` so the running host picks up the new binary. Restart
+`slipstream-web` the same way if you run the console. Channel notes for when you publish your own
+feeds: [Release Channels](/docs/channels). The web console update card is covered in
+[Updating the Host](/docs/updating).
 
-Updates later are a normal `sudo pacman -Syu`, then `systemctl --user restart slipstream-host` so the
-running host picks up the new binary. A `-Syu` moves every Slipstream package you installed, so
-restart `slipstream-web` the same way if you run the console. The web console can run the update for
-you — see [Updating the Host](/docs/updating); on Arch that button additionally needs
-`PACMAN_FULL_SYSUPGRADE=1` in `/etc/slipstream/update.conf`, because the only pacman update we will
-run is a full one.
-
-## 4. Configure and run
+## 3. Configure and run
 
 The host runs as a systemd **`--user`** service — it needs your session's PipeWire and D-Bus. Copy a
 starting config:
@@ -160,7 +134,7 @@ sudo firewall-cmd --permanent --add-service=slipstream-web && sudo firewall-cmd 
 That opens **TCP 47992** (HTTPS, login-gated). The mgmt API (47990) is opened for paired clients by the
 `slipstream-native` profile (game-library browsing over mTLS); off-loopback it serves only read-only
 status/library, and every admin action stays loopback-only. Full port lists (`nftables`, explicit ports) are in
-[`packaging/arch/README.md`](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/arch/README.md#firewall).
+[`packaging/arch/README.md`](https://github.com/vindeckyy/slipstream/blob/main/packaging/arch/README.md#firewall).
 
 ## 6. Connect a client
 
@@ -182,7 +156,7 @@ To build instead of using the binary repo, use the split `PKGBUILD` in `packagin
 `PF_WITH_SCRIPTING=1` to also build `slipstream-scripting` — both need `bun`):
 
 ```sh
-git clone https://github.com/vindeckyy/slipstream/slipstream.git && cd slipstream/packaging/arch
+git clone https://github.com/vindeckyy/slipstream.git && cd slipstream/packaging/arch
 # Build the working tree (no git fetch):
 PF_SRCDIR="$(git rev-parse --show-toplevel)" makepkg -f --holdver
 sudo pacman -U slipstream-host-*.pkg.tar.zst
@@ -191,6 +165,6 @@ sudo pacman -U slipstream-host-*.pkg.tar.zst
 NVENC/EGL come from the NVIDIA driver (`nvidia-utils`); on a GPU-less builder, symlink the CUDA
 stub into the link path first (the `PKGBUILD` header documents this). Full details, the
 Fedora→Arch dependency map, and the systemd-sysext mechanism are in
-[`packaging/arch/README.md`](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/arch/README.md).
+[`packaging/arch/README.md`](https://github.com/vindeckyy/slipstream/blob/main/packaging/arch/README.md).
 (For a **SteamOS host**, use the [on-device installer](/docs/steamos-host) instead — it builds
 the host and the HDR gamescope against the running OS.)

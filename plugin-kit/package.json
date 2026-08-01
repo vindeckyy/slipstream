@@ -4,14 +4,14 @@
 	"description": "Effect-based framework for slipstream plugins: lifecycle runtime, config/state, sync engine, UI serving, CLI scaffold, and browser helpers.",
 	"type": "module",
 	"license": "MIT OR Apache-2.0",
-	"homepage": "https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/plugin-kit",
+	"homepage": "https://github.com/vindeckyy/slipstream/tree/main/plugin-kit",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/vindeckyy/slipstream/slipstream.git",
+		"url": "https://github.com/vindeckyy/slipstream.git",
 		"directory": "plugin-kit"
 	},
 	"bugs": {
-		"url": "https://github.com/vindeckyy/slipstream/slipstream/issues"
+		"url": "https://github.com/vindeckyy/slipstream/issues"
 	},
 	"keywords": ["slipstream", "plugin", "framework", "effect"],
 	"main": "./dist/index.js",
@@ -33,7 +33,7 @@
 	},
 	"files": ["dist", "README.md"],
 	"publishConfig": {
-		"registry": "https://github.com/vindeckyy/slipstream/api/packages/unom/npm/"
+		"registry": "https://npm.pkg.github.com"
 	},
 	"scripts": {
 		"typecheck": "tsc --noEmit",

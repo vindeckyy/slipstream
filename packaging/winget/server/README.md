@@ -6,7 +6,9 @@ Slipstream Windows host, so users can install and upgrade with `winget` instead 
 
 ```powershell
 # one-time, from an ELEVATED prompt (winget requires admin to add a source)
-winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest
+# Point this at YOUR private winget REST host (see deploy notes below). There is no public
+# Slipstream winget source.
+# winget source add -n slipstream https://<your-winget-host> -t Microsoft.Rest
 
 winget install vindeckyy.SlipstreamHost                 # silent, wizard defaults
 winget install vindeckyy.SlipstreamHost --interactive   # the full wizard
@@ -50,7 +52,7 @@ which Inno gives us exactly (`<AppId>_is1`).
 | `server.mjs` | node:http front. Loads the catalogue, reloads on mtime change. |
 | `build-data.mjs` | Generates `data/data.json` from the published release manifests. Build-time only. |
 | `test.mjs` | 28 checks driving `handler.mjs` directly. |
-| `compose.production.yml` | The github-actions service. |
+| `compose.production.yml` | Production compose for the winget REST host. |
 
 ## How it runs
 
@@ -58,9 +60,9 @@ which Inno gives us exactly (`<AppId>_is1`).
 GitHub releases (manifest trio per stable tag)
         │  build-data.mjs   ← walks ALL releases, no local state   [CI, Linux job]
         ▼
-   data/data.json (~8 KB)   ← rsynced to github-actions on each stable tag
+   data/data.json (~8 KB)   ← rsynced to your-host on each stable tag
         ▼
-   bun + server.mjs on github-actions:3240  ←  edge Caddy TLS  ←  winget.slipstream.unom.io
+   bun + server.mjs on your-host:3240  ←  edge Caddy TLS  ←  <your-winget-host>
 ```
 
 Stock `oven/bun` image with the two `.mjs` files bind-mounted — the same shape as the flatpak server
@@ -106,19 +108,19 @@ trusted certificate, which is what the edge vhost provides in production.
 
 ## First-time setup
 
-1. **DNS** — `winget.slipstream.unom.io` → the github-actions hcloud box, in the `unom.io` Cloudflare zone
+1. **DNS** — `<your-winget-host>` → your hosting box / load balancer
    (DNS-only, same as `docs`). ✅ *done*
 2. **Caddy vhost** — in **`vindeckyy/slipstream`, `caddy/Caddyfile`**, next to the existing
-   `docs.slipstream.unom.io` block. ✅ *done*
+   `docs-site (local)` block. ✅ *done*
 
    ```caddyfile
-   winget.slipstream.unom.io {
+   <your-winget-host> {
        import security_headers
        reverse_proxy localhost:3240
    }
    ```
 
-   ⚠ **Not by hand on the box.** `~/caddy/Caddyfile` on github-actions looks like the config but is a copy
+   ⚠ **Not by hand on the box.** `~/caddy/Caddyfile` on your-host looks like the config but is a copy
    that `deploy-all.sh` rsyncs over from `vindeckyy/slipstream`, and there is no `.git` there to warn you. A
    vhost added only on the box survives until the next deploy and no longer: this one was
    hand-added on 2026-07-26, and the 2026-07-31 hardening commit rewrote the file from the repo's
@@ -133,8 +135,8 @@ trusted certificate, which is what the edge vhost provides in production.
    it has never heard of, so a redirect there proves nothing:
 
    ```bash
-   openssl s_client -connect winget.slipstream.unom.io:443 \
-     -servername winget.slipstream.unom.io </dev/null 2>&1 | grep -E '^subject=|alert'
+   openssl s_client -connect <your-winget-host>:443 \
+     -servername <your-winget-host> </dev/null 2>&1 | grep -E '^subject=|alert'
    ```
 3. Run `deploy-services.yml` to place the compose file and start the container. It serves 503 until
    a catalogue exists — expected, and visible on `/healthz`.
@@ -142,14 +144,14 @@ trusted certificate, which is what the edge vhost provides in production.
 
 ```bash
 cd packaging/winget/server && npm install && npm run build && npm test
-scp data/data.json <deploy-user>@<github-actions>:~/unom-winget/data/data.json
+scp data/data.json <deploy-user>@<your-host>:~/unom-winget/data/data.json
 ```
 
 Then verify from anywhere:
 
 ```bash
-curl -s https://winget.slipstream.unom.io/information | jq .
-curl -s -X POST https://winget.slipstream.unom.io/manifestSearch \
+curl -s https://<your-winget-host>/information | jq .
+curl -s -X POST https://<your-winget-host>/manifestSearch \
   -H 'content-type: application/json' -d '{"FetchAllManifests":true}' | jq '.Data[].PackageIdentifier'
 ```
 

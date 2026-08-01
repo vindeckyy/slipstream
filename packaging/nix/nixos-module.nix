@@ -6,7 +6,7 @@
 # RPM/deb Recommends), and the opt-in plugin/script runner (`services.slipstream.scripting`).
 #
 # Usage (flake):
-#   { inputs.slipstream.url = "git+https://github.com/vindeckyy/slipstream/slipstream";
+#   { inputs.slipstream.url = "git+https://github.com/vindeckyy/slipstream";
 #     outputs = { slipstream, nixpkgs, ... }: {
 #       nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
 #         modules = [ slipstream.nixosModules.default
@@ -338,7 +338,7 @@ in
 
       systemd.user.services.slipstream-host = {
         description = "slipstream GameStream + slipstream/1 streaming host";
-        documentation = [ "https://github.com/vindeckyy/slipstream/slipstream" ];
+        documentation = [ "https://github.com/vindeckyy/slipstream" ];
         # Soft ordering: the host listens immediately and only touches the compositor per session.
         after = [ "pipewire.service" ];
         wants = [ "pipewire.service" ];
@@ -396,7 +396,7 @@ in
       # scripts/slipstream-web-init.service).
       systemd.user.services.slipstream-web-init = {
         description = "slipstream web console first-run setup (login password)";
-        documentation = [ "https://github.com/vindeckyy/slipstream/slipstream" ];
+        documentation = [ "https://github.com/vindeckyy/slipstream" ];
         unitConfig.ConditionPathExists = "!%h/.config/slipstream/web-password";
         path = [ pkgs.coreutils ];
         serviceConfig = {
@@ -412,7 +412,7 @@ in
       # the host has created it; web-password is optional ('-'). Mirrors scripts/slipstream-web.service.
       systemd.user.services.slipstream-web = {
         description = "slipstream management web console";
-        documentation = [ "https://github.com/vindeckyy/slipstream/slipstream" ];
+        documentation = [ "https://github.com/vindeckyy/slipstream" ];
         after = [
           "slipstream-web-init.service"
           "slipstream-host.service"
@@ -450,7 +450,7 @@ in
 
       systemd.user.services.slipstream-scripting = {
         description = "slipstream plugin/script runner";
-        documentation = [ "https://github.com/vindeckyy/slipstream/slipstream" ];
+        documentation = [ "https://github.com/vindeckyy/slipstream" ];
         # Plugins talk to the host's loopback mgmt API; order after it (soft — the runner backs off
         # and retries per unit, so this is ordering only, not a hard requirement).
         after = [ "slipstream-host.service" ];

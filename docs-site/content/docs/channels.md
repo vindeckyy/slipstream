@@ -10,7 +10,7 @@ channels can sit on different commits. A `vX.Y.Z` git tag cuts a **stable** rele
 every platform is built at that one version, published to the stable channels, and all the
 artifacts (`.deb`, `.rpm`, `.msix`, host installer, `.apk`/`.aab`, `.dmg`, `.ipa`, flatpak, Decky
 zip, winget manifests) are attached to a single
-[GitHub Release](https://github.com/vindeckyy/slipstream/slipstream/releases).
+[GitHub Release](https://github.com/vindeckyy/slipstream/releases).
 
 The two tracks are **separate repos / tracks per platform**, never a shared version line — so a
 stable box never gets pulled onto a canary build, and a canary box always moves forward. Pick the
@@ -24,27 +24,27 @@ track per machine; switching is a one-line change.
 
 ## Subscribe — per platform
 
+There is no public Slipstream apt/rpm/flatpak/npm host. Build from this repo, use the packaging
+scripts under `packaging/`, or install artifacts from
+[GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached. If you publish
+your own feeds, keep canary and stable separate:
+
 | Platform | Canary | Stable |
 |---|---|---|
-| **apt** (host/client) | `deb [signed-by=…] https://github.com/vindeckyy/slipstream/api/packages/unom/debian canary main` | `… debian stable main` |
-| **rpm** (host) | baseurl `…/rpm/bazzite-canary` (or `fedora-44-canary`) | `…/rpm/bazzite` (or `fedora-44`) |
-| **sysext** (Bazzite host) | `sudo slipstream-sysext install --channel canary` | `… install` / default (feeds `…/slipstream-sysext/f43[-canary]`) |
-| **pacman** (Arch host/client) | `[slipstream-canary]` repo section | `[slipstream]` (`Server = …/api/packages/unom/arch/$repo/$arch`) |
-| **Flatpak** (client) | `flatpak install --user https://flatpak.unom.io/io.slipstream.Canary.flatpakref` | `…/io.slipstream.flatpakref` |
-| **Decky** (Steam Deck) | install-from-URL `…/generic/slipstream-decky/canary/slipstream.zip` | `…/slipstream-decky/latest/slipstream.zip` |
-| **Windows client** (MSIX) | `…/generic/slipstream-client-windows/canary/slipstream-client-windows_x64.msix` | `…/latest/…` + the release page |
-| **Windows host** (installer) | `…/generic/slipstream-host-windows/canary/slipstream-host-setup.exe` | `…/latest/…` + the release page |
-| **Windows host** (winget) | — *(stable only)* | `winget install vindeckyy.SlipstreamHost` / `winget upgrade vindeckyy.SlipstreamHost`, after `winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest` |
-| **Android** | Play **Internal testing** + sideload `…/generic/slipstream-android/canary/slipstream-android.apk` | Play **closed (alpha)** track + the release page |
+| **apt** (host/client) | your private `canary` apt distribution (local debs) | `stable` / release `.deb`s |
+| **rpm** (host) | your private `*-canary` rpm group | stable groups / release RPMs |
+| **sysext** (Bazzite host) | `sudo slipstream-sysext install --channel canary` | default / `--channel stable` |
+| **pacman** (Arch host/client) | rebuild from `main` / your canary repo | rebuild from a `v*` tag / your stable repo |
+| **Flatpak** (client) | local canary bundle build | local stable bundle / release `.flatpak` |
+| **Decky** (Steam Deck) | Decky install-from-URL of a canary zip you publish | stable zip / release asset |
+| **Windows client** (MSIX) | canary MSIX you publish | release MSIX on GitHub Releases |
+| **Windows host** (installer) | canary setup.exe you publish | release setup.exe on GitHub Releases |
+| **Windows host** (winget) | — *(stable only)* | `winget install vindeckyy.SlipstreamHost` against **your** private winget source (see `packaging/winget/`) |
+| **Android** | Play **Internal testing** + sideload a canary APK | Play **closed (alpha)** + release APK |
 | **Apple** (mac/iOS/tvOS) | **TestFlight** | TestFlight + a notarized `.dmg` on the release page |
 
-The apt distribution and the rpm group are just path segments in the URL — switching tracks is a
-one-line edit of `/etc/apt/sources.list.d/slipstream.list` (`stable` ↔ `canary`) or
-`/etc/yum.repos.d/slipstream.repo` (`…/rpm/bazzite` ↔ `…/rpm/bazzite-canary`), then
-`apt update` / `rpm-ostree upgrade`.
-
-> The OS-package channels (apt/rpm) are how Linux hosts get canary builds — they are **not**
-> attached to a canary release page. The GitHub Releases page is stable-only.
+> GitHub Releases are the stable-only public artifact page when assets are attached. OS-package
+> canary feeds are something you host yourself — they are not on the releases page.
 
 **winget is stable-only by design.** A winget manifest pins one immutable artifact per version, so
 there is nothing a rolling canary alias could point at. A Windows host on the canary channel updates
@@ -72,7 +72,7 @@ A build broke something and you want the previous one? Every channel can serve a
 | **Bazzite sysext** | `slipstream-sysext status` prints your feed URL; download the `slipstream-<version>-x86-64.raw` you want from it, then `sudo slipstream-sysext install --from-file slipstream-<version>-x86-64.raw`. |
 | **Windows installer** | Run the older `slipstream-host-setup-<version>.exe` over the current install. |
 | **Windows / winget** | `winget install vindeckyy.SlipstreamHost --version <x.y.z>` — the source serves per-version manifests. |
-| **Decky plugin** | Install-from-URL with an exact version: `https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/<version>/slipstream.zip`. |
+| **Decky plugin** | Install-from-URL with an exact version zip you published (or a release asset). |
 | **SteamOS (on-device build)** | `git -C ~/slipstream checkout v<x.y.z>` then `bash ~/slipstream/scripts/steamdeck/update.sh` (no `--pull` — that would fetch `main` again). |
 | **NixOS** | `sudo nixos-rebuild switch --rollback` for the previous generation, or pin the flake input to a `v<x.y.z>` tag and rebuild. |
 
@@ -94,8 +94,7 @@ across in both directions.
    git push origin v0.2.0
    ```
 4. Every platform workflow fans out, builds at `0.2.0`, publishes to its **stable** channel, and
-   attaches its artifact to the `v0.2.0` GitHub Release. Concurrent attaches are safe — the shared
-   `scripts/ci/github-release.{sh,ps1}` helper creates the release once and the rest reuse it.
+   attaches its artifact to the `v0.2.0` GitHub Release (when CI is wired to GitHub). Concurrent attaches are safe when the shared release helper creates the release once and the rest reuse it.
 5. **Promote the app stores manually** (CI only uploads to testing tracks — see below).
 
 That's the whole ritual: **push a tag, done.** There is nothing else to hand-edit.
@@ -144,14 +143,7 @@ Boxes added before this split point at the current stable channels, which now on
 Point your dev fleet at **canary**:
 
 ```sh
-# apt
-sudo sed -i 's/ stable main/ canary main/' /etc/apt/sources.list.d/slipstream.list
-sudo apt update && sudo apt upgrade
-
-# rpm-ostree (Bazzite / Fedora)
-sudo sed -i 's#/rpm/bazzite#/rpm/bazzite-canary#' /etc/yum.repos.d/slipstream.repo   # or fedora-44 → fedora-44-canary
-rpm-ostree upgrade
-
-# Flatpak (Steam Deck client)
-flatpak install --user https://flatpak.unom.io/io.slipstream.Canary.flatpakref
+# Local packages: rebuild from main (canary) or from a v* tag (stable), then reinstall.
+# Sysext: sudo slipstream-sysext install --channel canary
+# Flatpak: rebuild packaging/flatpak from main, or install a canary .flatpak you published.
 ```

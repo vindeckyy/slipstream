@@ -16,12 +16,12 @@ import { boostPluginPolling } from "@/api/plugins";
 /**
  * How much a plugin's provenance is worth, from most to least trustworthy:
  *
- * - `verified` — from the built-in `unom` source; unom reviewed that exact tarball.
- * - `external` — from an operator-added source; pinned and integrity-checked, but curated by
- *   somebody else. It is NOT reviewed by unom and never wears the verified badge.
- * - `unverified` — installed from a raw package spec through the high-friction dialog. No catalog,
+ * - `verified` - from the built-in `slipstream` source; maintainers reviewed that exact tarball.
+ * - `external` - from an operator-added source; pinned and integrity-checked, but curated by
+ *   somebody else. It is NOT reviewed by Slipstream maintainers and never wears the verified badge.
+ * - `unverified` - installed from a raw package spec through the high-friction dialog. No catalog,
  *   no review, no pinning. Stays badged unverified forever.
- * - `cli` — installed with the CLI, so the host holds no provenance record at all.
+ * - `cli` - installed with the CLI, so the host holds no provenance record at all.
  */
 export type StoreTier = "verified" | "external" | "unverified" | "cli";
 
@@ -36,7 +36,7 @@ export interface StoreHostInfo {
 export interface StoreSource {
 	name: string;
 	url: string;
-	/** The `unom` source ships with the host: it can't be edited or removed. */
+	/** The `slipstream` source ships with the host: it can't be edited or removed. */
 	builtin: boolean;
 	signed: boolean;
 	/** The last fetch failed or is too old — entries may be out of date. */

@@ -5,8 +5,8 @@ software-H.264 fallback), PipeWire and Opus. This page covers packaging it for t
 **Fedora Atomic / Bazzite** world (rpm-ostree + bootc), where most of those deps are already
 present; the NVIDIA-specific notes below apply to the NVENC path.
 
-> 👉 **Ubuntu/Debian hosts** install via `apt` from GitHub's package registry — see
-> [`debian/README.md`](debian/README.md) (`apt update && apt upgrade` for new builds).
+> 👉 **Ubuntu/Debian hosts** build `.deb`s with [`debian/README.md`](debian/README.md) (or install
+> release assets from GitHub Releases when attached).
 
 > 👉 **End-to-end Bazzite setup walkthrough** (install → udev/group → `host.env` → service →
 > firewall → verify → troubleshooting): [`bazzite/README.md`](bazzite/README.md). This file is the
@@ -50,33 +50,22 @@ while a sysext overlays `/usr` at runtime, survives OS updates, and updates in o
 no reboot. CI wraps the same RPMs below into the image, so content and channels are identical.
 
 ```sh
-curl -fsSLO https://github.com/vindeckyy/slipstream/slipstream/raw/branch/main/packaging/bazzite/slipstream-sysext.sh
+curl -fsSLO https://raw.githubusercontent.com/vindeckyy/slipstream/main/packaging/bazzite/slipstream-sysext.sh
 sudo bash slipstream-sysext.sh install     # then: sudo slipstream-sysext update | status | remove
 ```
 
 Full walkthrough (incl. the F43→F44 rebase behavior and migration off layering):
 [`bazzite/README.md`](bazzite/README.md).
 
-## Option B — GitHub RPM registry (per-host, `rpm-ostree` layering)
+## Option B — local RPM / rpm-ostree layering
 
-The host's RPM is published to **unom's self-hosted GitHub RPM registry** (CI builds it on every
-push), mirroring the [Debian/apt](debian/README.md) setup. Add one repo file, install, and track
-updates with `rpm-ostree upgrade` — no COPR account needed. Full guide: [`rpm/README.md`](rpm/README.md).
+Build the host RPM with [`rpm/README.md`](rpm/README.md) (or take one from GitHub Releases when
+attached), then layer it. There is no public RPM registry.
 
 ```sh
-# GPG-signed pkgs + GitHub-signed metadata → gpgcheck=1, repo_gpgcheck=1 (see rpm/README.md)
-sudo tee /etc/yum.repos.d/slipstream.repo >/dev/null <<'REPO'
-[github-unom-bazzite]
-name=slipstream (unom, Bazzite)
-baseurl=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/bazzite
-enabled=1
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/repository.key
-       https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-keys/1/RPM-GPG-KEY-slipstream
-REPO
-rpm-ostree install slipstream && systemctl reboot
-# updates:  rpm-ostree upgrade && systemctl reboot
+# After packaging/rpm/build-rpm.sh (or equivalent) produces dist/*.rpm:
+rpm-ostree install ./dist/slipstream-*.rpm && systemctl reboot
+# updates: install a newer local RPM the same way, then reboot
 ```
 
 ## Option C — COPR (per-host, `rpm-ostree install`)
@@ -128,8 +117,8 @@ web console at `https://<host-ip>:47992` or directly.
 
 > ⚠️ **COPR caveat:** COPR's mock chroot has no `bun`, so a COPR build produces only
 > `slipstream` + `slipstream-client` — **not** `slipstream-web`. For the console on a COPR/bootc host,
-> install from the **GitHub RPM registry** (Option B — it carries `slipstream-web`; the sysext image
-> includes it too), which is also why `bootc/Containerfile` installs from there rather than COPR.
+> build the RPM with `--with web` (or take a release asset that includes it); the sysext image
+> includes the console too.
 
 ## Why not Flatpak (for the HOST)?
 

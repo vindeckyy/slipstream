@@ -99,7 +99,7 @@ docs (3220) and flatpak (3230) services, behind the same edge Caddy; `windows-ho
 ships its catalogue on every stable tag, so releasing is one pipeline with no manual step.
 
 ```powershell
-winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest   # elevated, once
+# winget source add -n slipstream https://<your-winget-host> -t Microsoft.Rest   # elevated, once
 winget install vindeckyy.SlipstreamHost
 ```
 

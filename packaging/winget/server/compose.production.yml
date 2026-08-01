@@ -1,13 +1,11 @@
-# winget REST source for the slipstream Windows host, on github-actions (Hetzner Cloud).
+# winget REST source for the slipstream Windows host.
 #
-# Caddy on that same box terminates TLS for winget.slipstream.unom.io and reverse_proxies to :3240,
-# exactly as it already does for docs.slipstream.unom.io -> :3220. This inner service speaks plain
+# Put a TLS terminator in front of :3240 (Caddy, nginx, etc.). This inner service speaks plain
 # HTTP and is not published beyond the box. `winget source add` refuses anything but HTTPS with a
 # publicly trusted certificate, so that edge vhost is a hard requirement, not decoration.
 #
-# (Note: the sibling docs/flatpak compose files still carry stale comments about a
-# `github-pages-1` and 192.168.50.50 from an earlier home-lab topology. The public hostnames
-# resolve straight to the hcloud box and are served by Caddy there — no local proxy is involved.)
+# Repo / docs: https://github.com/vindeckyy/slipstream
+# In-tree docs: https://github.com/vindeckyy/slipstream/tree/main/docs-site/content/docs
 #
 # Stock bun image + bind-mounted sources, mirroring the flatpak server's stock-caddy approach: no
 # image to build, publish or pull, so a code change deploys by scp + `docker compose up -d`.

@@ -32,7 +32,7 @@ pub const SCHEMA: u32 = 1;
 pub const MAX_MANIFEST_BYTES: usize = 64 * 1024;
 
 /// The only origin a manifest may point the operator at for release notes.
-const NOTES_ORIGIN: &str = "https://github.com/vindeckyy/slipstream/";
+const NOTES_ORIGIN: &str = "https://github.com/vindeckyy/";
 
 /// The signed update manifest, as served (and signed) per channel.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -143,9 +143,9 @@ mod tests {
             "serial": 1785400000u64,
             "published_at": "2026-07-30T12:00:00Z",
             "version": "0.23.0",
-            "notes_url": "https://github.com/vindeckyy/slipstream/slipstream/releases/tag/v0.23.0",
+            "notes_url": "https://github.com/vindeckyy/slipstream/releases/tag/v0.23.0",
             "windows_host": {
-                "url": "https://github.com/vindeckyy/slipstream/slipstream/releases/download/v0.23.0/slipstream-host-setup-0.23.0.exe",
+                "url": "https://github.com/vindeckyy/slipstream/releases/download/v0.23.0/slipstream-host-setup-0.23.0.exe",
                 "sha256": "aa".repeat(32),
                 "authenticode_sha256": ["bb".repeat(32)],
                 "min_os": "10.0.22621"
@@ -225,7 +225,7 @@ mod tests {
         v["windows_host"]["sha256"] = serde_json::json!("nothex");
         assert!(parse_verified(&bytes(&v), "stable").is_err());
         let mut v = doc();
-        v["windows_host"]["url"] = serde_json::json!("http://github.com/vindeckyy/slipstream/x.exe");
+        v["windows_host"]["url"] = serde_json::json!("http://example.com/x.exe");
         assert!(parse_verified(&bytes(&v), "stable").is_err());
         // No windows leg at all is fine (PM channels don't need it).
         let mut v = doc();

@@ -104,7 +104,7 @@ let
   };
 
   meta = {
-    homepage = "https://github.com/vindeckyy/slipstream/slipstream";
+    homepage = "https://github.com/vindeckyy/slipstream";
     license = with lib.licenses; [
       mit
       asl20
@@ -309,7 +309,7 @@ in
     # node_modules, materialised offline. `bun.nix` (generated from web/bun.lock by the `bun2nix`
     # devDependency's postinstall hook, and committed) lists ONE `fetchurl` per package, keyed by
     # the lockfile's own integrity hash — including the @unom scope, whose tarball URLs the
-    # lockfile records in full (web/.npmrc → https://github.com/vindeckyy/slipstream/api/packages/unom/npm/, read-public,
+    # lockfile records in full (web/.npmrc → @unom npm registry URL, read-public,
     # the same anonymous pull CI's rpm/deb builds do). That replaces the old single fixed-output
     # `bun install` derivation whose aggregate `outputHash` had to be hand-bumped on every lockfile
     # change — the failure mode this design removes.

@@ -39,7 +39,7 @@ if [[ ${#layered[@]} -eq 0 ]]; then
   mapfile -t layered < <(rpm -qa --qf '%{NAME}\n' 'slipstream' 'slipstream-web' 2>/dev/null | sort -u)
 fi
 if [[ ${#layered[@]} -eq 0 ]]; then
-  echo "no slipstream packages are layered — install first (see https://docs.slipstream.unom.io/docs/bazzite)" >&2
+  echo "no slipstream packages are layered — install first (see docs-site/content/docs/bazzite.md)" >&2
   exit 1
 fi
 echo "layered slipstream packages: ${layered[*]}"

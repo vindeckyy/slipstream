@@ -20,8 +20,10 @@
 #            before signing existed, and after a key rotation. Idempotent. Also re-publishes the
 #            manifest if normalizing it changed anything, because the signature has to cover the
 #            bytes a client downloads.
-# Env: REGISTRY (github.com/vindeckyy/slipstream), OWNER (unom), TOKEN (write:package PAT), CURL_USER (login name),
+# Env: REGISTRY (required; your package-registry host, no public default), OWNER (unom),
+#      TOKEN (write:package PAT), CURL_USER (login name),
 #      RPM_GPG_PRIVATE_KEY (armored private key; absent => unsigned, fatal on a v* tag)
+# Docs: https://github.com/vindeckyy/slipstream
 set -euo pipefail
 
 SEAL=0
@@ -32,7 +34,7 @@ else
   RAW="${2:?usage: publish-sysext-feed.sh <feed> <image.raw>}"
   [ -f "$RAW" ] || { echo "no such image: $RAW" >&2; exit 1; }
 fi
-REGISTRY="${REGISTRY:-github.com/vindeckyy/slipstream}"
+REGISTRY="${REGISTRY:?set REGISTRY to your package-registry host}"
 OWNER="${OWNER:-unom}"
 KEEP="${KEEP:-0}"
 AUTH=(--user "${CURL_USER:-enricobuehler}:${TOKEN:?TOKEN (write:package PAT) required}")

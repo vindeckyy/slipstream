@@ -25,7 +25,8 @@ You need three things on the Deck:
    client. On a normal Deck that's the Flatpak, installed once in **Desktop Mode**:
 
    ```sh
-   flatpak install --user https://flatpak.unom.io/io.slipstream.flatpakref
+   # Build locally or install a .flatpak from GitHub Releases when attached:
+   # flatpak install --user --bundle /path/to/slipstream-client.flatpak
    ```
 
    (Full options: [Install a Client → Steam Deck](/docs/install-client#steam-deck).) If you have
@@ -46,21 +47,15 @@ developer toolchain — just paste a URL into Decky:
 1. On the Deck, open the **Quick Access Menu** (`…`) → the **plug** icon (Decky) → the **gear**
    (Settings) → enable **Developer Mode**.
 2. Open the new **Developer** tab and choose **Install Plugin from URL**.
-3. Paste the **stable** link and confirm:
-
-   ```
-   https://github.com/vindeckyy/slipstream/ss-decky
-   ```
+3. Paste a URL to a `slipstream.zip` you built (`clients/decky` → `pnpm run package`) or downloaded
+   from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached, then
+   confirm.
 
 The **Slipstream** panel appears in the Quick Access Menu right away — no Deck restart needed.
 
-> **Channels.** `https://github.com/vindeckyy/slipstream/ss-decky` is a short link to the **stable** channel (moves on
-> `vX.Y.Z` releases), currently
-> `https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/latest/slipstream.zip`. For the
-> latest `main` build use the **canary** zip —
-> `https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/canary/slipstream.zip` — or pin an
-> exact version with `https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/<version>/slipstream.zip`.
-> See [Release Channels](/docs/channels).
+> **Channels.** Publish separate stable and canary zips if you want two tracks — see
+> [Release Channels](/docs/channels). For local development, sideload with `pnpm run deploy` from
+> `clients/decky`.
 
 ## Use it
 
@@ -181,4 +176,4 @@ per-account configset entry pointing at it. Leave them — with the shortcuts go
 nothing — or delete the file if you'd rather not see it offered as a template.
 
 The plugin source lives in
-[`clients/decky`](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/clients/decky/README.md).
+[`clients/decky`](https://github.com/vindeckyy/slipstream/blob/main/clients/decky/README.md).

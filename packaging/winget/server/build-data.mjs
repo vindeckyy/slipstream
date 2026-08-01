@@ -1,9 +1,10 @@
 // Build src/data.json — the payload the Worker serves — from published winget manifests.
 //
-// Source of truth is the GitHub RELEASES, not local files: windows-host.yml attaches the manifest
-// trio to each stable tag, so walking releases yields every version the source should offer. That
-// matters because winget resolves `--version` and `upgrade` against the version LIST; a source that
-// only knows the newest release can neither pin an older one nor show an upgrade path from it.
+// Source of truth is the GitHub RELEASES (override via SLIPSTREAM_RELEASE_API / SLIPSTREAM_RELEASE_REPO for a
+// mirror), not local files: windows-host.yml attaches the manifest trio to each stable tag, so
+// walking releases yields every version the source should offer. That matters because winget
+// resolves `--version` and `upgrade` against the version LIST; a source that only knows the
+// newest release can neither pin an older one nor show an upgrade path from it.
 //
 // Deriving from releases also means this script holds no state. Re-running it reproduces the same
 // data.json, so a lost deployment is one command away and there is no accumulated file to drift.
@@ -19,8 +20,9 @@ import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const API = process.env.SLIPSTREAM_RELEASE_API ?? "https://github.com/vindeckyy/slipstream/api/v1";
-const REPO = process.env.SLIPSTREAM_RELEASE_REPO ?? "unom/slipstream";
+// Defaults target GitHub; override SLIPSTREAM_RELEASE_API / SLIPSTREAM_RELEASE_REPO for a self-hosted mirror.
+const API = process.env.SLIPSTREAM_RELEASE_API ?? "https://api.github.com";
+const REPO = process.env.SLIPSTREAM_RELEASE_REPO ?? "vindeckyy/slipstream";
 const PACKAGE_ID = "vindeckyy.SlipstreamHost";
 const SOURCE_IDENTIFIER = process.env.SLIPSTREAM_SOURCE_ID ?? "unom.slipstream";
 // The API contract this source implements. Advertised via /information so a future client can
@@ -68,7 +70,9 @@ async function fetchText(url) {
 }
 
 async function versionsFromReleases() {
-  const releases = await fetchJson(`${API}/repos/${REPO}/releases?limit=100`);
+  // GitHub uses per_page; GitHub accepts limit. Prefer per_page for the GitHub default.
+  const q = API.includes('api.github.com') ? 'per_page=100' : 'limit=100';
+  const releases = await fetchJson(`${API}/repos/${REPO}/releases?${q}`);
   const out = [];
   for (const rel of releases) {
     if (rel.draft) continue;

@@ -14,7 +14,7 @@ use std::time::Duration;
 
 /// Feed base — `<base>/<channel>/manifest.json` + `.sig`.
 pub const DEFAULT_FEED_BASE: &str =
-    "https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-update";
+    "https://github.com/vindeckyy/slipstream-update/releases/download";
 
 /// One fetch's wall-clock budget.
 const FETCH_TIMEOUT: Duration = Duration::from_secs(15);

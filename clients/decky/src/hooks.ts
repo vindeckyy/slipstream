@@ -18,7 +18,8 @@ import {
 } from "./backend";
 import { LaunchOpts, launchStream } from "./steam";
 
-export const DOCS_URL = "https://docs.slipstream.unom.io/docs/steam-deck";
+export const DOCS_URL =
+  "https://github.com/vindeckyy/slipstream/blob/main/docs-site/content/docs/steam-deck.md";
 
 // Decky Loader exposes its already-authenticated WSRouter as a global. This is NOT part of
 // @decky/api (it's a loader internal), so we treat it as optional and guard every use — on a

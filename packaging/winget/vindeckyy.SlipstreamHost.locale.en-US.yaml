@@ -4,12 +4,12 @@ PackageVersion: 0.19.2
 PackageLocale: en-US
 
 Publisher: unom
-PublisherUrl: https://github.com/vindeckyy/slipstream/slipstream
-PublisherSupportUrl: https://github.com/vindeckyy/slipstream/slipstream/issues
+PublisherUrl: https://github.com/vindeckyy/slipstream
+PublisherSupportUrl: https://github.com/vindeckyy/slipstream/issues
 PackageName: Slipstream Host
-PackageUrl: https://docs.slipstream.unom.io/docs/windows-host
+PackageUrl: https://github.com/vindeckyy/slipstream/tree/main/docs-site/content/docs
 License: MIT OR Apache-2.0
-LicenseUrl: https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/LICENSE-MIT
+LicenseUrl: https://github.com/vindeckyy/slipstream/blob/main/LICENSE-MIT
 Copyright: Copyright (c) unom
 ShortDescription: Low-latency game-streaming host — stream your PC's games to any Slipstream or Moonlight client.
 Description: |-
@@ -29,10 +29,10 @@ Tags:
   - gamestream
   - streaming
   - remote-play
-ReleaseNotesUrl: https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/docs/releases/v0.19.2.md
+ReleaseNotesUrl: https://github.com/vindeckyy/slipstream/blob/main/docs/releases/v0.19.2.md
 Documentations:
   - DocumentLabel: Windows Host Setup
-    DocumentUrl: https://docs.slipstream.unom.io/docs/windows-host
+    DocumentUrl: https://github.com/vindeckyy/slipstream/tree/main/docs-site/content/docs
 
 # Shown BEFORE download/install; the user must accept or the install does not proceed. This is what
 # carries — on the unattended path, where no wizard page is on screen — the disclosures the wizard
@@ -54,7 +54,7 @@ Agreements:
       /MERGETASKS=gamestream", or run --interactive and tick the GameStream checkbox. It can also be
       turned on later with `slipstream-host service install --gamestream=on` (or via
       SLIPSTREAM_HOST_CMD in %ProgramData%\slipstream\host.env), followed by a service restart.
-    AgreementUrl: https://docs.slipstream.unom.io/docs/windows-host
+    AgreementUrl: https://github.com/vindeckyy/slipstream/blob/main/docs-site/content/docs/windows-host.md
 
 # Displayed after the install completes. The console password is generated per install, so it can
 # only be pointed at, never printed here — this text is fixed at publish time.

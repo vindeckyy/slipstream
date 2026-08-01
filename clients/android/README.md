@@ -24,7 +24,7 @@ Google TV, budget Amlogic boxes) that otherwise reject a 64-bit-only build as "n
 
 Published to **Google Play (Internal Testing)** — join the beta via the
 [Discord](https://discord.gg/kaPNvzMuGU). Per-device setup and pairing:
-**[docs.slipstream.unom.io/docs/install-client](https://docs.slipstream.unom.io/docs/install-client)**.
+**[docs-site/content/docs/install-client.md](../../docs-site/content/docs/install-client.md)**.
 
 ## How it's built — Rust-heavy
 
@@ -77,5 +77,5 @@ The debug APK lands in `app/build/outputs/apk/debug/`. Launch it, pick a host, p
 
 ## Related
 
-- **[Documentation](https://docs.slipstream.unom.io)** — quick start, pairing, troubleshooting
+- **[Documentation](../../docs-site/content/docs/)** — quick start, pairing, troubleshooting
 - **[Project README](../../README.md)** — the host, the other clients, and how it all fits together

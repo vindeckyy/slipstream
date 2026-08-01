@@ -4510,7 +4510,7 @@
               "string",
               "null"
             ],
-            "description": "When unom reviewed this exact tarball (built-in source only)."
+            "description": "When Slipstream maintainers reviewed this exact tarball (built-in source only)."
           },
           "source": {
             "type": "string",
@@ -7339,7 +7339,7 @@
         "properties": {
           "builtin": {
             "type": "boolean",
-            "description": "The built-in `unom` source: not editable, not removable, and the only source whose entries\nmay carry the \"verified\" tier."
+            "description": "The built-in `slipstream` source: not editable, not removable, and the only source whose entries\nmay carry the \"verified\" tier."
           },
           "entry_count": {
             "type": "integer",

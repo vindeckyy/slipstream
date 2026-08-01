@@ -1,7 +1,9 @@
 # Windows host packaging — signed Inno Setup installer
 
-A one-file, signed `setup.exe` for the slipstream streaming **host** on Windows, published to GitHub's
-generic package registry (`slipstream-host-windows`) by `.github/workflows/windows-host.yml`.
+A one-file, signed `setup.exe` for the slipstream streaming **host** on Windows. Build it with the
+scripts in this directory, or attach it to a
+[GitHub Release](https://github.com/vindeckyy/slipstream/releases). CI
+(`.github/workflows/windows-host.yml`) can still produce builds when you wire publishing.
 
 > Full picture (drivers-from-source, toolchain, CI, dev loop): **slipstream-planning: `windows-build-and-packaging.md`** (internal planning repo). This README is the `packaging/windows/` file index.
 
@@ -188,7 +190,7 @@ pwsh -File packaging\windows\make-driver-cert.ps1 -TestOnly   # dry run: generat
 pwsh -File packaging\windows\make-driver-cert.ps1             # the real thing
 ```
 
-Then add both values as **repo**-level GitHub Actions secrets on `unom/slipstream` — same scope as
+Then add both values as **repo**-level Actions secrets on this repository — same scope as
 the `MSIX_CERT_PFX_B64` cert next door, and only this repo builds drivers (`RPM_GPG_PRIVATE_KEY` is
 org-level because other repos publish RPMs; nothing else needs this one). Back up the `.pfx` and its
 password somewhere you'd keep a signing key, then delete the output folder.
@@ -253,8 +255,8 @@ pwsh -File packaging\windows\pack-host-installer.ps1 -Version 0.0.0-dev -TargetD
 ## Release
 
 Push a `vX.Y.Z` tag — one tag releases every platform (see
-[Release Channels](https://slipstream.unom.io/docs/channels)). The workflow builds, signs, and
+[Release Channels](../../docs-site/content/docs/channels)). The workflow builds, signs, and
 publishes `slipstream-host-setup-X.Y.Z.exe` + the public `.cer`, refreshes the stable `latest/`
-alias, and attaches the installer to the unified GitHub Release. Main pushes publish rolling
+alias, and attaches the installer to the unified GitHub Release when publishing is wired. Main pushes publish rolling
 `<next-minor>.<run>` **canary** builds (base derived from the latest stable tag by
 `scripts/ci/ss-version.ps1`) to the `canary/` alias.

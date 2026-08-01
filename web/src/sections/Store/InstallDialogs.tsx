@@ -17,7 +17,7 @@ import { m } from "@/paraglide/messages";
 
 // Friction proportional to trust. The three install paths deliberately do NOT share a confirm
 // button: a verified install is one click on a plain dialog, an external one makes you read that
-// unom didn't review the code and names who did curate it, and a raw package spec makes you retype
+// maintainers didn't review the code and names who did curate it, and a raw package spec makes you retype
 // the spec and tick a box. The last one is never reachable by accident — no card, no button on a
 // listing, only the small footer link on Browse.
 
@@ -52,8 +52,8 @@ export const InstallDialog: FC<{
 								label="Install confirm"
 								text={
 									external
-										? "Installs a pinned package from a catalog you added. Integrity is checked; unom has not reviewed the code."
-										: "Installs this exact package from the built-in unom catalog. Prefer this path over a raw package spec."
+										? "Installs a pinned package from a catalog you added. Integrity is checked; Slipstream maintainers have not reviewed the code."
+										: "Installs this exact package from the built-in Slipstream catalog. Prefer this path over a raw package spec."
 								}
 							/>
 						</DialogTitle>

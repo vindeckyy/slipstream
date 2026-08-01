@@ -38,7 +38,7 @@ Runs from one shared codebase across **macOS, iOS, iPadOS, and tvOS**.
 
 Install from the App Store / TestFlight, or build from source below. Per-device install steps and the
 pairing walkthrough:
-**[docs.slipstream.unom.io/docs/install-client](https://docs.slipstream.unom.io/docs/install-client)**.
+**[docs-site/content/docs/install-client.md](../../docs-site/content/docs/install-client.md)**.
 
 ## Build / run / test (on a Mac)
 
@@ -127,5 +127,5 @@ SLIPSTREAM_AUTOCONNECT=<box-ip> SLIPSTREAM_MODE=1280x720x60 swift run Slipstream
 
 ## Related
 
-- **[Documentation](https://docs.slipstream.unom.io)** — quick start, pairing, troubleshooting
+- **[Documentation](../../docs-site/content/docs/)** — quick start, pairing, troubleshooting
 - **[Project README](../../README.md)** — the host, the other clients, and how it all fits together

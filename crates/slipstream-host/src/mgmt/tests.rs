@@ -575,7 +575,7 @@ fn plugin_allowlist_excludes_escalation_routes() {
     ));
     assert!(!auth::plugin_may_access(
         &Method::DELETE,
-        "/api/v1/store/sources/unom"
+        "/api/v1/store/sources/slipstream"
     ));
     // Host process power controls — bouncing or stopping the host is operator-only.
     for path in ["/api/v1/host/restart", "/api/v1/host/shutdown"] {

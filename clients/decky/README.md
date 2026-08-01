@@ -39,16 +39,11 @@ You need **[Decky Loader](https://decky.xyz/)** and the **`io.slipstream` flatpa
 read-only, so the flatpak (which bundles libadwaita/SDL3) is the canonical client. Discovery uses
 `avahi-browse`, which ships on SteamOS/Bazzite.
 
-**Recommended — install from URL** (published by CI): in Decky → Settings → **Developer Mode** →
-**Install Plugin from URL**, paste:
-
-```
-https://github.com/vindeckyy/slipstream/ss-decky
-```
-
-(short link for `https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/latest/slipstream.zip`;
-for a pinned version use `https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-decky/<version>/slipstream.zip`
-directly). The plugin then **self-updates** without
+**Recommended — install from URL**: in Decky → Settings → **Developer Mode** →
+**Install Plugin from URL**, paste a URL to a `slipstream.zip` you built (`pnpm run package`) or
+downloaded from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached.
+For local development, use `pnpm run deploy` instead. The plugin can **self-update** when you publish
+a feed it knows about, without
 the Decky store — when a newer build exists, an **Update** button appears and drives Decky
 Loader's own (SHA-256-verified) install. Installs and updates can take a couple of minutes on some
 networks: Decky's installer also contacts its plugin store first, which may be slow or blackholed
@@ -114,6 +109,6 @@ restart is required for an out-of-band install to appear.
 
 ## Related
 
-- **[Documentation](https://docs.slipstream.unom.io/docs/steam-deck)** — Steam Deck setup guide
+- **[Documentation](../../docs-site/content/docs/steam-deck.md)** — Steam Deck setup guide
 - **[Linux client](../linux/README.md)** — the app this plugin launches
 - **[Project README](../../README.md)** — the host, the other clients, and how it all fits together

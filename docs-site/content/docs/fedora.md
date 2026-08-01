@@ -3,10 +3,11 @@ title: Fedora
 description: Install the Slipstream host on Fedora from the RPM registry.
 ---
 
-Install a Slipstream host on **Fedora** from the self-hosted RPM registry. The host installs as an
-RPM-managed systemd **`--user`** service and updates with `dnf upgrade` like the rest of your
-system — no building required. It works with either **KDE Plasma** or **GNOME**; the
-desktop-specific setup (which compositor captures, headless sessions, quirks) lives on the
+Install a Slipstream host on **Fedora** by building an RPM from this repo, or by installing a
+release RPM from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when one is
+attached. There is no public dnf registry. The host installs as an RPM-managed systemd **`--user`**
+service. It works with either **KDE Plasma** or **GNOME**; the desktop-specific setup (which
+compositor captures, headless sessions, quirks) lives on the
 [desktop configure pages](#5-configure-your-desktop). Host encode is **NVENC on NVIDIA**; on
 **AMD/Intel** HEVC and AV1 go through **Vulkan Video**, with **VAAPI** for H.264 and as the fallback
 (`SLIPSTREAM_ENCODER=auto` picks per GPU).
@@ -63,50 +64,34 @@ ffmpeg -hide_banner -encoders | grep nvenc
 support (`mesa-va-drivers-freeworld` for AMD from RPM Fusion, `intel-media-driver` for Intel); on a
 desktop these are usually already present.
 
-## 2. Install the host (RPM)
+## 2. Install the host (local RPM)
 
-The host is published to the self-hosted GitHub RPM registry, in a per-release group (an RPM is
-soname-coupled to its base, so each Fedora release gets its own group). Pick the one matching your
-release — `rpm -E %fedora` prints the number you're on:
-
-- **Fedora 44** → `fedora-44`
-- **Fedora 43** → `bazzite` — that group is a plain Fedora 43 build of the same `slipstream` package,
-  so it's the right one for a regular Fedora 43 box too
-
-Put your group in the `baseurl` below, then add the repo and install:
+There is no public RPM registry for Slipstream. Build from this repo with
+[`packaging/rpm`](https://github.com/vindeckyy/slipstream/blob/main/packaging/rpm/README.md), or
+install an RPM from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when assets
+are attached:
 
 ```sh
-sudo tee /etc/yum.repos.d/slipstream.repo >/dev/null <<'REPO'
-[slipstream]
-name=slipstream
-# The group for your release: fedora-44 on Fedora 44, bazzite on Fedora 43.
-baseurl=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/fedora-44
-enabled=1
-# Packages are GPG-signed (gpgcheck=1) AND the repo metadata is GitHub-signed (repo_gpgcheck=1).
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/repository.key
-       https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-keys/1/RPM-GPG-KEY-slipstream
-REPO
-
-sudo dnf install slipstream
+git clone https://github.com/vindeckyy/slipstream.git && cd slipstream
+# Prefer the Fedora container CI uses so sonames match your release:
+# docker build --build-arg FEDORA_VERSION=$(rpm -E %fedora) -f ci/fedora-rpm.Dockerfile -t ss-rpm ci
+# then run packaging/rpm/build-rpm.sh inside it (see packaging/rpm/README.md).
+sudo dnf install ./dist/slipstream-*.rpm
 sudo usermod -aG input "$USER"     # /dev/uinput access for virtual gamepads (re-login to apply)
 ```
 
-Updates later are just `sudo dnf upgrade slipstream`, followed by
+Updates later: rebuild or download a newer RPM, install it the same way, then
 `systemctl --user restart slipstream-host` so the running host picks up the new binary. The package
 ships the systemd user units, the udev rule, the UDP socket-buffer sysctl tuning, and example
 configs.
 
-The group you picked above is the **stable** channel. For the latest `main` build, point `baseurl` at
-`fedora-44-canary` (or `bazzite-canary`) instead — see [Release Channels](/docs/channels). Updating
-in general, including the opt-in one-click button in the web console, is covered in
+Channel notes for when you publish your own feeds are in [Release Channels](/docs/channels).
+Updating in general, including the opt-in one-click button in the web console, is covered in
 [Updating the Host](/docs/updating).
 
-> `fedora-44` and `bazzite` are the only stable groups published, so on Fedora 42 or older — or on a
-> release newer than 44 — there's nothing matching yet. Build one with the same toolchain CI uses —
-> `docker build --build-arg FEDORA_VERSION=NN -f ci/fedora-rpm.Dockerfile -t ss-rpm ci` then run
-> `packaging/rpm/build-rpm.sh` inside it — or build from source (appendix below).
+> On Fedora 42 or older — or on a release newer than what the packaging tree documents — build with
+> the same toolchain CI uses (`docker build --build-arg FEDORA_VERSION=NN -f ci/fedora-rpm.Dockerfile
+> -t ss-rpm ci` then `packaging/rpm/build-rpm.sh` inside it), or build from source (appendix below).
 
 ## 3. Check it installed
 
@@ -207,7 +192,7 @@ sudo dnf install gcc gcc-c++ make cmake clang clang-devel nasm git pkgconf-pkg-c
   libdrm-devel mesa-libgbm-devel mesa-libGL-devel mesa-libEGL-devel mesa-libGLES-devel libva-devel \
   ffmpeg-devel libei-devel
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-git clone https://github.com/vindeckyy/slipstream/slipstream.git && cd slipstream
+git clone https://github.com/vindeckyy/slipstream.git && cd slipstream
 cargo build --release --locked \
   --features slipstream-host/nvenc,slipstream-host/vulkan-encode \
   -p slipstream-host

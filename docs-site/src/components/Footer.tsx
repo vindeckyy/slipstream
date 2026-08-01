@@ -8,7 +8,7 @@ const rootApi = getRouteApi('__root__')
 // The CMS sections and social links stay shared with the marketing site. The
 // small identity row gives the docs shell its own clear home before those
 // shared links begin.
-const SITE_URL = 'https://slipstream.unom.io'
+const SITE_URL = 'https://github.com/vindeckyy/slipstream'
 const resolveHref = (to: string) =>
   to.startsWith('/') ? new URL(to, SITE_URL).toString() : to
 

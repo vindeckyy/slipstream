@@ -38,7 +38,7 @@ const MAX_ADVISORIES: usize = 200;
 pub(crate) struct Index {
     /// Document schema — must equal [`SCHEMA`].
     pub schema: u32,
-    /// Human-readable name of the catalog ("unom official"). Display only.
+    /// Human-readable name of the catalog ("slipstream official"). Display only.
     #[serde(default)]
     pub name: String,
     /// RFC-3339 build timestamp. Display only — freshness is decided by our own fetch clock,
@@ -381,8 +381,8 @@ mod tests {
     }
 
     const GOOD: &str = r#"{"id":"rom-manager","pkg":"@slipstream/plugin-rom-manager",
-        "registry":"https://github.com/vindeckyy/slipstream/api/packages/unom/npm/","title":"ROM Manager",
-        "description":"d","author":"unom","version":"0.2.1","integrity":"sha512-AAAA",
+        "registry":"https://example.com/npm/","title":"ROM Manager",
+        "description":"d","author":"slipstream","version":"0.2.1","integrity":"sha512-AAAA",
         "verification":{"reviewedAt":"2026-07-19"},"platforms":["linux","windows"]}"#;
 
     #[test]
@@ -419,7 +419,7 @@ mod tests {
         .plugins
         .is_empty());
         assert!(Index::parse(&doc(
-            &GOOD.replace("https://github.com/vindeckyy/slipstream", "http://github.com/vindeckyy/slipstream")
+            &GOOD.replace("https://example.com", "http://example.com")
         ))
         .unwrap()
         .plugins
@@ -477,9 +477,9 @@ mod tests {
 
     /// The real published index must parse here, field for field.
     ///
-    /// This fixture is a snapshot of `unom/slipstream-plugin-index`'s `v1/index.json`. The index
-    /// repo's validator reimplements this module's rules in TypeScript (it has to — it gates PRs
-    /// before anything is signed), and two hand-written parsers of the same grammar drift. This
+    /// This fixture is a snapshot of `vindeckyy/slipstream-plugin-index`'s `v1/index.json`. The
+    /// index repo's validator reimplements this module's rules in TypeScript (it has to: it gates
+    /// PRs before anything is signed), and two hand-written parsers of the same grammar drift. This
     /// test is the seam that catches the drift from our side: if a document the publisher accepts
     /// stops being one we accept, an entry silently disappears from every operator's store.
     #[test]

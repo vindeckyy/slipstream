@@ -23,11 +23,11 @@ const BASE: StoreEntry = {
 	description:
 		"Scans your ROM directories, maps them to emulators, fetches box art, and reconciles everything into the host game library as a provider.",
 	icon: "gamepad-2",
-	author: "unom",
-	homepage: "https://github.com/vindeckyy/slipstream/slipstream-plugin-rom-manager",
+	author: "slipstream",
+	homepage: "https://github.com/vindeckyy/slipstream-plugin-rom-manager",
 	license: "MIT OR Apache-2.0",
 	version: "0.3.2",
-	source: "unom official",
+	source: "slipstream official",
 	tier: "verified",
 	// The catalog stores lowercase platform IDENTIFIERS; the card renders display names.
 	platforms: ["linux", "windows"],

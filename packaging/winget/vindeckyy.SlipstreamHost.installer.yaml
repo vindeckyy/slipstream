@@ -56,7 +56,7 @@ UpgradeBehavior: install
 
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/vindeckyy/slipstream/slipstream/releases/download/v0.19.2/slipstream-host-setup-0.19.2.exe
+    InstallerUrl: https://github.com/vindeckyy/slipstream/releases/download/v0.19.2/slipstream-host-setup-0.19.2.exe
     InstallerSha256: 96964117125BFD5AC4556987DAFAA3966A4A57BBC29C838803857852D595BF4D
 
 ManifestType: installer

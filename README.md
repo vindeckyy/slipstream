@@ -2,255 +2,136 @@
   <img src="assets/slipstream-logo.png" alt="Slipstream" width="420" />
 </p>
 
-<p align="center"><b>Low-latency desktop and game streaming with first-class Linux and Windows hosts.</b></p>
+<p align="center"><b>Low-latency desktop and game streaming for Linux and Windows hosts.</b></p>
 
-Slipstream is a private fork of [unom/slipstream](https://github.com/vindeckyy/slipstream.git). Upstream licenses
-and copyright notices are preserved. The host console UX takes inspiration from
-[Sunshine](https://github.com/LizardByte/Sunshine)'s web UI (workflows and controls, not copied assets).
+Slipstream is a private streaming stack: a virtual-display host, native clients, and a browser
+console. It speaks **GameStream** so [Moonlight](https://moonlight-stream.org/) works day one, and
+ships its own faster **`slipstream/1`** protocol (QUIC control + GF(2^16) Leopard-RS FEC). The host
+console UX takes cues from [Sunshine](https://github.com/LizardByte/Sunshine)'s workflows (not
+copied assets). Linux capture and compositor work also draws on ideas from local SolarFlare
+experiments in this workspace.
 
-Run the host on a Linux machine or a Windows PC, connect from a Mac, PC, phone, tablet, or TV, and
-stream your desktop or games — each device at its **own native resolution and refresh rate**, over
-your local network.
+Run the host on a Linux box or Windows PC. Connect from Mac, PC, phone, tablet, or TV. Each client
+gets its **own native resolution and refresh** on the LAN.
 
-📖 **Docs:** see [`docs-site/`](docs-site/) in this repo (no public docs host yet).
+**Docs:** [`docs-site/`](docs-site/) in this repo (no public docs host yet).
 
-🔒 **Security:** report vulnerabilities privately per [SECURITY.md](SECURITY.md). Please don't open a
-public issue for security reports.
+**Security:** report privately per [SECURITY.md](SECURITY.md). Do not open a public issue for security
+reports.
 
-Slipstream pairs a **virtual-display streaming host** with native clients on every platform. It speaks
-the existing **GameStream** protocol, so any [Moonlight](https://moonlight-stream.org/) client works
-day one — and adds its own faster **`slipstream/1`** protocol that breaks the ~1 Gbps FEC wall with a
-**GF(2¹⁶) Leopard-RS** transport. A single shared **Rust core** (`slipstream-core`) holds the
-protocol, FEC, and crypto, linked into the host and every native client — directly as a Rust crate
-on Linux and Windows, and over a stable C ABI from the Apple and Android apps.
+**Source:** private GitHub at `https://github.com/vindeckyy/slipstream` (default branch `main`).
 
-## What makes it different
+## Highlights
 
-- **Your device's exact mode.** For each client that connects, the host spins up a virtual display
-  sized to that device — 1080p60 to a laptop, 1440p120 to a desktop, 4K to a TV, all at once. No
-  letterboxing, no scaling, no rearranging your real monitors.
-- **Displays you configure, not just create.** Keep a game's display (and the game) alive across
-  disconnects so a reconnect drops straight back in; make the stream your sole desktop or extend
-  alongside your monitors; let several devices become monitors of one desktop; keep each client's
-  scaling. One-click presets in the console — a dedicated couch box, a shared desktop, a multi-monitor
-  workstation. See [Virtual displays](docs-site/content/docs/virtual-displays.md).
-- **A real virtual display on Windows, too.** On Linux the host uses per-compositor virtual outputs;
-  on Windows you get the same on-the-fly virtual display — at the client's exact mode, no physical
-  monitor or dummy HDMI plug, even on the secure desktop (UAC / lock screen). It also has **its own
-  indirect display driver (IDD)** the host pushes finished frames straight into, rather than scraping
-  a screen — tight, push-based integration that's unusual for a Windows streaming host.
-- **Low latency, GPU end to end.** Frames go straight from the compositor to the NVENC encoder with
-  zero CPU copies (dmabuf → CUDA/Vulkan → NVENC), over a transport tuned for responsiveness rather
-  than throughput. Stable 240 fps at 5120×1440; sub-millisecond capture-to-reassembly on-box,
-  ~1.3 ms cross-machine on a LAN. (On Linux AMD/Intel, Vulkan Video for HEVC and AV1 with VAAPI for
-  H.264 and as the fallback; a GPU-less software H.264 encoder exists as a last resort.)
-- **A library that fills itself.** Steam and non-Steam titles show up as a grid on every client, and
-  plugins add their own sources — ROM Manager (your ROM collection, matched to installed emulators),
-  Playnite, VirtualHere. Install them from the console's **Plugins** page or with
-  `slipstream-host plugins add`. See
-  [Plugins](https://docs.slipstream.unom.io/docs/plugins).
-- **Works with what you already have.** Any Moonlight/Artemis client connects over GameStream — and
-  native apps for macOS, Linux, Windows, and Android use the lower-latency `slipstream/1` protocol.
-- **Secure by default.** Hosts require a one-time SPAKE2 **PIN pairing**; after that, devices
-  reconnect on a pinned identity. No accounts, no cloud. Hosts auto-advertise over mDNS, so clients
-  find them on the network without typing an IP.
+- **Per-client virtual display.** Exact WxH@Hz for each device. No letterboxing, no rearranging your
+  real monitors.
+- **Display policy you control.** Keep a game alive across disconnects, dedicate a couch box, or
+  extend the desktop. Presets live in the console.
+- **Windows IDD-push path.** Finished frames go into Slipstream's own indirect display driver, not a
+  scrape of a physical screen.
+- **GPU-first encode.** Zero-copy where the platform allows (dmabuf / CUDA / Vulkan / NVENC, plus
+  AMF/QSV and software fallbacks).
+- **Self-filling library.** Steam and plugins (ROM Manager, Playnite, VirtualHere, …) from the
+  console Plugin store or `slipstream-host plugins add`.
+- **PIN pairing, no accounts.** SPAKE2 once, then pinned identities. mDNS discovery on the LAN.
 
-## Status
+## Status (short)
 
-| Component | State |
-|-----------|-------|
-| **Core** — `slipstream-core` + C ABI (protocol · FEC · crypto · QUIC) | ✅ Complete & hardened |
-| **GameStream host** → stock Moonlight | ✅ Live end-to-end: pairing, RTSP, audio, per-client virtual output at native resolution, GPU zero-copy NVENC, gamepads |
-| **Native protocol** — `slipstream/1` | ✅ Validated live: QUIC control + GF(2¹⁶) FEC/AES-GCM data plane, PIN pairing, mDNS discovery, mid-stream mode renegotiation |
-| **Windows host** (Windows 11 22H2+, x64) | ✅ Beta — shipping as a signed installer: its own all-Rust IddCx **virtual display** (secure-desktop capable) with a **sealed IDD-push** capture path — finished frames pushed straight into its own driver, not screen-scraped (no DDA/WGC) · GPU encode (NVENC on NVIDIA, AMF/QSV on AMD/Intel, software H.264 without a GPU) · WASAPI audio · bundled virtual-gamepad drivers (no ViGEmBus) · HDR incl. Vulkan-game HDR. NVIDIA live-validated; AMD/Intel CI-green |
-| **macOS / iOS / tvOS client** (`clients/apple`) | ✅ Streaming live: VideoToolbox decode (HEVC, and AV1 on hardware that decodes it), controllers incl. DualSense, discovery, pairing, speed test |
-| **Linux client** (`clients/linux` + `clients/session`) | ✅ Streaming live: relm4/GTK4 launcher shell that spawns a Vulkan session binary — Vulkan Video / VAAPI / software decode, PipeWire audio, SDL3 controllers, Skia console UI; ships as Flatpak/apt/rpm/Arch |
-| **Android client** (`clients/android`, phone + TV) | ✅ Streaming live: AMediaCodec decode + HDR10, AAudio audio, controllers, discovery, pairing |
-| **Windows client** (`clients/windows`, WinUI 3) | ✅ Streaming live: WinUI 3 shell + Vulkan session presenter, hardware decode on all GPU vendors via Vulkan Video → D3D11VA → software (NVIDIA + Intel validated on glass), WASAPI audio, SDL3 controllers, discovery, pairing; ships as signed MSIX (x64 + ARM64). Hardware decode and HDR10 present validated on glass on NVIDIA and Intel, including HDR pass-through on the Intel D3D11VA path |
-| **Web console + management API** (`web/`) | ✅ TanStack console over the OpenAPI mgmt API: host status, paired devices, on-demand PIN pairing, game library, virtual-display presets, plugin store, GPU selection, performance capture graphs, live host logs, host updates |
+| Piece | State |
+|-------|-------|
+| `slipstream-core` + C ABI | Complete |
+| GameStream → Moonlight | Live (opt-in `--gamestream` on trusted LAN) |
+| `slipstream/1` native path | Live |
+| Windows host | Beta (signed installer) |
+| Apple / Linux / Android / Windows clients | Streaming |
+| Web console (`web/`) | Live over the OpenAPI mgmt API |
 
-Every native client also ships a tiered **stats overlay** (Compact / Normal / Detailed) with a
-shared vocabulary across platforms, and the session client carries a full gamepad-driven **console
-shell** (`ss-console-ui`): host list, PIN pairing, settings, and an on-screen keyboard.
+Bare `slipstream-host serve` is **native-only** (`slipstream/1` + mgmt/console). Add `--gamestream`
+only on a LAN you trust.
 
-The **GameStream host works with a stock Moonlight client** — validated live on NVIDIA hardware
-(RTX 5070 Ti, RTX 4090): PIN pairing that persists across restarts, an app catalog, RTSP/ENet/audio,
-and **video at the client's exact resolution and refresh** via a per-session virtual output (KWin,
-gamescope, Mutter, and Sway/wlroots backends), encoded with GPU **zero-copy** (dmabuf → CUDA/Vulkan →
-NVENC) up to 5120×1440@240. The native **`slipstream/1`** protocol adds a QUIC control plane and a
-GF(2¹⁶) Leopard-FEC + AES-GCM data plane (p50 ~0.8 ms capture→received at 720p120), with
-mid-stream mode renegotiation and a wall-clock skew handshake so latency stays valid across machines.
-Both run from **one process**: bare `slipstream-host serve` is the **secure native-only default**
-(`slipstream/1` + the management API/web console), and `serve --gamestream` additionally enables the
-GameStream/Moonlight-compat planes (opt-in, trusted-LAN only — GameStream has inherent on-path
-weaknesses). The host is managed through a REST API and web console. Builds against FFmpeg 7 or 8.
+## Install (from this tree)
 
-What works where: **[the support matrix](https://docs.slipstream.unom.io/docs/support-matrix)** ·
-where it's heading: **[the roadmap](https://docs.slipstream.unom.io/docs/roadmap)**.
-
-## Install the host
-
-Pick your platform and install from its package registry — the per-platform guide covers adding the
-repo, first run, and the web console. The Linux host is the primary, most battle-tested path; on
-SteamOS the host is built on-device by a script instead, and a Windows host ships as a signed
-installer (all-vendor: NVIDIA, AMD, Intel).
-
-| Platform | Install | Guide |
-|--------|---------|-------|
-| **Ubuntu / Debian** (apt) | `sudo apt install slipstream-host` *(after adding the repo)* | [Ubuntu / Debian](https://docs.slipstream.unom.io/docs/ubuntu) · [packaging/debian](packaging/debian/README.md) |
-| **Bazzite / Fedora Atomic** (systemd-sysext) | `curl -fsSLO https://github.com/vindeckyy/slipstream/slipstream/raw/branch/main/packaging/bazzite/slipstream-sysext.sh && sudo bash slipstream-sysext.sh install` *(no layering, no reboot; rpm-ostree + bootc also supported)* | [Bazzite](https://docs.slipstream.unom.io/docs/bazzite) |
-| **Fedora** (dnf) | `sudo dnf install slipstream` *(after adding the repo; the console comes with it)* | [Fedora](https://docs.slipstream.unom.io/docs/fedora) · [packaging/rpm](packaging/rpm/README.md) |
-| **Arch / CachyOS** (pacman) | `sudo pacman -Syu slipstream-host` *(binary repo — always a full `-Syu`)* | [Arch Linux](https://docs.slipstream.unom.io/docs/arch) · [packaging/arch](packaging/arch/README.md) |
-| **SteamOS / Steam Deck** (on-device build) | `bash ~/slipstream/scripts/steamdeck/install.sh` *(after cloning this repo to `~/slipstream`)* | [SteamOS (Host)](https://docs.slipstream.unom.io/docs/steamos-host) |
-| **Windows** (11 22H2+, x64) | `winget install vindeckyy.SlipstreamHost` *(after `winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest`)* · or the signed `setup.exe` from the package registry | [Windows Host](https://docs.slipstream.unom.io/docs/windows-host) · [packaging/winget](packaging/winget/README.md) |
-
-`slipstream-host` is the streaming host; `slipstream-web` is the browser console (pairing + status).
-
-**Linux:** every package ships systemd **user** units, so you don't launch the host by hand. The
-host unit won't start until `~/.config/slipstream/host.env` exists, so copy the template your package
-installed first:
+Local / private setup is the default for now. Build from source, or use the scripts under
+[`packaging/`](packaging/) for the platform you care about.
 
 ```sh
-mkdir -p ~/.config/slipstream
-# /usr/share/slipstream/ on Fedora/Arch/Bazzite, /usr/share/slipstream-host/ on Debian/Ubuntu
-# (on Bazzite take host.env.bazzite instead)
-cp /usr/share/slipstream/host.env.example ~/.config/slipstream/host.env
+# Host + workspace (Linux example)
+cargo build -p slipstream-host
+./target/debug/slipstream-host serve --mgmt-bind 127.0.0.1:47990
 
-systemctl --user enable --now slipstream-host   # the streaming host
-systemctl --user enable --now slipstream-web    # the web console (Arch: install slipstream-web first)
+# Console (dev)
+cd web && bun install && bun run dev   # http://127.0.0.1:47992
 ```
 
-The shipped host unit runs `serve --gamestream` — the native `slipstream/1` plane **plus** the
-GameStream/Moonlight-compat planes, which belong on a trusted LAN only; for a native-only host drop
-the flag with a `systemctl --user edit slipstream-host` drop-in (which needs an empty `ExecStart=`
-line before the replacement — the install guide has the snippet). Then open
-`https://<host-ip>:47992` and pair.
+Packaged installs (apt / rpm / Arch / Bazzite / winget / Flatpak) live under `packaging/` with their
+own READMEs. Point package URLs and update feeds at **your** registry when you publish; this tree
+does not assume a public package host.
 
-How the virtual display and input are wired up depends on your desktop — see
-[KDE](https://docs.slipstream.unom.io/docs/kde) · [GNOME](https://docs.slipstream.unom.io/docs/gnome) ·
-[Steam / gamescope](https://docs.slipstream.unom.io/docs/gamescope) ·
-[Sway](https://docs.slipstream.unom.io/docs/sway).
-
-**Windows:** the installer registers and starts the host as a `LocalSystem` service, so there is
-nothing to run by hand — open the web console and pair. Use
-`slipstream-host service start|stop|restart|status` if you need to control it. Upgrades happen in
-place — the console's **Updates** card, `winget upgrade vindeckyy.SlipstreamHost`, or the newer
-`setup.exe` over the old install; uninstall from Add/Remove Programs.
-
-Full instructions: **[docs.slipstream.unom.io/docs/install](https://docs.slipstream.unom.io/docs/install)**.
-
-The console's **Host** page also shows when a newer host is out, along with the exact command for
-how *this* box was installed (or a one-click **Update now** on Windows) — see
-[Updating the host](https://docs.slipstream.unom.io/docs/updating). To remove it again, or to go back
-to an earlier version, see [Uninstalling](https://docs.slipstream.unom.io/docs/uninstall) and
-[Release Channels](https://docs.slipstream.unom.io/docs/channels#pin-a-version-or-roll-back).
+Desktop-specific host tips: [`docs-site/content/docs/`](docs-site/content/docs/) (KDE, GNOME,
+gamescope, Sway, Steam Deck, Windows).
 
 ## Connect a client
 
-| Streaming to… | Use |
-|---|---|
-| Mac, iPhone, iPad, Apple TV | The **Apple app** (`clients/apple`) — also on TestFlight |
-| Linux desktop / laptop | **`slipstream-client`** (Flatpak / apt / rpm / Arch) |
-| Steam Deck | The **Decky plugin** in Gaming Mode — it launches the client for you ([Steam Deck](https://docs.slipstream.unom.io/docs/steam-deck)); in Desktop Mode, the Flatpak directly |
-| Android phone or TV | The **Android app** (`clients/android`) |
-| Windows | Native **`slipstream-client`** (signed MSIX) or **Moonlight** |
-| Scripts, automation, another launcher | **`slipstream`** — the headless CLI shipped in the Linux client packages (`slipstream pair`, `slipstream hosts list --json`, `slipstream launch <host>`) |
-| Anything else (browser, old phone, smart TV) | **Moonlight** over GameStream |
+| Device | Client |
+|--------|--------|
+| Mac / iPhone / iPad / Apple TV | `clients/apple` |
+| Linux | `slipstream-client` (`clients/linux` + `clients/session`) |
+| Steam Deck | Decky plugin (`clients/decky`) or Flatpak |
+| Android | `clients/android` |
+| Windows | `clients/windows` or Moonlight |
+| Scripts | `slipstream` CLI (`clients/cli`) |
+| Anything else | Moonlight over GameStream |
 
-Each client discovers hosts on the network automatically and does a one-time
-[PIN pairing](https://docs.slipstream.unom.io/docs/pairing). Per-device install steps:
-**[/docs/install-client](https://docs.slipstream.unom.io/docs/install-client)**.
+Pairing is a one-time PIN. See `docs-site/content/docs/pairing.md`.
 
-## Build & test (from source)
-
-For development, or as an install fallback where no package is available:
+## Build and test
 
 ```sh
-cargo build --workspace          # core, host, tray, shared client crates, Linux shell + session client, the `slipstream` CLI, probe (Linux & macOS)
-cargo test  --workspace          # unit + loopback + proptest + C ABI harness
+cargo build --workspace
+cargo test  --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all --check
 
-cargo run -p loss-harness        # FEC loss-resilience sweep (no network needed)
-bash crates/slipstream-core/tests/c/run.sh   # standalone C-ABI link + round-trip proof
+cargo run -p loss-harness
+bash crates/slipstream-core/tests/c/run.sh
 ```
 
-The C header regenerates from `crates/slipstream-core/src/abi.rs` on every build (cbindgen via
-`build.rs`) into `include/slipstream_core.h`. The Apple, Android, and Windows clients have their own
-toolchains (Xcode/`swift build`, Gradle, and `cargo` on the MSVC target) — see each client's README
-and the [docs site](https://docs.slipstream.unom.io).
+The C header regenerates into `include/slipstream_core.h` on build. Apple, Android, and Windows
+clients have their own toolchains (see each client's README).
 
 ## Layout
 
 ```
 crates/
-  slipstream-core/   protocol · FEC · pacing · crypto · QUIC control plane — the C ABI (lib + cdylib + staticlib)
-  slipstream-host/   the host (Linux + Windows): virtual displays · capture · encode · input · GameStream · slipstream/1 · mgmt
-  ss-client-core/   shared client plumbing (Linux + Windows): session pump · FFmpeg decode · audio · SDL3 gamepads · trust · discovery
-  ss-presenter/     Vulkan session presenter: SDL3 window · ash swapchain · frame present · input capture
-  ss-console-ui/    Skia console UI for the session client: gamepad shell · stats OSD · pairing · on-screen keyboard
-  ss-ffvk/          FFmpeg Vulkan hwcontext bindings (AVVkFrame) for Vulkan Video decode on the presenter's device
-  ss-driver-proto/  host ↔ ss-vdisplay driver contract: control IOCTLs + IDD-push frame transport (no_std)
-  slipstream-tray/   host tray icon (Windows notification area / Linux StatusNotifierItem)
-clients/
-  apple/    macOS / iOS / tvOS app (Swift · VideoToolbox · Metal · GameController)
-  linux/    Linux launcher shell (Rust · relm4 / GTK4 / libadwaita) — spawns the session client to stream
-  session/  slipstream-session, the Vulkan streaming session (Rust · SDL3 · ash · Skia console UI) — also runs standalone (gamescope, Decky)
-  windows/  Windows desktop app (Rust · WinUI 3 · D3D11 · WASAPI · SDL3)
-  android/  Android phone + TV app (Kotlin · Rust JNI core · AMediaCodec · AAudio)
-  cli/      slipstream, the headless client CLI — pair · hosts · wake · library · launch · slipstream:// links
-  probe/    headless reference / measurement client for slipstream/1
-  decky/    Steam Deck Decky plugin
-web/                         web console (TanStack) over the management API — status · devices · pairing · library · displays · plugins · GPUs · performance · logs · updates
-api/openapi.json             management-API OpenAPI spec (regenerated via `slipstream-host openapi`, checked in)
-sdk/                         `@slipstream/host` — TypeScript management-API client + event stream (Effect)
-plugin-kit/                  `@slipstream/plugin-kit` — the plugin authoring kit (bun / TypeScript)
-packaging/                   apt · rpm / COPR · Arch · Flatpak · Bazzite sysext + bootc · Windows installer + drivers · winget · Nix · gamescope
-docs-site/                   public documentation site (Fumadocs) — https://docs.slipstream.unom.io
-include/slipstream_core.h     cbindgen-generated C header (checked in)
-tools/                       latency-probe · loss-harness (measurement)
-ci/                          CI container images (rust-ci · fedora-rpm)
+  slipstream-core/   protocol · FEC · crypto · QUIC · C ABI
+  slipstream-host/   host: displays · capture · encode · GameStream · slipstream/1 · mgmt
+  ss-*               capture, encode, inject, vdisplay, client-core, presenter, …
+clients/             apple · linux · session · windows · android · cli · probe · decky
+web/                 TanStack management console
+api/openapi.json     mgmt OpenAPI (from `slipstream-host openapi`)
+docs-site/           Fumadocs documentation
+packaging/           distro + Windows installer + winget + Flatpak + …
+include/             slipstream_core.h
 ```
 
 ## Design invariants
 
-- **One core, linked everywhere.** Protocol, FEC, and crypto live in `slipstream-core` exactly once,
-  exposed over a stable, versioned C ABI (`slipstream_abi_version()`, `SlipstreamConfig` carries its own
-  `struct_size`). Every native client links the same core.
-- **No async on the hot path.** The per-frame pipeline uses native threads only; `tokio`/`quinn` are
-  gated behind the off-by-default `quic` feature (control plane only).
-- **Native client resolution, no scaling.** Each session gets a virtual output at exactly the
-  client's WxH@Hz; each compositor keeps its own backend behind a shared `VirtualDisplay` trait.
-- **FEC is the wall-breaker.** GF(2⁸) (≤255 shards/block) for Moonlight compatibility; GF(2¹⁶)
-  (≤65535 shards/block, SIMD, O(n log n)) for `slipstream/1` to push past ~1 Gbps.
+- **One core.** Protocol, FEC, and crypto live in `slipstream-core` once; native clients share it
+  (Rust crate or C ABI).
+- **No async on the frame path.** Native threads only; `tokio`/`quinn` stay on the control plane.
+- **Native client resolution.** Each session gets a virtual output at exact WxH@Hz.
+- **FEC scales.** GF(2^8) for Moonlight; GF(2^16) for `slipstream/1`.
 
 ## License
 
-Licensed under either of
+MIT OR Apache-2.0. See [LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE), and
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or
-  <https://www.apache.org/licenses/LICENSE-2.0>)
-- MIT license ([LICENSE-MIT](LICENSE-MIT) or <https://opensource.org/licenses/MIT>)
-
-at your option — `SPDX-License-Identifier: MIT OR Apache-2.0`.
-
-### Contribution
-
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in
-the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any
-additional terms or conditions. See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-### Third-party components
-
-Slipstream's own source is MIT/Apache-2.0. Shipped binaries additionally link third-party components
-under their own (permissive) licenses — see [`THIRD-PARTY-NOTICES.txt`](THIRD-PARTY-NOTICES.txt)
-(regenerate with `scripts/gen-third-party-notices.sh`). The Windows host and client builds also
-bundle FFmpeg under the **LGPL v2.1+** (dynamically linked, replaceable DLLs; the license text and
-notice ship in the installed `licenses/` folder).
+Third-party notices for shipped binaries: [`THIRD-PARTY-NOTICES.txt`](THIRD-PARTY-NOTICES.txt).
+Historical copyright lines for earlier lineage (where required) live in [NOTICE](NOTICE).
 
 ### Trademarks
 
-Slipstream is an independent project and is **not affiliated with, endorsed by, or sponsored by**
-NVIDIA, Microsoft, Sony, Valve, or the Moonlight project. "GameStream", "Moonlight", "Xbox",
-"DualSense", "DualShock", and "PlayStation" are trademarks of their respective owners and are used
-here only to describe interoperability.
+Slipstream is independent and is not affiliated with NVIDIA, Microsoft, Sony, Valve, or Moonlight.
+"GameStream", "Moonlight", "Xbox", "DualSense", "DualShock", and "PlayStation" are trademarks of
+their owners and are used only to describe interoperability.

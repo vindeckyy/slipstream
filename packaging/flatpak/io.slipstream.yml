@@ -242,7 +242,7 @@ modules:
     sources:
       # The repo checkout. For a Flathub/published build, replace with a pinned git source:
       #   - type: git
-      #     url: https://github.com/vindeckyy/slipstream/slipstream
+      #     url: https://github.com/vindeckyy/slipstream
       #     tag: vX.Y.Z
       #     commit: <sha>
       # For ON-DECK / CI builds we build the checked-out working tree in place:

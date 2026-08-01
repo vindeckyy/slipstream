@@ -11,7 +11,7 @@
 //!
 //! | tier | where it came from | surfaced? |
 //! |------|--------------------|-----------|
-//! | **verified**   | the built-in `unom` source's index — unom reviewed this exact tarball | yes, with a badge |
+//! | **verified**   | the built-in `slipstream` source's index: Slipstream maintainers reviewed this exact tarball | yes, with a badge |
 //! | **external**   | an operator-added source's index — pinned and integrity-checked, curated by somebody else | yes, attributed, no badge |
 //! | **unverified** | a raw package spec typed into the console's danger dialog | never listed; install only |
 //!
@@ -654,7 +654,7 @@ mod tests {
         ensure_bunfig_scope(
             dir.path(),
             "@slipstream",
-            "https://github.com/vindeckyy/slipstream/api/packages/unom/npm/",
+            "https://example.com/npm/",
         )
         .unwrap();
         assert!(read().contains("@slipstream"));

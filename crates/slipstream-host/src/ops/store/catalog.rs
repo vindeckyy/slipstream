@@ -212,9 +212,10 @@ mod tests {
             etag: Some("\"abc\"".into()),
             fetched_at: 1_700_000_000,
         };
-        write_cache(dir.path(), "unom", &idx, &meta);
+        write_cache(dir.path(), "slipstream", &idx, &meta);
 
-        let (back, back_meta) = read_cache(dir.path(), "unom").expect("cache should be readable");
+        let (back, back_meta) =
+            read_cache(dir.path(), "slipstream").expect("cache should be readable");
         assert_eq!(back.plugins.len(), 1);
         assert_eq!(back.plugins[0].id, "a");
         assert_eq!(back_meta.etag.as_deref(), Some("\"abc\""));

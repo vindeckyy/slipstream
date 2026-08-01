@@ -16,7 +16,7 @@
 # administration; a script that needs the admin surface sets SLIPSTREAM_MGMT_TOKEN explicitly.
 [Unit]
 Description=slipstream plugin/script runner
-Documentation=https://github.com/vindeckyy/slipstream/slipstream
+Documentation=https://github.com/vindeckyy/slipstream
 # Plugins talk to the host's loopback mgmt API; order after it. Soft (ordering only, no Requires):
 # the runner supervises each unit with backoff, so a plugin started before the host simply retries.
 After=slipstream-host.service

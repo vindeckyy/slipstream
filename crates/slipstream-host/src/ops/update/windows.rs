@@ -7,7 +7,7 @@
 //! 1. **SHA-256 == the signed manifest's** — the primary integrity gate (the manifest is the
 //!    Ed25519-verified document; this check makes the downloaded bytes those exact bytes).
 //! 2. **Authenticode**: the embedded signature must be cryptographically valid, tolerating
-//!    `CERT_E_UNTRUSTEDROOT` while the shipping cert is self-signed (`CN=unom`); when the
+//!    `CERT_E_UNTRUSTEDROOT` while the shipping cert is self-signed (`CN=Slipstream`); when the
 //!    manifest carries leaf pins, the signing leaf's SHA-256 must match one. The leaf is taken
 //!    from the SAME `WinVerifyTrust` state (`WTHelperGetProvSignerFromChain`), never a second
 //!    parse — no verify-vs-inspect gap. An empty pin list skips only the pin comparison (the
@@ -275,7 +275,7 @@ fn preflight_disk(at: &Path, needed: u64) -> Result<(), String> {
     Ok(())
 }
 
-/// Authenticode: valid embedded signature (untrusted root tolerated — self-signed `CN=unom`),
+/// Authenticode: valid embedded signature (untrusted root tolerated; self-signed `CN=Slipstream`),
 /// signing-leaf SHA-256 ∈ `pins` when pins are present. The leaf comes out of the same
 /// `WinVerifyTrust` state via `WTHelperGetProvSignerFromChain`. (`pub(crate)`: the service
 /// supervisor's boot-loop rollback re-checks the cached previous installer with it.)

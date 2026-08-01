@@ -14,9 +14,8 @@ flagged explicitly. For the higher-level packaging rationale ("why not Flatpak",
 
 > ⚠️ **COPR note (Path C only).** The legacy layering path's commands reference a COPR project
 > named `enricobuehler/slipstream` that is operator-run and may not be published (see
-> `packaging/copr/README.md`); layer from the **GitHub RPM registry** instead (`../rpm/README.md`,
-> the repo file `https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/bazzite.repo`) — it's what CI
-> actually publishes to. Paths A (sysext) and B (bootc) don't involve the COPR at all.
+> `packaging/copr/README.md`); prefer a local RPM from `../rpm/README.md` or a GitHub Release
+> asset. Paths A (sysext) and B (bootc) don't involve the COPR at all.
 
 ---
 
@@ -28,7 +27,7 @@ There are three paths on Bazzite, driven by different files in `packaging/`:
 |---|---|---|---|
 | **A — systemd-sysext** ✅ recommended | `packaging/bazzite/slipstream-sysext.sh` + `build-sysext.sh` (published by `.github/workflows/rpm.yml`) | Overlays the host onto `/usr` as a system extension — no layering, no reboot, one-command updates | Everyone; the default |
 | **B — bootc / OCI image** | `packaging/bootc/Containerfile` | Bakes slipstream into a `FROM bazzite-nvidia` image once; you `bootc switch` any number of hosts onto it | Fleets, reproducible appliances, no per-host drift |
-| **C — rpm-ostree layering** (legacy) | `packaging/rpm/` + the GitHub RPM registry | Layers the `slipstream` RPM onto your deployment with `rpm-ostree install` | Only if you specifically want the RPM database to own the files |
+| **C — rpm-ostree layering** (legacy) | `packaging/rpm/` + a local RPM | Layers the `slipstream` RPM onto your deployment with `rpm-ostree install` | Only if you specifically want the RPM database to own the files |
 
 **Why A over C:** the Bazzite docs treat layering as a last resort — every layered package makes
 every OS update slower and can **block upgrades entirely** until removed. A sysext never enters an
@@ -44,13 +43,12 @@ Run on the Bazzite host:
 ```sh
 # One-time bootstrap; afterwards the tool is on PATH as `slipstream-sysext` (it ships inside
 # the image). `--channel canary` for rolling main-branch builds instead of releases.
-curl -fsSLO https://github.com/vindeckyy/slipstream/slipstream/raw/branch/main/packaging/bazzite/slipstream-sysext.sh
+curl -fsSLO https://raw.githubusercontent.com/vindeckyy/slipstream/main/packaging/bazzite/slipstream-sysext.sh
 sudo bash slipstream-sysext.sh install
 ```
 
-This downloads the newest image for your Fedora base (host + tray + **web console**,
-SHA-256-verified against a signed manifest from the feed
-`…/packages/unom/generic/slipstream-sysext/f<ver>[-canary]/`),
+This installs from a sysext feed when configured (host + tray + **web console**,
+SHA-256-verified against a signed manifest), or use `--from-file` with a locally built image.
 installs it as `/var/lib/extensions/slipstream.raw`, merges it, and immediately applies what the
 RPM scriptlets would have (udev reload, sysctl) plus the two `/etc` files a sysext can't carry
 (the gamescope-session drop-in and the tray autostart entry, staged under
@@ -65,7 +63,7 @@ sudo slipstream-sysext remove    # unmerge + delete; ~/.config/slipstream is lef
 Details worth knowing:
 
 - **The feed is signed.** Each feed carries `SHA256SUMS` plus a detached OpenPGP signature
-  `SHA256SUMS.asc` from `packages@unom.io` (`AF245C506F4E4763`) — the same key that signs our RPMs.
+  `SHA256SUMS.asc` from the feed signing key (fingerprint baked into the script) — the same key that can sign RPMs.
   `slipstream-sysext` verifies that signature, with the public key baked into the script, *before*
   it believes the manifest, and refuses a feed it can't verify. The checksums alone never proved
   authorship: they sit on the same registry as the images they describe, so whatever could replace
@@ -86,10 +84,10 @@ Details worth knowing:
 
 The image is built **off-host** (on any machine with `podman`) from
 `packaging/bootc/Containerfile`, which bases on `ghcr.io/ublue-os/bazzite-nvidia:stable`
-(override with `--build-arg BASE_IMAGE=…`), enables RPM Fusion free + nonfree, adds the GitHub RPM
-repo (`--build-arg SLIPSTREAM_RPM_GROUP=…`, default `bazzite`), and installs the host **and the web
-console** (`slipstream slipstream-web`). It uses the GitHub registry rather than the COPR specifically
-because the registry carries `slipstream-web` (COPR's mock chroot can't build it — no `bun`).
+(override with `--build-arg BASE_IMAGE=…`), enables RPM Fusion free + nonfree, and installs the host
+**and the web console** from an RPM feed you configure (`--build-arg SLIPSTREAM_RPM_GROUP=…`). Point
+it at a local RPM mirror or bake packages into the image build context — there is no public Slipstream
+RPM registry. COPR alone is not enough for the console (no `bun` in mock).
 
 ```sh
 # Build + push (run from the repo root, on your builder machine):
@@ -100,10 +98,9 @@ podman push  ghcr.io/<you>/bazzite-slipstream
 sudo bootc switch ghcr.io/<you>/bazzite-slipstream && systemctl reboot
 ```
 
-> ⚠️ The image installs from the **GitHub RPM registry** (group `bazzite`), so **Path B depends on
-> that registry being populated** — CI (`.github/workflows/rpm.yml`) publishes `slipstream` +
-> `slipstream-web` on every push to `main`. Packages are unsigned with GPG-signed metadata
-> (`repo_gpgcheck=1`), matching `packaging/rpm/README.md`.
+> ⚠️ Path B needs an RPM feed (or local packages) that includes `slipstream` + `slipstream-web`.
+> Build those with `packaging/rpm/` (CI: `.github/workflows/rpm.yml` when publishing is wired).
+> Prefer `gpgcheck=1` as in `packaging/rpm/README.md`.
 
 ### Path C — rpm-ostree layering (legacy)
 
@@ -300,9 +297,9 @@ into the user unit directory.
 ```sh
 systemctl --user daemon-reload
 systemctl --user enable --now slipstream-host
-# Management web console (pairing + status), if you installed slipstream-web (it ships in the GitHub
-# RPM registry / bootc image; COPR cannot build it; see ../rpm/README.md). Choose a login password
-# in the browser on first visit:
+# Management web console (pairing + status), if you installed slipstream-web (it ships in local
+# RPMs / the sysext / bootc image when built with web; COPR cannot build it; see ../rpm/README.md).
+# Choose a login password in the browser on first visit:
 systemctl --user enable --now slipstream-web
 # then open https://<host-ip>:47992
 ```

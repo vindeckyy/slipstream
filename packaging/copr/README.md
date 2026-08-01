@@ -4,7 +4,7 @@ COPR builds the RPM from this git repo (no manual SRPM upload). Configure the pr
 once in the COPR web UI (or with `copr-cli`):
 
 **Project → New Build → SCM**
-- Clone URL:      `https://github.com/vindeckyy/slipstream/slipstream`
+- Clone URL:      `https://github.com/vindeckyy/slipstream`
 - Committish:     `main` (or a release tag)
 - Subdirectory:   *(repo root)*
 - Spec File:      `packaging/rpm/slipstream.spec`
@@ -26,7 +26,7 @@ copr-cli create slipstream --chroot fedora-44-x86_64 \
   --repo 'https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$releasever.noarch.rpm' \
   --repo 'https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$releasever.noarch.rpm'
 copr-cli buildscm slipstream \
-  --clone-url https://github.com/vindeckyy/slipstream/slipstream \
+  --clone-url https://github.com/vindeckyy/slipstream \
   --commit main --spec packaging/rpm/slipstream.spec --method rpkg
 ```
 
@@ -43,7 +43,7 @@ bun binary (the console serves HTTPS — HTTP/1.1 over TLS — via `Bun.serve`),
 A stock COPR build produces only `slipstream` + `slipstream-client`.
 
 Two ways to get the console:
-- **Recommended:** install it from the GitHub RPM registry (`packaging/rpm/README.md`, Option A),
-  whose CI builder image has `bun` and builds `--with web`. (This is what `bootc/Containerfile` does.)
+- **Recommended:** build the RPM with `--with web` (`packaging/rpm/README.md`), or take a release
+  asset that includes `slipstream-web`. (Point `bootc/Containerfile` at whatever RPM feed you use.)
 - **In COPR:** add `bun` to the chroot (a custom mock config / external repo) and set the build
   option `--with web` on the project, then `dnf install slipstream-web`.

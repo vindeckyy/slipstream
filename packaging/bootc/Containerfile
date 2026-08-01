@@ -1,27 +1,35 @@
 # bootc / OCI image layer that bakes slipstream into a Bazzite-based atomic image.
 #
+# Source / docs: https://github.com/vindeckyy/slipstream
+# In-tree docs:  https://github.com/vindeckyy/slipstream/tree/main/docs-site/content/docs
+#
 # Bazzite is already a bootc image (Fedora Atomic + gamescope + PipeWire + the NVIDIA
-# stack), so we layer slipstream on top: enable RPM Fusion (for the NVENC ffmpeg) and unom's
-# GitHub RPM registry (NOT COPR — only the registry carries the slipstream-web subpackage),
-# install the packages, and pre-enable the udev rule. Build + push this image, then
-# `bootc switch` (or rebase) a Bazzite host onto it for an image-based, atomic install —
+# stack), so we layer slipstream on top: enable RPM Fusion (for the NVENC ffmpeg) and an
+# RPM registry you publish to (NOT COPR — only a full registry carries the slipstream-web
+# subpackage), install the packages, and pre-enable the udev rule. Build + push this image,
+# then `bootc switch` (or rebase) a Bazzite host onto it for an image-based, atomic install —
 # no per-host `rpm-ostree install` drift.
 #
-#   podman build -t ghcr.io/<you>/bazzite-slipstream -f packaging/bootc/Containerfile .
+#   podman build -t ghcr.io/<you>/bazzite-slipstream -f packaging/bootc/Containerfile \
+#     --build-arg SLIPSTREAM_RPM_BASEURL=https://<your-rpm-registry>/${SLIPSTREAM_RPM_GROUP} \
+#     --build-arg SLIPSTREAM_RPM_GPGKEY='https://<key-url-1> https://<key-url-2>' \
+#     .
 #   podman push  ghcr.io/<you>/bazzite-slipstream
 #   # on the target Bazzite host:
 #   sudo bootc switch ghcr.io/<you>/bazzite-slipstream   # then reboot
 #
 # Pick the base tag that matches your hardware (NVIDIA shown). See ublue-os/bazzite tags.
+#
+# There is no public GitHub yum/dnf baseurl for these RPMs. Leaving a fake github.com RPM
+# URL here would 404 at image build. Operators MUST set SLIPSTREAM_RPM_BASEURL and
+# SLIPSTREAM_RPM_GPGKEY to the registry they publish. Conventional group name for the
+# Fedora/Bazzite base is "bazzite" (include it in the baseurl path yourself).
 ARG BASE_IMAGE=ghcr.io/ublue-os/bazzite-nvidia:stable
 FROM ${BASE_IMAGE}
 
-# slipstream's RPMs come from unom's GitHub RPM registry (the recommended path — see
-# packaging/rpm/README). Use it rather than COPR specifically because it carries the
-# slipstream-web management console subpackage, which COPR's mock chroot can't build (no `bun`).
-# Group "bazzite" == the Fedora 43 base; override for a different base. GitHub signs the repo
-# metadata (repo_gpgcheck=1) and the packages are GPG-signed (gpgcheck=1, the packages@unom.io key).
-ARG SLIPSTREAM_RPM_GROUP=bazzite
+# The registry must serve repo metadata (repo_gpgcheck=1) and GPG-signed packages (gpgcheck=1).
+ARG SLIPSTREAM_RPM_BASEURL
+ARG SLIPSTREAM_RPM_GPGKEY
 
 # RPM Fusion nonfree provides the NVENC-capable ffmpeg-libs slipstream records/encodes with.
 # (Bazzite usually has RPM Fusion enabled already; this is belt-and-suspenders.)
@@ -30,13 +38,17 @@ RUN dnf5 -y install \
         https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm \
     || true
 
-# Add the GitHub RPM repo and install the host + the web console (slipstream-web pulls nodejs).
+# Fail closed if the operator forgot the registry build-args (no invented GitHub RPM URL).
+RUN test -n "${SLIPSTREAM_RPM_BASEURL}" && test -n "${SLIPSTREAM_RPM_GPGKEY}" \
+ || { echo "bootc: set --build-arg SLIPSTREAM_RPM_BASEURL=... and SLIPSTREAM_RPM_GPGKEY=... (see packaging/bootc/Containerfile header)" >&2; exit 1; }
+
+# Add the operator-provided RPM repo and install the host + the web console (slipstream-web pulls nodejs).
 RUN printf '%s\n' \
-      '[github-unom-slipstream]' \
-      'name=slipstream (unom)' \
-      "baseurl=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/${SLIPSTREAM_RPM_GROUP}" \
+      '[slipstream]' \
+      'name=slipstream' \
+      "baseurl=${SLIPSTREAM_RPM_BASEURL}" \
       'enabled=1' 'gpgcheck=1' 'repo_gpgcheck=1' \
-      'gpgkey=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/repository.key https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-keys/1/RPM-GPG-KEY-slipstream' \
+      "gpgkey=${SLIPSTREAM_RPM_GPGKEY}" \
       > /etc/yum.repos.d/slipstream.repo \
  && dnf5 -y install slipstream slipstream-web \
  && dnf5 clean all

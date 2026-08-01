@@ -48,8 +48,9 @@ cargo run -rp slipstream-host -- serve --gamestream    # + Moonlight compatibili
 Then pair from the web console (`https://<host-ip>:47992`) or the client app.
 
 Most people should install a **package** rather than run from source — see
-[`packaging/`](../../packaging/README.md) (apt · rpm/COPR/bootc · Arch/sysext · Windows installer) and
-the per-platform guides at **[docs.slipstream.unom.io/docs/install](https://docs.slipstream.unom.io/docs/install)**.
+[`packaging/`](../../packaging/README.md) (build local debs/rpms, COPR/bootc, Arch, sysext, Windows
+installer) and the per-platform guides under
+**[docs-site/content/docs/install.md](../../docs-site/content/docs/install.md)**.
 
 ### Subcommands
 
@@ -87,5 +88,5 @@ src/
 
 - **[`slipstream-core`](../slipstream-core/README.md)** — the shared protocol · FEC · crypto core
 - **[Clients](../../clients/)** — the apps that connect (Apple · Linux · Windows · Android · probe)
-- **[Packaging](../../packaging/README.md)** & **[docs](https://docs.slipstream.unom.io)** — install & operate
+- **[Packaging](../../packaging/README.md)** & **[docs](../../docs-site/content/docs/)** — install & operate
 - **slipstream-planning** (internal planning repo) — architecture rationale and deep-dive plans

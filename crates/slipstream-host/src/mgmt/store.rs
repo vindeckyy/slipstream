@@ -49,7 +49,7 @@ pub(crate) struct HostFacts {
 pub(crate) struct SourceView {
     pub name: String,
     pub url: String,
-    /// The built-in `unom` source: not editable, not removable, and the only source whose entries
+    /// The built-in `slipstream` source: not editable, not removable, and the only source whose entries
     /// may carry the "verified" tier.
     pub builtin: bool,
     /// Whether we check a signature on this source's index. An unsigned source still works; the
@@ -90,7 +90,7 @@ pub(crate) struct CatalogEntry {
     /// `verified` (built-in source) or `external` (an operator-added source). Never `unverified`:
     /// unverified installs come from a raw spec and are never listed (D7).
     pub tier: String,
-    /// When unom reviewed this exact tarball (built-in source only).
+    /// When Slipstream maintainers reviewed this exact tarball (built-in source only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reviewed_at: Option<String>,
     pub platforms: Vec<String>,
@@ -265,7 +265,7 @@ fn build_catalog(force: bool) -> CatalogResponse {
                 version: e.version.clone(),
                 source: st.source.name.clone(),
                 // The badge is the built-in source's alone: a third-party curator can pin and
-                // publish, but cannot confer unom's review (D6).
+                // publish, but cannot confer the built-in catalog's review (D6).
                 tier: if verified { "verified" } else { "external" }.to_string(),
                 reviewed_at: verified
                     .then(|| e.verification.as_ref().map(|v| v.reviewed_at.clone()))

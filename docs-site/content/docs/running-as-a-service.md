@@ -155,8 +155,9 @@ captures the secure desktop (UAC / lock screen) and survives reboots with nobody
 model Sunshine/Apollo use. Because it runs at that privilege level, keep it on a trusted network and be
 deliberate about which machine you host on — see [Security & Safe Use](/docs/security).
 
-The easy path is the **signed installer**: download `slipstream-host-setup-<ver>.exe` from the package
-registry ([`slipstream-host-windows`](https://github.com/vindeckyy/slipstream/unom/-/packages)) and run it. It drops the host
+The easy path is the **signed installer**: download `slipstream-host-setup-<ver>.exe` from
+[GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached (or build from
+`packaging/windows/`) and run it. It drops the host
 into `C:\Program Files\slipstream`, installs the bundled **ss-vdisplay** virtual-display driver, and
 registers + starts the service for you (`/VERYSILENT` for unattended). Upgrades and uninstall are
 handled through Add/Remove Programs.

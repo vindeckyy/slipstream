@@ -96,4 +96,4 @@ Match the surrounding code's comment density and naming. Commit messages end wit
 See the [README's Build & test section](README.md#build--test-from-source) for the extra dev
 commands (the FEC loss harness, the standalone C-ABI proof) and
 [Design invariants](README.md#design-invariants) for the rules a change is expected to hold to, and
-the [docs site](https://docs.slipstream.unom.io) for architecture and per-platform guides.
+the [local docs site](docs-site/) (`docs-site/content/docs/`) for architecture and per-platform guides.

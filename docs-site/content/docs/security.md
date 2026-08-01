@@ -261,4 +261,4 @@ Helpful things to include:
 We acknowledge reports within **3 business days** and practice coordinated disclosure — we'll keep
 you posted, agree a disclosure date, and credit you when the fix ships (unless you'd rather stay
 anonymous). The full policy is in
-[`SECURITY.md`](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/SECURITY.md).
+[`SECURITY.md`](https://github.com/vindeckyy/slipstream/blob/main/SECURITY.md).

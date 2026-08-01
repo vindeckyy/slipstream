@@ -1,12 +1,13 @@
 ---
 title: Install the Host
-description: Install the Slipstream host — on Linux from its package registry, or on Windows from a signed installer.
+description: Install the Slipstream host — on Linux from local packaging or GitHub Releases, or on Windows from a signed installer.
 ---
 
-On Linux, the package registries are the real distribution channel. Pick your distro, add the repo, and
-install with your native package manager. Each row links to the full per-distro guide (add the repo,
-first-run steps, the web console) — those are the source of truth, so this page doesn't duplicate them.
-On **Windows**, the host ships as a signed installer instead — see [Windows](#windows).
+On Linux, build packages from this repo (or install artifacts from
+[GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached). There is no
+public apt/rpm/npm package host. Pick your distro and follow the guide; each row links to the full
+per-distro walkthrough. On **Windows**, the host ships as a signed installer instead — see
+[Windows](#windows).
 
 > **First, read [Security & Safe Use](/docs/security).** A streaming host is remote control of the
 > machine. It's built for trusted local networks — don't expose it to the internet, and be thoughtful
@@ -14,24 +15,21 @@ On **Windows**, the host ships as a signed installer instead — see [Windows](#
 
 ## Pick your distro
 
-| Distro | Package manager | One-command happy path | Guide |
-|--------|-----------------|------------------------|-------|
-| **Ubuntu** | apt | `sudo apt install slipstream-host` | [Ubuntu](/docs/ubuntu) · [packaging/debian](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/debian/README.md) |
-| **Bazzite / Fedora Atomic** | systemd-sysext | `curl -fsSLO https://github.com/vindeckyy/slipstream/slipstream/raw/branch/main/packaging/bazzite/slipstream-sysext.sh && sudo bash slipstream-sysext.sh install` (no layering, no reboot) | [Bazzite](/docs/bazzite) · [packaging/bazzite](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/bazzite/README.md) |
-| **Fedora (dnf)** | dnf / rpm-ostree | `sudo dnf install slipstream` | [Fedora](/docs/fedora) · [packaging/rpm](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/rpm/README.md) |
-| **Arch** | pacman | `sudo pacman -Syu slipstream-host` (binary repo — always a full `-Syu`, never `-Sy`) | [Arch Linux](/docs/arch) · [packaging/arch](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/arch/README.md) |
+| Distro | Package manager | Happy path | Guide |
+|--------|-----------------|------------|-------|
+| **Ubuntu** | apt (local `.deb`) | build with `packaging/debian`, then `sudo apt install ./dist/slipstream-host_*.deb` | [Ubuntu](/docs/ubuntu) · [packaging/debian](https://github.com/vindeckyy/slipstream/blob/main/packaging/debian/README.md) |
+| **Bazzite / Fedora Atomic** | systemd-sysext | `curl -fsSLO https://raw.githubusercontent.com/vindeckyy/slipstream/main/packaging/bazzite/slipstream-sysext.sh && sudo bash slipstream-sysext.sh install` (or build the image locally) | [Bazzite](/docs/bazzite) · [packaging/bazzite](https://github.com/vindeckyy/slipstream/blob/main/packaging/bazzite/README.md) |
+| **Fedora (dnf)** | dnf / rpm-ostree | build with `packaging/rpm`, then `sudo dnf install ./dist/slipstream-*.rpm` | [Fedora](/docs/fedora) · [packaging/rpm](https://github.com/vindeckyy/slipstream/blob/main/packaging/rpm/README.md) |
+| **Arch** | pacman / makepkg | `cd packaging/arch && PF_SRCDIR="$(git rev-parse --show-toplevel)" makepkg -si` | [Arch Linux](/docs/arch) · [packaging/arch](https://github.com/vindeckyy/slipstream/blob/main/packaging/arch/README.md) |
 | **SteamOS (host)** | on-device script | clone the repo, then `bash ~/slipstream/scripts/steamdeck/install.sh` (builds on-device) | [SteamOS (Host)](/docs/steamos-host) |
-| **NixOS / Nix** | nix flake | `nix run git+https://github.com/vindeckyy/slipstream/slipstream#slipstream-host -- serve --gamestream` | [NixOS](#nixos) · [packaging/nix](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/nix/README.md) |
+| **NixOS / Nix** | nix flake | `nix run github:vindeckyy/slipstream#slipstream-host -- serve --gamestream` | [NixOS](#nixos) · [packaging/nix](https://github.com/vindeckyy/slipstream/blob/main/packaging/nix/README.md) |
 
-Each registry is public — no auth, you just trust the repo's signing key. Adding the repo is a
-one-time step covered in the linked guide; after that, normal `apt upgrade` / `dnf upgrade` /
-`pacman -Syu` (or `sudo slipstream-sysext update` on Bazzite) tracks new builds. On **NixOS** there
-is no repo to add — you add the flake as an input and enable its module, see [NixOS](#nixos).
+After you install a package once, rebuild or re-download for updates (or use
+`sudo slipstream-sysext update` on Bazzite when you publish a feed). On **NixOS** add the flake as
+an input and enable its module — see [NixOS](#nixos).
 
-> **Stable vs canary.** The repos in the per-distro guides are the **stable** channel — it only
-> moves when a `vX.Y.Z` release is cut. For the latest `main` build (fast, possibly broken), point
-> at the **canary** channel instead (`canary` apt distribution / `*-canary` rpm group). See
-> [Release Channels](/docs/channels).
+> **Stable vs canary.** When you publish your own package feeds, keep stable and canary separate so
+> a release never traps rolling builds. See [Release Channels](/docs/channels).
 
 ## Windows
 
@@ -42,33 +40,34 @@ For hardware encode you need a GPU — NVIDIA (NVENC), AMD (AMF), or Intel (QSV)
 fallback without one. More detail — including the CLI `slipstream-host service install` path — is in
 [Running as a Service → Windows](/docs/running-as-a-service#windows).
 
-### winget (recommended)
+### winget (optional)
 
-In an **admin** PowerShell, register the Slipstream source once, then install:
+If you host a private winget REST source (see `packaging/winget/`), register it once in an **admin**
+PowerShell, then install. There is no public Slipstream winget source:
 
 ```powershell
-winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest
+# winget source add -n slipstream https://<your-winget-host> -t Microsoft.Rest
 winget install vindeckyy.SlipstreamHost
 ```
 
-Later, `winget upgrade vindeckyy.SlipstreamHost` updates it in place. Add `--interactive` to get the full
-wizard instead (the optional task checkboxes, the web-console password page). winget carries
-**stable** releases only — canary builds are not published there.
+Otherwise use the manual installer below. winget carries **stable** releases only when you publish
+them that way.
 
 ### Manual download
 
-Download `slipstream-host-setup-<ver>.exe` and run it elevated. The full procedure — where to get it,
-everything the installer puts on the machine, its optional tasks, the console password, and the
-`/VERYSILENT` unattended switch — lives on one page: [Windows Host → Install](/docs/windows-host#install).
-This is also the path for **canary** builds, which winget doesn't carry — see
-[Release Channels](/docs/channels) for that download.
+Download `slipstream-host-setup-<ver>.exe` from
+[GitHub Releases](https://github.com/vindeckyy/slipstream/releases) (when attached) and run it
+elevated. The full procedure — everything the installer puts on the machine, its optional tasks, the
+console password, and the `/VERYSILENT` unattended switch — lives on one page:
+[Windows Host → Install](/docs/windows-host#install). This is also the path for **canary** builds.
+You can also build the installer locally from `packaging/windows/`.
 
 > **About the Unknown Publisher prompt.** The installer is signed with a self-signed certificate, so
-> Windows warns before it runs — accepting the prompt is enough, nothing else is required. The winget
-> route is no different: it downloads and runs that same installer. If you'd
+> Windows warns before it runs — accepting the prompt is enough, nothing else is required. If you'd
 > rather silence it, the matching **`slipstream-host-windows_<ver>.cer`** is published next to the
-> installer, and it's the **same certificate for every release**, so this is one-time. A self-signed
-> certificate is its own root, so it has to go in both stores. In an **admin** PowerShell:
+> installer when available, and it's the **same certificate for every release**, so this is one-time.
+> A self-signed certificate is its own root, so it has to go in both stores. In an **admin**
+> PowerShell:
 >
 > ```powershell
 > Import-Certificate -FilePath .\slipstream-host-windows_<ver>.cer `
@@ -90,7 +89,7 @@ You can run it straight from the flake without NixOS (on other distros, wrap it 
 [nixGL](https://github.com/nix-community/nixGL) so the GPU drivers resolve):
 
 ```sh
-nix run git+https://github.com/vindeckyy/slipstream/slipstream#slipstream-host -- serve --gamestream
+nix run github:vindeckyy/slipstream#slipstream-host -- serve --gamestream
 ```
 
 On NixOS, add the flake as an input, add `slipstream.nixosModules.default` to your system's modules,
@@ -117,7 +116,7 @@ systemctl --user enable --now slipstream-host slipstream-web
 
 The full option reference (client, console and scripting options, GPU driver notes, headless
 appliance setup) is in
-[packaging/nix](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/nix/README.md). To
+[packaging/nix](https://github.com/vindeckyy/slipstream/blob/main/packaging/nix/README.md). To
 update, run `nix flake update slipstream` in your flake directory, then `sudo nixos-rebuild switch`.
 
 ## What the packages are
@@ -125,14 +124,15 @@ update, run `nix flake update slipstream` in your flake directory, then `sudo ni
 - **`slipstream-host`** — the streaming host. Install this on your Linux gaming machine.
 - **`slipstream-web`** — the browser management console (pairing + status). Recommended alongside the
   host. On apt and RPM the host package *recommends* it, so your package manager pulls it in by
-  default, and the Bazzite sysext image already contains it. On **Arch** it's an optional
-  dependency, so name it yourself: `sudo pacman -Syu slipstream-web`.
-- **`slipstream-client`** — the GTK4 desktop client, for streaming *to* a Linux box (shipped via
-  apt / RPM / Arch, and as a Flatpak). On a **Steam Deck** take the Flatpak instead — SteamOS's
+  default when both packages are available, and the Bazzite sysext image already contains it when
+  you build one. On **Arch** it's an optional dependency, so name it yourself when you makepkg.
+- **`slipstream-client`** — the GTK4 desktop client, for streaming *to* a Linux box (build via
+  apt / RPM / Arch packaging, or Flatpak). On a **Steam Deck** prefer the Flatpak — SteamOS's
   `/usr` is read-only, so the native package isn't the path there:
 
   ```sh
-  flatpak install --user https://flatpak.unom.io/io.slipstream.flatpakref
+  # Build locally (packaging/flatpak) or install a .flatpak from GitHub Releases when attached:
+  # flatpak install --user --bundle /path/to/slipstream-client.flatpak
   ```
 
   For Gaming Mode, add the [Decky plugin](/docs/steam-deck) on top of it. Full client instructions
@@ -216,5 +216,5 @@ password — survives package removal).
 
 ## Building from source
 
-If no package exists for your platform, you can build from source — see the repository README. Source
-builds are a fallback; the registries are the supported path.
+If no package exists for your platform, build from source — see the repository README. Source builds
+and the packaging scripts under `packaging/` are the supported path.

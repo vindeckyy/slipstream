@@ -58,19 +58,16 @@ cover art) so you can launch a title straight into the stream.
 It ships as a real package, not just a source build — full steps in
 [Install a Client](/docs/install-client#linux-desktop-flatpak):
 
-- **Any Flatpak distro (recommended)** — one command from the hosted `flatpak.unom.io` repo; the
-  guide linked above has the exact command and how updates work. It's also the client the
-  [Decky plugin](/docs/steam-deck) uses by default, though the plugin drives a native
+- **Any Flatpak distro (recommended)** — build with `packaging/flatpak` or install a `.flatpak`
+  from GitHub Releases when attached; the guide linked above has the exact commands. It's also the
+  client the [Decky plugin](/docs/steam-deck) uses by default, though the plugin drives a native
   `slipstream-client` just as well.
-- **Ubuntu 26.04 or newer** — `apt install slipstream-client` from the Slipstream apt registry. The
-  client package needs SDL3 and GTK4 ≥ 4.20, which Ubuntu 24.04 LTS doesn't ship — on 24.04 use the
-  Flatpak above.
-- **Fedora** — `sudo dnf install slipstream-client` from the GitHub RPM registry (add the repo as in
-  the [Fedora guide](/docs/fedora)).
-- **Fedora Atomic / Bazzite** — use the Flatpak above. `rpm-ostree install slipstream-client` works,
-  but layering slows every OS update, so it's a last resort on an image-based system (see
-  [Bazzite](/docs/bazzite)).
-- **Arch** — `sudo pacman -Syu slipstream-client` from the signed binary repo (see [Arch Linux](/docs/arch)).
+- **Ubuntu 26.04 or newer** — build/install a local `slipstream-client` `.deb`. The client package
+  needs SDL3 and GTK4 ≥ 4.20, which Ubuntu 24.04 LTS doesn't ship — on 24.04 use the Flatpak above.
+- **Fedora** — build/install a local `slipstream-client` RPM (see the [Fedora guide](/docs/fedora)).
+- **Fedora Atomic / Bazzite** — use the Flatpak above. Layering a local RPM works, but slows every
+  OS update, so it's a last resort (see [Bazzite](/docs/bazzite)).
+- **Arch** — `makepkg -si` from `packaging/arch` (see [Arch Linux](/docs/arch)).
 
 Launch it, pick your host from the list, and stream. For scripting, use the
 [`slipstream` CLI](#scripting-the-slipstream-cli) that ships in the same packages:

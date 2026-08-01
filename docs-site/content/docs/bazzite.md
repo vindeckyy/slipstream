@@ -32,17 +32,19 @@ reboot**, and is removable in one command. This is the same mechanism the Fedora
 maintainers ship via the [fedora-sysexts](https://fedora-sysexts.github.io/) project.
 
 ```sh
-# One-time bootstrap (afterwards the updater is on PATH as `slipstream-sysext`):
-curl -fsSLO https://github.com/vindeckyy/slipstream/slipstream/raw/branch/main/packaging/bazzite/slipstream-sysext.sh
-sudo bash slipstream-sysext.sh install          # add `--channel canary` for rolling builds
+# From a clone of this repo (or download the script from GitHub):
+#   https://raw.githubusercontent.com/vindeckyy/slipstream/main/packaging/bazzite/slipstream-sysext.sh
+curl -fsSLO https://raw.githubusercontent.com/vindeckyy/slipstream/main/packaging/bazzite/slipstream-sysext.sh
+sudo bash slipstream-sysext.sh install          # add `--channel canary` if you publish a canary feed
 ```
 
-That downloads the newest image — host + tray + web console + the plugin runner
-(`slipstream-scripting`), plus the HDR `slipstream-gamescope` build — merges it, and applies the
-udev/sysctl setup on the spot; the host is usable immediately, no reboot. The feed's checksum
-manifest is OpenPGP-signed by packages@unom.io (key `AF245C506F4E4763`, the same one that signs our
-RPMs), and `slipstream-sysext` checks that signature against a key baked into the script before it
-trusts a single checksum — so it needs `gpg` on the box, and it refuses a feed it can't verify.
+That installs from a sysext feed when you have one configured, or you can build the image locally
+with `packaging/bazzite/build-sysext.sh` and install with
+`sudo bash slipstream-sysext.sh install --from-file …`. See
+[`packaging/bazzite/README.md`](https://github.com/vindeckyy/slipstream/blob/main/packaging/bazzite/README.md).
+When a feed is used, the checksum manifest is OpenPGP-signed (public key baked into the script), and
+`slipstream-sysext` checks that signature before it trusts a single checksum — so it needs `gpg` on
+the box, and it refuses a feed it can't verify.
 
 The plugin runner rides along in the image but isn't started: run
 `systemctl --user enable --now slipstream-scripting` when you want [plugins](/docs/plugins).
@@ -103,16 +105,16 @@ Three things to know:
   feed predates signing; it gets sealed on the next publish. To install from it anyway, accepting
   that the images are unauthenticated, run
   `sudo env SLIPSTREAM_SYSEXT_ALLOW_UNSIGNED=1 bash slipstream-sysext.sh install`. The other message,
-  `the feed's SHA256SUMS is NOT signed by packages@unom.io`, is not the same thing — don't install;
+  `the feed's SHA256SUMS is NOT signed by the expected key`, is not the same thing — don't install;
   re-download the script and try again.
 
-For a fully baked appliance image there's also a **bootc** Containerfile that installs the RPMs
-from the registry at image-build time — see `packaging/bootc/` in the repo. Plain `rpm-ostree`
-layering from the [RPM registry](https://github.com/vindeckyy/slipstream/unom/-/packages) keeps working too: add the
-repo exactly as on [Fedora](/docs/fedora), with the `baseurl` group matching your Fedora base, then
-`sudo rpm-ostree install slipstream slipstream-web` and reboot. The sysext is still the supported
-default. Building from source also works (Bazzite is Fedora Atomic underneath — same steps as
-[Fedora](/docs/fedora)).
+For a fully baked appliance image there's also a **bootc** Containerfile that installs RPMs you
+point it at during image-build time — see `packaging/bootc/` in the repo. Plain `rpm-ostree`
+layering with a local RPM (built via [`packaging/rpm`](https://github.com/vindeckyy/slipstream/blob/main/packaging/rpm/README.md)
+or taken from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases)) keeps working too:
+`sudo rpm-ostree install ./slipstream-*.rpm ./slipstream-web-*.rpm` and reboot. The sysext is still
+the supported default. Building from source also works (Bazzite is Fedora Atomic underneath — same
+steps as [Fedora](/docs/fedora)).
 
 ## Allow controller input
 

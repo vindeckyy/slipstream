@@ -37,7 +37,7 @@ pkgrel="${PF_PKGREL:-1}"
 # NVENC/QSV/AMF, all x86. On aarch64 the split below drops slipstream-host from `pkgname`, so
 # makepkg builds only the client and never tries to compile the host crate.
 arch=('x86_64' 'aarch64')
-url="https://github.com/vindeckyy/slipstream/slipstream"
+url="https://github.com/vindeckyy/slipstream"
 license=('MIT OR Apache-2.0')
 # !lto: makepkg's `lto` option injects -flto=auto into CFLAGS; aws-lc-sys (rustls' crypto)
 # compiles its C with those flags and GCC LTO bitcode objects are unreadable by rust's lld
@@ -66,7 +66,7 @@ fi
 # build() uses it instead AND the fetch is skipped entirely (a canary pkgver has no tag to
 # clone, and CI already has the checkout).
 if [ -z "${PF_SRCDIR:-}" ]; then
-  source=("git+https://github.com/vindeckyy/slipstream/slipstream.git#tag=v${pkgver}")
+  source=("git+https://github.com/vindeckyy/slipstream.git#tag=v${pkgver}")
   sha256sums=('SKIP')
 else
   source=()

@@ -79,7 +79,7 @@ export const LoginView: FC<{
 							<CardDescription className="text-sm leading-relaxed text-muted-foreground">
 								{m.login_subtitle()}{" "}
 								<a
-									href="https://docs.slipstream.unom.io/docs/forgot-password"
+									href="https://github.com/vindeckyy/slipstream/blob/main/docs-site/content/docs/forgot-password.md"
 									target="_blank"
 									rel="noreferrer"
 									className="font-medium text-foreground/90 underline decoration-foreground/25 underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"

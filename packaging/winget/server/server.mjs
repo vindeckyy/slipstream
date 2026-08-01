@@ -1,14 +1,14 @@
-// HTTP front for the winget REST source. Runs on github-actions under a stock `oven/bun` image with this
+// HTTP front for the winget REST source. Runs under a stock `oven/bun` image with this
 // file and the data bind-mounted — same shape as the flatpak server (stock caddy:2-alpine + a
 // bind-mounted Caddyfile), so there is no image to build, publish or pull.
 //
-// Plain HTTP on :3240. Caddy on the same box terminates TLS for winget.slipstream.unom.io and
-// reverse-proxies here — that TLS is not optional decoration: `winget source add` refuses anything
-// but HTTPS with a publicly trusted certificate.
+// Plain HTTP on :3240. Put a TLS terminator in front (Caddy, nginx, etc.) — that TLS is not
+// optional decoration: `winget source add` refuses anything but HTTPS with a publicly trusted
+// certificate. Repo: https://github.com/vindeckyy/slipstream
 //
 // Zero dependencies on purpose. The catalogue is a generated JSON file; parsing YAML and talking to
-// GitHub is build-data.mjs's job, which runs in CI. Nothing here needs node_modules, so the deploy
-// is two files and `docker compose up -d`.
+// the releases API is build-data.mjs's job, which runs in CI. Nothing here needs node_modules, so
+// the deploy is two files and `docker compose up -d`.
 import { readFileSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

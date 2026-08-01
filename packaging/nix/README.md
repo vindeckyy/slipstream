@@ -32,12 +32,12 @@ NVIDIA (zero-copy dmabuf → CUDA → NVENC), AMD/Intel (raw Vulkan-Video HEVC /
 
 ```sh
 # Build
-nix build git+https://github.com/vindeckyy/slipstream/slipstream#slipstream-host
-nix build git+https://github.com/vindeckyy/slipstream/slipstream#slipstream-client
+nix build github:vindeckyy/slipstream#slipstream-host
+nix build github:vindeckyy/slipstream#slipstream-client
 
 # Run
-nix run git+https://github.com/vindeckyy/slipstream/slipstream#slipstream-host -- serve --gamestream
-nix run git+https://github.com/vindeckyy/slipstream/slipstream#slipstream-client
+nix run github:vindeckyy/slipstream#slipstream-host -- serve --gamestream
+nix run github:vindeckyy/slipstream#slipstream-client
 ```
 
 GPU drivers are resolved at runtime from `/run/opengl-driver/lib`. On non-NixOS distros use
@@ -52,7 +52,7 @@ Add the flake and enable the host and/or client:
 
 ```nix
 {
-  inputs.slipstream.url = "git+https://github.com/vindeckyy/slipstream/slipstream";
+  inputs.slipstream.url = "github:vindeckyy/slipstream";
   # (optional) share your nixpkgs: inputs.slipstream.inputs.nixpkgs.follows = "nixpkgs";
 
   outputs = { self, nixpkgs, slipstream, ... }: {
@@ -237,9 +237,9 @@ The shell exports `PF_FFVK_VULKAN_INCLUDE` (Vulkan headers for ss-ffvk bindgen) 
   runs on every `bun install` (web's `postinstall`; the SDK's `prepare`, since sdk/ is the
   *published* `@slipstream/host` package and a `postinstall` would then fire on consumers' installs).
   Regenerate by hand with `cd web && bunx bun2nix -o bun.nix` if a lockfile is ever edited directly.
-  The `@unom` scope needs no special handling: `web/bun.lock` records those tarballs' full
-  `https://github.com/vindeckyy/slipstream/api/packages/unom/npm/…` URLs and the registry is read-public (the same
-  anonymous pull CI's rpm/deb builds do).
+  The `@unom` scope needs a registry mapping (see `web/.npmrc`): those package names stay
+  `@unom/ui` / `@unom/style` / `@unom/app-ui`. Point `.npmrc` at whatever private/local npm
+  registry you use for that scope.
 
   > ⚠ **`bun.nix` has no schema stability across bun2nix versions.** The flake input is pinned
   > (`github:nix-community/bun2nix?ref=2.1.2`) and the npm devDependency is pinned to the *same*

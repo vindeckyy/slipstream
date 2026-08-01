@@ -27,7 +27,7 @@ Release:        %{?ss_release}%{!?ss_release:1}%{?dist}
 Summary:        Low-latency desktop/game streaming host (Moonlight-compatible + slipstream/1)
 
 License:        MIT OR Apache-2.0
-URL:            https://github.com/vindeckyy/slipstream/slipstream
+URL:            https://github.com/vindeckyy/slipstream
 # COPR SCM builds provide the checkout; for a tarball build, drop a git archive here:
 Source0:        %{name}-%{version}.tar.gz
 

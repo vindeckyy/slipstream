@@ -3,17 +3,11 @@
 The native Linux **client** — the shell (crate `slipstream-client-linux`, binary
 `slipstream-client`) plus the Vulkan session binary it execs for streaming (crate
 `slipstream-client-session`, binary `slipstream-session`) — is
-published two ways by CI (`.github/workflows/flatpak.yml`), on every push to `main` (a rolling
-`<next-minor>-ciN.g<sha>` build, base derived from the latest stable tag by
-`scripts/ci/ss-version.sh`) and on `v*` tags (a clean `X.Y.Z`):
-
-1. **Hosted OSTree repo at `https://flatpak.unom.io`** (recommended) — a GPG-signed Flatpak
-   remote served by a static Caddy container on github-actions, so users **install once and then
-   `flatpak update`**. Shared unom-wide repo (remote name `unom`), reusable by other unom apps
-   under the same signing key. See "Install (recommended)" below.
-2. **Single-file `.flatpak` bundle** in **GitHub's generic package registry** (`unom` org) — the
-   no-remote fallback the **Decky plugin** consumes (stable `latest/slipstream-client.flatpak`
-   URL) and the offline/manual path. On tags it's also attached to the GitHub release.
+built by CI (`.github/workflows/flatpak.yml`) when enabled. There is no public Flatpak remote.
+Produce a **single-file `.flatpak` bundle** locally (see below) and install it with
+`flatpak install --user --bundle`, or attach the bundle to a
+[GitHub Release](https://github.com/vindeckyy/slipstream/releases). If you host your own OSTree
+repo later, users can `flatpak update` from that remote instead.
 
 > The **host** is NOT a flatpak (it needs unsandboxed `/dev/uinput` + zero-copy NVENC — see
 > [`../README.md`](../README.md) "Why not Flatpak"). Only the **client** is sandbox-friendly.
@@ -29,46 +23,20 @@ with HEVC-capable FFmpeg supplied automatically by the runtime's `codecs-extra` 
 App id: **`io.slipstream`** (matches the Apple bundle id family and the Decky plugin's
 flatpak fallback).
 
-## Install (recommended): the hosted repo
+## Install (local bundle)
 
-One command adds the signed `unom` remote and installs the client; it auto-adds Flathub for the
-GNOME runtime, and `flatpak update` tracks new builds from then on:
+Build the bundle, then install it per-user (no root; survives SteamOS updates on the Deck):
 
 ```sh
-flatpak install --user https://flatpak.unom.io/io.slipstream.flatpakref
+bash packaging/flatpak/build-flatpak.sh
+# Flathub must be enabled so the GNOME runtime + codecs-extra extension pull in:
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install --user --bundle dist/slipstream-client-*.flatpak
 flatpak run io.slipstream
 ```
 
-Equivalent two-step (add the whole remote, then install by app id):
-
-```sh
-flatpak remote-add --user --if-not-exists unom https://flatpak.unom.io/unom.flatpakrepo
-flatpak install --user unom io.slipstream
-```
-
-Updates — the whole point of the hosted repo:
-
-```sh
-flatpak update                    # or: flatpak update io.slipstream
-```
-
-## Install on the Deck via the bundle (no-remote fallback)
-
-The generic registry is a plain HTTP file store, so just download the bundle and install it
-per-user (no root, survives SteamOS updates). This is what the Decky plugin uses; the hosted
-repo above is the better path for a human on the Deck:
-
-```sh
-# Pick a version: a tag like 1.2.3, or the newest main build's <next-minor>-ciN.gSHA.
-VER=1.2.3
-URL="https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-client-flatpak/$VER/slipstream-client-$VER.flatpak"
-
-# Flathub must be enabled (it is on the Deck) so the GNOME runtime + codecs-extra extension pull in:
-flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-
-curl -fL -o /tmp/slipstream-client.flatpak "$URL"
-flatpak install --user --bundle /tmp/slipstream-client.flatpak
-```
+Or download a `.flatpak` from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases)
+when attached and `flatpak install --user --bundle` that file.
 
 Run it:
 
@@ -89,15 +57,14 @@ are "download the newer bundle and reinstall":
 flatpak install --user --bundle /tmp/slipstream-client.flatpak   # same command, newer file
 ```
 
-Installs from `https://flatpak.unom.io` instead just take `flatpak update` (see "Install
-(recommended)" above).
+If you later point a Flatpak remote at your own OSTree host, updates are just `flatpak update`.
 
 ## Build locally / the CI fallback
 
 CI builds this in a **`--privileged`** Fedora container, because `flatpak-builder` runs
-`bubblewrap`, which needs user namespaces the default Docker executor denies. **If the GitHub
+`bubblewrap`, which needs user namespaces the default Docker executor denies. **If the CI
 runner can't grant `--privileged`** (the job fails at `flatpak-builder` with
-*"Creating new namespace failed: Operation not permitted"*), build it out-of-band and upload
+*"Creating new namespace failed: Operation not permitted"*), build it out-of-band and publish
 by hand. The easiest place is **on the Deck itself** (it can run `org.flatpak.Builder`
 user-scope, no root):
 
@@ -109,10 +76,7 @@ flatpak install --user -y flathub org.flatpak.Builder
 # existing one — see below), builds, and exports dist/slipstream-client-<version>.flatpak:
 bash packaging/flatpak/build-flatpak.sh
 
-# Upload to the generic registry (PAT with write:package):
-curl -fsS --user "enricobuehler:$REGISTRY_TOKEN" \
-  --upload-file dist/slipstream-client-*.flatpak \
-  "https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-client-flatpak/0.0.1-manual/slipstream-client.flatpak"
+# Optional: attach dist/slipstream-client-*.flatpak to a GitHub Release, or copy it to your own feed.
 ```
 
 > `cargo-sources.json` generation needs `python3` + `aiohttp` + `tomlkit`, which the Deck lacks.
@@ -178,38 +142,23 @@ manifest pins a `skia-binaries-….tar.gz` source and points the build at it wit
 that pinned tarball (URL + sha256) to the matching `skia-binaries` release or the build breaks
 offline.
 
-## Hosting the repo (github-actions) + one-time setup
+## Hosting your own OSTree remote (optional)
 
-The OSTree repo flatpak-builder produces is GPG-signed in CI and rsynced to github-actions, where a tiny
-static **Caddy container** (`server/compose.production.yml` + `server/Caddyfile`, port **3230**)
-serves the `./site` tree (`repo/` + `unom.flatpakrepo` + `io.slipstream.flatpakref` +
-`index.html`). The edge Caddy on github-pages-1 fronts it at `https://flatpak.unom.io`.
-The CI deploy step **no-ops until the secret + infra exist**, so it won't redden builds mid-setup.
+If you want `flatpak update` instead of reinstalling bundles, host the OSTree repo flatpak-builder
+produces (GPG-signed) behind any static HTTP server, and publish a `.flatpakrepo` / `.flatpakref`
+that points at it. The scripts under `server/` in this directory are a starting point for a local
+Caddy container. There is no public Slipstream Flatpak remote.
 
-**Signing key:** dedicated RSA-4096 key `unom Flatpak Repo <flatpak@unom.io>`. Public key committed
-at [`unom-flatpak.gpg`](unom-flatpak.gpg) (its base64 goes into the `.flatpakrepo`/`.flatpakref`
-`GPGKey=`); private key (ASCII-armored, then base64) lives only in the CI secret.
-
-One-time setup (mirrors any new unom DMZ service — see the deploy-infra notes):
-
-1. **Secret** `FLATPAK_GPG_PRIVATE_KEY` on this repo = base64 of the armored private key
-   (`gpg --armor --export-secret-keys <fpr> | base64 -w0`). `DEPLOY_*` + `REGISTRY_TOKEN` already exist.
-2. **Edge Caddy** on github-pages-1 (`/home/caddy/caddy/Caddyfile`, apply by hand + `./reload.sh`):
-   `flatpak.unom.io { reverse_proxy 192.168.50.50:3230 }`
-3. **Port allowlist:** add `3230` to `caddy_target_ports` in `vindeckyy/slipstream` (proxmox/github-actions) + terraform apply.
-4. **DNS:** ensure `flatpak.unom.io` resolves to the edge proxy.
-
-Re-signing/rotation: regenerate the key, replace `unom-flatpak.gpg` + the secret; every client must
-re-add the remote (the `GPGKey` changed), so rotate rarely.
+**Signing key:** generate a dedicated Flatpak repo signing key; put the public half in
+[`unom-flatpak.gpg`](unom-flatpak.gpg) (or your own filename) and the private half in a CI secret
+such as `FLATPAK_GPG_PRIVATE_KEY`.
 
 ## Alternatives considered
 
-- **Hosted OSTree repo (chosen):** the only option that gives `flatpak update`. We self-host the
-  static tree on github-actions behind Caddy (GitHub has no flatpak/ostree registry); the build already
-  produces the repo, so the marginal cost is GPG signing + an rsync + a 10-line static container.
-- **Generic registry bundle (kept as fallback):** one curl to publish, one `flatpak install
-  --bundle` to consume; mirrors the deb/rpm curl-upload pattern. No auto-update — this is what the
-  **Decky plugin** pulls (stable `latest/slipstream-client.flatpak`), plus the offline/manual path.
-- **Release attachment:** also done on tags, good for a human-facing download page.
+- **Self-hosted OSTree repo:** the option that gives `flatpak update` once you front the static
+  tree with HTTPS.
+- **Single-file `.flatpak` bundle (default here):** one build, one `flatpak install --bundle`; no
+  auto-update — fine for Decky and offline installs.
+- **Release attachment:** attach the bundle to a GitHub Release for a human-facing download page.
 - **Flathub (deferred):** best discoverability + zero hosting, but a separate submission/review
-  process and less control; revisit once the client is past scaffold quality.
+  process; revisit once the client is past scaffold quality.

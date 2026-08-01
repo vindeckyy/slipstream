@@ -22,7 +22,7 @@ Already installed? Skip to [Keeping a client up to date](#keeping-a-client-up-to
 |--------|---------|
 | **Linux** desktop / laptop | [Flatpak](#linux-desktop-flatpak) (any distro) or native apt/rpm/Arch packages |
 | **Steam Deck** | [Decky plugin](/docs/steam-deck) for Gaming Mode, or [Flatpak in Desktop Mode](#steam-deck) |
-| **Windows** | [Signed MSIX](#windows) from the package registry |
+| **Windows** | [Signed MSIX](#windows) from GitHub Releases (or a local build) |
 | **macOS** | [Notarized `.dmg`](#macos) from the releases page |
 | **iPhone / iPad / Apple TV** | [TestFlight beta](#ios-ipados-apple-tv) |
 | **Android / Android TV** | [Beta — a Play test track, or sideload the APK](#android) |
@@ -31,12 +31,13 @@ Already installed? Skip to [Keeping a client up to date](#keeping-a-client-up-to
 
 ## Linux desktop (Flatpak)
 
-The **recommended** path on any Flatpak distro — install once, then `flatpak update` tracks new
-builds. One command adds the signed `unom` remote, pulls the GNOME runtime from Flathub
-automatically, and installs the client:
+The **recommended** path on any Flatpak distro is a local Flatpak build (or a `.flatpak` from
+[GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached). There is no
+public Flatpak remote. Build with [`packaging/flatpak`](https://github.com/vindeckyy/slipstream/blob/main/packaging/flatpak/README.md):
 
 ```sh
-flatpak install --user https://flatpak.unom.io/io.slipstream.flatpakref
+bash packaging/flatpak/build-flatpak.sh
+flatpak install --user --bundle dist/slipstream-client-*.flatpak
 flatpak run io.slipstream
 ```
 
@@ -54,10 +55,10 @@ see the linked guide — then it tracks updates with your normal `apt upgrade` /
 
 | Distro | Install | Guide |
 |--------|---------|-------|
-| **Ubuntu 26.04 or newer** | `sudo apt install slipstream-client` | [packaging/debian](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/debian/README.md) |
-| **Fedora** | `sudo dnf install slipstream-client` | [Fedora](/docs/fedora) for the `/etc/yum.repos.d/slipstream.repo` block (pick the group matching your release), then [packaging/rpm](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/rpm/README.md) |
-| **Fedora Atomic / Bazzite** | The Flatpak above — no layering. `rpm-ostree install slipstream-client` only if you already layer packages | [Bazzite](/docs/bazzite) for why layering is a last resort; [packaging/rpm](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/rpm/README.md) for the `bazzite` group repo block |
-| **Arch** | `sudo pacman -Syu slipstream-client` (signed binary repo) | [Arch Linux](/docs/arch) |
+| **Ubuntu 26.04 or newer** | build/install a local `.deb` | [packaging/debian](https://github.com/vindeckyy/slipstream/blob/main/packaging/debian/README.md) |
+| **Fedora** | build/install a local RPM | [Fedora](/docs/fedora) · [packaging/rpm](https://github.com/vindeckyy/slipstream/blob/main/packaging/rpm/README.md) |
+| **Fedora Atomic / Bazzite** | The Flatpak above — no layering. Local RPM + `rpm-ostree install` only if you already layer packages | [Bazzite](/docs/bazzite) · [packaging/rpm](https://github.com/vindeckyy/slipstream/blob/main/packaging/rpm/README.md) |
+| **Arch** | `makepkg -si` from `packaging/arch` | [Arch Linux](/docs/arch) |
 
 > **The client `.deb` needs SDL3 and GTK4 ≥ 4.20**, which Ubuntu 24.04 LTS doesn't ship, so
 > `apt install slipstream-client` can't satisfy its dependencies there. On 24.04 (or any older
@@ -94,28 +95,22 @@ Flatpak exactly as [above](#linux-desktop-flatpak) — it carries its own libadw
 survives SteamOS updates:
 
 ```sh
-flatpak install --user https://flatpak.unom.io/io.slipstream.flatpakref
+# Build locally, or install a .flatpak from GitHub Releases when attached:
+# flatpak install --user --bundle /path/to/slipstream-client.flatpak
+bash packaging/flatpak/build-flatpak.sh
+flatpak install --user --bundle dist/slipstream-client-*.flatpak
 ```
 
-See [packaging/flatpak](https://github.com/vindeckyy/slipstream/slipstream/src/branch/main/packaging/flatpak/README.md).
+See [packaging/flatpak](https://github.com/vindeckyy/slipstream/blob/main/packaging/flatpak/README.md).
 
 ## Windows
 
-The Windows client ships as a **signed MSIX** in the package registry. Builds use a self-signed
-certificate, so you import that certificate once before Windows will install the package.
+The Windows client ships as a **signed MSIX**. Builds use a self-signed certificate, so you import
+that certificate once before Windows will install the package.
 
-1. Download the package and its certificate. Each channel keeps one fixed URL, so these two lines
-   always fetch the current build — in PowerShell:
-
-   ```powershell
-   curl.exe -LO https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-client-windows/latest/slipstream-client-windows_x64.msix
-   curl.exe -LO https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-client-windows/latest/slipstream-client-windows_x64.cer
-   ```
-
-   Swap `_x64` for `_arm64` on an Arm device, and `latest` for `canary` to track `main`. The same
-   two files are attached to every [release](https://github.com/vindeckyy/slipstream/slipstream/releases), and every
-   build is also kept under its own version on the
-   [packages page](https://github.com/vindeckyy/slipstream/unom/-/packages) (generic group, `slipstream-client-windows`).
+1. Download the package and its certificate from
+   [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached (or build from
+   `clients/windows/`). Swap `_x64` for `_arm64` on an Arm device.
 2. **Trust the publisher certificate**, then install. The MSIX won't install until the certificate is
    trusted — but it's the **same certificate for every release**, so this is genuinely one-time and
    later updates need nothing. In an **admin** PowerShell:
@@ -141,7 +136,7 @@ certificate, so you import that certificate once before Windows will install the
 
 ## macOS
 
-Download the notarized disk image from the [releases page](https://github.com/vindeckyy/slipstream/slipstream/releases)
+Download the notarized disk image from the [releases page](https://github.com/vindeckyy/slipstream/releases)
 — `Slipstream-<version>.dmg`. It's Developer-ID signed, notarized, and stapled, so Gatekeeper opens
 it without warnings:
 
@@ -173,16 +168,10 @@ Once you're added, install it from Google Play, then open the app and pick your 
 **[Get Slipstream on Google Play →](https://play.google.com/store/apps/details?id=io.slipstream)**
 _(only resolves once your account is on the tester list)_
 
-**Prefer not to wait for an invite?** The signed APK is published publicly on every build, so you can
-sideload it instead — no account, no invite:
-
-```text
-https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-android/latest/slipstream-android.apk
-```
-
-Swap `latest` for `canary` to track `main`. Release APKs are also attached to each
-[release](https://github.com/vindeckyy/slipstream/slipstream/releases). Android asks you to allow installs from your
-browser or file manager the first time.
+**Prefer not to wait for an invite?** Sideload a signed APK from
+[GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached, or build from
+`clients/android/`. Android asks you to allow installs from your browser or file manager the first
+time.
 
 ## LG webOS TV (community)
 

@@ -705,7 +705,7 @@ mod tests {
                     serde_json::to_vec(&serde_json::json!({
                         "schema": 1, "channel": "stable", "serial": serial,
                         "version": "0.23.0",
-                        "notes_url": "https://github.com/vindeckyy/slipstream/slipstream/releases",
+                        "notes_url": "https://github.com/vindeckyy/slipstream/releases",
                     }))
                     .unwrap()
                     .as_slice(),

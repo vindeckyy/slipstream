@@ -148,7 +148,7 @@ export const SourceList: FC<{
 						{m.store_sources_title()}
 						<HelpTip
 							label={m.store_sources_title()}
-							text="Catalogs this host fetches for Browse. The built-in unom catalog stays; every other source is one you add and vouch for."
+							text="Catalogs this host fetches for Browse. The built-in Slipstream catalog stays; every other source is one you add and vouch for."
 						/>
 					</CardTitle>
 				</div>

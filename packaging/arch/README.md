@@ -23,38 +23,12 @@ default `makepkg` builds only host+client with no JS tooling — mirroring the R
 > Arch + NVIDIA **and** AMD/Intel (incl. the Steam Deck — see the on-device path above). The client
 > decodes via VAAPI on AMD/Intel with a software fallback.
 
-## Install from the binary repo (recommended)
+## Install (build locally)
 
-CI (`.github/workflows/arch.yml`) builds this PKGBUILD in an `archlinux:base-devel` container on
-every push and publishes the packages to the **GitHub Arch package registry** — a plain pacman
-repo, so an Arch box installs and updates slipstream with `pacman -Syu` like everything else.
-Two repos mirror the deb/rpm channels: `slipstream` (release tags) and `slipstream-canary`
-(rolling main-branch builds, versioned `X.Y.Z-0.<run#>` so a later release always outranks
-them). Enable exactly one.
-
-The registry **signs the repo database and every package**, so first import its key into
-pacman's keyring (a one-time step — after this, packages install signature-verified):
-
-```sh
-# 1. Trust the registry signing key.
-curl -fsS https://github.com/vindeckyy/slipstream/api/packages/unom/arch/repository.key \
-  | sudo pacman-key --add -
-sudo pacman-key --lsign-key E0CA04465C99C936E0B0C6510A317015A34DDD69
-
-# 2. Add the repo (pick ONE channel — slipstream for releases, slipstream-canary for main builds).
-#    printf, not a heredoc, so this works in fish too (CachyOS's default shell has no `<<EOF`).
-printf '\n[slipstream]\nServer = https://github.com/vindeckyy/slipstream/api/packages/unom/arch/$repo/$arch\n' \
-  | sudo tee -a /etc/pacman.conf >/dev/null
-
-# 3. Sync + install.
-sudo pacman -Sy slipstream-host        # gaming rig
-sudo pacman -Sy slipstream-client      # the native GTK4 Linux client
-sudo pacman -Sy slipstream-web         # optional browser management console
-```
-
-(No `SigLevel` line needed — pacman's default `Required DatabaseOptional` verifies the signed
-packages against the key you just trusted. Arch is rolling, so the packages are built against
-current Arch sonames — keep the box itself updated too.)
+There is no public pacman binary repo. Build with the PKGBUILD in the next section, or install
+packages from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached.
+If you publish your own pacman feed, keep stable and canary separate (see
+[Release Channels](../../docs-site/content/docs/channels.md)).
 
 Then the same first-run steps as a source build (printed by the install scriptlet): `input`
 group, `host.env`, `systemctl --user enable --now slipstream-host` — see the next section.

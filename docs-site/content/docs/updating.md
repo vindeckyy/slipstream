@@ -24,10 +24,10 @@ The console shows the right one of these automatically; for reference:
 
 | How you installed | How to update |
 |---|---|
-| Windows installer | download the newer `slipstream-host-setup-<version>.exe` from the [releases page](https://github.com/vindeckyy/slipstream/slipstream/releases) and run it — it upgrades in place, keeping your settings, console password and paired devices |
-| Windows via winget | `winget upgrade vindeckyy.SlipstreamHost` — **register the Slipstream source once first**, in an elevated terminal: `winget source add -n slipstream https://winget.slipstream.unom.io -t Microsoft.Rest` |
-| Ubuntu (apt) | `sudo apt update && sudo apt install --only-upgrade slipstream-host` |
-| Fedora (dnf) | `sudo dnf upgrade slipstream` |
+| Windows installer | download the newer `slipstream-host-setup-<version>.exe` from the [releases page](https://github.com/vindeckyy/slipstream/releases) and run it — it upgrades in place, keeping your settings, console password and paired devices |
+| Windows via winget | `winget upgrade vindeckyy.SlipstreamHost` after registering **your** private winget source (see `packaging/winget/`) |
+| Ubuntu (apt) | rebuild/install a newer `.deb`, or `sudo apt install --only-upgrade slipstream-host` if you mirror packages locally |
+| Fedora (dnf) | rebuild/install a newer RPM, or `sudo dnf upgrade slipstream` if you mirror packages locally |
 | Bazzite sysext (recommended) | `sudo slipstream-sysext update` |
 | Bazzite / Fedora Atomic rpm-ostree layer | see below — `rpm-ostree upgrade` alone is not enough (staged — reboot to finish) |
 | Arch / CachyOS (pacman) | `sudo pacman -Syu` (a normal full system upgrade) |
@@ -35,7 +35,7 @@ The console shows the right one of these automatically; for reference:
 | NixOS (flake) | `nix flake update slipstream` in your flake directory, then rebuild your system |
 
 winget carries **stable** releases only. A Windows host on the canary channel updates by running the
-canary installer again — `…/generic/slipstream-host-windows/canary/slipstream-host-setup.exe`, see
+canary installer again from your canary feed or a canary release asset — see
 [Release Channels](/docs/channels).
 
 ### rpm-ostree layer: `rpm-ostree upgrade` is not enough
@@ -148,8 +148,8 @@ surprising.
 
 ## Turning the check off
 
-The check contacts `github.com/vindeckyy/slipstream` (the Slipstream forge) and nothing else, and sends nothing but a
-normal download request. If you'd rather the host never checks, add this line to the host's
+The check contacts the configured release feed (GitHub Releases / your update manifest host) and
+nothing else, and sends nothing but a normal download request. If you'd rather the host never checks, add this line to the host's
 `host.env`:
 
 ```bash
@@ -167,9 +167,9 @@ Windows or Linux; the card shows the manual command instead.
 ## If the card says the feed is stale
 
 "Feed hasn't changed in over 45 days" means checks *succeed* but nothing new arrives. Usually
-that just means no release happened for a while; if the [releases page](https://github.com/vindeckyy/slipstream/slipstream/releases)
+that just means no release happened for a while; if the [releases page](https://github.com/vindeckyy/slipstream/releases)
 shows something newer than the card does, something between this host and the feed is pinning old
-data — worth a look at proxies or DNS on the way to `github.com/vindeckyy/slipstream`. That comparison only works on a
+data — worth a look at proxies or DNS on the way to the release feed. That comparison only works on a
 **stable** host: the releases page is stable-only, so a canary host being "behind" it means
 nothing.
 

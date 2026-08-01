@@ -1,101 +1,72 @@
-# slipstream-host — RPM (Bazzite / Fedora Atomic) via the GitHub registry
+# slipstream-host — RPM (Bazzite / Fedora Atomic)
 
-`slipstream-host` is published as an RPM to **GitHub's RPM package registry** in the public `unom`
-org (stable groups `bazzite`/`fedora-44`, canary groups `bazzite-canary`/`fedora-44-canary`), so
-Bazzite / Fedora Atomic hosts layer and update it with `rpm-ostree`. CI (`.github/workflows/rpm.yml`)
-builds and publishes on every push to `main` (a rolling `<next-minor>-0.ciN.g<sha>` build — the base
-is derived from the latest stable tag by `scripts/ci/ss-version.sh` — to the `*-canary`
-groups) and on `vX.Y.Z` tags (a clean `X.Y.Z-1` to the base groups, plus attached to the unified
-GitHub Release) — separate repos, so a stable box never jumps to a canary build (see
-[Release Channels](https://slipstream.unom.io/docs/channels)). The `baseurl` below subscribes to the
-`bazzite` stable group; use `bazzite-canary` for the latest main builds. The RPM is built in the
-Fedora 43 image (`ci/fedora-rpm.Dockerfile`) so its auto-generated library Requires
-(`libavcodec.so.NN`, …) match Bazzite's sonames; the NVIDIA driver lib (`libcuda.so.1`) is
-excluded — NVENC/EGL come from whatever NVIDIA stack the host runs (a weak Recommends).
+Build RPMs locally with this tree (or attach them to a
+[GitHub Release](https://github.com/vindeckyy/slipstream/releases)). There is no public RPM
+registry. CI (`.github/workflows/rpm.yml`) can still produce canary/stable builds when you wire
+publishing to your own feed or to GitHub Releases — keep those channels separate (see
+[Release Channels](../../docs-site/content/docs/channels)). The RPM is built in the Fedora image
+(`ci/fedora-rpm.Dockerfile`) so its auto-generated library Requires (`libavcodec.so.NN`, …) match
+the target sonames; the NVIDIA driver lib (`libcuda.so.1`) is excluded — NVENC/EGL come from
+whatever NVIDIA stack the host runs (a weak Recommends).
 
 This is the same package as the [COPR](../copr/README.md) / [bootc](../bootc/Containerfile)
-paths — same spec (`slipstream.spec`) — just self-hosted in GitHub instead of COPR, mirroring the
-[Debian/apt](../debian/README.md) setup.
+paths — same spec (`slipstream.spec`).
 
 ## Install on a Bazzite host (one-time)
 
 ```sh
-# Add the repo. Packages are GPG-signed (gpgcheck=1, the packages@unom.io key) AND the repo
-# metadata is GitHub-signed (repo_gpgcheck=1); gpgkey lists both so dnf/rpm-ostree imports each.
-sudo tee /etc/yum.repos.d/slipstream.repo >/dev/null <<'REPO'
-[github-unom-bazzite]
-name=slipstream (unom, Bazzite)
-baseurl=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/bazzite
-enabled=1
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=https://github.com/vindeckyy/slipstream/api/packages/unom/rpm/repository.key
-       https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-keys/1/RPM-GPG-KEY-slipstream
-REPO
-
-# Layer the host + the web console (pairing/status), then reboot into the new deployment.
+# Build (see "Build an RPM locally" below), then layer host + web console and reboot.
 # (slipstream Recommends slipstream-web; list it explicitly so it's pulled regardless of weak-dep
-# settings. The registry carries slipstream-web because CI builds the spec --with web; COPR can't.)
-rpm-ostree install slipstream slipstream-web
+# settings.)
+rpm-ostree install ./dist/slipstream-*.rpm ./dist/slipstream-web-*.rpm
 systemctl reboot
 ```
 
-> If `rpm-ostree` can't complete the metadata GPG check non-interactively, set `repo_gpgcheck=0`
-> (TLS-only trust to the self-hosted registry).
+If you publish your own dnf/rpm-ostree feed, point a `.repo` file at it with `gpgcheck=1` as in the
+signing section below.
 
 ## Per-package signing (`gpgcheck=1`, active)
 
-CI GPG-signs every RPM: `packaging/rpm/sign-rpms.sh` (run from `rpm.yml` between build and publish)
-signs with the dedicated EdDSA key **`packages@unom.io`** (`AF245C506F4E4763`) and self-verifies
-with `rpmkeys --checksig` before publishing, so an unsigned/bad build never reaches the registry.
-The public key is served from the registry (the `gpgkey=` URL above) and committed at
+CI can GPG-sign every RPM: `packaging/rpm/sign-rpms.sh` (run from `rpm.yml` between build and
+publish) signs with a dedicated EdDSA key (historical uid `packages@unom.io`, fingerprint
+`AF245C506F4E4763` when using the committed public key) and self-verifies with
+`rpmkeys --checksig` before publishing. The public key is committed at
 `packaging/rpm/RPM-GPG-KEY-slipstream`. (This is a GPG/OpenPGP key — a `step-ca`/X.509 cert can't
-sign RPMs; step-ca is only for registry/console TLS.)
+sign RPMs.)
 
-> `RPM_GPG_PRIVATE_KEY` is an **org-level** secret on `unom`, not a repo secret — it will not show
-> up under this repository's Actions secrets. Verify it end to end instead of by its absence there:
-> `curl -O <repo-url>/package/slipstream-web/<ver>/x86_64/…rpm && rpm -qp --qf '%{RSAHEADER:pgpsig}\n'`
-> (or `rpmkeys --checksig`, which reports `NOKEY` until you import the public key — `NOKEY` still
-> means *signed*, just by a key that box doesn't have yet).
+> Store `RPM_GPG_PRIVATE_KEY` as a CI secret on whatever forge you use. Verify end to end with
+> `rpmkeys --checksig` on a built RPM (`NOKEY` until you import the public key still means *signed*).
 
 On a `v*` tag build, a missing key **fails** the build: `sign-rpms.sh` will not publish unsigned
-RPMs into a repo whose own instructions say `gpgcheck=1`, because every user's `dnf upgrade` would
-then break on them. Non-release builds still fall through unsigned so forks and local builds work.
+RPMs into a repo whose own instructions say `gpgcheck=1`. Non-release builds still fall through
+unsigned so forks and local builds work.
 
-How it was set up (and how to rotate the key):
+How to generate (and rotate) a signing key:
 
 ```sh
-# 1. Generate a DEDICATED, passphrase-less signing key (separate from the GitHub metadata key).
+# 1. Generate a DEDICATED, passphrase-less signing key.
 gpg --batch --gen-key <<EOF
 %no-protection
 Key-Type: eddsa
 Key-Curve: ed25519
 Name-Real: slipstream packages
-Name-Email: packages@unom.io
+Name-Email: packages@example.invalid
 Expire-Date: 0
 %commit
 EOF
-gpg --armor --export-secret-keys packages@unom.io   # -> the RPM_GPG_PRIVATE_KEY CI secret
-gpg --armor --export             packages@unom.io > packaging/rpm/RPM-GPG-KEY-slipstream  # public half
-
-# 2. Add the armored PRIVATE key as the RPM_GPG_PRIVATE_KEY GitHub Actions secret, at the ORG level
-#    (github.com/vindeckyy/slipstream/org/unom/settings/actions/secrets) so every repo's workflows inherit it. Commit
-#    the public half and publish it to the registry so the gpgkey= URL resolves:
-curl --user "<user>:<write:package-PAT>" --upload-file packaging/rpm/RPM-GPG-KEY-slipstream \
-  https://github.com/vindeckyy/slipstream/api/packages/unom/generic/slipstream-keys/1/RPM-GPG-KEY-slipstream
+gpg --armor --export-secret-keys packages@example.invalid   # -> RPM_GPG_PRIVATE_KEY CI secret
+gpg --armor --export             packages@example.invalid > packaging/rpm/RPM-GPG-KEY-slipstream
 ```
 
-Rotating the key means a new generic-registry version (bump `slipstream-keys/1` → `/2` and the
-`gpgkey=` URL), since the registry rejects re-uploading an existing file.
+Commit the public half next to the packaging scripts, and serve it from your own feed if you
+publish one (so `gpgkey=` in a `.repo` file resolves).
 
 **This key also signs the Bazzite sysext feed**, and a third copy of its public half is baked into
 `packaging/bazzite/slipstream-sysext.sh` (`FEED_KEY=`) — that script is bootstrapped by `curl` on
 machines that have nothing installed yet, so it can't fetch the key from the thing it's
 authenticating. A rotation must update **all three**: the CI secret, this directory's
-`RPM-GPG-KEY-slipstream` (+ its registry upload), and `FEED_KEY`. `publish-sysext-feed.sh` compares
-its signing key's fingerprint against `FEED_KEY` and refuses to sign on a mismatch, so forgetting
-the third one fails the publish instead of stranding every Bazzite box in front of a feed it
-can't verify.
+`RPM-GPG-KEY-slipstream`, and `FEED_KEY`. `publish-sysext-feed.sh` compares its signing key's
+fingerprint against `FEED_KEY` and refuses to sign on a mismatch.
 
 After reboot, as the desktop user:
 

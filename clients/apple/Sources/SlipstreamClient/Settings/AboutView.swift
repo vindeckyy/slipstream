@@ -18,9 +18,9 @@ struct AboutView: View {
     /// Where the product actually lives. Kept here rather than scattered through the view so the
     /// three of them can be checked against the README in one glance.
     private enum Destination {
-        static let docs = URL(string: "https://docs.slipstream.unom.io")!
+        static let docs = URL(string: "https://github.com/vindeckyy/slipstream/tree/main/docs-site")!
         static let community = URL(string: "https://discord.gg/kaPNvzMuGU")!
-        static let source = URL(string: "https://github.com/vindeckyy/slipstream/slipstream")!
+        static let source = URL(string: "https://github.com/vindeckyy/slipstream")!
     }
 
     private static let tagline =
