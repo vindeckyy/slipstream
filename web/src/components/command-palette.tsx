@@ -5,6 +5,7 @@ import {
 	GaugeCircle,
 	KeyRound,
 	MonitorPlay,
+	Puzzle,
 	Server,
 	Settings,
 	Workflow,
@@ -33,7 +34,7 @@ type CommandTarget =
 	| "/config"
 	| "/automation"
 	| "/stats"
-	| "/settings";
+	| "/plugins";
 
 type CommandItem = {
 	to: CommandTarget;
@@ -68,8 +69,8 @@ const COMMANDS: readonly CommandItem[] = [
 		icon: Server,
 		label: () => m.nav_host(),
 		description: () =>
-			"Host identity, GPU status, updates, and competing GameStream host warnings.",
-		keywords: ["host", "gpu", "update", "system"],
+			"Host identity, GPU status, updates, power controls, and competing GameStream host warnings.",
+		keywords: ["host", "gpu", "update", "system", "restart", "shutdown"],
 	},
 	{
 		to: "/displays",
@@ -100,7 +101,7 @@ const COMMANDS: readonly CommandItem[] = [
 	{
 		to: "/config",
 		icon: Settings,
-		label: () => m.display_config_title(),
+		label: () => m.nav_config(),
 		description: () =>
 			"Host capture, input, network, and encoder defaults. Changes usually need a host restart.",
 		keywords: ["config", "configuration", "capture", "encoder", "network", "input"],
@@ -123,11 +124,11 @@ const COMMANDS: readonly CommandItem[] = [
 		keywords: ["stats", "capture", "recording", "monitor", "performance"],
 	},
 	{
-		to: "/settings",
-		icon: Settings,
-		label: () => m.nav_settings(),
-		description: () => "Console language and sign-out for this management session.",
-		keywords: ["settings", "preferences", "language"],
+		to: "/plugins",
+		icon: Puzzle,
+		label: () => m.nav_plugin_store(),
+		description: () => m.nav_plugin_store_help(),
+		keywords: ["plugin", "store", "install", "package"],
 	},
 ];
 

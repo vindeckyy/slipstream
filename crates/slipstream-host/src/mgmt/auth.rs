@@ -154,7 +154,10 @@ pub(crate) fn plugin_may_access(method: &Method, path: &str) -> bool {
         // the same prefix will carry `apply` (running an installer / the root helper), and a
         // whole-prefix deny can't be defeated by a route added later.
         || path == "/api/v1/update"
-        || path.starts_with("/api/v1/update/");
+        || path.starts_with("/api/v1/update/")
+        // Stopping or bouncing the host process is operator-only.
+        || path == "/api/v1/host/restart"
+        || path == "/api/v1/host/shutdown";
     !denied
 }
 

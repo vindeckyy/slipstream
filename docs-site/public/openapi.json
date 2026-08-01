@@ -4,15 +4,50 @@
     "title": "slipstream management API",
     "description": "Control-plane API for managing a slipstream streaming host: host capabilities, runtime status, paired clients, the pairing PIN flow, and session control. Authentication: HTTP bearer token, enforced on every route except `/api/v1/health` when the host is started with a management token (mandatory for non-loopback binds).",
     "contact": {
-      "name": "unom"
+      "name": "Slipstream contributors"
     },
     "license": {
       "name": "MIT OR Apache-2.0",
       "identifier": "MIT OR Apache-2.0"
     },
-    "version": "0.22.3"
+    "version": "0.23.0"
   },
   "paths": {
+    "/api/v1/capture/methods": {
+      "get": {
+        "tags": [
+          "host"
+        ],
+        "summary": "Available desktop capture methods",
+        "description": "Lists every SolarFlare-shaped desktop-mirror backend the host knows (no hermes-kms), with a\nbest-effort availability probe. Pass an `id` as `SLIPSTREAM_CAPTURE_METHOD` / the host-config\n`capture_method` field. `auto` walks the preference order at session open.",
+        "operationId": "listCaptureMethods",
+        "responses": {
+          "200": {
+            "description": "Desktop capture methods with availability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AvailableCaptureMethod"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/clients": {
       "get": {
         "tags": [
@@ -155,41 +190,6 @@
                   "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/AvailableHeadlessCompositor"
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid bearer token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/capture/methods": {
-      "get": {
-        "tags": [
-          "host"
-        ],
-        "summary": "Available desktop capture methods",
-        "description": "Lists every SolarFlare-shaped desktop-mirror backend the host knows (no hermes-kms), with a\nbest-effort availability probe. Pass an `id` as `SLIPSTREAM_CAPTURE_METHOD` / the host-config\n`capture_method` field. `auto` walks the preference order at session open.",
-        "operationId": "listCaptureMethods",
-        "responses": {
-          "200": {
-            "description": "Desktop capture methods with availability",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AvailableCaptureMethod"
                   }
                 }
               }
@@ -1047,6 +1047,158 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/host/config": {
+      "get": {
+        "tags": [
+          "host"
+        ],
+        "summary": "Host configuration",
+        "description": "Persisted operator knobs (name, encoder, AV, network, input). Written to `host-config.json`\nand dual-written to `host.env` for the next process start.",
+        "operationId": "getHostConfig",
+        "responses": {
+          "200": {
+            "description": "Stored host configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostConfigState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "host"
+        ],
+        "summary": "Set host configuration",
+        "description": "Saves the console form to disk. Most fields require a host restart before the running\nprocess picks them up (`requires_restart` stays true).",
+        "operationId": "setHostConfig",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HostConfigFile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Configuration stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostConfigState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Could not persist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/host/restart": {
+      "post": {
+        "tags": [
+          "host"
+        ],
+        "summary": "Restart the host process",
+        "description": "Schedules a bounce of `slipstream-host` (service manager when available, otherwise re-exec).\nReturns immediately with `202`; the process exits shortly after so the response can flush.\nAny live stream drops. Does not reboot the machine.",
+        "operationId": "restartHost",
+        "responses": {
+          "202": {
+            "description": "Restart scheduled"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Could not schedule restart",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/host/shutdown": {
+      "post": {
+        "tags": [
+          "host"
+        ],
+        "summary": "Shut down the host process",
+        "description": "Schedules a clean stop of `slipstream-host` (session takeover restore, then exit). Returns\nimmediately with `202`. The process does not start again until an operator or supervisor\nstarts it. Does not power off the machine.",
+        "operationId": "shutdownHost",
+        "responses": {
+          "202": {
+            "description": "Shutdown scheduled"
           },
           "401": {
             "description": "Missing or invalid bearer token",
@@ -3638,104 +3790,6 @@
           }
         }
       }
-    },
-    "/api/v1/host/config": {
-      "get": {
-        "tags": [
-          "host"
-        ],
-        "operationId": "getHostConfig",
-        "responses": {
-          "200": {
-            "description": "Stored host configuration",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HostConfigState"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid bearer token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      },
-      "put": {
-        "tags": [
-          "host"
-        ],
-        "operationId": "setHostConfig",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/HostConfigFile"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Configuration stored",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HostConfigState"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Malformed body",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid bearer token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Could not persist",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
     }
   },
   "components": {
@@ -4146,6 +4200,60 @@
               "null"
             ],
             "description": "Vertical capsule / poster (Steam `library_600x900.jpg`). Best for a grid."
+          }
+        }
+      },
+      "AudioVideoConfig": {
+        "type": "object",
+        "properties": {
+          "capture_method": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Desktop capture backend (`SLIPSTREAM_CAPTURE_METHOD`):\n`auto` | `portal` | `kwin` | `wlr` | `kms` | `x11` | `nvfbc` (no hermes-kms)."
+          },
+          "compositor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Virtual-display compositor preference (`SLIPSTREAM_COMPOSITOR`):\n`kwin` | `mutter` | `wlroots` | `hyprland` | `gamescope`."
+          },
+          "four_four_four": {
+            "type": "boolean",
+            "description": "Prefer 4:4:4 when supported (`SLIPSTREAM_444`)."
+          },
+          "gamescope_hdr": {
+            "type": "boolean",
+            "description": "Gamescope HDR."
+          },
+          "headless_compositor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Headless session spawner (`SLIPSTREAM_HEADLESS_COMPOSITOR`):\n`off` | `auto` | `labwc` | `krfb` | `gamescope`."
+          },
+          "max_fps": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Cap encode FPS (`SLIPSTREAM_MAX_FPS`).",
+            "minimum": 0
+          },
+          "ten_bit": {
+            "type": "boolean",
+            "description": "Prefer 10-bit encode when the client asks (`SLIPSTREAM_TEN_BIT`)."
+          },
+          "video_source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`virtual` | `portal` (`SLIPSTREAM_VIDEO_SOURCE`)."
           }
         }
       },
@@ -4857,6 +4965,29 @@
           }
         }
       },
+      "EncoderConfig": {
+        "type": "object",
+        "properties": {
+          "encoder": {
+            "type": "string",
+            "description": "`auto` | `nvenc` | `amf` | `qsv` | `vaapi` | `software` (`SLIPSTREAM_ENCODER`)."
+          },
+          "render_adapter": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Substring pin for the render adapter (`SLIPSTREAM_RENDER_ADAPTER`)."
+          },
+          "zerocopy": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Tri-state zero-copy override (`SLIPSTREAM_ZEROCOPY`). `null` = vendor default."
+          }
+        }
+      },
       "EndGameRequest": {
         "type": "object",
         "description": "Request body for `endGame`.",
@@ -5473,6 +5604,22 @@
           "dedicated"
         ]
       },
+      "GeneralConfig": {
+        "type": "object",
+        "properties": {
+          "host_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Display name for Moonlight / mDNS (`SLIPSTREAM_HOST_NAME`)."
+          },
+          "perf": {
+            "type": "boolean",
+            "description": "Verbose perf logging (`SLIPSTREAM_PERF`)."
+          }
+        }
+      },
       "GpuState": {
         "type": "object",
         "description": "Full GPU-selection state for the console: inventory, the persisted preference, what the next\nsession will use, and what is in use right now.",
@@ -5682,6 +5829,59 @@
           }
         }
       },
+      "HostConfigFile": {
+        "type": "object",
+        "description": "Sunshine-shaped host settings the console can toggle without editing env files by hand.",
+        "properties": {
+          "audio_video": {
+            "$ref": "#/components/schemas/AudioVideoConfig"
+          },
+          "encoders": {
+            "$ref": "#/components/schemas/EncoderConfig"
+          },
+          "general": {
+            "$ref": "#/components/schemas/GeneralConfig"
+          },
+          "input": {
+            "$ref": "#/components/schemas/InputConfig"
+          },
+          "network": {
+            "$ref": "#/components/schemas/NetworkConfig"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "HostConfigState": {
+        "type": "object",
+        "description": "Host configuration the console can edit (Sunshine-style toggles).",
+        "required": [
+          "settings",
+          "configured",
+          "requires_restart",
+          "env_path"
+        ],
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "description": "Whether an operator has ever saved host-config.json."
+          },
+          "env_path": {
+            "type": "string",
+            "description": "Absolute path of the dual-written host.env file."
+          },
+          "requires_restart": {
+            "type": "boolean",
+            "description": "Env-backed knobs need a host restart to take effect in the running process."
+          },
+          "settings": {
+            "$ref": "#/components/schemas/HostConfigFile"
+          }
+        }
+      },
       "HostEvent": {
         "allOf": [
           {
@@ -5817,6 +6017,22 @@
           "per-client",
           "per-client-mode"
         ]
+      },
+      "InputConfig": {
+        "type": "object",
+        "properties": {
+          "gamepad": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Gamepad backend preference (`SLIPSTREAM_GAMEPAD`)."
+          },
+          "gamescope_grab_cursor": {
+            "type": "boolean",
+            "description": "Gamescope: grab cursor into the nested session."
+          }
+        }
       },
       "InstallRequest": {
         "type": "object",
@@ -6126,7 +6342,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Other Moonlight-compatible hosts (Sunshine/Apollo/…) detected on this machine at startup —\nrunning one alongside Slipstream is unsupported. Compact labels (e.g. `Sunshine (running)`);\nthe tray/console surface them so the clash is visible before pairing silently fails."
+            "description": "Other Moonlight-compatible hosts (Sunshine/Apollo/...) whose process is running now.\nSide-by-side is unsupported. Compact labels (e.g. `Sunshine (running)`); install-only /\nservice-registered hits stay out of this field (see `detect-conflicts` / `render_report`)."
           },
           "games": {
             "type": "array",
@@ -6358,6 +6574,28 @@
             ],
             "description": "The PIN to display while armed (null when disarmed).",
             "example": "1234"
+          }
+        }
+      },
+      "NetworkConfig": {
+        "type": "object",
+        "properties": {
+          "chacha20": {
+            "type": "boolean",
+            "description": "Prefer ChaCha20-Poly1305 for soft-AES clients (`SLIPSTREAM_CHACHA20`)."
+          },
+          "fec_pct": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "FEC percentage for the native plane (`SLIPSTREAM_FEC_PCT`), when set.",
+            "minimum": 0
+          },
+          "mdns": {
+            "type": "boolean",
+            "description": "Advertise over mDNS (`SLIPSTREAM_MDNS`). Default on."
           }
         }
       },
@@ -7677,170 +7915,6 @@
               "null"
             ],
             "description": "This install could one-click apply, but the operator hasn't opted in yet — the\ncommand to run (Linux: join the `slipstream-update` group)."
-          }
-        }
-      },
-      "GeneralConfig": {
-        "type": "object",
-        "properties": {
-          "host_name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "perf": {
-            "type": "boolean"
-          }
-        }
-      },
-      "InputConfig": {
-        "type": "object",
-        "properties": {
-          "gamepad": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "gamescope_grab_cursor": {
-            "type": "boolean"
-          }
-        }
-      },
-      "AudioVideoConfig": {
-        "type": "object",
-        "properties": {
-          "video_source": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "capture_method": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "auto | portal | kwin | wlr | kms | x11 | nvfbc"
-          },
-          "compositor": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "kwin | mutter | wlroots | hyprland | gamescope"
-          },
-          "headless_compositor": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "off | auto | labwc | krfb | gamescope"
-          },
-          "max_fps": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 0
-          },
-          "ten_bit": {
-            "type": "boolean"
-          },
-          "four_four_four": {
-            "type": "boolean"
-          },
-          "gamescope_hdr": {
-            "type": "boolean"
-          }
-        }
-      },
-      "NetworkConfig": {
-        "type": "object",
-        "properties": {
-          "chacha20": {
-            "type": "boolean"
-          },
-          "mdns": {
-            "type": "boolean"
-          },
-          "fec_pct": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 0
-          }
-        }
-      },
-      "EncoderConfig": {
-        "type": "object",
-        "required": [
-          "encoder"
-        ],
-        "properties": {
-          "encoder": {
-            "type": "string"
-          },
-          "render_adapter": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "zerocopy": {
-            "type": [
-              "boolean",
-              "null"
-            ]
-          }
-        }
-      },
-      "HostConfigFile": {
-        "type": "object",
-        "properties": {
-          "version": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "general": {
-            "$ref": "#/components/schemas/GeneralConfig"
-          },
-          "input": {
-            "$ref": "#/components/schemas/InputConfig"
-          },
-          "audio_video": {
-            "$ref": "#/components/schemas/AudioVideoConfig"
-          },
-          "network": {
-            "$ref": "#/components/schemas/NetworkConfig"
-          },
-          "encoders": {
-            "$ref": "#/components/schemas/EncoderConfig"
-          }
-        }
-      },
-      "HostConfigState": {
-        "type": "object",
-        "required": [
-          "settings",
-          "configured",
-          "requires_restart",
-          "env_path"
-        ],
-        "properties": {
-          "settings": {
-            "$ref": "#/components/schemas/HostConfigFile"
-          },
-          "configured": {
-            "type": "boolean"
-          },
-          "requires_restart": {
-            "type": "boolean"
-          },
-          "env_path": {
-            "type": "string"
           }
         }
       }

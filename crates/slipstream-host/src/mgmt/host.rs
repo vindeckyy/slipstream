@@ -713,3 +713,46 @@ pub(crate) async fn set_host_config(
     tracing::info!("management API: host configuration updated");
     Json(host_config_state()).into_response()
 }
+
+/// Restart the host process
+///
+/// Schedules a bounce of `slipstream-host` (service manager when available, otherwise re-exec).
+/// Returns immediately with `202`; the process exits shortly after so the response can flush.
+/// Any live stream drops. Does not reboot the machine.
+#[utoipa::path(
+    post,
+    path = "/host/restart",
+    tag = "host",
+    operation_id = "restartHost",
+    responses(
+        (status = ACCEPTED, description = "Restart scheduled"),
+        (status = INTERNAL_SERVER_ERROR, description = "Could not schedule restart", body = ApiError),
+        (status = UNAUTHORIZED, description = "Missing or invalid bearer token", body = ApiError),
+    )
+)]
+pub(crate) async fn restart_host() -> Response {
+    match crate::power::schedule_restart() {
+        Ok(()) => StatusCode::ACCEPTED.into_response(),
+        Err(e) => api_error(StatusCode::INTERNAL_SERVER_ERROR, &e),
+    }
+}
+
+/// Shut down the host process
+///
+/// Schedules a clean stop of `slipstream-host` (session takeover restore, then exit). Returns
+/// immediately with `202`. The process does not start again until an operator or supervisor
+/// starts it. Does not power off the machine.
+#[utoipa::path(
+    post,
+    path = "/host/shutdown",
+    tag = "host",
+    operation_id = "shutdownHost",
+    responses(
+        (status = ACCEPTED, description = "Shutdown scheduled"),
+        (status = UNAUTHORIZED, description = "Missing or invalid bearer token", body = ApiError),
+    )
+)]
+pub(crate) async fn shutdown_host() -> Response {
+    crate::power::schedule_shutdown();
+    StatusCode::ACCEPTED.into_response()
+}

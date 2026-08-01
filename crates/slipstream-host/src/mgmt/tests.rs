@@ -577,6 +577,17 @@ fn plugin_allowlist_excludes_escalation_routes() {
         &Method::DELETE,
         "/api/v1/store/sources/unom"
     ));
+    // Host process power controls — bouncing or stopping the host is operator-only.
+    for path in ["/api/v1/host/restart", "/api/v1/host/shutdown"] {
+        assert!(
+            !auth::plugin_may_access(&Method::POST, path),
+            "plugin token must not reach {path}"
+        );
+        assert!(
+            !auth::cert_may_access(&Method::POST, path),
+            "a paired streaming cert must not reach {path}"
+        );
+    }
     // …but a route that merely starts with the same letters is unaffected.
     assert!(auth::plugin_may_access(&Method::GET, "/api/v1/status"));
 }
@@ -972,6 +983,37 @@ async fn plugin_registry_roundtrip() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
+/// Power controls return 202 without exiting when side effects are disabled for tests.
+#[tokio::test]
+async fn host_power_routes_accept_and_require_admin() {
+    crate::power::disable_side_effects_for_test();
+    let app = test_app(test_state(), None);
+
+    let post = |path: &str| {
+        axum::http::Request::post(path)
+            .body(Body::empty())
+            .unwrap()
+    };
+
+    assert_eq!(
+        send(&app, post("/api/v1/host/restart")).await.0,
+        StatusCode::ACCEPTED
+    );
+    assert_eq!(
+        send(&app, post("/api/v1/host/shutdown")).await.0,
+        StatusCode::ACCEPTED
+    );
+
+    // Plugin token is denied.
+    let plugin = axum::http::Request::builder()
+        .method("POST")
+        .uri("/api/v1/host/restart")
+        .header("authorization", "Bearer plugin-secret")
+        .body(Body::empty())
+        .unwrap();
+    assert_eq!(send(&app, plugin).await.0, StatusCode::FORBIDDEN);
+}
+
 /// The OpenAPI document lists every route with a unique operationId (codegen relies
 /// on both), and the checked-in copy is current.
 #[test]
@@ -983,6 +1025,8 @@ fn openapi_document_is_complete_and_checked_in() {
     for p in [
         "/api/v1/health",
         "/api/v1/host",
+        "/api/v1/host/restart",
+        "/api/v1/host/shutdown",
         "/api/v1/status",
         "/api/v1/clients",
         "/api/v1/clients/{fingerprint}",

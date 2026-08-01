@@ -171,8 +171,19 @@ pub(crate) async fn set_display_settings(
     tracing::info!("management API: display policy updated");
     // The policy carries the capture-monitor pin, so a picker change must re-aim absolute input now
     // rather than at the next host restart — and must clear the anchor when the pin is cleared.
+    // Enumeration (Mutter/wlroots/…) builds a short-lived Tokio runtime + D-Bus/Wayland round-trip,
+    // so it must not run on an async worker — same reason `get_display_monitors` uses spawn_blocking.
     #[cfg(target_os = "linux")]
-    crate::refresh_capture_monitor_anchor("display policy updated");
+    if let Err(e) = tokio::task::spawn_blocking(|| {
+        crate::refresh_capture_monitor_anchor("display policy updated");
+    })
+    .await
+    {
+        tracing::error!(
+            error = %e,
+            "capture-monitor anchor refresh task failed after display policy update"
+        );
+    }
     Json(display_settings_state()).into_response()
 }
 

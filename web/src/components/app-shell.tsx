@@ -4,6 +4,7 @@ import {
 	GaugeCircle,
 	Home,
 	KeyRound,
+	LogOut,
 	MonitorPlay,
 	MoreHorizontal,
 	Puzzle,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { toast } from "@unom/ui/toast";
 import { useGetHostInfo, useGetStatus } from "@/api/gen/host/host";
 import { useHostEvents } from "@/api/events";
 import { pluginIcon, uiPlugins, usePlugins } from "@/api/plugins";
@@ -39,87 +41,74 @@ type NavItem = {
 	help: () => string;
 };
 
-/** Compatibility route set shared by the desktop groups and mobile overflow. */
-const NAV: readonly NavItem[] = [
-	{
-		to: "/",
-		icon: Home,
-		label: () => m.nav_dashboard(),
-		help: () =>
-			"Live host overview: session state, paired clients, and recent activity.",
-	},
-	{
-		to: "/pin",
-		icon: KeyRound,
-		label: () => m.nav_pairing(),
-		help: () =>
-			"Pair Moonlight or Slipstream clients with a PIN, and manage already-paired devices.",
-	},
-	{
-		to: "/apps",
-		icon: AppWindow,
-		label: () => m.nav_library(),
-		help: () =>
-			"Browse and manage the game library the host advertises to clients.",
-	},
-	{
-		to: "/config",
-		icon: Settings,
-		label: () => m.display_config_title(),
-		help: () =>
-			"Host capture, input, network, and encoder defaults. Changes usually need a host restart.",
-	},
-	{
-		to: "/troubleshoot",
-		icon: Wrench,
-		label: () => m.nav_logs(),
-		help: () => "Read live host logs and export them for troubleshooting.",
-	},
-] as const;
-
-/** Additional console routes shared by desktop groups and mobile overflow. */
-const MORE_NAV: readonly NavItem[] = [
-	{
-		to: "/host",
-		icon: Server,
-		label: () => m.nav_host(),
-		help: () =>
-			"Host identity, GPU status, updates, and competing GameStream host warnings.",
-	},
-	{
-		to: "/displays",
-		icon: MonitorPlay,
-		label: () => m.nav_displays(),
-		help: () =>
-			"Virtual display policy, presets, keep-alive, and live monitor layout.",
-	},
-	{
-		to: "/stats",
-		icon: GaugeCircle,
-		label: () => m.nav_stats(),
-		help: () =>
-			"Capture performance graphs, recordings, and live stream health.",
-	},
-	{
-		to: "/automation",
-		icon: Workflow,
-		label: () => m.nav_automation(),
-		help: () =>
-			"Run shell commands or webhooks when host events fire (connect, stream, pair, and more).",
-	},
-	{
-		to: "/plugins",
-		icon: Puzzle,
-		label: () => m.nav_plugins(),
-		help: () => "Open installed plugin UIs embedded in the console.",
-	},
-	{
-		to: "/settings",
-		icon: Settings,
-		label: () => m.nav_settings(),
-		help: () => "Console language and sign-out for this management session.",
-	},
-] as const;
+const navDashboard: NavItem = {
+	to: "/",
+	icon: Home,
+	label: () => m.nav_dashboard(),
+	help: () =>
+		"Live host overview: session state, paired clients, and recent activity.",
+};
+const navPairing: NavItem = {
+	to: "/pin",
+	icon: KeyRound,
+	label: () => m.nav_pairing(),
+	help: () =>
+		"Pair Moonlight or Slipstream clients with a PIN, and manage already-paired devices.",
+};
+const navLibrary: NavItem = {
+	to: "/apps",
+	icon: AppWindow,
+	label: () => m.nav_library(),
+	help: () =>
+		"Browse and manage the game library the host advertises to clients.",
+};
+const navConfig: NavItem = {
+	to: "/config",
+	icon: Settings,
+	label: () => m.nav_config(),
+	help: () =>
+		"Host capture, input, network, and encoder defaults. Changes usually need a host restart.",
+};
+const navLogs: NavItem = {
+	to: "/troubleshoot",
+	icon: Wrench,
+	label: () => m.nav_logs(),
+	help: () => "Read live host logs and export them for troubleshooting.",
+};
+const navHost: NavItem = {
+	to: "/host",
+	icon: Server,
+	label: () => m.nav_host(),
+	help: () =>
+		"Host identity, GPU status, updates, power controls, and competing GameStream host warnings.",
+};
+const navDisplays: NavItem = {
+	to: "/displays",
+	icon: MonitorPlay,
+	label: () => m.nav_displays(),
+	help: () =>
+		"Virtual display policy, presets, keep-alive, and live monitor layout.",
+};
+const navStats: NavItem = {
+	to: "/stats",
+	icon: GaugeCircle,
+	label: () => m.nav_stats(),
+	help: () =>
+		"Capture performance graphs, recordings, and live stream health.",
+};
+const navAutomation: NavItem = {
+	to: "/automation",
+	icon: Workflow,
+	label: () => m.nav_automation(),
+	help: () =>
+		"Run shell commands or webhooks when host events fire (connect, stream, pair, and more).",
+};
+const navPluginStore: NavItem = {
+	to: "/plugins",
+	icon: Puzzle,
+	label: () => m.nav_plugin_store(),
+	help: () => m.nav_plugin_store_help(),
+};
 
 const EXACT: readonly string[] = ["/", "/plugins"];
 
@@ -128,40 +117,48 @@ const EXACT: readonly string[] = ["/", "/plugins"];
  * reach host tools, then change the console. The existing route targets stay intact, including the
  * compatibility aliases (`/pin`, `/apps`, and `/troubleshoot`).
  */
-const NAV_GROUPS = [
+const NAV_GROUPS: readonly {
+	id: string;
+	label: () => string;
+	items: readonly NavItem[];
+}[] = [
 	{
 		id: "observe",
 		label: () => m.status_title(),
-		items: [NAV[0], MORE_NAV[2], NAV[4]],
+		items: [navDashboard, navStats, navLogs],
 	},
 	{
 		id: "operate",
 		label: () => m.nav_library(),
-		items: [NAV[2], NAV[1], MORE_NAV[1]],
+		items: [navLibrary, navPairing, navDisplays],
 	},
 	{
 		id: "host",
 		label: () => m.nav_host(),
-		items: [MORE_NAV[0], MORE_NAV[3]],
+		items: [navHost, navAutomation],
 	},
 	{
 		id: "system",
-		label: () => m.nav_settings(),
-		items: [NAV[3], MORE_NAV[4], MORE_NAV[5]],
+		label: () => m.nav_tools(),
+		items: [navConfig, navPluginStore],
 	},
-] as const;
+];
 
 /** Keep the most useful observatory views one tap away on a phone. */
-const MOBILE_PRIMARY = [NAV[0], NAV[2], MORE_NAV[0], MORE_NAV[2]] as const;
-const MOBILE_OVERFLOW = [
-	NAV[1],
-	NAV[3],
-	NAV[4],
-	MORE_NAV[1],
-	MORE_NAV[3],
-	MORE_NAV[4],
-	MORE_NAV[5],
-] as const;
+const MOBILE_PRIMARY: readonly NavItem[] = [
+	navDashboard,
+	navLibrary,
+	navHost,
+	navStats,
+];
+const MOBILE_OVERFLOW: readonly NavItem[] = [
+	navPairing,
+	navConfig,
+	navLogs,
+	navDisplays,
+	navAutomation,
+	navPluginStore,
+];
 
 /** Dense M3 / console nav row: tonal active fill + leading indicator rail. */
 const navItemClass =
@@ -222,8 +219,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 						<PluginNavSection />
 					</div>
 
-					<div className="mt-auto border-t border-border/70 px-3 py-3">
+					<div className="mt-auto space-y-2 border-t border-border/70 px-3 py-3">
 						<LanguageSwitcher />
+						<SignOutButton />
 					</div>
 				</aside>
 
@@ -616,6 +614,33 @@ function MobileNav() {
 											</Link>
 										);
 									})}
+									<button
+										type="button"
+										title={m.action_logout()}
+										className={menuItem}
+										onClick={() => {
+											setMoreOpen(false);
+											void (async () => {
+												try {
+													const res = await fetch("/_auth/logout", {
+														method: "POST",
+													});
+													if (!res.ok)
+														throw new Error(`logout failed: ${res.status}`);
+													window.location.href = "/login";
+												} catch {
+													toast.error(m.settings_logout_failed());
+												}
+											})();
+										}}
+									>
+										<span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted/55">
+											<LogOut className="size-5" aria-hidden />
+										</span>
+										<span className="min-w-0 text-left text-xs font-medium leading-snug">
+											{m.action_logout()}
+										</span>
+									</button>
 								</div>
 							</motion.div>
 						</>
@@ -705,5 +730,28 @@ function LanguageSwitcher() {
 				</Tooltip>
 			))}
 		</div>
+	);
+}
+
+function SignOutButton() {
+	const onLogout = async () => {
+		try {
+			const res = await fetch("/_auth/logout", { method: "POST" });
+			if (!res.ok) throw new Error(`logout failed: ${res.status}`);
+			window.location.href = "/login";
+		} catch {
+			toast.error(m.settings_logout_failed());
+		}
+	};
+	return (
+		<button
+			type="button"
+			onClick={() => void onLogout()}
+			title={m.action_logout()}
+			className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] text-muted-foreground outline-none transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+		>
+			<LogOut className="size-4 shrink-0 opacity-80" aria-hidden />
+			<span className="truncate">{m.action_logout()}</span>
+		</button>
 	);
 }
