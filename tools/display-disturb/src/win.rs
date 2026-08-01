@@ -62,9 +62,8 @@ fn parse_args() -> Args {
         match argv[i].as_str() {
             "--interval-ms" => {
                 i += 1;
-                a.interval = Duration::from_millis(
-                    argv.get(i).and_then(|s| s.parse().ok()).unwrap_or(2000),
-                );
+                a.interval =
+                    Duration::from_millis(argv.get(i).and_then(|s| s.parse().ok()).unwrap_or(2000));
             }
             "--caps" => a.caps = true,
             "--vcp" => {
@@ -135,8 +134,7 @@ fn monitors() -> Vec<(HMONITOR, String)> {
     let mut v: Vec<(HMONITOR, String)> = Vec::new();
     // SAFETY: null dc/clip = enumerate all display monitors; `cb` only touches the Vec whose
     // address rides in LPARAM for the duration of this synchronous call.
-    let _ =
-        unsafe { EnumDisplayMonitors(None, None, Some(cb), LPARAM(&mut v as *mut _ as isize)) };
+    let _ = unsafe { EnumDisplayMonitors(None, None, Some(cb), LPARAM(&mut v as *mut _ as isize)) };
     v
 }
 
@@ -149,9 +147,7 @@ fn physical_monitors(mon: HMONITOR, label: &str) -> Vec<(HANDLE, String)> {
     let t = Instant::now();
     let mut count = 0u32;
     // SAFETY: valid HMONITOR from enumeration; `count` is a valid out-param.
-    if unsafe { GetNumberOfPhysicalMonitorsFromHMONITOR(mon, &mut count) }.is_err()
-        || count == 0
-    {
+    if unsafe { GetNumberOfPhysicalMonitorsFromHMONITOR(mon, &mut count) }.is_err() || count == 0 {
         report("ddc-open", label, t.elapsed(), false);
         return Vec::new();
     }
@@ -167,9 +163,8 @@ fn physical_monitors(mon: HMONITOR, label: &str) -> Vec<(HANDLE, String)> {
             // Copy the field out: PHYSICAL_MONITOR is packed(1), so referencing the array
             // in place would be an unaligned reference (E0793).
             let name = p.szPhysicalMonitorDescription;
-            let desc = String::from_utf16_lossy(
-                &name[..name.iter().position(|&c| c == 0).unwrap_or(0)],
-            );
+            let desc =
+                String::from_utf16_lossy(&name[..name.iter().position(|&c| c == 0).unwrap_or(0)]);
             (p.hPhysicalMonitor, desc.trim().to_string())
         })
         .collect()
@@ -198,8 +193,7 @@ fn ddc_loop(args: &Args) -> ! {
                     if ok {
                         let mut buf = vec![0u8; len as usize];
                         // SAFETY: `buf` is exactly the reported capabilities length.
-                        ok = unsafe { CapabilitiesRequestAndCapabilitiesReply(h, &mut buf) }
-                            == 1;
+                        ok = unsafe { CapabilitiesRequestAndCapabilitiesReply(h, &mut buf) } == 1;
                     }
                     report("ddc-caps", &label, t.elapsed(), ok);
                 } else {
@@ -208,13 +202,7 @@ fn ddc_loop(args: &Args) -> ! {
                     // SAFETY: `h` is a live physical-monitor handle; out-params are valid; a
                     // read of a standard VCP code mutates nothing monitor-side.
                     let ok = unsafe {
-                        GetVCPFeatureAndVCPFeatureReply(
-                            h,
-                            args.vcp,
-                            None,
-                            &mut cur,
-                            Some(&mut max),
-                        )
+                        GetVCPFeatureAndVCPFeatureReply(h, args.vcp, None, &mut cur, Some(&mut max))
                     } == 1;
                     report("ddc-vcp", &label, t.elapsed(), ok);
                 }
@@ -261,9 +249,8 @@ fn modeset_loop(args: &Args) -> ! {
         eprintln!("no active display device found");
         std::process::exit(1);
     };
-    let label = String::from_utf16_lossy(
-        &name[..name.iter().position(|&c| c == 0).unwrap_or(name.len())],
-    );
+    let label =
+        String::from_utf16_lossy(&name[..name.iter().position(|&c| c == 0).unwrap_or(name.len())]);
     loop {
         let mut dm = DEVMODEW {
             dmSize: std::mem::size_of::<DEVMODEW>() as u16,
@@ -271,10 +258,9 @@ fn modeset_loop(args: &Args) -> ! {
         };
         // SAFETY: `name` is the NUL-terminated device string from enumeration; `dm.dmSize`
         // is stamped; ENUM_CURRENT_SETTINGS fills the live mode.
-        let got = unsafe {
-            EnumDisplaySettingsW(PCWSTR(name.as_ptr()), ENUM_CURRENT_SETTINGS, &mut dm)
-        }
-        .as_bool();
+        let got =
+            unsafe { EnumDisplaySettingsW(PCWSTR(name.as_ptr()), ENUM_CURRENT_SETTINGS, &mut dm) }
+                .as_bool();
         if !got {
             eprintln!("EnumDisplaySettingsW failed for {label}");
             std::process::exit(1);

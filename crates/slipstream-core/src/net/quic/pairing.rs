@@ -1,7 +1,7 @@
 //! The pairing-ceremony control messages (SPAKE2): PairRequest/Challenge/Proof/Result.
 
 use super::*;
-use crate::error::{SlipstreamError, Result};
+use crate::error::{Result, SlipstreamError};
 
 // ---------------------------------------------------------------------------------------------
 // Pairing ceremony (typed control messages): instead of a session Hello, a client may open

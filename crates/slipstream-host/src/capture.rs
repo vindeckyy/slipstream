@@ -128,10 +128,7 @@ pub fn open_desktop_capture(
         for &backend in CaptureBackend::desktop_auto_order() {
             match open_desktop_backend(backend, want_hdr, want_metadata_cursor) {
                 Ok(c) => {
-                    tracing::info!(
-                        backend = backend.as_str(),
-                        "desktop capture: auto selected"
-                    );
+                    tracing::info!(backend = backend.as_str(), "desktop capture: auto selected");
                     return Ok(c);
                 }
                 Err(e) => {
@@ -174,9 +171,7 @@ fn open_desktop_backend(
             open_portal_monitor(want_hdr, want_metadata_cursor)
         }
         CaptureBackend::X11 => ss_capture::open_x11_desktop().context("open X11 desktop capturer"),
-        CaptureBackend::Wlr => {
-            ss_capture::open_wlr_desktop().context("open wlr desktop capturer")
-        }
+        CaptureBackend::Wlr => ss_capture::open_wlr_desktop().context("open wlr desktop capturer"),
         CaptureBackend::Kms => ss_capture::open_kms_desktop().context("open KMS desktop capturer"),
         CaptureBackend::NvFbc => {
             ss_capture::open_nvfbc_desktop().context("open NvFBC desktop capturer")

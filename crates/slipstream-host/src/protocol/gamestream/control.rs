@@ -25,9 +25,9 @@
 use super::{AppState, CONTROL_PORT};
 use crate::inject::gamepad::GamepadManager;
 use anyhow::{anyhow, Context, Result};
+use rusty_enet::{Event, Host, HostSettings, Packet, PeerID};
 use slipstream_core::input::InputEvent;
 use slipstream_core::quic::HdrMeta;
-use rusty_enet::{Event, Host, HostSettings, Packet, PeerID};
 use std::net::UdpSocket;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;

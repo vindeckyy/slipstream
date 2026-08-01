@@ -373,7 +373,11 @@ unsafe fn open_vaapi_encoder_mode(
     // where depth 2 restores throughput at that one-frame cost. NOTE: the per-frame block tracks
     // GPU CLOCKS — a paced 60 fps trickle lets the VCN downclock (~8 ms/frame vs ~4.4 ms hot);
     // see `gpuclocks` for the session clock pin that removes the ramp tax.
-    let depth = async_depth(std::env::var("SLIPSTREAM_VAAPI_ASYNC_DEPTH").ok().as_deref());
+    let depth = async_depth(
+        std::env::var("SLIPSTREAM_VAAPI_ASYNC_DEPTH")
+            .ok()
+            .as_deref(),
+    );
     opts.set("async_depth", &depth.to_string());
     if low_power {
         opts.set("low_power", "1"); // VDEnc — the only encode entrypoint on modern Intel

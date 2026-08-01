@@ -16,10 +16,10 @@ mod core;
 
 pub use core::frame::*;
 
-pub use core::hdr as hdr;
-pub use core::metronome as metronome;
-pub use core::session_tuning as session_tuning;
-pub use core::thread_qos as thread_qos;
+pub use core::hdr;
+pub use core::metronome;
+pub use core::session_tuning;
+pub use core::thread_qos;
 
 #[cfg(target_os = "windows")]
-pub use core::dxgi as dxgi;
+pub use core::dxgi;

@@ -288,7 +288,9 @@ impl PlanError {
     pub fn message(&self) -> String {
         match self {
             PlanError::AmbiguousHost(r) => {
-                format!("More than one saved host is called \"{r}\" — open Slipstream and pick one.")
+                format!(
+                    "More than one saved host is called \"{r}\" — open Slipstream and pick one."
+                )
             }
             PlanError::UnresolvableHost(r) => {
                 format!("No saved host matches \"{r}\".")

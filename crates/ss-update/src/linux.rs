@@ -99,7 +99,6 @@ pub fn main() {
     std::process::exit(if ok { 0 } else { 1 });
 }
 
-
 // One libc symbol, declared directly — not worth a libc dependency in a root helper.
 extern "C" {
     #[link_name = "geteuid"]

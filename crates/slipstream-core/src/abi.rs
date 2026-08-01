@@ -222,7 +222,9 @@ fn guard<F: FnOnce() -> SlipstreamStatus>(f: F) -> SlipstreamStatus {
 /// Swallowing is right here — the object is being torn down either way.
 fn guard_void<F: FnOnce()>(f: F) {
     if std::panic::catch_unwind(AssertUnwindSafe(f)).is_err() {
-        tracing::error!("panic escaped a slipstream_* teardown entry point; swallowed at the C ABI");
+        tracing::error!(
+            "panic escaped a slipstream_* teardown entry point; swallowed at the C ABI"
+        );
     }
 }
 
@@ -1211,7 +1213,8 @@ const _: () = {
     assert!(SLIPSTREAM_GAMEPAD_SWITCHPRO == GamepadPref::SwitchPro.to_u8() as u32);
     assert!(SLIPSTREAM_GAMEPAD_STEAMCONTROLLER2 == GamepadPref::SteamController2.to_u8() as u32);
     assert!(
-        SLIPSTREAM_GAMEPAD_STEAMCONTROLLER2_PUCK == GamepadPref::SteamController2Puck.to_u8() as u32
+        SLIPSTREAM_GAMEPAD_STEAMCONTROLLER2_PUCK
+            == GamepadPref::SteamController2Puck.to_u8() as u32
     );
     // Extended button bits mirror the wire `input::gamepad` constants.
     assert!(SLIPSTREAM_GAMEPAD_BTN_PADDLE1 == g::BTN_PADDLE1);

@@ -13,11 +13,11 @@
 //! scaling. SDL cursors are fixed-size from their surface (no draw-time scaling), so we cache
 //! shapes RAW and resample per install — rebuilding when the serial OR the fit changes.
 
-use slipstream_core::client::NativeClient;
-use slipstream_core::quic::{CursorState, HOST_CAP_CURSOR};
 use sdl3::mouse::{Cursor, MouseUtil, SystemCursor};
 use sdl3::pixels::PixelFormat;
 use sdl3::surface::Surface;
+use slipstream_core::client::NativeClient;
+use slipstream_core::quic::{CursorState, HOST_CAP_CURSOR};
 use std::collections::HashMap;
 use std::time::Duration;
 

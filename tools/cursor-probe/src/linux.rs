@@ -230,13 +230,7 @@ pub fn run() -> Result<()> {
 
 /// Write a packed 4-bpp frame as a PPM, swapping B/R for the BGR layouts. Enough fidelity
 /// to answer "is the pointer in the pixels".
-fn dump_ppm(
-    path: &str,
-    w: u32,
-    h: u32,
-    format: ss_frame::PixelFormat,
-    data: &[u8],
-) -> Result<()> {
+fn dump_ppm(path: &str, w: u32, h: u32, format: ss_frame::PixelFormat, data: &[u8]) -> Result<()> {
     use std::io::Write;
     let mut out = std::io::BufWriter::new(std::fs::File::create(path)?);
     write!(out, "P6\n{w} {h}\n255\n")?;

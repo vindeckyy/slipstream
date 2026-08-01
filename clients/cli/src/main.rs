@@ -19,7 +19,6 @@
 
 #![forbid(unsafe_code)]
 
-
 #[cfg(any(target_os = "linux", windows))]
 #[path = "cmd/mod.rs"]
 mod cli;

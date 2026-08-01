@@ -209,7 +209,9 @@ fn resolve(backend: HeadlessBackend) -> HeadlessBackend {
                 tracing::info!("headless compositor: detected KWin, using krfb-virtualmonitor");
                 HeadlessBackend::Krfb
             } else if is_gamescope_running() && which("gamescope").is_some() {
-                tracing::info!("headless compositor: detected Gamescope, using gamescope --headless");
+                tracing::info!(
+                    "headless compositor: detected Gamescope, using gamescope --headless"
+                );
                 HeadlessBackend::Gamescope
             } else {
                 tracing::info!("headless compositor: using labwc backend");
@@ -299,7 +301,8 @@ fn start_labwc(width: u32, height: u32, refresh_hz: u32) -> Result<HeadlessSessi
     let labwc = which("labwc").context("headless compositor: labwc not found in PATH")?;
     let wlr_randr =
         which("wlr-randr").context("headless compositor: wlr-randr not found in PATH")?;
-    let run_dir = user_runtime_dir().context("headless compositor: cannot determine XDG_RUNTIME_DIR")?;
+    let run_dir =
+        user_runtime_dir().context("headless compositor: cannot determine XDG_RUNTIME_DIR")?;
 
     tracing::info!(%labwc, %wlr_randr, run_dir = %run_dir.display(), "headless compositor: starting labwc");
 
@@ -401,7 +404,8 @@ fn start_labwc(width: u32, height: u32, refresh_hz: u32) -> Result<HeadlessSessi
 
 fn start_gamescope(width: u32, height: u32, refresh_hz: u32) -> Result<HeadlessSession> {
     let bin = which("gamescope").context("headless compositor: gamescope not found in PATH")?;
-    let run_dir = user_runtime_dir().context("headless compositor: cannot determine XDG_RUNTIME_DIR")?;
+    let run_dir =
+        user_runtime_dir().context("headless compositor: cannot determine XDG_RUNTIME_DIR")?;
 
     let before = list_prefixed(&run_dir, "wayland-");
     // Keep the compositor alive with a no-op nested client; the host launches real apps later
@@ -561,7 +565,10 @@ mod tests {
     #[test]
     fn parse_backend_ids() {
         assert_eq!(HeadlessBackend::parse("auto"), Some(HeadlessBackend::Auto));
-        assert_eq!(HeadlessBackend::parse("LABWC"), Some(HeadlessBackend::Labwc));
+        assert_eq!(
+            HeadlessBackend::parse("LABWC"),
+            Some(HeadlessBackend::Labwc)
+        );
         assert_eq!(
             HeadlessBackend::parse("krfb-virtualmonitor"),
             Some(HeadlessBackend::Krfb)

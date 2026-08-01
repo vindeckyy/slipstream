@@ -9,8 +9,8 @@ use crate::model::ConsoleCmd;
 use crate::screens::{Ctx, Outbox};
 use crate::theme::{Fonts, DIM, W};
 use crate::widgets::{permits, Charset, KeyMsg, Keyboard, ListMsg, MenuList, RowSpec};
-use ss_client_core::gamepad::{MenuEvent, MenuPulse};
 use skia_safe::{Canvas, Rect};
+use ss_client_core::gamepad::{MenuEvent, MenuPulse};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Field {

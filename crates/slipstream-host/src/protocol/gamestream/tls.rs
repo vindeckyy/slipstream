@@ -72,7 +72,11 @@ pub(crate) async fn serve_https(
                 .1
                 .peer_certificates()
                 .and_then(|c| c.first())
-                .map(|c| hex::encode(slipstream_core::quic::endpoint::cert_fingerprint(c.as_ref())));
+                .map(|c| {
+                    hex::encode(slipstream_core::quic::endpoint::cert_fingerprint(
+                        c.as_ref(),
+                    ))
+                });
             let fp = PeerCertFingerprint(fp);
             let addr = PeerAddr(peer);
             let svc =

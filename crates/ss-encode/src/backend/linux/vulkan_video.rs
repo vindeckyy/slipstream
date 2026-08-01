@@ -130,7 +130,11 @@ fn quality_request() -> u32 {
 /// being read as a force-on. The old `v == "0"` test made `"0 "` mean the *opposite* of what the
 /// operator wrote, and turned a typo into a forced RGB-direct session with no cursor.
 fn rgb_request() -> Option<bool> {
-    parse_rgb_request(std::env::var("SLIPSTREAM_VULKAN_RGB_DIRECT").ok().as_deref())
+    parse_rgb_request(
+        std::env::var("SLIPSTREAM_VULKAN_RGB_DIRECT")
+            .ok()
+            .as_deref(),
+    )
 }
 
 /// The pure half of [`rgb_request`], so the accepted spellings are testable without mutating the

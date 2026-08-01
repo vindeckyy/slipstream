@@ -112,4 +112,3 @@ pub(crate) fn apply_for_kind(kind: &str) -> Result<bool, String> {
         other => Err(format!("no apply leg for install kind {other}")),
     }
 }
-

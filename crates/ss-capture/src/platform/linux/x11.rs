@@ -270,7 +270,9 @@ fn primary_region(conn: &RustConnection, root: Window) -> Option<Region> {
         .reply()
         .ok()?;
     if info.crtc == 0 {
-        tracing::debug!("X11 capture: the primary output drives no CRTC — capturing the whole root");
+        tracing::debug!(
+            "X11 capture: the primary output drives no CRTC — capturing the whole root"
+        );
         return None;
     }
     let crtc = conn

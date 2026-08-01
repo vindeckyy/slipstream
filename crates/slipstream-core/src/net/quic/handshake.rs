@@ -5,7 +5,7 @@ use crate::config::{
     CompositorPref, Config, FecConfig, FecScheme, GamepadPref, Mode, ProtocolPhase, Role,
 };
 use crate::crypto::SessionKey;
-use crate::error::{SlipstreamError, Result};
+use crate::error::{Result, SlipstreamError};
 
 /// `client → host`: open the session, requesting a display mode (the host creates its
 /// virtual output at exactly this size/refresh — native resolution end to end).

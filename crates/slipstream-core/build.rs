@@ -27,7 +27,9 @@ fn main() {
             println!("cargo:warning=slipstream-core: wrote {}", out.display());
         }
         Err(e) => {
-            println!("cargo:warning=slipstream-core: cbindgen failed ({e}); header not regenerated");
+            println!(
+                "cargo:warning=slipstream-core: cbindgen failed ({e}); header not regenerated"
+            );
         }
     }
 }

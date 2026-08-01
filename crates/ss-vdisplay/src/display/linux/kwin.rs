@@ -1399,7 +1399,7 @@ mod tests {
             "Virtual-slipstream",   // base name (shared identity)
             "Virtual-slipstream-1", // client A's per-slot output
             "Virtual-slipstream-7", // client B's per-slot output
-            "eDP-1",               // a physical panel
+            "eDP-1",                // a physical panel
         ];
         let to_disable: Vec<&str> = enabled
             .iter()

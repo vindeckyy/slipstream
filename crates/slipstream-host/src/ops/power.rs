@@ -70,12 +70,7 @@ fn try_supervisor_restart() -> Result<bool, String> {
             return Ok(false);
         }
         let status = Command::new("systemctl")
-            .args([
-                "--user",
-                "--no-block",
-                "restart",
-                "slipstream-host.service",
-            ])
+            .args(["--user", "--no-block", "restart", "slipstream-host.service"])
             .status()
             .map_err(|e| format!("systemctl restart slipstream-host: {e}"))?;
         if status.success() {
@@ -127,9 +122,8 @@ fn schedule_reexec() -> Result<(), String> {
     {
         let mut cmd = Command::new("sh");
         // $0 / $@ are the exe + serve args passed after -c.
-        let wait = format!(
-            "while kill -0 {parent} 2>/dev/null; do sleep 0.05; done; exec \"$0\" \"$@\""
-        );
+        let wait =
+            format!("while kill -0 {parent} 2>/dev/null; do sleep 0.05; done; exec \"$0\" \"$@\"");
         cmd.arg("-c").arg(wait).arg(&exe);
         for a in &args {
             cmd.arg(a);

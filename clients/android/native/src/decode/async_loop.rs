@@ -660,7 +660,7 @@ fn feeder_loop(
                 }
             }
             Err(SlipstreamError::NoFrame) => {} // timeout — re-check shutdown and poll again
-            Err(_) => break,                   // session closed
+            Err(_) => break,                    // session closed
         }
     }
 }

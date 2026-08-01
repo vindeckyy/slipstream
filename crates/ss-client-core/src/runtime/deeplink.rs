@@ -562,12 +562,18 @@ mod tests {
     #[test]
     fn refusals_are_specific() {
         assert_eq!(parse("https://example.com/"), Err(ParseError::NotOurScheme));
-        assert_eq!(parse("slipstream:/connect/x"), Err(ParseError::NotOurScheme));
+        assert_eq!(
+            parse("slipstream:/connect/x"),
+            Err(ParseError::NotOurScheme)
+        );
         assert_eq!(
             parse(&format!("slipstream://connect/{}", "a".repeat(MAX_URL_LEN))),
             Err(ParseError::TooLong)
         );
-        assert_eq!(parse("slipstream://pair/1234"), Err(ParseError::PairRefused));
+        assert_eq!(
+            parse("slipstream://pair/1234"),
+            Err(ParseError::PairRefused)
+        );
         assert_eq!(
             parse("slipstream://teardown/host"),
             Err(ParseError::UnknownRoute("teardown".into()))

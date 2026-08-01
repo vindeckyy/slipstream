@@ -72,7 +72,10 @@ pub(super) async fn serve_session(
         let pin = match np.pin_for_attempt(&client_fp_hex) {
             crate::native_pairing::PinAttempt::Pin(pin) => pin,
             crate::native_pairing::PinAttempt::Disarmed => {
-                close_rejected(&conn, slipstream_core::reject::RejectReason::PairingNotArmed);
+                close_rejected(
+                    &conn,
+                    slipstream_core::reject::RejectReason::PairingNotArmed,
+                );
                 anyhow::bail!(
                     "pairing not armed (arm it in the console, or start with --allow-pairing)"
                 )
@@ -180,7 +183,10 @@ pub(super) async fn serve_session(
                     anyhow::bail!("pairing request denied in the console")
                 }
                 PairingDecision::TimedOut => {
-                    close_rejected(&conn, slipstream_core::reject::RejectReason::ApprovalTimeout);
+                    close_rejected(
+                        &conn,
+                        slipstream_core::reject::RejectReason::ApprovalTimeout,
+                    );
                     anyhow::bail!(
                         "pairing request not approved within {PENDING_APPROVAL_WAIT:?} \
                          — the device can knock again"
@@ -722,8 +728,8 @@ pub(super) async fn serve_session(
                                     // Per-AU host-timing emission (0xCF): only when the client advertised the cap bit. All
                                     // first-party clients do (the core connector ORs it in); an older client leaves it clear
                                     // and gets no extra datagrams.
-    let timing_conn =
-        (hello.video_caps & slipstream_core::quic::VIDEO_CAP_HOST_TIMING != 0).then(|| conn.clone());
+    let timing_conn = (hello.video_caps & slipstream_core::quic::VIDEO_CAP_HOST_TIMING != 0)
+        .then(|| conn.clone());
     // Probe-sequence capability: the client reassembles speed-test filler in its own index window,
     // so mid-session bursts don't consume video frame indexes. An older client (bit clear) gets
     // mid-session probes declined instead — see `run_probe_burst`.

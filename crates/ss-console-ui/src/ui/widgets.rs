@@ -7,8 +7,8 @@
 use crate::anim::{approach, Spring, TRAY_C, TRAY_K};
 use crate::library::{BUMP_C, BUMP_K};
 use crate::theme::{brand, white, Fonts, PanelStroke, BRAND, DIM, FAINT, W, WHITE};
-use ss_client_core::gamepad::{MenuDir, MenuEvent, MenuPulse};
 use skia_safe::{Canvas, Paint, Path, RRect, Rect};
+use ss_client_core::gamepad::{MenuDir, MenuEvent, MenuPulse};
 
 // --- Menu list -----------------------------------------------------------------------------
 

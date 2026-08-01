@@ -6,7 +6,7 @@
 
 Slipstream is a private streaming stack: a virtual-display host, native clients, and a browser
 console. It speaks **GameStream** so [Moonlight](https://moonlight-stream.org/) works day one, and
-ships its own faster **`slipstream/1`** protocol (QUIC control + GF(2^16) Leopard-RS FEC). The host
+ships its own faster **`slipstream/1`** protocol with QUIC control and packet-loss recovery. The host
 console UX takes cues from [Sunshine](https://github.com/LizardByte/Sunshine)'s workflows (not
 copied assets). Linux capture and compositor work also draws on ideas from local SolarFlare
 experiments in this workspace.
@@ -120,7 +120,8 @@ include/             slipstream_core.h
   (Rust crate or C ABI).
 - **No async on the frame path.** Native threads only; `tokio`/`quinn` stay on the control plane.
 - **Native client resolution.** Each session gets a virtual output at exact WxH@Hz.
-- **FEC scales.** GF(2^8) for Moonlight; GF(2^16) for `slipstream/1`.
+- **Packet-loss recovery scales.** GameStream stays Moonlight-compatible; `slipstream/1` can
+  protect larger frames without retransmitting them.
 
 ## License
 

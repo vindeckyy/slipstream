@@ -14,13 +14,13 @@ use crate::theme::{match_first_family, Fonts};
 use anyhow::{anyhow, Context as _, Result};
 use ash::vk as avk;
 use ash::vk::Handle as _;
+use skia_safe::gpu::vk as skvk;
+use skia_safe::gpu::{self, DirectContext, SurfaceOrigin};
+use skia_safe::{Canvas, Color4f, Font, FontMgr, Paint, Point, RRect, Rect, Surface};
 use ss_client_core::gamepad::{MenuEvent, MenuPulse};
 use ss_presenter::overlay::{
     FrameCtx, Overlay, OverlayAction, OverlayFrame, SessionPhase, SharedDevice,
 };
-use skia_safe::gpu::vk as skvk;
-use skia_safe::gpu::{self, DirectContext, SurfaceOrigin};
-use skia_safe::{Canvas, Color4f, Font, FontMgr, Paint, Point, RRect, Rect, Surface};
 use std::time::Instant;
 
 /// Skia's GPU resource budget — poster art plus a few screen layers; 64 MB fits

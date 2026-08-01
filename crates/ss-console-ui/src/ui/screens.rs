@@ -3,19 +3,24 @@
 //! chrome, and the overlays — a screen never draws its own background or hint bar, so
 //! every screen animates and reads identically.
 
+#[path = "screens/add_host.rs"]
 pub(crate) mod add_host;
+#[path = "screens/home.rs"]
 pub(crate) mod home;
+#[path = "screens/library.rs"]
 pub(crate) mod library;
+#[path = "screens/pair.rs"]
 pub(crate) mod pair;
+#[path = "screens/settings.rs"]
 pub(crate) mod settings;
 
 use crate::glyphs::Hint;
 use crate::library::LibraryShared;
 use crate::model::{ConsoleCmd, HostRow};
 use crate::theme::Fonts;
+use skia_safe::{Canvas, Rect};
 use ss_client_core::gamepad::{MenuEvent, MenuPulse};
 use ss_client_core::{gamepad::PadInfo, trust};
-use skia_safe::{Canvas, Rect};
 
 /// What a screen draws over (the shell crossfades between them on push/pop).
 #[derive(Clone, Copy, PartialEq, Eq)]

@@ -24,9 +24,9 @@
 
 use crate::keymap_sdl;
 use crate::touch::{Abs, Act, Gestures};
-use ss_client_core::trust::{MouseMode, TouchMode};
 use slipstream_core::client::NativeClient;
 use slipstream_core::input::{InputEvent, InputKind};
+use ss_client_core::trust::{MouseMode, TouchMode};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 

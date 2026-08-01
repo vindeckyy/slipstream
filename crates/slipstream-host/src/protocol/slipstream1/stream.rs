@@ -1433,7 +1433,8 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
     // Streamed-AU wire mode: the client's cap AND the host escape hatch (`SLIPSTREAM_STREAMED_AU=0`
     // reverts to whole-AU sends without touching the encoder's slicing knobs). The third gate —
     // whether the ENCODER actually chunks — is dynamic (`supports_chunked_poll`, per AU).
-    let streamed_wire = streamed_au && std::env::var("SLIPSTREAM_STREAMED_AU").as_deref() != Ok("0");
+    let streamed_wire =
+        streamed_au && std::env::var("SLIPSTREAM_STREAMED_AU").as_deref() != Ok("0");
     // Slice-granularity streamed blocks (P2): needs the streamed wire AND the client's
     // multi-slice tolerance (the slices only exist when the encoder splits the frame, which
     // `plan.max_slices` already keyed off the same cap). `SLIPSTREAM_SLICE_STREAM=0` pins the

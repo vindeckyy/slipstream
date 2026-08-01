@@ -3,11 +3,11 @@
 //! cert's own X.509 signature bytes are an input to the pairing hashes, so we extract them.
 
 use anyhow::{anyhow, Context, Result};
-use ss_paths::config_dir;
 use rsa::pkcs1v15::SigningKey;
 use rsa::pkcs8::{DecodePrivateKey, EncodePrivateKey, LineEnding};
 use rsa::RsaPrivateKey;
 use sha2::Sha256;
+use ss_paths::config_dir;
 use std::fs;
 
 pub struct ServerIdentity {

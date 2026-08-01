@@ -2,7 +2,7 @@
 
 use super::worker::reject_from_close;
 use super::{join_host_port, NativeClient};
-use crate::error::{SlipstreamError, Result};
+use crate::error::{Result, SlipstreamError};
 use crate::quic::{endpoint, io};
 use std::time::Duration;
 

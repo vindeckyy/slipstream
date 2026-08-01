@@ -212,9 +212,10 @@ machine. Slipstream narrows it as far as it can:
 - **Catalog entries are version- and hash-pinned.** Every plugin in the catalog names one exact
   version and that version's package hash, and the host re-checks the hash before it downloads
   anything. A package quietly republished under the same version number is refused, not installed.
-- **The badges tell you who looked at it.** **Verified** means somebody at unom reviewed *that exact
-  package* from the built-in catalog. **External source** (*from &lt;source&gt;*) means a catalog
-  **you** added — still pinned and hash-checked, but curated by somebody else. **Unverified** means
+- **The badges tell you who looked at it.** **Verified** means Slipstream maintainers reviewed
+  *that exact package* from the built-in catalog. **External source** (*from &lt;source&gt;*) means a
+  catalog **you** added. It is still pinned and hash-checked, but curated by somebody else.
+  **Unverified** means
   you installed it by hand from a package spec: nobody reviewed it, nothing pins it, and it stays
   marked that way for as long as it is installed.
 - **Adding a catalog source is a one-time trust decision** — every plugin in that catalog becomes

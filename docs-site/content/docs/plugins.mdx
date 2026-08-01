@@ -36,8 +36,8 @@ badges — worth reading once, because a plugin runs with the same privileges as
 ### What "Verified" means
 
 Every catalogued plugin pins **one exact version** and that version's package hash. A verified entry
-means somebody at unom reviewed *that exact package* — not the project in general, and not whatever
-it publishes next. When a plugin releases a new version, the store keeps offering the reviewed one
+covers the exact package reviewed by Slipstream maintainers. The project and later releases require
+their own review. When a plugin releases a new version, the store keeps offering the reviewed one
 until the new release is reviewed too. Before anything is downloaded, the host re-checks the pinned
 hash against the registry, so a package that was quietly republished under the same version number
 is refused rather than installed.
@@ -51,8 +51,8 @@ Three things a plugin can be:
 
 | Badge | Where it came from |
 |---|---|
-| **Verified** | The built-in catalog. unom reviewed this exact package. |
-| **External source**, *from &lt;source&gt;* | A catalog **you** added. Still pinned and hash-checked, but curated by somebody else — unom has not looked at the code. This badge is amber, not the red **Unverified** below. |
+| **Verified** | The built-in catalog. Slipstream maintainers reviewed this exact package. |
+| **External source**, *from &lt;source&gt;* | A catalog **you** added. It is still pinned and hash-checked, but curated by somebody else. Slipstream maintainers have not reviewed the code. This badge is amber, unlike the red **Unverified** badge below. |
 | **Unverified** | Installed by hand from a package spec. Nobody reviewed it and nothing pins it; the console asks you to type the name to confirm, and the plugin stays marked this way for as long as it is installed. |
 
 ### Adding another catalog

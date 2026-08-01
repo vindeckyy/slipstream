@@ -81,7 +81,8 @@ pub(crate) struct Args {
     /// handshake on the same control stream and assert both estimates are sane and consistent:
     /// the headless validator for the host answering `ClockProbe` at any time (what the native
     /// clients' mid-stream re-sync relies on). Aborts the session when the re-probe fails.
-    pub(crate) clock_resync: bool,}
+    pub(crate) clock_resync: bool,
+}
 
 pub(crate) fn parse_mode(m: &str) -> Option<Mode> {
     let mut it = m.split('x');
@@ -273,4 +274,3 @@ pub(crate) fn codec_ext(codec: u8) -> &'static str {
         _ => "h265",
     }
 }
-

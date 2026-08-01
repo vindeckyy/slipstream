@@ -141,11 +141,7 @@ impl Dispatch<WlOutput, ()> for State {
         } = event
         {
             if flags.contains(wl_output::Mode::Current) {
-                if let Some(slot) = state
-                    .outputs
-                    .iter_mut()
-                    .find(|o| o.output == *output)
-                {
+                if let Some(slot) = state.outputs.iter_mut().find(|o| o.output == *output) {
                     slot.width = width;
                     slot.height = height;
                 }
@@ -513,7 +509,9 @@ impl WlrCapturer {
             .clone();
         // overlay_cursor = 1: bake the pointer into the frame (we publish no CursorOverlay).
         let frame = manager.capture_output(1, self.output(), &qh, ());
-        self.conn.flush().context("wayland flush (capture_output)")?;
+        self.conn
+            .flush()
+            .context("wayland flush (capture_output)")?;
 
         let version = self.state.screencopy_version;
         let deadline = Instant::now() + FRAME_WAIT;
@@ -568,7 +566,9 @@ impl WlrCapturer {
         self.state.pending.failed = false;
         self.state.pending.y_invert = false;
         frame.copy(&buffer);
-        self.conn.flush().context("wayland flush (screencopy copy)")?;
+        self.conn
+            .flush()
+            .context("wayland flush (screencopy copy)")?;
 
         let deadline = Instant::now() + FRAME_WAIT;
         self.dispatch_until(deadline, |p| p.ready || p.failed)?;

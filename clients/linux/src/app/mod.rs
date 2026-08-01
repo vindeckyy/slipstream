@@ -14,9 +14,9 @@ use crate::trust::{self, Settings};
 use crate::ui::hosts::{ConnectRequest, HostsMsg, HostsOutput, HostsPage};
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
+use relm4::prelude::*;
 use slipstream_core::client::NativeClient;
 use slipstream_core::config::{CompositorPref, GamepadPref};
-use relm4::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 

@@ -6,8 +6,8 @@
 //! the data-plane thread over the session's mpsc bridges.
 
 use super::*;
-use ss_clipboard::ClipCoordCmd;
 use slipstream_core::quic::{ClipControl, ClipOffer, ClipState};
+use ss_clipboard::ClipCoordCmd;
 
 /// Run the control task for one live session. Owns the control streams (`serve_session` hands them
 /// off after negotiation) plus every channel end that bridges to the data-plane thread, and the

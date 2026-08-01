@@ -14,9 +14,9 @@
 use super::style::*;
 use super::{AppCtx, Screen};
 use crate::trust::{KnownHosts, Settings};
+use slipstream_core::config::GamepadPref;
 use ss_client_core::profiles::{ProfilesFile, StreamProfile};
 use ss_client_core::trust::StatsVerbosity;
-use slipstream_core::config::GamepadPref;
 use std::sync::Arc;
 use windows_reactor::*;
 

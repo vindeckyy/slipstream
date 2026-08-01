@@ -30,9 +30,9 @@ use ashpd::desktop::{
 };
 use ashpd::zbus;
 use futures_util::StreamExt;
-use slipstream_core::input::{InputEvent, InputKind};
 use reis::ei;
 use reis::event::{DeviceCapability, EiEvent};
+use slipstream_core::input::{InputEvent, InputKind};
 use std::collections::HashMap;
 use std::os::unix::net::UnixStream;
 use std::time::{Duration, Instant};

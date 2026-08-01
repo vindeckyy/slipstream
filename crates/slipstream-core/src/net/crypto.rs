@@ -29,7 +29,7 @@
 //! shape, so the entire nonce discipline above carries over verbatim.
 
 use crate::config::Role;
-use crate::error::{SlipstreamError, Result};
+use crate::error::{Result, SlipstreamError};
 use aes_gcm::aead::{Aead, AeadInPlace, KeyInit, Payload};
 use aes_gcm::{Aes128Gcm, Key, Nonce};
 use chacha20poly1305::ChaCha20Poly1305;

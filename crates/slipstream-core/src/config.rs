@@ -1,7 +1,7 @@
 //! Session configuration and protocol/FEC parameters.
 
 use crate::crypto::SessionKey;
-use crate::error::{SlipstreamError, Result};
+use crate::error::{Result, SlipstreamError};
 use crate::packet::{CRYPTO_OVERHEAD, HEADER_LEN, MAX_DATAGRAM_BYTES};
 use zeroize::Zeroize;
 
@@ -408,7 +408,9 @@ impl Config {
             ));
         }
         if self.fec.max_data_per_block == 0 {
-            return Err(SlipstreamError::InvalidArg("max_data_per_block must be > 0"));
+            return Err(SlipstreamError::InvalidArg(
+                "max_data_per_block must be > 0",
+            ));
         }
         // The per-block total (data + recovery) must fit both the field ceiling and the
         // u16 wire fields.

@@ -651,12 +651,7 @@ mod tests {
         assert_eq!(read().matches("@retro-hub").count(), 1);
 
         // A second scope joins the same table.
-        ensure_bunfig_scope(
-            dir.path(),
-            "@slipstream",
-            "https://example.com/npm/",
-        )
-        .unwrap();
+        ensure_bunfig_scope(dir.path(), "@slipstream", "https://example.com/npm/").unwrap();
         assert!(read().contains("@slipstream"));
         assert!(read().contains("@retro-hub"));
 

@@ -34,8 +34,8 @@
 use crate::pyrowave_wire;
 use crate::{EncodedFrame, Encoder, EncoderCaps};
 use anyhow::{bail, Context, Result};
-use ss_frame::{CapturedFrame, FramePayload};
 use pyrowave_sys as pw;
+use ss_frame::{CapturedFrame, FramePayload};
 use std::collections::VecDeque;
 use windows::core::{Interface, PCWSTR};
 use windows::Win32::Foundation::{CloseHandle, DuplicateHandle, DUPLICATE_SAME_ACCESS, HANDLE};

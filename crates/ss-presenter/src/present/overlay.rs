@@ -6,8 +6,8 @@
 //! `None` costs the hot path nothing (the quad isn't even recorded).
 
 use ash::vk;
-use ss_client_core::gamepad::{MenuEvent, MenuPulse};
 use slipstream_core::config::GamepadPref;
+use ss_client_core::gamepad::{MenuEvent, MenuPulse};
 
 /// The presenter's device, shared with the overlay so its renderer (Skia's
 /// `DirectContext`) creates resources on the same VkDevice/queue. Handles stay valid for

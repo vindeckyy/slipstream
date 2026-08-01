@@ -287,7 +287,7 @@ pub(super) fn run_sync(
                     pending = Some(frame);
                 }
                 Err(SlipstreamError::NoFrame) => {} // timeout — still drain output below
-                Err(_) => break,                   // session closed
+                Err(_) => break,                    // session closed
             }
         }
         // Time the productive work (feed + drain) only — the `next_frame` poll wait above is idle

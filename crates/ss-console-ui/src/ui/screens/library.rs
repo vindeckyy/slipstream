@@ -13,8 +13,8 @@ use crate::library::{
 use crate::model::{ConsoleCmd, HostRow};
 use crate::screens::{ConnectIntent, Ctx, Outbox};
 use crate::theme::{white, Fonts, DIM, W, WHITE};
-use ss_client_core::gamepad::{MenuDir, MenuEvent, MenuPulse};
 use skia_safe::{Canvas, Color4f, Data, Image, Paint, Point, RRect, Rect, M44};
+use ss_client_core::gamepad::{MenuDir, MenuEvent, MenuPulse};
 use std::collections::HashMap;
 
 pub(crate) struct LibraryScreen {

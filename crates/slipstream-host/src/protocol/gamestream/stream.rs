@@ -807,7 +807,6 @@ pub(super) fn gs_bit_depth(format: crate::capture::PixelFormat) -> u8 {
     }
 }
 
-
 /// Packetize + paced-send + encode loop (plan §W1); [`run`] calls [`stream_data::stream_body`].
 mod stream_data;
 use stream_data::stream_body;

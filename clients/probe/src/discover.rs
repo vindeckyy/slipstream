@@ -75,4 +75,3 @@ pub(crate) fn discover(secs: u64) -> Result<()> {
     }
     Ok(())
 }
-

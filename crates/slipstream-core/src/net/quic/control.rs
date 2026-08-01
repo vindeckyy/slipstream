@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::config::Mode;
-use crate::error::{SlipstreamError, Result};
+use crate::error::{Result, SlipstreamError};
 
 /// `client → host`, any time after [`Start`]: switch the session to a new display mode
 /// (window resized, refresh changed) without reconnecting. The host answers with

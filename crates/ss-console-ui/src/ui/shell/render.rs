@@ -6,9 +6,9 @@ use crate::library::LibraryShared;
 use crate::model::HostRow;
 use crate::screens::{Bg, Ctx, Screen};
 use crate::theme::{white, Fonts, PanelStroke, W, WHITE};
+use skia_safe::{Canvas, Color4f, Rect};
 use ss_client_core::gamepad::PadInfo;
 use ss_client_core::trust;
-use skia_safe::{Canvas, Color4f, Rect};
 use std::time::Instant;
 
 use super::{Motion, Shell, BOTTOM_BAND, TOP_BAND};

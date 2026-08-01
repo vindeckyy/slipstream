@@ -188,7 +188,8 @@ fn set_app_user_model_id() {
             return; // packaged (or indeterminate) — leave the identity alone
         }
         // Must stay in sync with ss-presenter's win32.rs, or the windows stop grouping.
-        let _ = SetCurrentProcessExplicitAppUserModelID(windows::core::w!("unom.slipstream.client"));
+        let _ =
+            SetCurrentProcessExplicitAppUserModelID(windows::core::w!("unom.slipstream.client"));
     }
 }
 

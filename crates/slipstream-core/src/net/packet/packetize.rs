@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::config::Config;
-use crate::error::{SlipstreamError, Result};
+use crate::error::{Result, SlipstreamError};
 use crate::fec::ErasureCoder;
 use zerocopy::IntoBytes;
 
@@ -268,7 +268,9 @@ impl Packetizer {
             let k = block_data_count(b);
             let m = recovery_for(k);
             if k + m > u16::MAX as usize {
-                return Err(SlipstreamError::Unsupported("block shard count exceeds u16"));
+                return Err(SlipstreamError::Unsupported(
+                    "block shard count exceeds u16",
+                ));
             }
             total_recovery += m;
         }
@@ -426,7 +428,9 @@ impl Packetizer {
                 au.emitted_shards
                     .checked_mul(payload as u64)
                     .and_then(|b| u32::try_from(b).ok())
-                    .ok_or(SlipstreamError::Unsupported("streamed AU exceeds u32 bytes"))?
+                    .ok_or(SlipstreamError::Unsupported(
+                        "streamed AU exceeds u32 bytes",
+                    ))?
             } else {
                 0 // the legacy sentinel contract: uniform full-K blocks, no base on the wire
             };
@@ -510,7 +514,9 @@ impl Packetizer {
             .recovery_for(k)
             .min(self.max_total_shards.saturating_sub(k));
         if k + m > u16::MAX as usize {
-            return Err(SlipstreamError::Unsupported("block shard count exceeds u16"));
+            return Err(SlipstreamError::Unsupported(
+                "block shard count exceeds u16",
+            ));
         }
         // Stage the one possibly-partial (or empty-frame) shard in the zero-padded scratch.
         let full_shards = bytes.len() / payload;

@@ -1658,7 +1658,8 @@ fn maybe_boot_loop_rollback(restarts: u32, attempted: &mut bool) {
         .unwrap_or(0);
     // A stale intent never triggers rollbacks, and a boot-looping OLD binary (version ≠ the
     // intent's target) is not an update failure — boot reconciliation owns that story.
-    if now.saturating_sub(intent.started_unix) > 30 * 60 || env!("SLIPSTREAM_VERSION") != intent.to {
+    if now.saturating_sub(intent.started_unix) > 30 * 60 || env!("SLIPSTREAM_VERSION") != intent.to
+    {
         return;
     }
     *attempted = true;

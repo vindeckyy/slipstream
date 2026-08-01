@@ -276,7 +276,10 @@ mod tests {
     fn positional_url_finds_links_only() {
         let args = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
         assert_eq!(
-            positional_url(&args(&["slipstream-client.exe", "slipstream://connect/Desk"])),
+            positional_url(&args(&[
+                "slipstream-client.exe",
+                "slipstream://connect/Desk"
+            ])),
             Some("slipstream://connect/Desk".into())
         );
         // The alias form still parses (it is never emitted, only accepted).

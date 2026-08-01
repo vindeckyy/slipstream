@@ -25,7 +25,6 @@
 // Unsafe-proof program: every `unsafe {}` in this leaf carries a `// SAFETY:` proof.
 #![deny(clippy::undocumented_unsafe_blocks)]
 
-mod types;
 /// Which kernel adapter types ([`D3DKMT_ADAPTERTYPE`] bit-field words) never belong in the GPU
 /// inventory. Pure bit math on every platform so the classification is unit-tested with words
 /// captured from real hardware; only the Windows [`enumerate`] consumes it at runtime.
@@ -33,26 +32,27 @@ mod types;
 /// [`D3DKMT_ADAPTERTYPE`]: https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmdt/ns-d3dkmdt-_d3dkmt_adaptertype
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 mod adapter_type;
+mod enumerate;
 /// Kernel-side adapter-type query (`D3DKMTQueryAdapterInfo(KMTQAITYPE_ADAPTERTYPE)`) via raw
 /// gdi32 FFI — the `windows` crate's `Wdk_*` bindings aren't enabled, and one 3-call query
 /// doesn't justify them.
 #[cfg(target_os = "windows")]
 mod kmt;
-mod enumerate;
 mod prefs;
 mod select;
+mod types;
 
-pub use types::{GpuHandle, GpuInfo, VENDOR_AMD, VENDOR_INTEL, VENDOR_NVIDIA, vendor_tag};
 pub use enumerate::enumerate;
 pub use prefs::{prefs, GpuMode, GpuPrefStore, GpuPreference, PreferredGpu};
-pub use select::{
-    active, find_preferred, manual_selection, pick, selected_gpu, selection_key, session_begin,
-    ActiveGpu, ActiveSession, PickSource, SelectedGpu,
-};
 #[cfg(target_os = "linux")]
 pub use select::linux_render_node;
 #[cfg(target_os = "windows")]
 pub use select::resolve_render_adapter_luid;
+pub use select::{
+    active, find_preferred, manual_selection, pick, selected_gpu, selection_key, session_begin,
+    ActiveGpu, ActiveSession, PickSource, SelectedGpu,
+};
+pub use types::{vendor_tag, GpuHandle, GpuInfo, VENDOR_AMD, VENDOR_INTEL, VENDOR_NVIDIA};
 
 #[cfg(test)]
 mod tests {

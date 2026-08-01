@@ -26,6 +26,7 @@
 #![deny(clippy::undocumented_unsafe_blocks)]
 
 use anyhow::{anyhow, Context, Result};
+use rand::RngCore;
 use slipstream_core::config::{
     mtu1500_shard_payload_for, CompositorPref, FecConfig, FecScheme, GamepadPref, Role,
 };
@@ -38,7 +39,6 @@ use slipstream_core::quic::{
 };
 use slipstream_core::transport::UdpTransport;
 use slipstream_core::Session;
-use rand::RngCore;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
 
@@ -585,7 +585,10 @@ const REJECT_BUSY_CODE: u32 = slipstream_core::reject::REJECT_BUSY_CLOSE_CODE;
 /// reason ("pairing not armed", "denied in the console") — the task's `Err` then only logs.
 /// Without this the dropped connection closes with a bare code 0, indistinguishable on the
 /// client from transport trouble (the "not accepted" support-thread failure mode).
-pub(super) fn close_rejected(conn: &quinn::Connection, reason: slipstream_core::reject::RejectReason) {
+pub(super) fn close_rejected(
+    conn: &quinn::Connection,
+    reason: slipstream_core::reject::RejectReason,
+) {
     conn.close(reason.close_code().into(), reason.to_string().as_bytes());
 }
 
@@ -742,7 +745,6 @@ pub(super) type AudioCapSlot = Arc<std::sync::Mutex<Option<Box<dyn crate::audio:
 /// the client uses a comparable connect timeout, and a client that gives up first closes the
 /// connection (the host stops waiting at once).
 pub(super) const PENDING_APPROVAL_WAIT: std::time::Duration = std::time::Duration::from_secs(180);
-
 
 /// Backoff between reopen attempts after a host-lifetime service's backend (a capturer) fails
 /// to open or its worker dies, so a persistently-unavailable resource isn't hammered. (The
@@ -1418,7 +1420,10 @@ mod tests {
     }
 
     fn test_paired_path() -> std::path::PathBuf {
-        std::env::temp_dir().join(format!("slipstream-paired-test-{}.json", std::process::id()))
+        std::env::temp_dir().join(format!(
+            "slipstream-paired-test-{}.json",
+            std::process::id()
+        ))
     }
 
     /// Delegated approval (§8b-1) end to end in-process, the SEAMLESS flow: an

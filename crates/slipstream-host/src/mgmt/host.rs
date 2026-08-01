@@ -462,7 +462,11 @@ pub(crate) async fn list_headless_compositors() -> Json<Vec<AvailableHeadlessCom
     #[cfg(target_os = "linux")]
     let list = crate::vdisplay::headless_available()
         .into_iter()
-        .map(|(id, label, available)| AvailableHeadlessCompositor { id, label, available })
+        .map(|(id, label, available)| AvailableHeadlessCompositor {
+            id,
+            label,
+            available,
+        })
         .collect();
     Json(list)
 }

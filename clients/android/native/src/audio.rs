@@ -420,7 +420,7 @@ fn decode_loop(
                 }
             }
             Err(SlipstreamError::NoFrame) => {} // timeout
-            Err(_) => break,                   // session closed
+            Err(_) => break,                    // session closed
         }
     }
     log::info!(

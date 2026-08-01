@@ -217,9 +217,7 @@ fn resolve(reference: &str) -> Result<(KnownHosts, usize), u8> {
     match deeplink::resolve_host(&link, &known) {
         HostResolution::Known(i) => Ok((known, i)),
         HostResolution::Ambiguous => {
-            eprintln!(
-                "more than one saved host is called \"{reference}\" — use its address or id"
-            );
+            eprintln!("more than one saved host is called \"{reference}\" — use its address or id");
             Err(UNRESOLVED)
         }
         HostResolution::Unknown { addr, port, .. } => {
@@ -536,9 +534,7 @@ fn library_cmd(args: &[String]) -> u8 {
             if has(args, "--json") {
                 let rows: Vec<serde_json::Value> = games
                     .iter()
-                    .map(
-                        |g| serde_json::json!({"id": g.id, "store": g.store, "title": g.title}),
-                    )
+                    .map(|g| serde_json::json!({"id": g.id, "store": g.store, "title": g.title}))
                     .collect();
                 println!("{}", serde_json::json!({ "games": rows }));
             } else {
@@ -872,8 +868,7 @@ fn reset() -> u8 {
     }
     eprint!("Forget every saved host and reset settings? [y/N] ");
     let mut line = String::new();
-    if std::io::stdin().read_line(&mut line).is_err() || !line.trim().eq_ignore_ascii_case("y")
-    {
+    if std::io::stdin().read_line(&mut line).is_err() || !line.trim().eq_ignore_ascii_case("y") {
         eprintln!("cancelled");
         return OK;
     }

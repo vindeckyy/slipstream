@@ -9,9 +9,9 @@ use crate::glyphs::{Hint, HintKey};
 use crate::screens::{Ctx, Outbox};
 use crate::theme::{Fonts, DIM, W};
 use crate::widgets::{ListMsg, MenuList, RowSpec};
+use skia_safe::{Canvas, Rect};
 use ss_client_core::gamepad::{MenuEvent, MenuPulse};
 use ss_client_core::trust::{MouseMode, StatsVerbosity, TouchMode};
-use skia_safe::{Canvas, Rect};
 
 /// Stable row identity — adjust/activate dispatch by id so nothing acts on a stale
 /// index when the pad list under the "Use controller" row churns.

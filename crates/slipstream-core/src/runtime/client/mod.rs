@@ -13,7 +13,7 @@
 
 use crate::clipboard::{ClipCommand, ClipEventCore};
 use crate::config::{CompositorPref, GamepadPref, Mode};
-use crate::error::{SlipstreamError, Result};
+use crate::error::{Result, SlipstreamError};
 use crate::input::InputEvent;
 use crate::quic::{
     endpoint, ClipControl, ClipKind, ClipOffer, ColorInfo, HdrMeta, HidOutput, ProbeRequest,

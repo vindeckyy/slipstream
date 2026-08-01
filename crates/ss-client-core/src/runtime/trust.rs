@@ -11,9 +11,9 @@
 
 use crate::profiles::{ProfilesFile, Resolution, StreamProfile};
 use anyhow::{anyhow, Context, Result};
+use serde::{Deserialize, Serialize};
 use slipstream_core::client::NativeClient;
 use slipstream_core::quic::endpoint;
-use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 pub fn config_dir() -> Result<PathBuf> {

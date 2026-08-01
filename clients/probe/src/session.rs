@@ -1,5 +1,6 @@
 //! Probe session: connect, verify/stream, and input-plane exercise paths.
 
+use crate::args::{codec_ext, hex, load_or_create_identity, now_ns, Args};
 use anyhow::{anyhow, Context, Result};
 use slipstream_core::config::Role;
 use slipstream_core::input::{InputEvent, InputKind};
@@ -10,11 +11,8 @@ use slipstream_core::quic::{
     Welcome,
 };
 use slipstream_core::transport::UdpTransport;
-use slipstream_core::{SlipstreamError, Session};
+use slipstream_core::{Session, SlipstreamError};
 use std::io::Write;
-use crate::args::{
-    codec_ext, hex, load_or_create_identity, now_ns, Args,
-};
 
 pub(crate) async fn session(args: Args) -> Result<()> {
     let remote: std::net::SocketAddr = args.connect.parse().context("--connect host:port")?;
@@ -649,7 +647,8 @@ pub(crate) async fn session(args: Args) -> Result<()> {
                         pcm[f * 2 + 1] = s;
                     }
                     if let Ok(n) = enc.encode_float(&pcm, &mut out) {
-                        let d = slipstream_core::quic::encode_mic_datagram(seq, now_ns(), &out[..n]);
+                        let d =
+                            slipstream_core::quic::encode_mic_datagram(seq, now_ns(), &out[..n]);
                         if conn2.send_datagram(d.into()).is_err() {
                             break 'stream;
                         }

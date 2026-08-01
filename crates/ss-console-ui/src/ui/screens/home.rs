@@ -11,8 +11,8 @@ use crate::library::{step_cursor, StepResult, BUMP_C, BUMP_K, BUMP_PX, SPRING_C,
 use crate::model::{ConsoleCmd, HostRow};
 use crate::screens::{ConnectIntent, Ctx, Outbox, Screen};
 use crate::theme::{brand, white, Fonts, PanelStroke, BRAND, DIM, ONLINE_GREEN, W, WHITE};
-use ss_client_core::gamepad::{MenuDir, MenuEvent, MenuPulse};
 use skia_safe::{Canvas, Color4f, MaskFilter, Paint, Path, Point, RRect, Rect};
+use ss_client_core::gamepad::{MenuDir, MenuEvent, MenuPulse};
 
 const TILE_W: f64 = 340.0;
 const TILE_H: f64 = 224.0;

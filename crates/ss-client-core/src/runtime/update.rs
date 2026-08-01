@@ -21,10 +21,10 @@
 
 #![cfg(target_os = "linux")]
 
+use serde::Serialize;
 use ss_update_check::detect::{self, InstallKind, Product};
 use ss_update_check::version::{is_newer, Channel};
 use ss_update_check::PublicKey;
-use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;

@@ -989,11 +989,7 @@ async fn host_power_routes_accept_and_require_admin() {
     crate::power::disable_side_effects_for_test();
     let app = test_app(test_state(), None);
 
-    let post = |path: &str| {
-        axum::http::Request::post(path)
-            .body(Body::empty())
-            .unwrap()
-    };
+    let post = |path: &str| axum::http::Request::post(path).body(Body::empty()).unwrap();
 
     assert_eq!(
         send(&app, post("/api/v1/host/restart")).await.0,
@@ -1063,10 +1059,7 @@ fn openapi_document_is_complete_and_checked_in() {
         "getSessionSettings",
         "setSessionSettings",
     ] {
-        assert!(
-            op_ids.contains(&id),
-            "spec is missing operationId {id}"
-        );
+        assert!(op_ids.contains(&id), "spec is missing operationId {id}");
     }
     let total = op_ids.len();
     op_ids.sort_unstable();
@@ -1106,8 +1099,10 @@ fn structural_entry_points_remain_reachable() {
         crate::native::native_serve_opts;
     let _restart: fn() -> Result<(), String> = crate::power::schedule_restart;
     let _shutdown: fn() = crate::power::schedule_shutdown;
-    let _lease: fn(crate::gamelease::LeaseRequest, crate::gamelease::OnExit) -> crate::gamelease::GameLease =
-        crate::gamelease::open;
+    let _lease: fn(
+        crate::gamelease::LeaseRequest,
+        crate::gamelease::OnExit,
+    ) -> crate::gamelease::GameLease = crate::gamelease::open;
     let _ = (
         std::any::type_name_of_val(&_serve),
         std::any::type_name_of_val(&_opts),
@@ -1220,7 +1215,10 @@ async fn display_monitors_answers_even_with_no_compositor() {
     );
     // The pin is reported verbatim so the console can flag "pinned to a monitor you don't have";
     // unset on the test host.
-    assert!(body["pinned"].is_null(), "no SLIPSTREAM_CAPTURE_MONITOR set");
+    assert!(
+        body["pinned"].is_null(),
+        "no SLIPSTREAM_CAPTURE_MONITOR set"
+    );
 }
 
 #[tokio::test]

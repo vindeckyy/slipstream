@@ -5,10 +5,10 @@
 #[cfg(feature = "ui")]
 mod console;
 
+use slipstream_core::config::{CompositorPref, GamepadPref, Mode};
 use ss_client_core::gamepad::GamepadService;
 use ss_client_core::session::SessionParams;
 use ss_client_core::trust;
-use slipstream_core::config::{CompositorPref, GamepadPref, Mode};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Duration;
@@ -210,8 +210,7 @@ pub(crate) fn session_params(
         host: addr,
         port,
         mode,
-        compositor: CompositorPref::from_name(&settings.compositor)
-            .unwrap_or(CompositorPref::Auto),
+        compositor: CompositorPref::from_name(&settings.compositor).unwrap_or(CompositorPref::Auto),
         gamepad: {
             // The setting AS CHOSEN goes to the pad service too, not just the Hello: the host
             // builds each virtual pad from that pad's arrival and only falls back to this
@@ -384,8 +383,7 @@ pub fn run() -> u8 {
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 

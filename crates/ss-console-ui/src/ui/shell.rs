@@ -15,14 +15,16 @@ use crate::library::{mesh_sksl, LibraryShared};
 use crate::model::{ConsoleBus, ConsoleCmd, ConsoleShared, HostRow, PairPhase, WakeStatus};
 use crate::screens::{Bg, ConnectIntent, Ctx, Nav, Outbox, Screen};
 use anyhow::{anyhow, Result};
+use skia_safe::{Canvas, Color4f, Data, Paint, Rect, RuntimeEffect};
 use ss_client_core::gamepad::{MenuDir, MenuEvent, MenuPulse, PadInfo};
 use ss_client_core::trust;
 use ss_presenter::overlay::OverlayAction;
-use skia_safe::{Canvas, Color4f, Data, Paint, Rect, RuntimeEffect};
 use std::collections::VecDeque;
 use std::time::Instant;
 
+#[path = "shell/overlays.rs"]
 mod overlays;
+#[path = "shell/render.rs"]
 mod render;
 
 const TRANSITION_S: f64 = 0.26;
@@ -445,4 +447,5 @@ impl Shell {
 }
 
 #[cfg(test)]
+#[path = "shell/tests.rs"]
 mod tests;

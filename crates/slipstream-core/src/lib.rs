@@ -92,7 +92,7 @@ pub mod transport;
 pub mod wol;
 
 pub use config::{CompositorPref, Config, FecConfig, FecScheme, Mode, ProtocolPhase, Role};
-pub use error::{SlipstreamError, SlipstreamStatus, Result};
+pub use error::{Result, SlipstreamError, SlipstreamStatus};
 pub use session::{Frame, Session};
 pub use stats::Stats;
 

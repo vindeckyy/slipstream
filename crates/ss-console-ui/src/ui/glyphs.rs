@@ -6,8 +6,8 @@
 //! drivable either way.
 
 use crate::theme::{white, Fonts, W};
-use slipstream_core::config::GamepadPref;
 use skia_safe::{Canvas, Color4f, Paint, Path, Point, RRect, Rect};
+use slipstream_core::config::GamepadPref;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum GlyphStyle {

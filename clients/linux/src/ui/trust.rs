@@ -3,14 +3,14 @@
 //! `AppModel::update` (`AppMsg::Connect`); these are the interaction surfaces it opens,
 //! each resolving into typed [`AppMsg`]s.
 
-use crate::app::{AppModel, AppMsg};
 use crate::app::spawn::{CancelHandle, SpawnOpts};
+use crate::app::{AppModel, AppMsg};
 use crate::trust;
 use crate::ui::hosts::ConnectRequest;
 use adw::prelude::*;
 use gtk::glib;
-use ss_client_core::orchestrate::{WakeOutcome, WakeWait};
 use relm4::prelude::*;
+use ss_client_core::orchestrate::{WakeOutcome, WakeWait};
 
 /// Wake-and-wait: the FALLBACK after a failed dial to a non-advertising saved host with a
 /// known MAC (`AppMsg::WakeConnect` dials first — mDNS absence ≠ unreachable). The host is

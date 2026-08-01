@@ -10,7 +10,7 @@
 
 use crate::config::{Config, Role};
 use crate::crypto::SessionCrypto;
-use crate::error::{SlipstreamError, Result};
+use crate::error::{Result, SlipstreamError};
 use crate::fec::{coder_for, ErasureCoder};
 use crate::input::InputEvent;
 use crate::packet::{

@@ -12,9 +12,7 @@
 //! models. `SLIPSTREAM_FAKE_LIBRARY=<file.json>` feeds canned entries with no host
 //! (portrait paths starting with `/` load from disk), the GPU-only dev path.
 
-use super::{
-    arg_flag, arg_value, fullscreen_mode, parse_host_port, session_params, window_pos,
-};
+use super::{arg_flag, arg_value, fullscreen_mode, parse_host_port, session_params, window_pos};
 use ss_client_core::gamepad::is_steam_deck;
 use ss_client_core::{discovery, library, trust, wol};
 use ss_console_ui::{
@@ -189,7 +187,9 @@ pub fn run(target: Option<&str>) -> u8 {
         // its stdout, so it keeps persisting the size itself.
         match_window: super::match_window(&settings_at_start, true),
         render_scale: settings_at_start.render_scale,
-        render_scale_max_dim: slipstream_core::render_scale::max_dimension(&settings_at_start.codec),
+        render_scale_max_dim: slipstream_core::render_scale::max_dimension(
+            &settings_at_start.codec,
+        ),
     };
 
     let result =

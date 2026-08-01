@@ -1890,7 +1890,8 @@ fn desktop_steam_pid() -> Option<u32> {
 /// service itself or the host-managed gamescope session? Desktop Steams live in desktop app scopes
 /// (e.g. `app-gnome-steam-<pid>.scope`) instead. Pure + unit-tested.
 fn cgroup_is_slipstream_owned(cgroup: &str) -> bool {
-    cgroup.contains("slipstream-host.service") || cgroup.contains(&format!("{SESSION_UNIT}.service"))
+    cgroup.contains("slipstream-host.service")
+        || cgroup.contains(&format!("{SESSION_UNIT}.service"))
 }
 
 /// Is `pid` alive and not a zombie? (A zombie keeps its `/proc` entry but has already released the
