@@ -672,6 +672,11 @@ pub(super) fn stream_body(
             // receiver-side packet loss / FEC-recovery / send-buffer EAGAIN counters, so those stay
             // 0 (not fabricated); `frames_dropped` is the per-frame pipeline-queue overflow delta.
             if stats.is_armed() {
+                let capture_telemetry = capturer.telemetry();
+                let capture_age_us = crate::stats_recorder::capture_age_us(
+                    capture_telemetry.last_frame_ns,
+                    crate::stats_recorder::unix_now_ns(),
+                );
                 let session_id = *sid.get_or_insert_with(|| {
                     stats.register_session(
                         "gamestream",
@@ -715,6 +720,17 @@ pub(super) fn stream_body(
                     packets_dropped: 0,
                     send_dropped: 0,
                     fec_recovered: 0,
+                    capture_age_us,
+                    capture_age_over_limit: crate::stats_recorder::capture_age_over_limit(
+                        capture_age_us,
+                    ),
+                    capture_backend: capturer.backend_name().to_string(),
+                    capture_frames_published: capture_telemetry.frames_published,
+                    capture_frames_overwritten: capture_telemetry.frames_overwritten,
+                    capture_buffers_drained: capture_telemetry.buffers_drained,
+                    capture_modifier: capture_telemetry.modifier,
+                    capture_width: capture_telemetry.width,
+                    capture_height: capture_telemetry.height,
                 };
                 stats.push_sample(session_id, sample);
             }

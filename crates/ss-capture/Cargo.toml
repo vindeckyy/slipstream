@@ -37,6 +37,9 @@ tokio = { version = "1", features = ["rt", "rt-multi-thread", "net", "time"] }
 # `xfixes` feature (auto-pulls `render` + `shape`) is what exposes GetCursorImage/SelectCursorInput.
 # `randr` is for the X11 GetImage capturer (linux/x11.rs), which crops to the primary output's CRTC.
 x11rb = { version = "0.13", default-features = false, features = ["randr", "xfixes"] }
+# NvFBC is an NVIDIA-driver-only optional capture API. Load it at runtime so the same Linux
+# binary remains usable on AMD/Intel and on NVIDIA systems without the FBC library.
+libloading = "0.8"
 # wlroots `zwlr_screencopy_manager_v1` SHM capturer (linux/wlr.rs). Same stack as ss-inject's
 # virtual-input path; `wayland-backend` is referenced by the generated interface tables.
 wayland-client = "0.31"

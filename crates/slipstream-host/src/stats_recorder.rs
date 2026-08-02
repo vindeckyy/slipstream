@@ -59,6 +59,69 @@ pub struct StatsSample {
     pub send_dropped: u32,
     /// FEC shards recovered this window (delta).
     pub fec_recovered: u32,
+    /// Age of the newest source frame when the statistics boundary was recorded. This is the
+    /// capture-side age only, before network and client presentation latency.
+    #[serde(default)]
+    pub capture_age_us: u32,
+    /// Whether `capture_age_us` exceeded `SLIPSTREAM_CAPTURE_MAX_AGE_MS` at this boundary.
+    #[serde(default)]
+    pub capture_age_over_limit: bool,
+    /// Stable capture adapter label, for example `pipewire`, `wlr-screencopy`, or `x11-getimage`.
+    #[serde(default)]
+    pub capture_backend: String,
+    /// Frames published by the source since the capturer opened.
+    #[serde(default)]
+    pub capture_frames_published: u64,
+    /// Cumulative source-side frame overwrites at the statistics boundary. A rising value means
+    /// the encoder is not consuming the one-deep newest-frame slot quickly enough.
+    #[serde(default)]
+    pub capture_frames_overwritten: u64,
+    /// Cumulative extra PipeWire buffers discarded while selecting the newest buffer.
+    #[serde(default)]
+    pub capture_buffers_drained: u64,
+    /// Negotiated source modifier, or zero for linear/unknown.
+    #[serde(default)]
+    pub capture_modifier: u64,
+    /// Negotiated source dimensions. Zero means the backend has not reported them.
+    #[serde(default)]
+    pub capture_width: u32,
+    #[serde(default)]
+    pub capture_height: u32,
+}
+
+/// Current wall-clock nanoseconds, matching the timestamp domain used by captured frames and the
+/// wire latency probes. This is intentionally separate from the recorder's monotonic elapsed clock:
+/// the two clocks have different jobs and must not be subtracted from each other.
+pub fn unix_now_ns() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_nanos() as u64)
+        .unwrap_or(0)
+}
+
+/// Convert a capture timestamp into a bounded age for the stats wire shape. A zero or future
+/// timestamp means the backend has no usable arrival anchor, so the sample reports zero rather
+/// than fabricating a negative duration.
+pub fn capture_age_us(last_frame_ns: u64, now_ns: u64) -> u32 {
+    if last_frame_ns == 0 || last_frame_ns > now_ns {
+        return 0;
+    }
+    ((now_ns - last_frame_ns) / 1_000).min(u32::MAX as u64) as u32
+}
+
+/// Return whether a measured source age is beyond the operator's diagnostic ceiling. Zero is an
+/// unavailable timestamp, not a fresh frame, so it never trips the flag.
+pub fn capture_age_over_limit(age_us: u32) -> bool {
+    if age_us == 0 {
+        return false;
+    }
+    let configured = ss_host_config::config().capture_max_age_ms;
+    let limit_ms = if configured == 0 {
+        50
+    } else {
+        configured.clamp(1, 500)
+    };
+    age_us > limit_ms.saturating_mul(1_000)
 }
 
 /// Capture summary — the filename stem plus the negotiated mode/codec/client. Stored at the head
@@ -456,6 +519,14 @@ fn meta_of(live: &Live) -> CaptureMeta {
 mod tests {
     use super::*;
 
+    #[test]
+    fn capture_age_rejects_missing_and_future_timestamps() {
+        assert_eq!(capture_age_us(0, 10_000), 0);
+        assert_eq!(capture_age_us(11_000, 10_000), 0);
+        assert_eq!(capture_age_us(8_000, 10_000), 2);
+        assert!(!capture_age_over_limit(0));
+    }
+
     fn temp_dir() -> PathBuf {
         // A per-call unique dir: a process-wide counter (NOT a timestamp, which collides when tests
         // run in parallel within the same millisecond — one test's cleanup would then wipe another's
@@ -484,6 +555,15 @@ mod tests {
             packets_dropped: 0,
             send_dropped: 0,
             fec_recovered: 0,
+            capture_age_us: 0,
+            capture_age_over_limit: false,
+            capture_backend: String::new(),
+            capture_frames_published: 0,
+            capture_frames_overwritten: 0,
+            capture_buffers_drained: 0,
+            capture_modifier: 0,
+            capture_width: 0,
+            capture_height: 0,
         }
     }
 

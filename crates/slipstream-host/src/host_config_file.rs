@@ -79,6 +79,15 @@ pub struct AudioVideoConfig {
     /// Gamescope HDR.
     #[serde(default)]
     pub gamescope_hdr: bool,
+    /// Requested PipeWire video-node latency in milliseconds. This is a scheduling hint, not a
+    /// guarantee from the compositor.
+    #[serde(default)]
+    #[schema(minimum = 1, maximum = 40)]
+    pub pipewire_latency_ms: Option<u32>,
+    /// Capture-frame age threshold used by the Linux latency diagnostics.
+    #[serde(default)]
+    #[schema(minimum = 1, maximum = 500)]
+    pub capture_max_age_ms: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
@@ -203,6 +212,16 @@ impl HostConfigFile {
                 errors.push("audio_video.max_fps must be between 15 and 480".into());
             }
         }
+        if let Some(value) = self.audio_video.pipewire_latency_ms {
+            if !(1..=40).contains(&value) {
+                errors.push("audio_video.pipewire_latency_ms must be between 1 and 40".into());
+            }
+        }
+        if let Some(value) = self.audio_video.capture_max_age_ms {
+            if !(1..=500).contains(&value) {
+                errors.push("audio_video.capture_max_age_ms must be between 1 and 500".into());
+            }
+        }
         if let Some(value) = self.network.fec_pct {
             if value > 90 {
                 errors.push("network.fec_pct must be between 0 and 90".into());
@@ -235,6 +254,12 @@ impl HostConfigFile {
         }
         if let Some(fps) = self.audio_video.max_fps {
             self.audio_video.max_fps = Some(fps.clamp(15, 480));
+        }
+        if let Some(value) = self.audio_video.pipewire_latency_ms {
+            self.audio_video.pipewire_latency_ms = Some(value.clamp(1, 40));
+        }
+        if let Some(value) = self.audio_video.capture_max_age_ms {
+            self.audio_video.capture_max_age_ms = Some(value.clamp(1, 500));
         }
         if let Some(pct) = self.network.fec_pct {
             self.network.fec_pct = Some(pct.min(90));
@@ -308,6 +333,20 @@ impl HostConfigFile {
             "SLIPSTREAM_GAMESCOPE_HDR",
             self.audio_video.gamescope_hdr,
         );
+        if let Some(value) = self.audio_video.pipewire_latency_ms {
+            set(
+                &mut out,
+                "SLIPSTREAM_PIPEWIRE_LATENCY_MS",
+                &value.to_string(),
+            );
+        }
+        if let Some(value) = self.audio_video.capture_max_age_ms {
+            set(
+                &mut out,
+                "SLIPSTREAM_CAPTURE_MAX_AGE_MS",
+                &value.to_string(),
+            );
+        }
         set_bool(&mut out, "SLIPSTREAM_CHACHA20", self.network.chacha20);
         set_bool(&mut out, "SLIPSTREAM_MDNS", self.network.mdns);
         if let Some(pct) = self.network.fec_pct {
@@ -432,6 +471,16 @@ mod tests {
         cfg.audio_video.max_fps = Some(9999);
         let s = cfg.sanitized();
         assert_eq!(s.audio_video.max_fps, Some(480));
+    }
+
+    #[test]
+    fn sanitize_clamps_latency_diagnostics() {
+        let mut cfg = HostConfigFile::default();
+        cfg.audio_video.pipewire_latency_ms = Some(9999);
+        cfg.audio_video.capture_max_age_ms = Some(9999);
+        let s = cfg.sanitized();
+        assert_eq!(s.audio_video.pipewire_latency_ms, Some(40));
+        assert_eq!(s.audio_video.capture_max_age_ms, Some(500));
     }
 
     #[test]

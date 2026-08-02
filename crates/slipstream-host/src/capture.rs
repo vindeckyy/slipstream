@@ -109,46 +109,58 @@ pub fn open_portal_monitor(
 /// Open a capturer for an *existing* desktop (GameStream mirror / `video_source=portal` path).
 ///
 /// Honours `SLIPSTREAM_CAPTURE_METHOD` / [`CaptureBackend::resolve`]:
-/// - `auto` — try [`CaptureBackend::desktop_auto_order`], skip failures with `tracing::debug`
+/// - `auto` — try the compositor-aware [`CaptureBackend::desktop_auto_order_for`] list, skipping
+///   failures with `tracing::debug`
 /// - `portal` / `kwin` — [`open_portal_monitor`] (KWin Phase 1 still goes through the portal)
 /// - `x11` — [`ss_capture::open_x11_desktop`]
 /// - `wlr` — [`ss_capture::open_wlr_desktop`]
-/// - `kms` / `nvfbc` — Phase 2 stubs ([`ss_capture::open_kms_desktop`] / [`ss_capture::open_nvfbc_desktop`])
+/// - `kms` — DRM primary-plane dma-buf capture
+/// - `nvfbc` — NVIDIA NvFBC shared-CUDA capture
 #[cfg(target_os = "linux")]
 pub fn open_desktop_capture(
     want_hdr: bool,
     want_metadata_cursor: bool,
 ) -> Result<Box<dyn Capturer>> {
-    let method = ss_host_config::config()
-        .capture_method
-        .as_deref()
-        .unwrap_or("auto");
-    if method.eq_ignore_ascii_case("auto") {
-        let mut errors = Vec::new();
-        for &backend in CaptureBackend::desktop_auto_order() {
-            match open_desktop_backend(backend, want_hdr, want_metadata_cursor) {
-                Ok(c) => {
-                    tracing::info!(backend = backend.as_str(), "desktop capture: auto selected");
-                    return Ok(c);
-                }
-                Err(e) => {
-                    tracing::debug!(
-                        backend = backend.as_str(),
-                        error = %format!("{e:#}"),
-                        "desktop capture: auto skip"
-                    );
-                    errors.push(format!("{}: {e:#}", backend.as_str()));
+    let compositor = crate::vdisplay::detect().ok();
+    let pipeline = crate::session_plan::LinuxDisplayPipeline::for_desktop(compositor);
+    tracing::info!(pipeline = %pipeline.label(), "resolved Linux desktop display pipeline");
+
+    let mut errors = Vec::new();
+    for backend in pipeline.candidates.iter().copied() {
+        match open_desktop_backend(backend, want_hdr, want_metadata_cursor) {
+            Ok(c) => {
+                tracing::info!(
+                    compositor = pipeline
+                        .compositor
+                        .map(|value| value.id())
+                        .unwrap_or("unknown"),
+                    backend = backend.as_str(),
+                    "desktop capture pipeline selected"
+                );
+                return Ok(c);
+            }
+            Err(e) => {
+                tracing::debug!(
+                    compositor = pipeline.compositor.map(|value| value.id()).unwrap_or("unknown"),
+                    backend = backend.as_str(),
+                    error = %format!("{e:#}"),
+                    "desktop capture pipeline candidate rejected"
+                );
+                errors.push(format!("{}: {e:#}", backend.as_str()));
+                if pipeline.requested_capture.is_some() {
+                    break;
                 }
             }
         }
-        bail!(
-            "desktop capture auto: every backend failed ({})",
-            errors.join("; ")
-        );
     }
-    let backend = CaptureBackend::resolve();
-    open_desktop_backend(backend, want_hdr, want_metadata_cursor)
-        .with_context(|| format!("open desktop capture ({})", backend.as_str()))
+    let preference = pipeline
+        .requested_capture
+        .map(|value| value.as_str())
+        .unwrap_or("auto");
+    bail!(
+        "desktop capture {preference}: every compatible pipeline candidate failed ({})",
+        errors.join("; ")
+    )
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -172,10 +184,14 @@ fn open_desktop_backend(
         }
         CaptureBackend::X11 => ss_capture::open_x11_desktop().context("open X11 desktop capturer"),
         CaptureBackend::Wlr => ss_capture::open_wlr_desktop().context("open wlr desktop capturer"),
-        CaptureBackend::Kms => ss_capture::open_kms_desktop().context("open KMS desktop capturer"),
-        CaptureBackend::NvFbc => {
-            ss_capture::open_nvfbc_desktop().context("open NvFBC desktop capturer")
+        CaptureBackend::Kms => {
+            ss_capture::open_kms_desktop_for_monitor(crate::vdisplay::capture_monitor().as_deref())
+                .context("open KMS desktop capturer")
         }
+        CaptureBackend::NvFbc => ss_capture::open_nvfbc_desktop_for_monitor(
+            crate::vdisplay::capture_monitor().as_deref(),
+        )
+        .context("open NvFBC desktop capturer"),
         CaptureBackend::IddPush => {
             bail!("IDD-push is a Windows capture path, not a Linux desktop mirror")
         }
@@ -189,19 +205,32 @@ fn open_desktop_backend(
 pub fn capture_virtual_output(
     vout: crate::vdisplay::VirtualOutput,
     want: OutputFormat,
-    _capture: crate::session_plan::CaptureBackend,
+    capture: crate::session_plan::CaptureBackend,
 ) -> Result<Box<dyn Capturer>> {
-    // The portal negotiates its own pixel format, so `want.gpu` gates GPU zero-copy capture (the
-    // capture backend is always the portal — the `CaptureBackend` arg is a Windows-only dispatch)
-    // and `want.chroma_444` selects the worker's planar-YUV444 GPU convert. `gpu = false` (4:4:4
-    // without zero-copy) forces the CPU mmap path so the encoder gets CPU-resident RGB to swscale
-    // into YUV444P.
+    // The virtual-output source is currently PipeWire on Linux and IDD-push on Windows. Keep the
+    // resolved backend in the call so the display and capture decision remains one pipeline record;
+    // Linux's virtual-output source is always the compositor-created PipeWire node. The capture
+    // method preference applies only to an existing desktop mirror, where there is no output we
+    // created and no PipeWire node selected by the virtual-display backend.
+    // `want.gpu` gates GPU zero-copy capture and `want.chroma_444` selects the worker's planar-YUV444
+    // GPU convert. `gpu = false` (4:4:4 without zero-copy) forces the CPU mmap path so the encoder
+    // gets CPU-resident RGB to swscale into YUV444P.
     //
     // `want.hdr` runs the 10-bit PQ/BT.2020 offer. It is only ever set for a gamescope output off
     // our `pipewire-hdr` build — every other Linux virtual output is SDR-only upstream — and the
     // handshake already resolved that through [`capturer_supports_hdr_for`] before the Welcome,
     // so passing it through here is the whole of this arm's HDR logic. It used to be dropped on
     // the floor, which is what kept the Linux native plane at 8 bits.
+    let pipeline = crate::session_plan::LinuxDisplayPipeline::for_virtual_output(
+        crate::vdisplay::detect().ok(),
+        capture,
+    );
+    tracing::info!(
+        pipeline = %pipeline.label(),
+        zero_copy = want.gpu,
+        hdr = want.hdr,
+        "resolved Linux virtual-output display pipeline"
+    );
     ss_capture::open_virtual_output(
         vout.remote_fd,
         vout.node_id,

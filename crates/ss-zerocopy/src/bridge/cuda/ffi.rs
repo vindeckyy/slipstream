@@ -19,12 +19,19 @@ pub type CUstream = *mut c_void; // opaque CUstream_st*
 pub type CUdeviceptr = u64;
 pub type CUgraphicsResource = *mut c_void;
 pub type CUarray = *mut c_void;
+pub type CUtexObject = u64;
 pub type CUexternalMemory = *mut c_void; // opaque CUextMemory_st*
 pub type CUexternalSemaphore = *mut c_void; // opaque CUextSemaphore_st*
 
 /// `CUmemorytype` (cuda.h): HOST=1, DEVICE=2, ARRAY=3, UNIFIED=4.
 pub const CU_MEMORYTYPE_DEVICE: c_uint = 2;
 pub const CU_MEMORYTYPE_ARRAY: c_uint = 3;
+
+/// CUDA array and texture-object enum values from `cuda.h`.
+pub const CU_AD_FORMAT_UNSIGNED_INT8: c_uint = 0x01;
+pub const CU_RESOURCE_TYPE_ARRAY: c_uint = 0x00;
+pub const CU_TR_ADDRESS_MODE_CLAMP: c_uint = 1;
+pub const CU_TR_FILTER_MODE_POINT: c_uint = 0;
 
 /// `CUctx_flags` (cuda.h): block the CPU on an OS primitive while waiting for the GPU instead of
 /// busy-spinning. On this shared box (compositor + send thread on the same cores) spinning a core
@@ -56,6 +63,78 @@ pub struct CUDA_MEMCPY2D {
     pub WidthInBytes: usize,
     pub Height: usize,
 }
+
+/// `CUDA_ARRAY3D_DESCRIPTOR` (cuda.h, `_v2` ABI). NvFBC needs a live CUDA array and texture
+/// object on the capture thread before `NvFBCToCudaSetUp`; this descriptor creates the array used
+/// for that driver warmup.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct CUDA_ARRAY3D_DESCRIPTOR {
+    pub Width: usize,
+    pub Height: usize,
+    pub Depth: usize,
+    pub Format: c_uint,
+    pub NumChannels: c_uint,
+    pub Flags: c_uint,
+}
+
+/// The array arm of `CUDA_RESOURCE_DESC::res`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct CUDA_RESOURCE_DESC_ARRAY {
+    pub hArray: CUarray,
+}
+
+/// `CUDA_RESOURCE_DESC::res` is a 128-byte union in cuda.h. Keep the reserved arm so the Rust
+/// representation has the same size and alignment as the C union even though the warmup only
+/// uses the array arm.
+#[repr(C)]
+pub union CUDA_RESOURCE_DESC_RES {
+    pub array: CUDA_RESOURCE_DESC_ARRAY,
+    pub reserved: [c_int; 32],
+}
+
+/// `CUDA_RESOURCE_DESC` (cuda.h). Only the array resource is used here.
+#[repr(C)]
+pub struct CUDA_RESOURCE_DESC {
+    pub resType: c_uint,
+    pub res: CUDA_RESOURCE_DESC_RES,
+    pub flags: c_uint,
+}
+
+/// `CUDA_TEXTURE_DESC` (cuda.h). The warmup uses point filtering, clamp addressing, and the
+/// default integer read mode; the remaining fields stay zero as documented defaults.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct CUDA_TEXTURE_DESC {
+    pub addressMode: [c_uint; 3],
+    pub filterMode: c_uint,
+    pub flags: c_uint,
+    pub maxAnisotropy: c_uint,
+    pub mipmapFilterMode: c_uint,
+    pub mipmapLevelBias: f32,
+    pub minMipmapLevelClamp: f32,
+    pub maxMipmapLevelClamp: f32,
+    pub borderColor: [f32; 4],
+    pub reserved: [c_int; 12],
+}
+
+const _: () = {
+    use std::mem::{offset_of, size_of};
+
+    assert!(size_of::<CUDA_ARRAY3D_DESCRIPTOR>() == 40);
+    assert!(offset_of!(CUDA_ARRAY3D_DESCRIPTOR, Format) == 24);
+    assert!(offset_of!(CUDA_ARRAY3D_DESCRIPTOR, Flags) == 32);
+    assert!(size_of::<CUDA_RESOURCE_DESC_ARRAY>() == 8);
+    assert!(size_of::<CUDA_RESOURCE_DESC_RES>() == 128);
+    assert!(size_of::<CUDA_RESOURCE_DESC>() == 144);
+    assert!(offset_of!(CUDA_RESOURCE_DESC, res) == 8);
+    assert!(offset_of!(CUDA_RESOURCE_DESC, flags) == 136);
+    assert!(size_of::<CUDA_TEXTURE_DESC>() == 104);
+    assert!(offset_of!(CUDA_TEXTURE_DESC, filterMode) == 12);
+    assert!(offset_of!(CUDA_TEXTURE_DESC, borderColor) == 40);
+    assert!(offset_of!(CUDA_TEXTURE_DESC, reserved) == 56);
+};
 
 /// `CUDA_EXTERNAL_MEMORY_HANDLE_DESC` (cuda.h, 64-bit layout). `handle` is a union whose
 /// largest member is the win32 two-pointer struct (16 bytes, align 8); for the OPAQUE_FD type
@@ -224,6 +303,18 @@ pub(crate) struct CudaApi {
     cuMemAllocPitch_v2:
         unsafe extern "C" fn(*mut CUdeviceptr, *mut usize, usize, usize, c_uint) -> CUresult,
     cuMemFree_v2: unsafe extern "C" fn(CUdeviceptr) -> CUresult,
+    cuArray3DCreate_v2:
+        Option<unsafe extern "C" fn(*mut CUarray, *const CUDA_ARRAY3D_DESCRIPTOR) -> CUresult>,
+    cuArrayDestroy: Option<unsafe extern "C" fn(CUarray) -> CUresult>,
+    cuTexObjectCreate: Option<
+        unsafe extern "C" fn(
+            *mut CUtexObject,
+            *const CUDA_RESOURCE_DESC,
+            *const CUDA_TEXTURE_DESC,
+            *const c_void,
+        ) -> CUresult,
+    >,
+    cuTexObjectDestroy: Option<unsafe extern "C" fn(CUtexObject) -> CUresult>,
     cuMemcpy2DAsync_v2: unsafe extern "C" fn(*const CUDA_MEMCPY2D, CUstream) -> CUresult,
     cuStreamSynchronize: unsafe extern "C" fn(CUstream) -> CUresult,
     cuCtxGetStreamPriorityRange: unsafe extern "C" fn(*mut c_int, *mut c_int) -> CUresult,
@@ -315,6 +406,22 @@ pub(crate) fn cuda_api() -> Option<&'static CudaApi> {
                 cuCtxSetCurrent: *lib.get(b"cuCtxSetCurrent\0").ok()?,
                 cuMemAllocPitch_v2: *lib.get(b"cuMemAllocPitch_v2\0").ok()?,
                 cuMemFree_v2: *lib.get(b"cuMemFree_v2\0").ok()?,
+                cuArray3DCreate_v2: lib
+                    .get(b"cuArray3DCreate_v2\0")
+                    .ok()
+                    .map(|symbol| *symbol),
+                cuArrayDestroy: lib
+                    .get(b"cuArrayDestroy\0")
+                    .ok()
+                    .map(|symbol| *symbol),
+                cuTexObjectCreate: lib
+                    .get(b"cuTexObjectCreate\0")
+                    .ok()
+                    .map(|symbol| *symbol),
+                cuTexObjectDestroy: lib
+                    .get(b"cuTexObjectDestroy\0")
+                    .ok()
+                    .map(|symbol| *symbol),
                 cuMemcpy2DAsync_v2: *lib.get(b"cuMemcpy2DAsync_v2\0").ok()?,
                 cuStreamSynchronize: *lib.get(b"cuStreamSynchronize\0").ok()?,
                 cuCtxGetStreamPriorityRange: *lib.get(b"cuCtxGetStreamPriorityRange\0").ok()?,
@@ -430,6 +537,47 @@ pub(crate) unsafe fn cuMemFree_v2(dptr: CUdeviceptr) -> CUresult {
         // table is never unloaded — `mem::forget(lib)`); the caller upholds the driver-API contract,
         // with the site-specific proof at each call site.
         Some(a) => unsafe { (a.cuMemFree_v2)(dptr) },
+        None => CU_ERROR_NOT_LOADED,
+    }
+}
+pub(crate) unsafe fn cuArray3DCreate_v2(
+    handle: *mut CUarray,
+    descriptor: *const CUDA_ARRAY3D_DESCRIPTOR,
+) -> CUresult {
+    match cuda_api().and_then(|api| api.cuArray3DCreate_v2) {
+        // SAFETY: forwards the caller's live out-parameter and descriptor to the loaded CUDA
+        // entry point; the call-site proof establishes that the descriptor is valid and remains
+        // alive for the synchronous call.
+        Some(function) => unsafe { function(handle, descriptor) },
+        None => CU_ERROR_NOT_LOADED,
+    }
+}
+pub(crate) unsafe fn cuArrayDestroy(array: CUarray) -> CUresult {
+    match cuda_api().and_then(|api| api.cuArrayDestroy) {
+        // SAFETY: forwards the caller's live CUDA array handle to the loaded entry point. The
+        // caller owns the handle and calls this exactly once during teardown.
+        Some(function) => unsafe { function(array) },
+        None => CU_ERROR_NOT_LOADED,
+    }
+}
+pub(crate) unsafe fn cuTexObjectCreate(
+    texture: *mut CUtexObject,
+    resource: *const CUDA_RESOURCE_DESC,
+    descriptor: *const CUDA_TEXTURE_DESC,
+    view: *const c_void,
+) -> CUresult {
+    match cuda_api().and_then(|api| api.cuTexObjectCreate) {
+        // SAFETY: forwards the caller's live out-parameter and descriptors to the loaded CUDA
+        // entry point; the call-site proof establishes all descriptors stay alive through return.
+        Some(function) => unsafe { function(texture, resource, descriptor, view) },
+        None => CU_ERROR_NOT_LOADED,
+    }
+}
+pub(crate) unsafe fn cuTexObjectDestroy(texture: CUtexObject) -> CUresult {
+    match cuda_api().and_then(|api| api.cuTexObjectDestroy) {
+        // SAFETY: forwards the caller's live CUDA texture handle to the loaded entry point. The
+        // caller owns the handle and calls this exactly once during teardown.
+        Some(function) => unsafe { function(texture) },
         None => CU_ERROR_NOT_LOADED,
     }
 }

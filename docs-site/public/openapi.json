@@ -4381,6 +4381,16 @@
       "AudioVideoConfig": {
         "type": "object",
         "properties": {
+          "capture_max_age_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Capture-frame age threshold used by the Linux latency diagnostics.",
+            "maximum": 500,
+            "minimum": 1
+          },
           "capture_method": {
             "type": [
               "string",
@@ -4418,6 +4428,16 @@
             "format": "int32",
             "description": "Cap encode FPS (`SLIPSTREAM_MAX_FPS`).",
             "minimum": 0
+          },
+          "pipewire_latency_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Requested PipeWire video-node latency in milliseconds. This is a scheduling hint, not a\nguarantee from the compositor.",
+            "maximum": 40,
+            "minimum": 1
           },
           "ten_bit": {
             "type": "boolean",
@@ -7680,6 +7700,55 @@
             "type": "integer",
             "format": "int32",
             "description": "Configured target bitrate.",
+            "minimum": 0
+          },
+          "capture_age_over_limit": {
+            "type": "boolean",
+            "description": "Whether `capture_age_us` exceeded `SLIPSTREAM_CAPTURE_MAX_AGE_MS` at this boundary."
+          },
+          "capture_age_us": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Age of the newest source frame when the statistics boundary was recorded. This is the\ncapture-side age only, before network and client presentation latency.",
+            "minimum": 0
+          },
+          "capture_backend": {
+            "type": "string",
+            "description": "Stable capture adapter label, for example `pipewire`, `wlr-screencopy`, or `x11-getimage`."
+          },
+          "capture_buffers_drained": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Cumulative extra PipeWire buffers discarded while selecting the newest buffer.",
+            "minimum": 0
+          },
+          "capture_frames_overwritten": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Cumulative source-side frame overwrites at the statistics boundary. A rising value means\nthe encoder is not consuming the one-deep newest-frame slot quickly enough.",
+            "minimum": 0
+          },
+          "capture_frames_published": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Frames published by the source since the capturer opened.",
+            "minimum": 0
+          },
+          "capture_height": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "capture_modifier": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Negotiated source modifier, or zero for linear/unknown.",
+            "minimum": 0
+          },
+          "capture_width": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Negotiated source dimensions. Zero means the backend has not reported them.",
             "minimum": 0
           },
           "fec_recovered": {

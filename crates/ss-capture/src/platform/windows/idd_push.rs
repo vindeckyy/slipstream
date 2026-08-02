@@ -1869,6 +1869,10 @@ fn deliver_cursor_channel(
 }
 
 impl Capturer for IddPushCapturer {
+    fn backend_name(&self) -> &'static str {
+        "idd-push"
+    }
+
     fn cursor(&mut self) -> Option<ss_frame::CursorOverlay> {
         self.live_cursor()
     }

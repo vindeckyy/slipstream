@@ -154,6 +154,21 @@ lost 3 (2.4%)
 
 All values refresh once per second over the last second of frames.
 
+## Host capture diagnostics
+
+The web console's **Stats** page shows source-side diagnostics alongside its latency charts when
+the host reports them. `Backend` identifies the selected adapter, `Newest frame age` measures how
+old the newest source frame was when the host recorded the sample, and `Peak sampled age` shows the
+largest value in the displayed recording. These values stop before encoding, network transfer,
+decode, and display, so they isolate compositor and capture delay from the rest of the path.
+
+`Frames overwritten` counts frames replaced in the one-deep newest-frame slot, and `Buffers
+drained` counts older PipeWire buffers discarded while selecting the newest buffer. Rising values
+mean the source is producing work faster than the downstream path consumes it. `Age over threshold`
+means at least one sample exceeded `SLIPSTREAM_CAPTURE_MAX_AGE_MS`; it is diagnostic only and does
+not drop or pace frames. Source size and the negotiated modifier help identify a format or import
+fallback when comparing two capture methods.
+
 ### Clocks, and the `(same-host clock)` tag
 
 `end-to-end` and `host+network` span two machines, so they need the two clocks to
@@ -249,6 +264,9 @@ A recording carries per-stage p50/p99 pipeline latency, new frames/s versus re-e
 (source starvation), the attempted wire bitrate against the target, and frame/packet/send drops plus
 FEC recoveries. Its header names the **encoder backend and the GPU** that produced it — without
 those, a stage split can't be read at all.
+It also records the resolved capture backend, source dimensions and modifier, capture age, and
+published, overwritten, and drained source-frame counts, so a rising age or overwrite count points
+to the compositor handoff rather than the encoder.
 
 **Download** saves it as a `.json` file you can attach to a report; **Delete** removes it. On disk
 they live on the host in `~/.config/slipstream/captures/` (`%ProgramData%\slipstream\captures\` on

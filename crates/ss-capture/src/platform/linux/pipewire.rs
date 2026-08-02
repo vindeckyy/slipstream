@@ -17,6 +17,20 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use spa::param::video::{VideoFormat, VideoInfoRaw};
 use spa::pod::Pod;
 
+/// Convert the configured video latency hint to PipeWire's fraction syntax.
+///
+/// PipeWire treats `node.latency` as seconds. The host configuration already clamps this value,
+/// but the local clamp keeps this leaf safe when it is exercised independently in tests.
+fn requested_node_latency() -> String {
+    let configured = ss_host_config::config().pipewire_latency_ms;
+    let milliseconds = if configured == 0 {
+        8
+    } else {
+        configured.clamp(1, 40)
+    };
+    format!("{milliseconds}/1000")
+}
+
 /// Map a negotiated SPA video format to a layout the encoder can consume. Returns
 /// `None` for formats we don't handle (the frame is then skipped).
 fn map_format(f: VideoFormat) -> Option<PixelFormat> {
@@ -96,8 +110,18 @@ impl UserData {
     /// slot is the truth), and a poisoned mutex is unreachable in practice (the only critical
     /// sections are a `take` and this store).
     fn publish(&self, frame: CapturedFrame) {
+        self.signals
+            .last_frame_ns
+            .store(frame.pts_ns, Ordering::Relaxed);
+        self.signals
+            .frames_published
+            .fetch_add(1, Ordering::Relaxed);
         if let Ok(mut slot) = self.slot.lock() {
-            *slot = Some(frame);
+            if slot.replace(frame).is_some() {
+                self.signals
+                    .frames_overwritten
+                    .fetch_add(1, Ordering::Relaxed);
+            }
         }
         let _ = self.wake.try_send(());
     }
@@ -995,6 +1019,14 @@ pub fn pipewire_thread(
         gate_since: None,
     };
 
+    let node_latency = requested_node_latency();
+    tracing::info!(
+        node_id,
+        requested_latency_ms = ss_host_config::config().pipewire_latency_ms,
+        pipewire_latency = %node_latency,
+        "pipewire capture latency hint"
+    );
+
     let stream = pw::stream::StreamBox::new(
         &core,
         "slipstream-screencast",
@@ -1007,6 +1039,9 @@ pub fn pipewire_thread(
             // wedges that node — and a stuck link head-blocks the PipeWire daemon's shared
             // work queue, stalling ALL new link negotiation system-wide.
             "node.dont-reconnect"     => "true",
+            // This is a request only. The compositor may choose a larger quantum, so the
+            // capture path also records frame arrival age instead of treating this as a promise.
+            *pw::keys::NODE_LATENCY   => node_latency.as_str(),
         },
     )
     .context("pw Stream")?;
@@ -1056,8 +1091,17 @@ pub fn pipewire_thread(
                     (u64::from(sz.width) << 32) | u64::from(sz.height),
                     Ordering::Relaxed,
                 );
+                ud.signals
+                    .negotiated_width
+                    .store(u64::from(sz.width), Ordering::Relaxed);
+                ud.signals
+                    .negotiated_height
+                    .store(u64::from(sz.height), Ordering::Relaxed);
                 ud.format = map_format(ud.info.format());
                 ud.modifier = ud.info.modifier();
+                ud.signals
+                    .negotiated_modifier
+                    .store(ud.modifier, Ordering::Relaxed);
                 // HDR: the 10-bit PQ formats are only ever offered with MANDATORY BT.2020/PQ
                 // colorimetry props, so a 10-bit negotiation IS an HDR negotiation — but log
                 // what the producer actually fixated for diagnosis.
@@ -1109,6 +1153,11 @@ pub fn pipewire_thread(
                 unsafe { stream.queue_raw_buffer(newest) };
                 newest = next;
                 drained += 1;
+            }
+            if drained > 1 {
+                ud.signals
+                    .buffers_drained
+                    .fetch_add(u64::from(drained - 1), Ordering::Relaxed);
             }
             // Sacrificial-mode gate (kwin.rs `create`): until the producer renegotiates to the
             // expected dims, every buffer — frame AND cursor meta, whose positions are in the

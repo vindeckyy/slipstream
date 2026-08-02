@@ -166,6 +166,107 @@ pub fn make_current() -> Result<()> {
     unsafe { ck(cuCtxSetCurrent(ctx), "cuCtxSetCurrent") }
 }
 
+/// A CUDA array and texture object kept alive while NvFBC initializes its shared-CUDA session.
+/// NVIDIA's NvFBC setup path requires a texture to have been created on the capture thread before
+/// `NvFBCToCudaSetUp`, even though the steady-state capture copies into pitched device memory.
+pub struct CudaWarmupTexture {
+    array: CUarray,
+    texture: CUtexObject,
+}
+
+// SAFETY: both fields are opaque CUDA handles owned by this value. The value is created and
+// destroyed on a thread with the shared context current, and moving the handles to that capture
+// thread does not expose Rust memory or permit concurrent mutation.
+unsafe impl Send for CudaWarmupTexture {}
+
+impl CudaWarmupTexture {
+    /// Create the small driver-visible texture resource NvFBC needs before CUDA setup.
+    pub fn new(width: u32, height: u32) -> Result<Self> {
+        if width == 0 || height == 0 {
+            bail!("CUDA warmup texture dimensions must be non-zero")
+        }
+        make_current()?;
+        let descriptor = CUDA_ARRAY3D_DESCRIPTOR {
+            Width: width as usize,
+            Height: height as usize,
+            Depth: 0,
+            Format: CU_AD_FORMAT_UNSIGNED_INT8,
+            NumChannels: 4,
+            Flags: 0,
+        };
+        let mut array = std::ptr::null_mut();
+        // SAFETY: `make_current` established the shared context on this thread. `descriptor` is a
+        // live, correctly laid out CUDA descriptor and `array` is a distinct stack out-parameter;
+        // the synchronous driver call retains neither Rust pointer.
+        unsafe {
+            ck(
+                cuArray3DCreate_v2(&mut array, &descriptor),
+                "cuArray3DCreate_v2 (NvFBC warmup)",
+            )?;
+        }
+
+        let resource = CUDA_RESOURCE_DESC {
+            resType: CU_RESOURCE_TYPE_ARRAY,
+            res: CUDA_RESOURCE_DESC_RES {
+                array: CUDA_RESOURCE_DESC_ARRAY { hArray: array },
+            },
+            flags: 0,
+        };
+        let texture_descriptor = CUDA_TEXTURE_DESC {
+            addressMode: [CU_TR_ADDRESS_MODE_CLAMP; 3],
+            filterMode: CU_TR_FILTER_MODE_POINT,
+            ..CUDA_TEXTURE_DESC::default()
+        };
+        let mut texture = 0;
+        // SAFETY: `resource` and `texture_descriptor` are live, correctly laid out descriptors;
+        // `array` is the successful allocation above and `texture` is a distinct out-parameter.
+        // The null resource-view pointer is the documented default and the synchronous call does
+        // not retain either Rust descriptor.
+        let result = unsafe {
+            ck(
+                cuTexObjectCreate(
+                    &mut texture,
+                    &resource,
+                    &texture_descriptor,
+                    std::ptr::null(),
+                ),
+                "cuTexObjectCreate (NvFBC warmup)",
+            )
+        };
+        if let Err(error) = result {
+            // SAFETY: `array` was returned by the successful create call above, the shared context
+            // remains current, and this is the only teardown path after texture creation failed.
+            unsafe {
+                let _ = cuArrayDestroy(array);
+            }
+            return Err(error);
+        }
+        Ok(Self { array, texture })
+    }
+}
+
+impl Drop for CudaWarmupTexture {
+    fn drop(&mut self) {
+        if self.array.is_null() && self.texture == 0 {
+            return;
+        }
+        if let Err(error) = make_current() {
+            tracing::debug!(error = %error, "could not make CUDA context current to destroy NvFBC warmup texture");
+            return;
+        }
+        // SAFETY: both handles were created by `CudaWarmupTexture::new`, the shared context is
+        // current, and each handle is destroyed at most once during this value's drop.
+        unsafe {
+            if self.texture != 0 {
+                let _ = cuTexObjectDestroy(self.texture);
+            }
+            if !self.array.is_null() {
+                let _ = cuArrayDestroy(self.array);
+            }
+        }
+    }
+}
+
 /// DIAGNOSTIC-ONLY: create a fresh dedicated context on device 0, run `probe` with it, destroy it,
 /// and restore the shared context as current. Used by the NVENC backend's session-open
 /// self-diagnosis to split "this process's shared context is in a bad state" (probe succeeds on
@@ -979,6 +1080,46 @@ pub fn copy_device_to_device(
     unsafe { copy_issue(&copy, "cuMemcpy2DAsync_v2(dev->dev)", sync) }
 }
 
+/// Copy a raw device pointer supplied by an external CUDA producer into an owned Slipstream
+/// buffer. NvFBC's shared-CUDA API returns a transient device pointer owned by the driver; this
+/// boundary lets the capture backend take one device-to-device copy while keeping the encoder's
+/// normal `DeviceBuffer` lifetime and pool rules.
+pub fn copy_raw_device_to_device(
+    src_ptr: CUdeviceptr,
+    src_pitch: usize,
+    dst: &DeviceBuffer,
+    sync: bool,
+) -> Result<()> {
+    anyhow::ensure!(src_ptr != 0, "external CUDA source pointer is null");
+    let width_bytes = (dst.width as usize)
+        .checked_mul(4)
+        .ok_or_else(|| anyhow::anyhow!("external CUDA copy width overflows"))?;
+    anyhow::ensure!(
+        src_pitch >= width_bytes,
+        "external CUDA source pitch is too small"
+    );
+    anyhow::ensure!(
+        dst.width > 0 && dst.height > 0,
+        "external CUDA copy has empty dimensions"
+    );
+    let copy = CUDA_MEMCPY2D {
+        srcMemoryType: CU_MEMORYTYPE_DEVICE,
+        srcDevice: src_ptr,
+        srcPitch: src_pitch,
+        dstMemoryType: CU_MEMORYTYPE_DEVICE,
+        dstDevice: dst.ptr,
+        dstPitch: dst.pitch,
+        WidthInBytes: width_bytes,
+        Height: dst.height as usize,
+        ..Default::default()
+    };
+    // SAFETY: the caller makes the shared CUDA context current and keeps the external source
+    // allocation valid until this synchronous copy completes, or until the downstream stream has
+    // consumed it when `sync` is false. `dst` owns a live pitched allocation whose dimensions are
+    // exactly the copy rectangle. The descriptor is a live local for the whole FFI call.
+    unsafe { copy_issue(&copy, "cuMemcpy2DAsync_v2(external dev->dev)", sync) }
+}
+
 /// Copy our imported NV12 [`DeviceBuffer`] (Y + UV planes) into NVENC's two-plane CUDA surface
 /// `(y_dst, y_pitch)` / `(uv_dst, uv_pitch)` (`av_hwframe_get_buffer`'s `data[0]`/`data[1]` +
 /// `linesize[0]`/`linesize[1]`). The Y plane is `width`×`height` bytes; the chroma plane is
@@ -1398,6 +1539,17 @@ pub fn copy_pitched_nv12_to_buffer(
     unsafe {
         copy_blocking(&y, "cuMemcpy2DAsync_v2(ext->dev nv12 Y)")?;
         copy_blocking(&uv, "cuMemcpy2DAsync_v2(ext->dev nv12 UV)")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CudaWarmupTexture;
+
+    #[test]
+    fn warmup_texture_rejects_zero_dimensions_before_driver_access() {
+        assert!(CudaWarmupTexture::new(0, 1080).is_err());
+        assert!(CudaWarmupTexture::new(1920, 0).is_err());
     }
 }
 

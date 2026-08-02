@@ -70,6 +70,17 @@ mechanics. The one exception is a gamescope the host only *attaches* to, which k
 | Hyprland | ⚠️ ⁸ | ✅ | ⚠️ ⁷ |
 | macOS / anything else | ❌ | ❌ | ❌ |
 
+The physical-monitor mirror path has five Linux capture adapters. Portal/PipeWire is the general
+Wayland path and carries dmabuf negotiation when the compositor offers it. The wlroots screencopy
+adapter uses the compositor's direct SHM protocol. `kms` reads the active DRM primary plane and
+exports its framebuffer as a dma-buf, which avoids a host copy but depends on DRM-card access, an
+active primary plane, and an encoder that can import that format/modifier. `x11` is a synchronous
+X11 `GetImage` fallback that copies the framebuffer through the X socket. `nvfbc` is the NVIDIA X11
+path: the host loads NvFBC and CUDA at runtime, uses the driver's push model, and copies the
+driver-owned CUDA surface into a pooled encoder buffer. Every adapter is runtime-probed, so a
+missing driver or protocol is reported as unavailable instead of becoming a selectable but doomed
+option. Hermes-KMS is not part of Slipstream.
+
 1. Slipstream's own IddCx display driver. It requires **Windows 11 22H2 (build 22621) or newer** —
    the driver declares IddCx 1.10 and the installer enforces the floor. This is also the only
    backend that can give each client a **stable display identity**: it writes an EDID serial per

@@ -16,6 +16,8 @@ export type HostConfigFile = {
 		compositor?: string | null;
 		headless_compositor?: string | null;
 		max_fps?: number | null;
+		pipewire_latency_ms?: number | null;
+		capture_max_age_ms?: number | null;
 		ten_bit: boolean;
 		four_four_four: boolean;
 		gamescope_hdr: boolean;

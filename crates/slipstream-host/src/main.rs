@@ -318,6 +318,7 @@ fn is_management_cli(args: &[String]) -> bool {
         | Some("library")
         | Some("detect-conflicts")
         | Some("doctor")
+        | Some("probe-capture")
         // Reads the compositor's output list and exits — none of the host-startup work applies,
         // and it must not re-run the pin's own startup report while printing that same list.
         | Some("list-monitors")
@@ -552,6 +553,59 @@ fn real_main() -> Result<()> {
                 "GameStream HDR capable (SLIPSTREAM_10BIT + a capable source + encoder): {}",
                 gamestream::host_hdr_capable()
             );
+            Ok(())
+        }
+        // Report the compositor-aware desktop capture pipeline without opening a portal or
+        // changing display state. This is the command-line equivalent of the management capture
+        // methods endpoint and is useful before configuring an unattended host.
+        #[cfg(target_os = "linux")]
+        Some("probe-capture") => {
+            let compositor = vdisplay::detect().ok();
+            let pipeline = session_plan::LinuxDisplayPipeline::for_desktop(compositor);
+            let monitor = vdisplay::capture_monitor();
+            let portal_ok = std::env::var_os("XDG_RUNTIME_DIR").is_some();
+            let x11_ok = std::env::var_os("DISPLAY").is_some();
+            let wayland_ok = std::env::var_os("WAYLAND_DISPLAY").is_some();
+            let kwin_hint = std::env::var("XDG_CURRENT_DESKTOP")
+                .ok()
+                .is_some_and(|desktop| desktop.to_ascii_lowercase().contains("kde"))
+                || std::env::var_os("KDE_FULL_SESSION").is_some();
+            let kms_ok = ss_capture::probe_kms_for_monitor(monitor.as_deref());
+            let nvfbc_ok = ss_capture::probe_nvfbc_for_monitor(monitor.as_deref());
+            println!(
+                "compositor: {}",
+                compositor.map_or("unknown", |value| value.id())
+            );
+            println!("capture monitor: {}", monitor.as_deref().unwrap_or("auto"));
+            println!(
+                "candidate order: {}",
+                pipeline
+                    .candidates
+                    .iter()
+                    .map(|value| value.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+            for backend in pipeline.candidates {
+                let available = match backend {
+                    session_plan::CaptureBackend::Portal => portal_ok,
+                    session_plan::CaptureBackend::Kwin => portal_ok && kwin_hint,
+                    session_plan::CaptureBackend::Wlr => wayland_ok,
+                    session_plan::CaptureBackend::Kms => kms_ok,
+                    session_plan::CaptureBackend::X11 => x11_ok,
+                    session_plan::CaptureBackend::NvFbc => nvfbc_ok,
+                    session_plan::CaptureBackend::IddPush => false,
+                };
+                println!(
+                    "{}: {}",
+                    backend.as_str(),
+                    if available {
+                        "available"
+                    } else {
+                        "unavailable"
+                    }
+                );
+            }
             Ok(())
         }
         // Compositor readiness probe: exit 0 iff the (detected or SLIPSTREAM_COMPOSITOR-forced)
@@ -952,8 +1006,9 @@ USAGE:
     slipstream-host openapi                    print the management API's OpenAPI document (codegen)
     slipstream-host doctor [--json]            check host readiness before starting a stream
     slipstream-host slipstream1-host [OPTIONS]  native slipstream/1 host (QUIC control + UDP data plane)
-    slipstream-host probe-compositor           exit 0 iff the compositor is up + ready (bringup gate)
-    slipstream-host list-monitors              list the host's physical monitors (Linux) — the
+     slipstream-host probe-compositor           exit 0 iff the compositor is up + ready (bringup gate)
+     slipstream-host probe-capture              show the compositor-aware Linux capture pipeline
+     slipstream-host list-monitors              list the host's physical monitors (Linux) — the
                                               connector names SLIPSTREAM_CAPTURE_MONITOR takes
     slipstream-host spike [OPTIONS]            capture→encode→file pipeline spike (dev tool)
 

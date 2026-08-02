@@ -165,6 +165,15 @@ pub struct HostConfig {
     /// Clamped to 1..=4; a backend that cannot honor the multiplied rate simply reports what it
     /// achieved and the pacing follows that, exactly as it does for any other refusal.
     pub vdisplay_hz_mult: u32,
+    /// `SLIPSTREAM_PIPEWIRE_LATENCY_MS` — requested video-node latency for Linux ScreenCast
+    /// streams. This is a PipeWire scheduling hint, not a guarantee: the producer may choose a
+    /// larger quantum when the compositor or driver cannot sustain the request. Defaults to 8 ms,
+    /// clamped to 1..=40 ms.
+    pub pipewire_latency_ms: u32,
+    /// `SLIPSTREAM_CAPTURE_MAX_AGE_MS` — diagnostic threshold for a frame that reaches the encoder
+    /// too late. It does not drop frames by itself; the frame scheduler owns that policy. Defaults
+    /// to 50 ms, clamped to 1..=500 ms.
+    pub capture_max_age_ms: u32,
 }
 
 impl HostConfig {
@@ -254,6 +263,14 @@ impl HostConfig {
                 .and_then(|s| s.trim().parse::<u32>().ok())
                 .unwrap_or(1)
                 .clamp(1, 4),
+            pipewire_latency_ms: val("SLIPSTREAM_PIPEWIRE_LATENCY_MS")
+                .and_then(|s| s.trim().parse::<u32>().ok())
+                .unwrap_or(8)
+                .clamp(1, 40),
+            capture_max_age_ms: val("SLIPSTREAM_CAPTURE_MAX_AGE_MS")
+                .and_then(|s| s.trim().parse::<u32>().ok())
+                .unwrap_or(50)
+                .clamp(1, 500),
         }
     }
 }

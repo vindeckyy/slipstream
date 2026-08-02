@@ -587,7 +587,7 @@ export const SectionConfig: FC = () => {
 								<TabsContent value="av" className="mt-0 outline-none">
 									<ConfigCard
 										title={`${m.status_audio()} / ${m.status_video()}`}
-										description="Choose capture and compositor paths, then tune stream output."
+										description="Choose the display pipeline, then tune stream output. Linux resolves the compositor and capture backend together."
 										advanced
 									>
 										<FieldGroup title="Capture and display">
@@ -673,9 +673,9 @@ export const SectionConfig: FC = () => {
 													</HelpOption>
 													<HelpOption
 														value="kms"
-														title="Direct KMS capture. Lower-level; use when portal/compositor capture fails."
+														title="DRM/KMS primary-plane dma-buf capture. Best when the display is already scanning out on a usable DRM card."
 													>
-														KMS
+														DRM/KMS primary plane
 													</HelpOption>
 													<HelpOption
 														value="x11"
@@ -685,9 +685,9 @@ export const SectionConfig: FC = () => {
 													</HelpOption>
 													<HelpOption
 														value="nvfbc"
-														title="NVIDIA NvFBC capture. Needs a supported NVIDIA driver stack."
+														title="NVIDIA NvFBC shared-CUDA capture. Requires an X11 display, NVIDIA capture support, and CUDA."
 													>
-														NvFBC
+														NVIDIA NvFBC
 													</HelpOption>
 												</FieldSelect>
 											</Row>
@@ -824,6 +824,56 @@ export const SectionConfig: FC = () => {
 														patch((d) => {
 															const n = Number(e.target.value);
 															d.audio_video.max_fps = e.target.value
+																? n
+																: null;
+														})
+													}
+												/>
+											</Row>
+											<Row
+												label="PipeWire latency hint"
+												hint="1 to 40 ms, blank = 8 ms."
+												help="Requests a small scheduling quantum from the Linux PipeWire capture node. The compositor or driver may choose a larger value."
+												recommended="8 ms"
+												htmlFor="cfg-pipewire-latency"
+												controlWidth="sm"
+											>
+												<Input
+													id="cfg-pipewire-latency"
+													className={cn(fieldControlClass, "sm:w-28")}
+													type="number"
+													min={1}
+													max={40}
+													value={draft.audio_video.pipewire_latency_ms ?? ""}
+													onChange={(e) =>
+														patch((d) => {
+															const n = Number(e.target.value);
+															d.audio_video.pipewire_latency_ms = e.target.value
+																? n
+																: null;
+														})
+													}
+												/>
+											</Row>
+											<Row
+												label="Capture age warning"
+												hint="1 to 500 ms, blank = 50 ms."
+												help="Marks stats samples when the newest source frame is older than this threshold. It is diagnostic only and does not drop frames."
+												recommended="50 ms"
+												htmlFor="cfg-capture-max-age"
+												controlWidth="sm"
+											>
+												<Input
+													id="cfg-capture-max-age"
+													className={cn(fieldControlClass, "sm:w-28")}
+													type="number"
+													min={1}
+													max={500}
+													value={draft.audio_video.capture_max_age_ms ?? ""}
+													onChange={(e) =>
+														patch((d) => {
+															const n = Number(e.target.value);
+															d.audio_video.capture_max_age_ms = e.target.value
 																? n
 																: null;
 														})

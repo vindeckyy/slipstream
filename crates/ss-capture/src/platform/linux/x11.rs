@@ -25,14 +25,14 @@
 //! gamescope target provider; pointing it at an ordinary display is the obvious follow-up.
 
 use anyhow::{anyhow, Context, Result};
-use std::time::Instant;
 use x11rb::connection::Connection;
 use x11rb::errors::ReplyError;
 use x11rb::protocol::randr::ConnectionExt as _;
 use x11rb::protocol::xproto::{ConnectionExt as _, ImageFormat, ImageOrder, Screen, Setup, Window};
 use x11rb::rust_connection::RustConnection;
 
-use super::{CapturedFrame, Capturer, FramePayload, PixelFormat};
+use super::{CaptureTelemetry, CapturedFrame, Capturer, FramePayload, PixelFormat};
+use crate::capture_now_ns;
 
 /// The RandR version whose `GetOutputPrimary` we rely on (1.3). Asked for, not required: a server
 /// without the extension just loses the primary-output crop and captures the whole root.
@@ -58,8 +58,6 @@ pub struct X11Capturer {
     root: Window,
     region: Region,
     format: PixelFormat,
-    /// Frame timestamps are relative to the capturer's own start, like every other source here.
-    start: Instant,
     /// Gated by [`Capturer::set_active`]: a pooled capturer between streams must not keep pulling
     /// whole framebuffers through the X socket.
     active: bool,
@@ -67,6 +65,8 @@ pub struct X11Capturer {
     /// reconfigured underneath us. Neither recovers in place — the region was resolved at open —
     /// so the capturer reports itself dead and the caller rebuilds against the new geometry.
     dead: bool,
+    last_frame_ns: u64,
+    frames_published: u64,
 }
 
 impl X11Capturer {
@@ -106,9 +106,10 @@ impl X11Capturer {
             root,
             region,
             format,
-            start: Instant::now(),
             active: true,
             dead: false,
+            last_frame_ns: 0,
+            frames_published: 0,
         })
     }
 
@@ -154,10 +155,13 @@ impl X11Capturer {
         }
         let mut data = reply.data;
         data.truncate(want);
+        let pts_ns = capture_now_ns();
+        self.last_frame_ns = pts_ns;
+        self.frames_published = self.frames_published.saturating_add(1);
         Ok(CapturedFrame {
             width: u32::from(width),
             height: u32::from(height),
-            pts_ns: self.start.elapsed().as_nanos() as u64,
+            pts_ns,
             format: self.format,
             payload: FramePayload::Cpu(data),
             cursor: None,
@@ -166,6 +170,20 @@ impl X11Capturer {
 }
 
 impl Capturer for X11Capturer {
+    fn backend_name(&self) -> &'static str {
+        "x11-getimage"
+    }
+
+    fn telemetry(&self) -> CaptureTelemetry {
+        CaptureTelemetry {
+            last_frame_ns: self.last_frame_ns,
+            frames_published: self.frames_published,
+            width: u32::from(self.region.width),
+            height: u32::from(self.region.height),
+            ..CaptureTelemetry::default()
+        }
+    }
+
     fn next_frame(&mut self) -> Result<CapturedFrame> {
         self.capture()
     }

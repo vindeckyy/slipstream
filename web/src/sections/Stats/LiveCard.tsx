@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Loadable } from "@/lib/query";
 import { m } from "@/paraglide/messages";
 import { HealthChart, LatencyChart, ThroughputChart } from "./charts";
+import { CaptureDiagnostics } from "./CaptureDiagnostics";
 import {
 	ChartBlock,
 	HEALTH_CHART_HELP,
@@ -84,6 +85,7 @@ export const LiveCard: FC<{ live: Loadable<Capture> }> = ({ live }) => {
 						</p>
 					) : (
 						<>
+							<CaptureDiagnostics samples={samples} />
 							<ChartBlock
 								title={m.stats_latency_title()}
 								desc={m.stats_latency_desc()}

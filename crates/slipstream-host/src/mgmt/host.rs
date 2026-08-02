@@ -404,28 +404,42 @@ pub(crate) async fn list_capture_methods() -> Json<Vec<AvailableCaptureMethod>> 
         let portal_ok = std::env::var_os("XDG_RUNTIME_DIR").is_some();
         let x11_ok = std::env::var_os("DISPLAY").is_some();
         let wayland_ok = std::env::var_os("WAYLAND_DISPLAY").is_some();
+        let monitor = crate::vdisplay::capture_monitor();
+        let kms_ok = ss_capture::probe_kms_for_monitor(monitor.as_deref());
+        let nvfbc_ok = ss_capture::probe_nvfbc_for_monitor(monitor.as_deref());
         let kwin_hint = std::env::var("XDG_CURRENT_DESKTOP")
             .ok()
             .is_some_and(|d| d.to_ascii_lowercase().contains("kde"))
             || std::env::var_os("KDE_FULL_SESSION").is_some();
-        // Phase 2 stubs: probes exist for future wiring; availability stays false until open works.
-        let _ = (ss_capture::probe_kms(), ss_capture::probe_nvfbc());
-        [
-            ("auto", "Auto", true),
-            ("portal", "XDG Portal", portal_ok),
-            ("kwin", "KWin Screencast", portal_ok || kwin_hint),
-            ("wlr", "wlroots screencopy", wayland_ok),
-            ("kms", "KMS (Phase 2)", false),
-            ("x11", "X11", x11_ok),
-            ("nvfbc", "NvFBC (Phase 2)", false),
-        ]
-        .into_iter()
-        .map(|(id, label, available)| AvailableCaptureMethod {
-            id: id.into(),
-            label: label.into(),
-            available,
-        })
-        .collect()
+        let compositor = crate::vdisplay::detect().ok();
+        let mut order = crate::session_plan::CaptureBackend::desktop_auto_order_for(compositor);
+        if !order.contains(&crate::session_plan::CaptureBackend::Kwin) {
+            order.push(crate::session_plan::CaptureBackend::Kwin);
+        }
+        let mut list = vec![AvailableCaptureMethod {
+            id: "auto".into(),
+            label: "Auto".into(),
+            available: true,
+        }];
+        list.extend(order.into_iter().map(|backend| {
+            let (label, available) = match backend {
+                crate::session_plan::CaptureBackend::Portal => ("XDG Portal", portal_ok),
+                crate::session_plan::CaptureBackend::Kwin => {
+                    ("KWin Screencast", portal_ok && kwin_hint)
+                }
+                crate::session_plan::CaptureBackend::Wlr => ("wlroots screencopy", wayland_ok),
+                crate::session_plan::CaptureBackend::Kms => ("DRM/KMS primary plane", kms_ok),
+                crate::session_plan::CaptureBackend::X11 => ("X11", x11_ok),
+                crate::session_plan::CaptureBackend::NvFbc => ("NVIDIA NvFBC", nvfbc_ok),
+                crate::session_plan::CaptureBackend::IddPush => ("IDD-push", false),
+            };
+            AvailableCaptureMethod {
+                id: backend.as_str().into(),
+                label: label.into(),
+                available,
+            }
+        }));
+        list
     };
     Json(list)
 }

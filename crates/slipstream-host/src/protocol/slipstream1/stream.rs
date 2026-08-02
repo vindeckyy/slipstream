@@ -746,6 +746,33 @@ struct SendStats {
     /// moment the first video AU's packets have fully left the socket (finish is once-only, so
     /// the per-frame call is a cheap no-op afterwards).
     bringup: Arc<crate::bringup::Trace>,
+    /// Capture-side identity and mailbox counters shared by the encode and send threads. The
+    /// send thread owns the session and emits the aggregate stats sample, while only the encode
+    /// thread owns the live capturer.
+    capture: Arc<SharedCaptureTelemetry>,
+}
+
+#[derive(Default)]
+struct SharedCaptureTelemetry {
+    snapshot: std::sync::Mutex<ss_capture::CaptureTelemetry>,
+    backend: std::sync::Mutex<String>,
+}
+
+impl SharedCaptureTelemetry {
+    fn update(&self, backend: &'static str, snapshot: ss_capture::CaptureTelemetry) {
+        *self.snapshot.lock().unwrap_or_else(|e| e.into_inner()) = snapshot;
+        *self.backend.lock().unwrap_or_else(|e| e.into_inner()) = backend.to_string();
+    }
+
+    fn read(&self) -> (ss_capture::CaptureTelemetry, String) {
+        let snapshot = *self.snapshot.lock().unwrap_or_else(|e| e.into_inner());
+        let backend = self
+            .backend
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        (snapshot, backend)
+    }
 }
 
 /// Whether a session on `compositor` (`None` = the synthetic source) with a `per_client_mode`
@@ -990,6 +1017,11 @@ fn send_loop(
             // sample — the cap/submit/encode split carried over from the capture thread plus this
             // window's pacing/goodput/loss. Loss fields are deltas vs the previous window's snapshot.
             if stats.rec.is_armed() {
+                let (capture_telemetry, capture_backend) = stats.capture.read();
+                let capture_age_us = crate::stats_recorder::capture_age_us(
+                    capture_telemetry.last_frame_ns,
+                    crate::stats_recorder::unix_now_ns(),
+                );
                 let session_id = *sid.get_or_insert_with(|| {
                     // Read the LIVE mode at registration time (H3): a capture armed after a
                     // mid-stream mode switch gets the mode the stream actually runs at.
@@ -1036,6 +1068,17 @@ fn send_loop(
                     packets_dropped: s.packets_dropped.saturating_sub(last_packets_dropped) as u32,
                     send_dropped: s.packets_send_dropped.saturating_sub(last_send_dropped) as u32,
                     fec_recovered: s.fec_recovered_shards.saturating_sub(last_fec_recovered) as u32,
+                    capture_age_us,
+                    capture_age_over_limit: crate::stats_recorder::capture_age_over_limit(
+                        capture_age_us,
+                    ),
+                    capture_backend,
+                    capture_frames_published: capture_telemetry.frames_published,
+                    capture_frames_overwritten: capture_telemetry.frames_overwritten,
+                    capture_buffers_drained: capture_telemetry.buffers_drained,
+                    capture_modifier: capture_telemetry.modifier,
+                    capture_width: capture_telemetry.width,
+                    capture_height: capture_telemetry.height,
                 };
                 stats.rec.push_sample(session_id, sample);
             }
@@ -1619,6 +1662,8 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         mut cur_display_gen,
         built_bitrate,
     ) = pipe;
+    let capture_diag = Arc::new(SharedCaptureTelemetry::default());
+    capture_diag.update(capturer.backend_name(), capturer.telemetry());
     // The encoder may have opened at a re-resolved rate (a mirrored head delivering a size this
     // session never negotiated). Adopt it before anything downstream reads `bitrate_kbps`.
     adopt_built_bitrate(&mut bitrate_kbps, built_bitrate, &live_bitrate);
@@ -1769,6 +1814,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         client: client_label.clone(),
         bitrate_kbps: live_bitrate.clone(),
         bringup: bringup.clone(),
+        capture: capture_diag.clone(),
     };
     let send_thread = std::thread::Builder::new()
         .name("slipstream-send".into())
@@ -2541,6 +2587,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         let measure = perf || stats.is_armed();
         let t_cap = std::time::Instant::now();
         let cap_result = capturer.try_latest();
+        capture_diag.update(capturer.backend_name(), capturer.telemetry());
         let cap_us = if measure {
             t_cap.elapsed().as_micros() as u32
         } else {

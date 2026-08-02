@@ -1224,12 +1224,14 @@ async fn display_monitors_answers_even_with_no_compositor() {
         listed > 0 || !body["error"].is_null() || body["compositor"].is_null() || nested,
         "an empty list must carry an error, an absent compositor, or a nested one: {body}"
     );
-    // The pin is reported verbatim so the console can flag "pinned to a monitor you don't have";
-    // unset on the test host.
-    assert!(
-        body["pinned"].is_null(),
-        "no SLIPSTREAM_CAPTURE_MONITOR set"
-    );
+    // The effective pin can come from the persisted display policy even when the environment is
+    // unset. Compare against the same resolver used by real sessions, so this test does not depend
+    // on whichever user's settings file happens to be mounted in the test process.
+    #[cfg(target_os = "linux")]
+    let expected_pin = crate::vdisplay::capture_monitor();
+    #[cfg(not(target_os = "linux"))]
+    let expected_pin: Option<String> = None;
+    assert_eq!(body["pinned"].as_str(), expected_pin.as_deref());
 }
 
 #[tokio::test]

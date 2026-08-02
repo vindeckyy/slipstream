@@ -32,7 +32,8 @@ use wayland_protocols_wlr::screencopy::v1::client::{
     zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
 };
 
-use super::{CapturedFrame, Capturer, FramePayload, PixelFormat};
+use super::{CaptureTelemetry, CapturedFrame, Capturer, FramePayload, PixelFormat};
+use crate::capture_now_ns;
 
 /// Cap on waiting for one screencopy handshake (buffer params or ready/failed).
 const FRAME_WAIT: Duration = Duration::from_secs(5);
@@ -385,9 +386,12 @@ pub struct WlrCapturer {
     /// Index into `state.outputs` of the captured head (resolved at open).
     output_idx: usize,
     shm_slot: Option<ShmSlot>,
-    start: Instant,
     active: bool,
     dead: bool,
+    width: u32,
+    height: u32,
+    last_frame_ns: u64,
+    frames_published: u64,
 }
 
 impl WlrCapturer {
@@ -452,11 +456,16 @@ impl WlrCapturer {
             state,
             output_idx,
             shm_slot: None,
-            start: Instant::now(),
             active: true,
             dead: false,
+            width: ow as u32,
+            height: oh as u32,
+            last_frame_ns: 0,
+            frames_published: 0,
         };
         let _ = cap.capture().context("screencopy probe frame")?;
+        cap.last_frame_ns = 0;
+        cap.frames_published = 0;
         Ok(cap)
     }
 
@@ -574,10 +583,15 @@ impl WlrCapturer {
             self.dead = true;
         })?;
 
+        let pts_ns = capture_now_ns();
+        self.last_frame_ns = pts_ns;
+        self.frames_published = self.frames_published.saturating_add(1);
+        self.width = info.width;
+        self.height = info.height;
         Ok(CapturedFrame {
             width: info.width,
             height: info.height,
-            pts_ns: self.start.elapsed().as_nanos() as u64,
+            pts_ns,
             format,
             payload: FramePayload::Cpu(data),
             cursor: None,
@@ -586,6 +600,20 @@ impl WlrCapturer {
 }
 
 impl Capturer for WlrCapturer {
+    fn backend_name(&self) -> &'static str {
+        "wlr-screencopy"
+    }
+
+    fn telemetry(&self) -> CaptureTelemetry {
+        CaptureTelemetry {
+            last_frame_ns: self.last_frame_ns,
+            frames_published: self.frames_published,
+            width: self.width,
+            height: self.height,
+            ..CaptureTelemetry::default()
+        }
+    }
+
     fn next_frame(&mut self) -> Result<CapturedFrame> {
         self.capture()
     }

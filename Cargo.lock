@@ -4233,6 +4233,7 @@ dependencies = [
  "anyhow",
  "ashpd",
  "libc",
+ "libloading",
  "pipewire",
  "slipstream-core",
  "ss-driver-proto",

@@ -18,6 +18,7 @@ command — [`slipstream`](#slipstream-on-the-client-machine), which ships with 
 | [`list-monitors`](#list-monitors) | List the physical monitors, by connector name. | Linux |
 | `mirror-test` | Prove capture works from one of them — see [`list-monitors`](#list-monitors). | Linux |
 | [`hdr-probe`](#hdr-probe-and-probe-compositor) | Report whether this box can deliver a 10-bit HDR stream, and what's missing. | Linux |
+| [`probe-capture`](#probe-capture) | Show the compositor-aware Linux capture order and runtime availability. | Linux |
 | [`hdr-p010-selftest`](#hdr-probe-and-probe-compositor) | Check the GPU's HDR capture colour conversion, with no display or session. | Windows |
 | [`probe-compositor`](#hdr-probe-and-probe-compositor) | Exit 0 when the compositor is up and can create a virtual output. | Linux |
 | [`detect-conflicts`](#detect-conflicts) | Report other Moonlight-compatible hosts on this machine. | all |
@@ -211,6 +212,23 @@ to stream.
 mirror, capture, frames — with no client involved. It reports the first frame, the frame count and
 the negotiated size. Screen recording is damage-driven, so move the mouse on the host while it runs;
 an idle desktop legitimately yields almost nothing.
+
+## `probe-capture`
+
+`slipstream-host probe-capture` reports the compositor detected for the current session, the
+effective physical-monitor pin, the candidate order selected for an existing desktop, and each
+candidate's best-effort runtime availability. It does not open a portal or create a display. The
+NvFBC check briefly creates and destroys a capture session so CUDA setup failures are visible
+without changing the display topology.
+
+```sh
+slipstream-host probe-capture
+```
+
+Use it with the same environment as the host service. KMS availability tests primary-plane discovery
+and dma-buf export, while NvFBC creates and tears down a lightweight session through CUDA setup;
+portal, X11, and wlroots availability are prerequisite hints because their sessions are negotiated
+with the compositor when a stream opens.
 
 ## `hdr-probe` and `probe-compositor`
 

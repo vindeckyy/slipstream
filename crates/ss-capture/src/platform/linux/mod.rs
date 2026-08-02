@@ -21,14 +21,17 @@
 // Every `unsafe` block in this file carries a `// SAFETY:` proof; enforce it (unsafe-proof program).
 #![deny(clippy::undocumented_unsafe_blocks)]
 
-use super::{CapturedFrame, Capturer, DmabufFrame, FramePayload, PixelFormat, ZeroCopyPolicy};
+use super::{
+    CaptureTelemetry, CapturedFrame, Capturer, DmabufFrame, FramePayload, PixelFormat,
+    ZeroCopyPolicy,
+};
 use anyhow::{anyhow, Context, Result};
 
 // gamescope cursor source (remote-desktop-sweep Phase C) — feeds `cursor_live` from XFixes when
 // the PipeWire node carries no `SPA_META_Cursor` (gamescope's does not).
 mod xfixes_cursor;
 use std::os::fd::OwnedFd;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver, RecvTimeoutError, TryRecvError};
 use std::sync::Arc;
 use std::thread;
@@ -120,6 +123,15 @@ struct CaptureSignals {
     /// the gamescope cursor source, which must map root-space pointer coordinates into FRAME space
     /// (gamescope's `-w/-h` and `-W/-H` are independent knobs).
     frame_size: Arc<std::sync::atomic::AtomicU64>,
+    /// Capture-side counters sampled by [`PortalCapturer::telemetry`]. These are atomics because
+    /// the PipeWire loop owns the producer state while the encode thread samples it.
+    last_frame_ns: Arc<AtomicU64>,
+    frames_published: Arc<AtomicU64>,
+    frames_overwritten: Arc<AtomicU64>,
+    buffers_drained: Arc<AtomicU64>,
+    negotiated_width: Arc<AtomicU64>,
+    negotiated_height: Arc<AtomicU64>,
+    negotiated_modifier: Arc<AtomicU64>,
 }
 
 impl CaptureSignals {
@@ -133,6 +145,13 @@ impl CaptureSignals {
             gpu_dmabuf_offer: Arc::new(AtomicBool::new(false)),
             cursor_live: Arc::new(std::sync::Mutex::new(None)),
             frame_size: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            last_frame_ns: Arc::new(AtomicU64::new(0)),
+            frames_published: Arc::new(AtomicU64::new(0)),
+            frames_overwritten: Arc::new(AtomicU64::new(0)),
+            buffers_drained: Arc::new(AtomicU64::new(0)),
+            negotiated_width: Arc::new(AtomicU64::new(0)),
+            negotiated_height: Arc::new(AtomicU64::new(0)),
+            negotiated_modifier: Arc::new(AtomicU64::new(0)),
         }
     }
 }
@@ -507,6 +526,22 @@ fn spawn_pipewire(
 }
 
 impl Capturer for PortalCapturer {
+    fn backend_name(&self) -> &'static str {
+        "pipewire"
+    }
+
+    fn telemetry(&self) -> CaptureTelemetry {
+        CaptureTelemetry {
+            last_frame_ns: self.signals.last_frame_ns.load(Ordering::Relaxed),
+            frames_published: self.signals.frames_published.load(Ordering::Relaxed),
+            frames_overwritten: self.signals.frames_overwritten.load(Ordering::Relaxed),
+            buffers_drained: self.signals.buffers_drained.load(Ordering::Relaxed),
+            width: self.signals.negotiated_width.load(Ordering::Relaxed) as u32,
+            height: self.signals.negotiated_height.load(Ordering::Relaxed) as u32,
+            modifier: self.signals.negotiated_modifier.load(Ordering::Relaxed),
+        }
+    }
+
     fn next_frame(&mut self) -> Result<CapturedFrame> {
         self.frame_within(Duration::from_secs(10))
     }
@@ -849,8 +884,9 @@ mod pw_pods;
 mod x11;
 pub use x11::X11Capturer;
 
-// Phase-2 stubs: DRM/KMS plane capture and NVIDIA NvFBC. Openers return clear not-implemented
-// errors; probes advertise card0 / libnvidia-fbc presence for auto-order and mgmt.
+// Direct desktop sources. KMS exports the active primary plane as a dmabuf; NvFBC loads the
+// optional NVIDIA shared-CUDA API at runtime. Both stay beside the portal/X11/wlroots adapters so
+// the host can resolve one compositor-aware pipeline without pulling the compositor into capture.
 pub mod kms;
 pub mod nvfbc;
 

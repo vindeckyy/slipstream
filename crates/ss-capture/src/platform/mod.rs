@@ -6,8 +6,8 @@
 
 #[cfg(target_os = "linux")]
 pub(crate) use crate::{
-    note_hdr_capture_failed, CapturedFrame, Capturer, DmabufFrame, FramePayload, HdrSource,
-    PixelFormat, ZeroCopyPolicy,
+    note_hdr_capture_failed, CaptureTelemetry, CapturedFrame, Capturer, DmabufFrame, FramePayload,
+    HdrSource, PixelFormat, ZeroCopyPolicy,
 };
 
 #[cfg(target_os = "linux")]

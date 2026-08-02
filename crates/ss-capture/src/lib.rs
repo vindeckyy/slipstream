@@ -21,6 +21,37 @@ use ss_frame::{CapturedFrame, FramePayload, PixelFormat};
 #[cfg(target_os = "linux")]
 use ss_frame::DmabufFrame;
 
+/// Cheap, bounded capture-side telemetry. The hot path updates counters atomically and the host
+/// samples this snapshot at its existing statistics boundary, so enabling the management capture
+/// does not add a lock or allocation to frame delivery.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CaptureTelemetry {
+    /// Wall-clock nanoseconds stamped immediately before the frame is published to the handoff
+    /// slot. This is the capture-arrival anchor used by the host's existing frame-age calculation.
+    pub last_frame_ns: u64,
+    /// Frames published by the source since the capturer was opened.
+    pub frames_published: u64,
+    /// Published frames that replaced a frame the consumer had not taken yet.
+    pub frames_overwritten: u64,
+    /// Extra PipeWire buffers discarded while selecting the newest buffer in a callback.
+    pub buffers_drained: u64,
+    /// Negotiated frame width and height. Zero means negotiation has not completed.
+    pub width: u32,
+    pub height: u32,
+    /// Negotiated modifier, or zero for linear/unknown.
+    pub modifier: u64,
+}
+
+/// Wall-clock nanoseconds used for the capture timestamp carried through the encoder and wire
+/// timing probes. Capturers that cannot expose a producer timestamp still get a consistent host
+/// arrival anchor at the moment their frame is materialized.
+pub(crate) fn capture_now_ns() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_nanos() as u64)
+        .unwrap_or(0)
+}
+
 /// Produces frames from a captured output. Lives on its own thread, handing frames over without
 /// ever blocking the compositor — the Linux portal publishes into a one-deep OVERWRITING slot
 /// (drop-oldest), so a stalled consumer costs the intermediate frames and is still handed the
@@ -97,6 +128,18 @@ pub trait Capturer: Send {
     /// IDD-push capturer, whose failures already end the session through its own rebuild path.
     fn is_alive(&self) -> bool {
         true
+    }
+
+    /// Stable backend label used by pipeline diagnostics and stats. It is intentionally a static
+    /// string so sampling it never allocates.
+    fn backend_name(&self) -> &'static str {
+        "unknown"
+    }
+
+    /// Return a point-in-time capture telemetry snapshot. Backends without instrumentation keep
+    /// the default zero-valued snapshot.
+    fn telemetry(&self) -> CaptureTelemetry {
+        CaptureTelemetry::default()
     }
 
     // ---- Cursor -----------------------------------------------------------------------------
@@ -224,6 +267,10 @@ impl SyntheticCapturer {
 }
 
 impl Capturer for SyntheticCapturer {
+    fn backend_name(&self) -> &'static str {
+        "synthetic"
+    }
+
     fn next_frame(&mut self) -> Result<CapturedFrame> {
         let w = self.width as usize;
         let h = self.height as usize;
@@ -296,6 +343,10 @@ impl FastSyntheticCapturer {
 }
 
 impl Capturer for FastSyntheticCapturer {
+    fn backend_name(&self) -> &'static str {
+        "synthetic-fast"
+    }
+
     fn next_frame(&mut self) -> Result<CapturedFrame> {
         if self.noise {
             // Fresh, every-frame-decorrelated noise: reseed from the frame index so consecutive
@@ -650,30 +701,55 @@ pub fn open_x11_desktop() -> Result<Box<dyn Capturer>> {
     platform::linux::X11Capturer::open().map(|c| Box::new(c) as Box<dyn Capturer>)
 }
 
-/// Open a DRM/KMS desktop capturer (Phase 2 stub). Always returns
-/// `"KMS capture not yet implemented (Phase 2)"`.
+/// Open a DRM/KMS primary-plane desktop capturer. The source exports the active packed-RGB
+/// framebuffer as a dma-buf for the Linux encoder import path, so this path has no host readback.
 #[cfg(target_os = "linux")]
 pub fn open_kms_desktop() -> Result<Box<dyn Capturer>> {
     platform::linux::kms::open_kms_desktop()
 }
 
-/// Open an NvFBC desktop capturer (Phase 2 stub). Always returns
-/// `"NvFBC capture not yet implemented (Phase 2)"`.
+/// Open KMS while honoring the host's effective physical-monitor pin.
+#[cfg(target_os = "linux")]
+pub fn open_kms_desktop_for_monitor(monitor: Option<&str>) -> Result<Box<dyn Capturer>> {
+    platform::linux::kms::open_kms_desktop_for_monitor(monitor)
+}
+
+/// Open an NVIDIA NvFBC desktop capturer. NvFBC and CUDA are loaded at runtime, so an unavailable
+/// NVIDIA driver returns an ordinary backend error and the compositor-aware pipeline can retry its
+/// next candidate.
 #[cfg(target_os = "linux")]
 pub fn open_nvfbc_desktop() -> Result<Box<dyn Capturer>> {
     platform::linux::nvfbc::open_nvfbc_desktop()
 }
 
-/// True when `/dev/dri/card0` exists (DRM card present). Does not open the device.
+/// Open NvFBC while honoring the host's effective physical-monitor pin.
+#[cfg(target_os = "linux")]
+pub fn open_nvfbc_desktop_for_monitor(monitor: Option<&str>) -> Result<Box<dyn Capturer>> {
+    platform::linux::nvfbc::open_nvfbc_desktop_for_monitor(monitor)
+}
+
+/// True when an accessible DRM card exposes an active universal primary plane.
 #[cfg(target_os = "linux")]
 pub fn probe_kms() -> bool {
     platform::linux::kms::probe_kms()
 }
 
-/// True when `libnvidia-fbc.so*` is findable via dlopen. Does not call NvFBC capture APIs.
+/// True when KMS can open and Prime-export the selected monitor's active primary plane.
+#[cfg(target_os = "linux")]
+pub fn probe_kms_for_monitor(monitor: Option<&str>) -> bool {
+    platform::linux::kms::probe_kms_for_monitor(monitor)
+}
+
+/// True when the NVIDIA NvFBC library, CUDA path, X display, and driver status all allow capture.
 #[cfg(target_os = "linux")]
 pub fn probe_nvfbc() -> bool {
     platform::linux::nvfbc::probe_nvfbc()
+}
+
+/// True when NvFBC and CUDA can capture the selected physical monitor.
+#[cfg(target_os = "linux")]
+pub fn probe_nvfbc_for_monitor(monitor: Option<&str>) -> bool {
+    platform::linux::nvfbc::probe_nvfbc_for_monitor(monitor)
 }
 
 /// Open the wlroots `zwlr_screencopy_manager_v1` desktop capturer (SHM path). CPU frames only

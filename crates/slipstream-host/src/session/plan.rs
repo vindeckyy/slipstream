@@ -17,8 +17,8 @@
 //! is **stage 5**.
 //!
 //! The type is platform-neutral so it threads through the shared `virtual_stream`/`build_pipeline`
-//! signatures; on Linux it resolves to the single portal/single-process path (the 3-way dispatch is a
-//! Windows-only concern).
+//! signatures. Linux virtual outputs still use the portal/PipeWire node, while existing-desktop
+//! sessions can resolve to portal, wlroots, KMS, X11, or NvFBC through the same pipeline record.
 
 /// Where a session's frames come from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,11 +29,11 @@ pub enum CaptureBackend {
     Kwin,
     /// Linux: wlroots `zwlr_screencopy_manager_v1` (direct Wayland screencopy).
     Wlr,
-    /// Linux: DRM/KMS plane capture (Phase 2 — not hermes-kms).
+    /// Linux: DRM/KMS primary-plane dma-buf capture (not hermes-kms).
     Kms,
     /// Linux: X11 / XShm desktop grab.
     X11,
-    /// Linux: NVIDIA NvFBC (Phase 2).
+    /// Linux: NVIDIA NvFBC shared-CUDA capture.
     NvFbc,
     /// Windows: IDD direct-push — frames pulled straight from the ss-vdisplay driver's shared ring
     /// (in-process; the host runs as SYSTEM in the interactive console session, so it captures the
@@ -43,6 +43,22 @@ pub enum CaptureBackend {
 }
 
 impl CaptureBackend {
+    /// Parse the stable operator spelling used by `SLIPSTREAM_CAPTURE_METHOD` and the pipeline
+    /// resolver. Unknown values deliberately return `None` so callers can distinguish an explicit
+    /// invalid request from `auto`.
+    pub fn from_name(value: &str) -> Option<Self> {
+        Some(match value.trim().to_ascii_lowercase().as_str() {
+            "portal" => CaptureBackend::Portal,
+            "kwin" => CaptureBackend::Kwin,
+            "wlr" | "wlroots" => CaptureBackend::Wlr,
+            "kms" => CaptureBackend::Kms,
+            "x11" => CaptureBackend::X11,
+            "nvfbc" => CaptureBackend::NvFbc,
+            "idd_push" | "idd-push" => CaptureBackend::IddPush,
+            _ => return None,
+        })
+    }
+
     /// Resolve the capture backend from [`config`](crate::config). This is the single resolver shared by
     /// [`SessionPlan::resolve`] and the standalone callers (GameStream / spike), so they can't drift.
     #[cfg(target_os = "linux")]
@@ -50,17 +66,12 @@ impl CaptureBackend {
         match ss_host_config::config()
             .capture_method
             .as_deref()
-            .unwrap_or("auto")
+            .and_then(Self::from_name)
         {
-            "portal" => CaptureBackend::Portal,
-            "kwin" => CaptureBackend::Kwin,
-            "wlr" => CaptureBackend::Wlr,
-            "kms" => CaptureBackend::Kms,
-            "x11" => CaptureBackend::X11,
-            "nvfbc" => CaptureBackend::NvFbc,
+            Some(backend) => backend,
             // auto: keep Portal as the resolve answer for virtual-output sessions; desktop-mirror
             // openers call [`Self::resolve_desktop`] which tries backends in SolarFlare order.
-            _ => CaptureBackend::Portal,
+            None => CaptureBackend::Portal,
         }
     }
 
@@ -76,6 +87,35 @@ impl CaptureBackend {
             CaptureBackend::Portal,
             CaptureBackend::Kwin,
         ]
+    }
+
+    /// Resolve the capture preference as a compositor-aware candidate list. The compositor and
+    /// capture source are coupled here because a backend that is valid for one session may be
+    /// unavailable or needlessly expensive for another. The returned order still contains only
+    /// capture adapters; the compositor remains the owner of output/session semantics.
+    #[cfg(target_os = "linux")]
+    pub fn desktop_auto_order_for(
+        compositor: Option<crate::vdisplay::Compositor>,
+    ) -> Vec<CaptureBackend> {
+        use crate::vdisplay::Compositor;
+
+        match compositor {
+            Some(Compositor::Wlroots | Compositor::Hyprland) => vec![
+                CaptureBackend::Wlr,
+                CaptureBackend::Portal,
+                CaptureBackend::Kms,
+                CaptureBackend::X11,
+                CaptureBackend::NvFbc,
+            ],
+            Some(Compositor::Mutter | Compositor::Kwin | Compositor::Gamescope) => vec![
+                CaptureBackend::Portal,
+                CaptureBackend::Kms,
+                CaptureBackend::NvFbc,
+                CaptureBackend::X11,
+                CaptureBackend::Wlr,
+            ],
+            None => Self::desktop_auto_order().to_vec(),
+        }
     }
 
     pub fn as_str(self) -> &'static str {
@@ -99,6 +139,74 @@ impl CaptureBackend {
     #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     pub fn resolve() -> Self {
         CaptureBackend::Portal
+    }
+}
+
+/// The source being prepared by the unified Linux display pipeline.
+#[cfg(target_os = "linux")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LinuxDisplaySource {
+    ExistingDesktop,
+    VirtualOutput,
+}
+
+/// The compositor/capture pairing resolved for one Linux session. The adapters remain separate,
+/// but this value is the single owner of which capture candidates are valid for the live session.
+#[cfg(target_os = "linux")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LinuxDisplayPipeline {
+    pub compositor: Option<crate::vdisplay::Compositor>,
+    pub source: LinuxDisplaySource,
+    pub requested_capture: Option<CaptureBackend>,
+    pub candidates: Vec<CaptureBackend>,
+}
+
+#[cfg(target_os = "linux")]
+impl LinuxDisplayPipeline {
+    pub fn for_desktop(compositor: Option<crate::vdisplay::Compositor>) -> Self {
+        let requested_capture = ss_host_config::config()
+            .capture_method
+            .as_deref()
+            .filter(|value| !value.eq_ignore_ascii_case("auto"))
+            .and_then(CaptureBackend::from_name);
+        let candidates = requested_capture
+            .map(|backend| vec![backend])
+            .unwrap_or_else(|| CaptureBackend::desktop_auto_order_for(compositor));
+        Self {
+            compositor,
+            source: LinuxDisplaySource::ExistingDesktop,
+            requested_capture,
+            candidates,
+        }
+    }
+
+    pub fn for_virtual_output(
+        compositor: Option<crate::vdisplay::Compositor>,
+        _capture: CaptureBackend,
+    ) -> Self {
+        Self {
+            compositor,
+            source: LinuxDisplaySource::VirtualOutput,
+            // A compositor-created virtual output is consumed by its PipeWire node. The
+            // desktop-mirror preference must not silently replace that source with KMS, X11, or
+            // NvFBC after the virtual display has already been created.
+            requested_capture: None,
+            candidates: vec![CaptureBackend::Portal],
+        }
+    }
+
+    pub fn label(&self) -> String {
+        let compositor = self.compositor.map(|value| value.id()).unwrap_or("unknown");
+        let candidates = self
+            .candidates
+            .iter()
+            .map(|value| value.as_str())
+            .collect::<Vec<_>>()
+            .join(",");
+        format!(
+            "compositor={compositor} source={:?} capture_candidates={candidates}",
+            self.source
+        )
     }
 }
 
@@ -381,6 +489,45 @@ fn resolve_encoder() -> EncoderBackend {
         crate::encode::WindowsBackend::Amf => EncoderBackend::Amf,
         crate::encode::WindowsBackend::Qsv => EncoderBackend::Qsv,
         crate::encode::WindowsBackend::Software => EncoderBackend::Software,
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    use super::{CaptureBackend, LinuxDisplayPipeline};
+    use crate::vdisplay::Compositor;
+
+    #[test]
+    fn capture_backend_aliases_are_stable() {
+        assert_eq!(CaptureBackend::from_name("wlr"), Some(CaptureBackend::Wlr));
+        assert_eq!(
+            CaptureBackend::from_name("wlroots"),
+            Some(CaptureBackend::Wlr)
+        );
+        assert_eq!(
+            CaptureBackend::from_name("NVFBC"),
+            Some(CaptureBackend::NvFbc)
+        );
+        assert_eq!(CaptureBackend::from_name("unknown"), None);
+    }
+
+    #[test]
+    fn compositor_changes_desktop_candidate_order() {
+        let wlroots = LinuxDisplayPipeline {
+            compositor: Some(Compositor::Wlroots),
+            source: super::LinuxDisplaySource::ExistingDesktop,
+            requested_capture: None,
+            candidates: CaptureBackend::desktop_auto_order_for(Some(Compositor::Wlroots)),
+        };
+        let mutter = LinuxDisplayPipeline {
+            compositor: Some(Compositor::Mutter),
+            source: super::LinuxDisplaySource::ExistingDesktop,
+            requested_capture: None,
+            candidates: CaptureBackend::desktop_auto_order_for(Some(Compositor::Mutter)),
+        };
+        assert_eq!(wlroots.candidates[0], CaptureBackend::Wlr);
+        assert_eq!(mutter.candidates[0], CaptureBackend::Portal);
+        assert_ne!(wlroots.candidates, mutter.candidates);
     }
 }
 
