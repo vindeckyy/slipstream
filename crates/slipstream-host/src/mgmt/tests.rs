@@ -126,6 +126,7 @@ async fn cert_auth_is_a_read_only_allowlist() {
         "/api/v1/host",
         "/api/v1/status",
         "/api/v1/compositors",
+        "/api/v1/diagnostics/preflight",
         "/api/v1/library",
     ] {
         assert_ne!(
@@ -180,6 +181,16 @@ async fn cert_auth_is_a_read_only_allowlist() {
         .await,
         StatusCode::UNAUTHORIZED,
         "arming pairing must require the bearer token"
+    );
+    assert_eq!(
+        send_cert(
+            &app,
+            post_json("/api/v1/support-bundles", serde_json::json!({})),
+            fp
+        )
+        .await,
+        StatusCode::UNAUTHORIZED,
+        "support bundle export must require the bearer token"
     );
     assert_eq!(
         send_cert(

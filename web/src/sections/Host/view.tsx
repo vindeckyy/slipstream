@@ -23,7 +23,9 @@ export const HostView: FC<{
 	/** Warning about other Moonlight-compatible servers on this machine — renders nothing when
 	 * there are none (see `ConflictsCard.tsx`). Sits at the top: it explains "nothing can connect". */
 	conflicts?: ReactNode;
-}> = ({ host, gpu, update, power, conflicts }) => {
+	/** Read-only capture and runtime checks for the host (see `PreflightCard.tsx`). */
+	preflight?: ReactNode;
+}> = ({ host, gpu, update, power, conflicts, preflight }) => {
 	const h = host.data;
 	return (
 		<Section maxWidth={false}>
@@ -82,6 +84,7 @@ export const HostView: FC<{
 				</div>
 
 				{conflicts}
+				{preflight}
 				{h && <ConnectCard host={h} />}
 
 				<QueryState

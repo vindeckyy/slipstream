@@ -4,6 +4,7 @@ import { useLocale } from "@/lib/i18n";
 import { ConflictsCard } from "./ConflictsCard";
 import { GpuSection } from "./GpuCard";
 import { PowerCard } from "./PowerCard";
+import { PreflightCard } from "./PreflightCard";
 import { UpdateSection } from "./UpdateCard";
 import { HostView } from "./view";
 
@@ -15,6 +16,7 @@ export const SectionHost: FC = () => {
 		<HostView
 			host={host}
 			conflicts={<ConflictsCard />}
+			preflight={<PreflightCard />}
 			gpu={<GpuSection />}
 			update={<UpdateSection />}
 			power={<PowerCard />}

@@ -365,6 +365,48 @@ fun nativeDisplayMode(context: Context): Triple<Int, Int, Int> {
 }
 
 /**
+ * Device-specific safe defaults for the mode requested from the host. The Fire HD 10 (13th Gen)
+ * panel is 1920x1200, but Amazon documents its hardware H.264 and HEVC decoders through 1080p60.
+ * Requesting the panel's full height therefore fails on this device even though the display can
+ * show it. Keep the panel mode available as an explicit custom request, while making the first
+ * connection use a 16:10 mode inside the documented decoder envelope.
+ */
+object DeviceProfiles {
+    const val FIRE_HD_10_13_MODEL = "KFTUWI"
+
+    fun isFireHd10(model: String?): Boolean =
+        model?.trim()?.uppercase() == FIRE_HD_10_13_MODEL
+
+    fun streamDefaultMode(model: String?, native: Triple<Int, Int, Int>): Triple<Int, Int, Int> {
+        if (!isFireHd10(model)) return native
+        val (width, height, hz) = native
+        if (width >= 1920 && height >= 1200) {
+            return Triple(1680, 1050, hz.coerceAtMost(60))
+        }
+        return native
+    }
+
+    /**
+     * Keep an explicit mode request when the selected decoder supports it. On the Fire HD 10,
+     * prefer the native-aspect safe mode, then standard 1080p, when a decoder rejects the request.
+     * The callback is supplied by the platform codec probe so this policy remains unit-testable.
+     */
+    fun resolveModeForDecoder(
+        model: String?,
+        requested: Triple<Int, Int, Int>,
+        supports: (Triple<Int, Int, Int>) -> Boolean,
+    ): Triple<Int, Int, Int> {
+        if (!isFireHd10(model) || supports(requested)) return requested
+        val hz = requested.third.coerceAtMost(60)
+        val candidates = listOf(
+            Triple(1680, 1050, hz),
+            Triple(1920, 1080, hz),
+        )
+        return candidates.firstOrNull(supports) ?: requested
+    }
+}
+
+/**
  * True when this device's display can actually present HDR10, so we should advertise HDR to the
  * host. On an SDR panel we advertise `0` instead — the host then sends a proper 8-bit BT.709 stream
  * rather than BT.2020 PQ the panel would mis-tone-map (the washed-out/dark failure). Mirrors the
@@ -400,7 +442,7 @@ fun displaySupportsHdr(context: Context): Boolean {
 
 /** Resolve [Settings] (with its 0=native placeholders) to the concrete mode to request. */
 fun Settings.effectiveMode(context: Context): Triple<Int, Int, Int> {
-    val native = nativeDisplayMode(context)
+    val native = DeviceProfiles.streamDefaultMode(Build.MODEL, nativeDisplayMode(context))
     val w = if (width > 0) width else native.first
     val h = if (height > 0) height else native.second
     val hz = if (hz > 0) hz else native.third

@@ -137,6 +137,13 @@ tempfile = "3"
 [target.'cfg(any(target_os = "linux", target_os = "windows"))'.dependencies]
 opus = "0.3"
 
+[target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
+# Direct-SDK NVENC is part of every supported Linux host build. Its CUDA and NVENC entry points are
+# loaded at runtime, and encoder dispatch reaches it only for CUDA-backed NVIDIA capture, so the
+# same binary remains usable on AMD, Intel, and driverless systems. Keep this target-specific:
+# NVENC test binaries have an NVIDIA import-library requirement on Windows.
+ss-encode = { path = "../ss-encode", features = ["nvenc"] }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 # `screencast` gates the ScreenCast portal module; `remote_desktop` adds the RemoteDesktop
 # portal we use for libei input on KWin/GNOME; `tokio` is the default runtime.
@@ -290,12 +297,12 @@ bytemuck = { version = "1.19", features = ["derive"] }
 # ffmpeg-next, the NVENC SDK, openh264, pyrowave-sys — moved there, plan §W6). Selecting a feature
 # on the host turns on the matching backend inside ss-encode.
 [features]
-# PyroWave ships in every default build (the codec stays strictly opt-in per session — a client
-# must explicitly prefer CODEC_PYROWAVE; nothing changes for normal HEVC/AV1 sessions).
+# PyroWave ships in every default build (the codec stays strictly opt-in per session; a client
+# must explicitly prefer CODEC_PYROWAVE, so normal HEVC/AV1 sessions do not change).
 default = ["pyrowave"]
-# NVENC hardware encode (Linux CUDA + Windows D3D11). OFF by default; entry points resolved at
-# RUNTIME from the driver DLL/so, so the same binary starts fine on AMD/Intel boxes. Build the GPU
-# host with `--features nvenc`.
+# NVENC hardware encode (Linux CUDA + Windows D3D11). The Linux target dependency below enables
+# the runtime-loaded backend for ordinary Linux builds. The named feature remains for Windows
+# release builds, whose test binaries need NVIDIA's import library when NVENC is selected.
 nvenc = ["ss-encode/nvenc"]
 # AMD/Intel hardware encode on Windows (AMF/QSV via ffmpeg-next). OFF by default: needs a `FFMPEG_DIR`
 # (BtbN lgpl-shared with `*_amf`/`*_qsv`) at build and bundles the FFmpeg DLLs at runtime. Build the

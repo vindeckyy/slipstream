@@ -48,7 +48,7 @@ impl ErasureCoder for Gf8Coder {
         let cached = matches!(&*guard, Some((ck, cm, _)) if *ck == k && *cm == recovery_count);
         if !cached {
             let rs = ReedSolomon::new(k, recovery_count)
-                .map_err(|_| FecError::Config("invalid GF(2^8) shard counts"))?;
+                .map_err(|_| FecError::Config("invalid FEC shard counts"))?;
             *guard = Some((k, recovery_count, rs));
         }
         let rs = &guard.as_ref().expect("cache populated above").2;
@@ -94,7 +94,7 @@ impl ErasureCoder for Gf8Coder {
             matches!(&*guard, Some((ck, cm, _)) if *ck == data_count && *cm == recovery_count);
         if !cached {
             let rs = ReedSolomon::new(data_count, recovery_count)
-                .map_err(|_| FecError::Config("invalid GF(2^8) shard counts"))?;
+                .map_err(|_| FecError::Config("invalid FEC shard counts"))?;
             *guard = Some((data_count, recovery_count, rs));
         }
         let rs = &guard.as_ref().expect("cache populated above").2;
@@ -133,7 +133,7 @@ impl ErasureCoder for Gf8Coder {
             matches!(&*guard, Some((ck, cm, _)) if *ck == data_count && *cm == recovery_count);
         if !cached {
             let rs = ReedSolomon::new(data_count, recovery_count)
-                .map_err(|_| FecError::Config("invalid GF(2^8) shard counts"))?;
+                .map_err(|_| FecError::Config("invalid FEC shard counts"))?;
             *guard = Some((data_count, recovery_count, rs));
         }
         let rs = &guard.as_ref().expect("cache populated above").2;

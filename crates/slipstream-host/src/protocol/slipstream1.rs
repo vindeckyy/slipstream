@@ -409,6 +409,13 @@ pub(crate) async fn serve(
         // in the spawned task, so a slow client still never blocks accepting the next one.
         let conn = match incoming.await {
             Ok(c) => c,
+            Err(e) if accept_failure_is_idle_timeout(&e) => {
+                // A peer sent a valid QUIC Initial but stopped answering before the handshake
+                // completed. No application session existed, so this is an abandoned dial rather
+                // than a host failure.
+                tracing::debug!("QUIC handshake timed out before session acceptance");
+                continue; // not counted toward max_sessions
+            }
             Err(e) => {
                 tracing::warn!(error = %e, "QUIC accept failed");
                 continue; // not counted toward max_sessions
@@ -548,6 +555,14 @@ fn install_shutdown_restore() {
 /// The accept loop is sequential, so the control phase must be bounded — a client that
 /// connects and never finishes the handshake would otherwise wedge the host for everyone.
 pub(super) const HANDSHAKE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Quinn starts an incoming connection after a valid QUIC Initial. If that peer disappears before
+/// finishing the transport handshake, the endpoint's idle timer reports [`quinn::ConnectionError::TimedOut`].
+/// This precedes every Slipstream control message and is routine for an abandoned dial. Every
+/// other accept error remains actionable and stays at warning level.
+fn accept_failure_is_idle_timeout(error: &quinn::ConnectionError) -> bool {
+    matches!(error, quinn::ConnectionError::TimedOut)
+}
 
 /// How long the stream thread may still run AFTER its session was told to stop before
 /// [`serve_session`] gives up waiting for it.
@@ -801,6 +816,16 @@ fn delivered_mode(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn accept_timeout_is_the_only_routine_transport_handshake_failure() {
+        assert!(accept_failure_is_idle_timeout(
+            &quinn::ConnectionError::TimedOut
+        ));
+        assert!(!accept_failure_is_idle_timeout(
+            &quinn::ConnectionError::Reset
+        ));
+    }
 
     #[test]
     fn live_mode_pack_roundtrips_and_interval_recovers_hz() {

@@ -36,7 +36,7 @@ suspend fun connectToHost(
     // Render scale: ask the host for `chosen mode × scale` (even + codec-clamped) — > 1 supersamples
     // (the compositor downscales the larger decoded frame to the SurfaceView), < 1 renders under
     // native. 1.0 leaves the resolved mode untouched.
-    val (w, h) = RenderScale.apply(
+    val (requestedW, requestedH) = RenderScale.apply(
         baseW, baseH, settings.renderScale, RenderScale.maxDimension(settings.codec)
     )
     val hdrEnabled = settings.hdrEnabled && displaySupportsHdr(context)
@@ -61,6 +61,25 @@ suspend fun connectToHost(
         // still resolves HEVC. An explicit user choice always wins unchanged.
         val preferredCodec = settings.preferredCodec().takeIf { it != 0 }
             ?: if (codecBits and 4 != 0 && !partialFrame) 4 else 0
+        val modeMime = when (preferredCodec) {
+            1 -> "video/avc"
+            4 -> "video/av01"
+            else -> "video/hevc"
+        }
+        val requestedMode = Triple(requestedW, requestedH, hz)
+        val resolvedMode = DeviceProfiles.resolveModeForDecoder(
+            Build.MODEL,
+            requestedMode,
+        ) { candidate ->
+            VideoDecoders.supportsMode(modeMime, candidate.first, candidate.second, candidate.third)
+        }
+        if (resolvedMode != requestedMode) {
+            Log.w(
+                "pf.caps",
+                "decoder rejected ${requestedMode.first}x${requestedMode.second}@${requestedMode.third}; " +
+                    "using ${resolvedMode.first}x${resolvedMode.second}@${resolvedMode.third} ($modeMime)",
+            )
+        }
         // The connect-time capability readout (`adb logcat -s pf.caps`): the P2 slice pipeline
         // is client-inert unless BOTH probes pass — this line says which decoder failed one.
         Log.i(
@@ -70,7 +89,7 @@ suspend fun connectToHost(
                 " (lowLatency=${settings.lowLatencyMode})",
         )
         NativeBridge.nativeConnect(
-            host, port, w, h, hz,
+            host, port, resolvedMode.first, resolvedMode.second, resolvedMode.third,
             identity.certPem, identity.privateKeyPem, pinHex,
             settings.bitrateKbps, settings.compositor, gamepadPref,
             hdrEnabled, multiSlice,

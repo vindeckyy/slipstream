@@ -44,28 +44,33 @@ export const PowerCard: FC = () => {
 		if (phase !== "restarting" && phase !== "offline") return;
 		const started = Date.now();
 		let cancelled = false;
+		let sawOffline = false;
 		const tick = async () => {
 			while (!cancelled) {
 				try {
 					const res = await fetch("/api/v1/host", {
 						credentials: "same-origin",
-					});
-					if (res.ok) {
-						if (phase === "restarting") {
-							await queryClient.invalidateQueries({
-								queryKey: getGetHostInfoQueryKey(),
-							});
-							setPhase("idle");
-							setTimedOut(false);
-							return;
-						}
-						// Offline phase: operator started the host by hand.
+						});
+					if (phase === "restarting" && res.ok) {
+						await queryClient.invalidateQueries({
+							queryKey: getGetHostInfoQueryKey(),
+						});
 						setPhase("idle");
 						setTimedOut(false);
 						return;
 					}
+					if (phase === "offline") {
+						if (!res.ok) sawOffline = true;
+						if (sawOffline && res.ok) {
+							// Offline phase: operator started the host by hand after shutdown.
+							setPhase("idle");
+							setTimedOut(false);
+							return;
+						}
+					}
 				} catch {
 					// Expected while the host is down.
+					if (phase === "offline") sawOffline = true;
 				}
 				if (phase === "restarting" && Date.now() - started > RECONNECT_TIMEOUT_MS) {
 					setTimedOut(true);

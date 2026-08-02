@@ -585,6 +585,29 @@ enum SendMsg {
     Chunk(ChunkMsg),
 }
 
+/// Hand a frame to the send thread without allowing a stopped session to block forever on
+/// backpressure. The send thread owns the transport and can be stuck in pacing or a driver call, so
+/// a plain `SyncSender::send` would keep the capture thread alive until the outer stop grace expires.
+fn send_msg_until_stop(
+    tx: &std::sync::mpsc::SyncSender<SendMsg>,
+    mut msg: SendMsg,
+    stop: &AtomicBool,
+) -> bool {
+    loop {
+        match tx.try_send(msg) {
+            Ok(()) => return true,
+            Err(std::sync::mpsc::TrySendError::Disconnected(_)) => return false,
+            Err(std::sync::mpsc::TrySendError::Full(returned)) => {
+                if stop.load(Ordering::SeqCst) {
+                    return false;
+                }
+                msg = returned;
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+        }
+    }
+}
+
 /// One encoder chunk of a streamed AU. AU-level fields (`capture_ns`/`flags`/`frame_index`/
 /// `deadline`) are identical on every chunk of one AU (the send thread opens the streamed seal
 /// at `first`); the perf split fields are meaningful on `last` (whole-AU figures, exactly like
@@ -3210,7 +3233,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                         repeat,
                         was_measured: measure,
                     };
-                    if frame_tx.send(SendMsg::Chunk(msg)).is_err() {
+                    if !send_msg_until_stop(&frame_tx, SendMsg::Chunk(msg), &stop) {
                         send_gone = true;
                         break;
                     }
@@ -3324,7 +3347,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
             // Hand to the send thread; this blocks (backpressure) if it's behind. An Err means it
             // exited (send failure / stop) — end the encode loop too.
             bringup.mark("first_au"); // P0.1 (first-crossing only; free afterwards)
-            if frame_tx.send(SendMsg::Frame(msg)).is_err() {
+            if !send_msg_until_stop(&frame_tx, SendMsg::Frame(msg), &stop) {
                 send_gone = true;
                 break;
             }
@@ -3530,15 +3553,21 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
             repeat: false,
             was_measured: false,
         };
-        if frame_tx.send(SendMsg::Frame(msg)).is_err() {
+        if !send_msg_until_stop(&frame_tx, SendMsg::Frame(msg), &stop) {
             break;
         }
         au_seq = au_seq.wrapping_add(1);
         sent += 1;
     }
-    // Signal the send thread to drain + exit (drop the channel), then join it.
+    // Signal the send thread to drain + exit (drop the channel). A deliberate disconnect must not
+    // wait forever for a send-side pacing or driver call that is already stuck. Dropping a thread
+    // handle detaches it; the stop-aware send loop will exit when that call returns.
     drop(frame_tx);
-    let _ = send_thread.join();
+    if stop.load(Ordering::SeqCst) {
+        drop(send_thread);
+    } else {
+        let _ = send_thread.join();
+    }
     tracing::info!(sent, "slipstream/1 virtual stream complete");
     Ok(())
 }
@@ -4352,6 +4381,28 @@ mod tests {
         assert!(!mark_recovery_boundary(&mut pos, false, period)); // pos 2
         assert!(!mark_recovery_boundary(&mut pos, false, period)); // pos 3
         assert!(mark_recovery_boundary(&mut pos, false, period)); // pos 4 → mark
+    }
+
+    #[test]
+    fn stopped_session_does_not_wait_on_full_send_queue() {
+        let (tx, _rx) = std::sync::mpsc::sync_channel(0);
+        let stop = AtomicBool::new(true);
+        let msg = SendMsg::Frame(FrameMsg {
+            data: Vec::new(),
+            capture_ns: 0,
+            flags: 0,
+            frame_index: 0,
+            deadline: std::time::Instant::now(),
+            encode_us: 0,
+            queue_us: 0,
+            cap_us: 0,
+            submit_us: 0,
+            wait_us: 0,
+            repeat: false,
+            was_measured: false,
+        });
+
+        assert!(!send_msg_until_stop(&tx, msg, &stop));
     }
 
     #[test]

@@ -2,6 +2,7 @@ package io.slipstream
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -602,7 +603,8 @@ private fun GeneralSettings(s: Settings, update: (Settings) -> Unit) {
 
 @Composable
 private fun DisplaySettings(s: Settings, update: (Settings) -> Unit, context: android.content.Context) {
-    val (nw, nh, nhz) = nativeDisplayMode(context)
+    val (nw, nh, nhz) = Settings().effectiveMode(context)
+    val fireHd10 = DeviceProfiles.isFireHd10(Build.MODEL)
     // "Custom…" picked while the stored size is still a preset — keeps the size fields visible
     // until an edit actually makes it custom (or a preset is re-picked). Custom itself is detected
     // from the stored size, never flagged (see [isCustomResolution]), so nothing new persists.
@@ -617,8 +619,12 @@ private fun DisplaySettings(s: Settings, update: (Settings) -> Unit, context: an
                 ((-1 to -1) to if (s.isCustomResolution()) "Custom (${s.width} × ${s.height})" else "Custom…"),
             selected = if (showCustom) -1 to -1 else s.width to s.height,
             field = SettingsOverlay.FIELD_RESOLUTION,
-            caption = "The host makes a display exactly this size — no scaling. Native follows " +
-                "this device's panel.",
+            caption = if (fireHd10) {
+                "This Fire HD 10 uses 1680 × 1050 at 60 Hz by default for reliable HEVC decode. " +
+                    "Custom 1920 × 1200 is available when the decoder accepts it."
+            } else {
+                "The host makes a display exactly this size. Native follows this device's panel."
+            },
         ) { (w, h) ->
             if (w < 0) {
                 // Seed from the current *effective* size so the fields start from something

@@ -708,6 +708,13 @@ pub(crate) async fn get_host_config() -> Json<HostConfigState> {
 pub(crate) async fn set_host_config(
     ApiJson(settings): ApiJson<crate::host_config_file::HostConfigFile>,
 ) -> Response {
+    let errors = settings.validate();
+    if !errors.is_empty() {
+        return api_error(
+            StatusCode::BAD_REQUEST,
+            &format!("invalid host configuration: {}", errors.join("; ")),
+        );
+    }
     if let Err(e) = crate::host_config_file::store().set(settings) {
         return api_error(
             StatusCode::INTERNAL_SERVER_ERROR,

@@ -75,6 +75,24 @@ cd clients/android
 
 The debug APK lands in `app/build/outputs/apk/debug/`. Launch it, pick a host, pair, and stream.
 
+### Signed sideload APK
+
+Release builds use the same keystore as Play uploads. Keep the keystore outside the repository and
+set the four `RELEASE_*` values from [.env.template](.env.template), or provide them as CI secrets.
+
+```sh
+cd clients/android
+cp .env.template .env
+# fill RELEASE_KEYSTORE_FILE, RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD
+./gradlew :app:assembleRelease
+adb install -r app/build/outputs/apk/release/app-release.apk
+apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
+```
+
+The release artifact is a universal signed APK containing `arm64-v8a`, `armeabi-v7a`, and
+`x86_64`. CI publishes the signed APK as the `slipstream-android` artifact and keeps the canary and
+stable sideload aliases separate from the Play bundle.
+
 ## Related
 
 - **[Documentation](../../docs-site/content/docs/)** — quick start, pairing, troubleshooting

@@ -499,6 +499,8 @@ fn stop_process_group(mut child: Child) {
         }
     }
     tracing::info!(pid, "headless compositor: sending SIGKILL");
+    // SAFETY: `pid` is the session-leader PID we spawned with `setsid`; negating it addresses
+    // that process group. `SIGKILL` is a valid signal.
     unsafe {
         libc::kill(-pid, libc::SIGKILL);
     }

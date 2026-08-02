@@ -208,6 +208,37 @@
         }
       }
     },
+    "/api/v1/diagnostics/preflight": {
+      "get": {
+        "tags": [
+          "diagnostics"
+        ],
+        "summary": "Evaluate host readiness without changing display or stream state.",
+        "operationId": "getDiagnosticsPreflight",
+        "responses": {
+          "200": {
+            "description": "Read-only host preflight report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreflightReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/display/layout": {
       "put": {
         "tags": [
@@ -3653,6 +3684,152 @@
         }
       }
     },
+    "/api/v1/support-bundles": {
+      "post": {
+        "tags": [
+          "support"
+        ],
+        "summary": "Create and persist a redacted support bundle.",
+        "operationId": "supportBundleCreate",
+        "responses": {
+          "200": {
+            "description": "Redacted support bundle created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportBundle"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Could not write the bundle",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/support-bundles/{id}": {
+      "get": {
+        "tags": [
+          "support"
+        ],
+        "summary": "Read a previously generated support bundle.",
+        "operationId": "supportBundleGet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The support bundle id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Redacted support bundle",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportBundle"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No bundle with that id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The bundle is unreadable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "support"
+        ],
+        "summary": "Delete a locally stored support bundle.",
+        "operationId": "supportBundleDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The support bundle id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Bundle deleted"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No bundle with that id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/update/apply": {
       "post": {
         "tags": [
@@ -4560,6 +4737,15 @@
             }
           }
         }
+      },
+      "CheckStatus": {
+        "type": "string",
+        "enum": [
+          "pass",
+          "warn",
+          "fail",
+          "skip"
+        ]
       },
       "ClientRef": {
         "type": "object",
@@ -6869,6 +7055,66 @@
           }
         }
       },
+      "PreflightCheck": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "status",
+          "detail"
+        ],
+        "properties": {
+          "detail": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable identifier suitable for UI filtering and support reports."
+          },
+          "label": {
+            "type": "string"
+          },
+          "remediation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/CheckStatus"
+          }
+        }
+      },
+      "PreflightReport": {
+        "type": "object",
+        "required": [
+          "schema",
+          "generated_unix_ms",
+          "ready",
+          "checks"
+        ],
+        "properties": {
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PreflightCheck"
+            }
+          },
+          "generated_unix_ms": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "schema": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "PrepCmd": {
         "type": "object",
         "description": "One per-app preparation step (RFC §6 — deliberate Sunshine `prep-cmd` parity): `do` runs\n**synchronously before the app launches** (an HDR toggle or a MangoHud env change must land\nfirst), `undo` runs at session end — reverse order across steps, best-effort, on every exit\npath including a crash-unwind (RAII via [`PrepGuard`]).",
@@ -7650,6 +7896,121 @@
           }
         }
       },
+      "SupportBundle": {
+        "type": "object",
+        "required": [
+          "schema",
+          "id",
+          "generated_unix_ms",
+          "host",
+          "configuration",
+          "runtime",
+          "logs",
+          "recordings",
+          "redactions"
+        ],
+        "properties": {
+          "configuration": {
+            "$ref": "#/components/schemas/HostConfigFile"
+          },
+          "generated_unix_ms": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "host": {
+            "$ref": "#/components/schemas/SupportHost"
+          },
+          "id": {
+            "type": "string"
+          },
+          "logs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LogEntry"
+            }
+          },
+          "recordings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaptureMeta"
+            }
+          },
+          "redactions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "runtime": {
+            "$ref": "#/components/schemas/SupportRuntime"
+          },
+          "schema": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "SupportHost": {
+        "type": "object",
+        "required": [
+          "version",
+          "abi_version",
+          "os",
+          "os_name",
+          "gamestream"
+        ],
+        "properties": {
+          "abi_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "gamestream": {
+            "type": "boolean"
+          },
+          "os": {
+            "type": "string"
+          },
+          "os_name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "SupportRuntime": {
+        "type": "object",
+        "required": [
+          "video_streaming",
+          "audio_streaming",
+          "active_game",
+          "stats",
+          "conflicts"
+        ],
+        "properties": {
+          "active_game": {
+            "type": "boolean"
+          },
+          "audio_streaming": {
+            "type": "boolean"
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "stats": {
+            "$ref": "#/components/schemas/StatsStatus"
+          },
+          "video_streaming": {
+            "type": "boolean"
+          }
+        }
+      },
       "Topology": {
         "type": "string",
         "description": "What the host does to the box's display topology while managed virtual displays are up.",
@@ -7935,6 +8296,10 @@
       "description": "Host identity, capabilities, and liveness"
     },
     {
+      "name": "diagnostics",
+      "description": "Read-only host preflight checks for capture, encoding, configuration, and conflicts"
+    },
+    {
       "name": "gpu",
       "description": "GPU inventory and selection: list the host's GPUs, choose automatic or a preferred GPU, see the one in use"
     },
@@ -7969,6 +8334,10 @@
     {
       "name": "logs",
       "description": "Host log stream: the newest in-memory log entries, cursor-paged for live following"
+    },
+    {
+      "name": "support",
+      "description": "Owner-private redacted support bundles containing host diagnostics, recent logs, and performance summaries"
     },
     {
       "name": "events",

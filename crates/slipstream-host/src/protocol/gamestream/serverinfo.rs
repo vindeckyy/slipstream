@@ -113,7 +113,7 @@ fn base_codec_mode_support() -> u32 {
     // direct-SDK session, cached) — the same probe `host_wire_caps` consults, so both planes
     // stop advertising HEVC/AV1 on a chip without them (the GM107 dead-session field bug).
     // Fail-open like every arm here: an unanswerable probe → `probed_mask` = None → superset.
-    #[cfg(all(target_os = "linux", feature = "nvenc"))]
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     if !crate::encode::linux_zero_copy_is_vaapi() {
         if let Some(m) = probed_mask(crate::encode::nvenc_codec_support()) {
             return m;

@@ -31,6 +31,7 @@ use utoipa_scalar::{Scalar, Servable};
 
 mod auth;
 mod clients;
+pub(crate) mod diagnostics;
 mod display;
 mod events;
 mod gpu;
@@ -43,6 +44,7 @@ mod session;
 mod shared;
 mod stats;
 mod store;
+mod support;
 #[cfg(test)]
 mod tests;
 mod update;
@@ -193,6 +195,7 @@ fn api_router_parts() -> (Router<Arc<MgmtState>>, utoipa::openapi::OpenApi) {
                 .routes(routes!(host::list_compositors))
                 .routes(routes!(host::list_capture_methods))
                 .routes(routes!(host::list_headless_compositors))
+                .routes(routes!(diagnostics::get_preflight))
                 .routes(routes!(gpu::list_gpus))
                 .routes(routes!(gpu::set_gpu_preference))
                 .routes(routes!(display::get_display_settings))
@@ -253,6 +256,11 @@ fn api_router_parts() -> (Router<Arc<MgmtState>>, utoipa::openapi::OpenApi) {
                     stats::stats_recording_delete
                 ))
                 .routes(routes!(stats::logs_get))
+                .routes(routes!(support::support_bundle_create))
+                .routes(routes!(
+                    support::support_bundle_get,
+                    support::support_bundle_delete
+                ))
                 .routes(routes!(events::stream_events))
                 .routes(routes!(hooks::get_hooks, hooks::set_hooks))
                 .routes(routes!(plugins::list_plugins))
@@ -297,6 +305,7 @@ pub fn openapi_json() -> String {
     modifiers(&SecurityAddon),
     tags(
         (name = "host", description = "Host identity, capabilities, and liveness"),
+        (name = "diagnostics", description = "Read-only host preflight checks for capture, encoding, configuration, and conflicts"),
         (name = "gpu", description = "GPU inventory and selection: list the host's GPUs, choose automatic or a preferred GPU, see the one in use"),
         (name = "display", description = "Virtual-display management policy: lifecycle (keep-alive), topology (primary/exclusive), conflict handling, identity, and layout"),
         (name = "clients", description = "Paired Moonlight client management"),
@@ -306,6 +315,7 @@ pub fn openapi_json() -> String {
         (name = "library", description = "Game library: installed-store titles (Steam) plus user-curated custom entries"),
         (name = "stats", description = "Streaming performance-stats capture: arm/stop a recording, read the live + saved time-series for graphing"),
         (name = "logs", description = "Host log stream: the newest in-memory log entries, cursor-paged for live following"),
+        (name = "support", description = "Owner-private redacted support bundles containing host diagnostics, recent logs, and performance summaries"),
         (name = "events", description = "Host lifecycle events: an SSE stream (client/session/stream lifecycle, pairing, displays, library, host) with Last-Event-ID resume and server-side kind filters"),
         (name = "hooks", description = "Operator hooks: commands and webhooks fired on lifecycle events (fire-and-forget — hooks observe, never veto)"),
         (name = "plugins", description = "Plugin directory: running `slipstream-plugin-*` processes register a lease and, optionally, a loopback UI the web console proxies and adds to its nav"),

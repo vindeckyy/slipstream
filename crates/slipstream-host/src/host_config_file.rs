@@ -138,6 +138,94 @@ impl Default for HostConfigFile {
 }
 
 impl HostConfigFile {
+    /// Validate operator input before it is normalized and persisted.
+    ///
+    /// Loading an older file still uses [`Self::sanitized`] for compatibility, but API writes
+    /// should report the offending fields instead of silently changing the requested settings.
+    pub fn validate(&self) -> Vec<String> {
+        let mut errors = Vec::new();
+        if self.version != 1 {
+            errors.push(format!("version must be 1 (got {})", self.version));
+        }
+        if let Some(name) = self.general.host_name.as_deref() {
+            if name.chars().count() > 128 {
+                errors.push("general.host_name must be at most 128 characters".into());
+            }
+            if name.chars().any(char::is_control) {
+                errors.push("general.host_name must not contain control characters".into());
+            }
+        }
+        if let Some(value) = self.audio_video.video_source.as_deref() {
+            if !matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "virtual" | "portal"
+            ) {
+                errors.push("audio_video.video_source must be virtual or portal".into());
+            }
+        }
+        if let Some(value) = self.audio_video.capture_method.as_deref() {
+            if !matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "auto" | "portal" | "kwin" | "wlr" | "kms" | "x11" | "nvfbc"
+            ) {
+                errors.push("audio_video.capture_method is not a supported backend".into());
+            }
+        }
+        if let Some(value) = self.audio_video.compositor.as_deref() {
+            if !matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "kwin"
+                    | "kde"
+                    | "plasma"
+                    | "mutter"
+                    | "gnome"
+                    | "wlroots"
+                    | "wlr"
+                    | "sway"
+                    | "river"
+                    | "hyprland"
+                    | "hypr"
+                    | "gamescope"
+            ) {
+                errors.push("audio_video.compositor is not a supported backend".into());
+            }
+        }
+        if let Some(value) = self.audio_video.headless_compositor.as_deref() {
+            if !matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "off" | "auto" | "labwc" | "krfb" | "gamescope"
+            ) {
+                errors.push("audio_video.headless_compositor is not a supported backend".into());
+            }
+        }
+        if let Some(value) = self.audio_video.max_fps {
+            if !(15..=480).contains(&value) {
+                errors.push("audio_video.max_fps must be between 15 and 480".into());
+            }
+        }
+        if let Some(value) = self.network.fec_pct {
+            if value > 90 {
+                errors.push("network.fec_pct must be between 0 and 90".into());
+            }
+        }
+        let encoder = self.encoders.encoder.trim().to_ascii_lowercase();
+        if !matches!(
+            encoder.as_str(),
+            "auto" | "nvenc" | "amf" | "qsv" | "vaapi" | "software"
+        ) {
+            errors.push("encoders.encoder is not a supported encoder".into());
+        }
+        if self
+            .encoders
+            .render_adapter
+            .as_deref()
+            .is_some_and(|value| value.chars().any(char::is_control))
+        {
+            errors.push("encoders.render_adapter must not contain control characters".into());
+        }
+        errors
+    }
+
     pub fn sanitized(mut self) -> Self {
         self.version = 1;
         if self.encoders.encoder.trim().is_empty() {
@@ -285,6 +373,10 @@ impl HostConfigStore {
     }
 
     pub fn set(&self, settings: HostConfigFile) -> Result<()> {
+        let errors = settings.validate();
+        if !errors.is_empty() {
+            anyhow::bail!("invalid host configuration: {}", errors.join("; "));
+        }
         let settings = settings.sanitized();
         if let Some(dir) = self.path.parent() {
             ss_paths::create_private_dir(dir)?;
@@ -340,5 +432,18 @@ mod tests {
         cfg.audio_video.max_fps = Some(9999);
         let s = cfg.sanitized();
         assert_eq!(s.audio_video.max_fps, Some(480));
+    }
+
+    #[test]
+    fn validate_reports_field_errors() {
+        let mut cfg = HostConfigFile::default();
+        cfg.audio_video.capture_method = Some("broken".into());
+        cfg.audio_video.max_fps = Some(1);
+        cfg.network.fec_pct = Some(91);
+        let errors = cfg.validate();
+        assert_eq!(errors.len(), 3);
+        assert!(errors.iter().any(|e| e.contains("capture_method")));
+        assert!(errors.iter().any(|e| e.contains("max_fps")));
+        assert!(errors.iter().any(|e| e.contains("fec_pct")));
     }
 }

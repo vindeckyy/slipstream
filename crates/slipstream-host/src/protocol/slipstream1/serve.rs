@@ -292,7 +292,8 @@ pub(super) async fn serve_session(
         // routes to the mirror there — a pin left in a Windows host's settings streams nothing
         // different, and must not silently disable resize as a side effect.
         #[cfg(target_os = "linux")]
-        let mirrored = crate::vdisplay::capture_monitor().is_some();
+        let mirrored =
+            source == Slipstream1Source::Virtual && crate::vdisplay::capture_monitor().is_some();
         #[cfg(not(target_os = "linux"))]
         let mirrored = false;
         reconfig_allowed(compositor, per_client_mode_identity, mirrored)

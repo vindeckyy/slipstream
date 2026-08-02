@@ -155,6 +155,10 @@ pub(crate) fn plugin_may_access(method: &Method, path: &str) -> bool {
         // whole-prefix deny can't be defeated by a route added later.
         || path == "/api/v1/update"
         || path.starts_with("/api/v1/update/")
+        // Support bundles contain redacted logs and host diagnostics; keep them operator-only
+        // even though the plugin lane can read ordinary status and stats routes.
+        || path == "/api/v1/support-bundles"
+        || path.starts_with("/api/v1/support-bundles/")
         // Stopping or bouncing the host process is operator-only.
         || path == "/api/v1/host/restart"
         || path == "/api/v1/host/shutdown";
@@ -174,6 +178,7 @@ pub(crate) fn cert_may_access(method: &Method, path: &str) -> bool {
                 | "/api/v1/compositors"
                 | "/api/v1/compositors/headless"
                 | "/api/v1/capture/methods"
+                | "/api/v1/diagnostics/preflight"
                 | "/api/v1/status"
                 // The paired-client ROSTERS (`/clients`, `/native/clients`) are deliberately NOT on
                 // this lane — they expose every OTHER paired device's name + fingerprint, which one

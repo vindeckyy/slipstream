@@ -64,6 +64,7 @@ struct OutputSlot {
 }
 
 /// Wayland dispatch state: globals + the in-flight frame handshake.
+#[derive(Default)]
 struct State {
     screencopy: Option<ZwlrScreencopyManagerV1>,
     /// Interface version we bound (caps at 3). Gates waiting for `buffer_done`.
@@ -71,18 +72,6 @@ struct State {
     shm: Option<WlShm>,
     outputs: Vec<OutputSlot>,
     pending: FramePending,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            screencopy: None,
-            screencopy_version: 0,
-            shm: None,
-            outputs: Vec::new(),
-            pending: FramePending::default(),
-        }
-    }
 }
 
 impl Dispatch<wl_registry::WlRegistry, ()> for State {
@@ -519,10 +508,7 @@ impl WlrCapturer {
             if p.failed {
                 return true;
             }
-            match p.info {
-                Some(_) if version < 3 || p.buffer_done => true,
-                _ => false,
-            }
+            p.info.is_some() && (version < 3 || p.buffer_done)
         })?;
         if self.state.pending.failed {
             frame.destroy();
@@ -584,9 +570,8 @@ impl WlrCapturer {
             .shm_slot
             .as_ref()
             .ok_or_else(|| anyhow!("screencopy SHM slot missing after ready"))?;
-        let data = pack_frame(slot.bytes(), &info, y_invert).map_err(|e| {
+        let data = pack_frame(slot.bytes(), &info, y_invert).inspect_err(|_| {
             self.dead = true;
-            e
         })?;
 
         Ok(CapturedFrame {

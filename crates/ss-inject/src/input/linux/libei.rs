@@ -33,13 +33,21 @@ use futures_util::StreamExt;
 use reis::ei;
 use reis::event::{DeviceCapability, EiEvent};
 use slipstream_core::input::{InputEvent, InputKind};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::os::unix::net::UnixStream;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 /// `code` value marking a horizontal scroll event (mirrors `gamestream::input`).
 const SCROLL_HORIZONTAL: u32 = 1;
+
+/// Input retained while EIS connects and advertises its devices.
+const PENDING_INPUT_LIMIT: usize = 256;
+/// A short quiet period after the latest device event distinguishes a missing capability from a
+/// capability whose device has not resumed yet.
+const DEVICE_NEGOTIATION_SETTLE: Duration = Duration::from_millis(250);
+/// Avoid tight reconnect loops when the portal or compositor is unavailable.
+const EIS_RECONNECT_BACKOFF: Duration = Duration::from_secs(2);
 
 /// Where to find the EIS server.
 #[derive(Clone, Debug)]
@@ -55,6 +63,170 @@ pub enum EiSource {
     /// A file containing the EIS socket path/name (gamescope's relayed `LIBEI_SOCKET`); polled
     /// until it appears, since the compositor may still be starting.
     SocketPathFile(std::path::PathBuf),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SessionExit {
+    Shutdown,
+    SetupFailed,
+    SetupTimedOut,
+    Disconnected,
+    EventError,
+    ResumeTimedOut,
+    FlushFailed,
+}
+
+impl SessionExit {
+    fn reconnect(self) -> bool {
+        self != Self::Shutdown
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct CapabilitySet(u64);
+
+impl CapabilitySet {
+    fn insert(&mut self, capability: DeviceCapability) {
+        self.0 |= capability as u64;
+    }
+
+    fn contains(self, capability: DeviceCapability) -> bool {
+        self.0 & capability as u64 != 0
+    }
+
+    fn can_inject(self, event: &InputEvent) -> bool {
+        match event.kind {
+            InputKind::MouseMove => self.contains(DeviceCapability::Pointer),
+            InputKind::MouseMoveAbs => self.contains(DeviceCapability::PointerAbsolute),
+            InputKind::MouseButtonDown | InputKind::MouseButtonUp => {
+                self.contains(DeviceCapability::Button)
+            }
+            InputKind::MouseScroll => self.contains(DeviceCapability::Scroll),
+            InputKind::KeyDown | InputKind::KeyUp => self.contains(DeviceCapability::Keyboard),
+            InputKind::TouchDown | InputKind::TouchMove | InputKind::TouchUp => {
+                self.contains(DeviceCapability::Touch)
+                    || (self.contains(DeviceCapability::PointerAbsolute)
+                        && self.contains(DeviceCapability::Button))
+            }
+            InputKind::GamepadState
+            | InputKind::GamepadButton
+            | InputKind::GamepadAxis
+            | InputKind::GamepadRemove
+            | InputKind::GamepadArrival
+            | InputKind::TextInput => true,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PendingDecision {
+    Ready,
+    Waiting,
+    Unsupported,
+}
+
+/// Bounded input retained across device negotiation and EIS reconnects. Motion is coalesced before
+/// applying the bound, so a missing compositor cannot accumulate an unbounded stale-motion tail.
+struct PendingInput {
+    events: VecDeque<InputEvent>,
+}
+
+impl PendingInput {
+    fn new() -> Self {
+        Self {
+            events: VecDeque::with_capacity(PENDING_INPUT_LIMIT),
+        }
+    }
+
+    fn push(&mut self, event: InputEvent) -> bool {
+        match self.events.back_mut() {
+            Some(last)
+                if last.kind == InputKind::MouseMove && event.kind == InputKind::MouseMove =>
+            {
+                last.x = last.x.saturating_add(event.x);
+                last.y = last.y.saturating_add(event.y);
+                return true;
+            }
+            Some(last)
+                if last.kind == InputKind::MouseScroll
+                    && event.kind == InputKind::MouseScroll
+                    && last.code == event.code =>
+            {
+                last.x = last.x.saturating_add(event.x);
+                return true;
+            }
+            Some(last)
+                if last.kind == InputKind::MouseMoveAbs
+                    && event.kind == InputKind::MouseMoveAbs =>
+            {
+                *last = event;
+                return true;
+            }
+            Some(last)
+                if last.kind == InputKind::TouchMove
+                    && event.kind == InputKind::TouchMove
+                    && last.code == event.code =>
+            {
+                *last = event;
+                return true;
+            }
+            _ => {}
+        }
+
+        if self.events.len() == PENDING_INPUT_LIMIT {
+            let Some(index) = self.events.iter().position(|queued| {
+                matches!(
+                    queued.kind,
+                    InputKind::MouseMove
+                        | InputKind::MouseMoveAbs
+                        | InputKind::MouseScroll
+                        | InputKind::TouchMove
+                )
+            }) else {
+                return false;
+            };
+            self.events.remove(index);
+        }
+        self.events.push_back(event);
+        true
+    }
+
+    fn push_front(&mut self, event: InputEvent) {
+        if self.events.len() == PENDING_INPUT_LIMIT {
+            self.events.pop_back();
+        }
+        self.events.push_front(event);
+    }
+
+    fn decision(
+        event: &InputEvent,
+        resumed: CapabilitySet,
+        advertised: CapabilitySet,
+        settled: bool,
+    ) -> PendingDecision {
+        if resumed.can_inject(event) {
+            PendingDecision::Ready
+        } else if !settled || advertised.can_inject(event) {
+            PendingDecision::Waiting
+        } else {
+            PendingDecision::Unsupported
+        }
+    }
+
+    fn next_resolved(
+        &mut self,
+        resumed: CapabilitySet,
+        advertised: CapabilitySet,
+        settled: bool,
+    ) -> Option<(InputEvent, PendingDecision)> {
+        let event = *self.events.front()?;
+        let decision = Self::decision(&event, resumed, advertised, settled);
+        if decision == PendingDecision::Waiting {
+            return None;
+        }
+        self.events.pop_front();
+        Some((event, decision))
+    }
 }
 
 /// Handle held by the control thread; forwards events to the libei worker thread.
@@ -76,7 +248,7 @@ impl LibeiInjector {
         // Return immediately — the portal/socket handshake must NOT run on the caller's
         // (control) thread, or a slow/denied setup would freeze the ENet control stream and
         // drop the client. The worker establishes the session asynchronously and logs its
-        // status; events enqueue until devices resume (a few startup events may be dropped).
+        // status; events remain queued until the capabilities they need resume.
         Ok(Self { tx })
     }
 }
@@ -89,7 +261,7 @@ impl InputInjector for LibeiInjector {
     }
 }
 
-/// Worker thread entry: build a tokio runtime and run the session to completion.
+/// Worker thread entry: build a tokio runtime and keep the EIS session alive.
 fn worker(rx: UnboundedReceiver<InputEvent>, source: EiSource) {
     let rt = match tokio::runtime::Builder::new_multi_thread()
         .worker_threads(1)
@@ -102,30 +274,81 @@ fn worker(rx: UnboundedReceiver<InputEvent>, source: EiSource) {
             return;
         }
     };
-    rt.block_on(session_main(rx, source));
+    rt.block_on(worker_main(rx, source));
 }
 
-/// Open the portal/socket + EIS (bounded), then pump events until disconnect or shutdown.
-async fn session_main(mut rx: UnboundedReceiver<InputEvent>, source: EiSource) {
+/// Keep the receiver alive while individual EIS sessions reconnect. This prevents the injector
+/// service from learning about a dead session by losing the event that first hits its dead sender.
+async fn worker_main(mut rx: UnboundedReceiver<InputEvent>, source: EiSource) {
+    let mut pending = PendingInput::new();
+    loop {
+        let exit = session_main(&mut rx, source.clone(), &mut pending).await;
+        if !exit.reconnect() {
+            return;
+        }
+        tracing::debug!(?exit, "libei: reconnecting EIS session");
+
+        let backoff = tokio::time::sleep(EIS_RECONNECT_BACKOFF);
+        tokio::pin!(backoff);
+        loop {
+            tokio::select! {
+                msg = rx.recv() => match msg {
+                    Some(input) => {
+                        if !pending.push(input) {
+                            tracing::warn!(
+                                limit = PENDING_INPUT_LIMIT,
+                                kind = ?input.kind,
+                                "libei: pending input is full; dropping the newest event"
+                            );
+                        }
+                    }
+                    None => return,
+                },
+                _ = &mut backoff => break,
+            }
+        }
+    }
+}
+
+/// Open one portal/socket EIS session, then pump it until reconnect or shutdown.
+async fn session_main(
+    rx: &mut UnboundedReceiver<InputEvent>,
+    source: EiSource,
+    pending: &mut PendingInput,
+) -> SessionExit {
     // Keep `_rd`/`_session` bound for the whole loop — dropping the portal session closes the
     // EIS connection. Bound the setup so a headless approval dialog (un-bypassed grant) can't
     // hang the worker forever.
-    let (_keepalive, context, mut events, output_hint) = match tokio::time::timeout(
-        Duration::from_secs(30),
-        connect(source),
-    )
-    .await
-    {
+    let setup = tokio::time::timeout(Duration::from_secs(30), connect(source));
+    tokio::pin!(setup);
+    let setup_result = loop {
+        tokio::select! {
+            result = &mut setup => break result,
+            msg = rx.recv() => match msg {
+                Some(input) => {
+                    if !pending.push(input) {
+                        tracing::warn!(
+                            limit = PENDING_INPUT_LIMIT,
+                            kind = ?input.kind,
+                            "libei: pending input is full; dropping the newest event"
+                        );
+                    }
+                }
+                None => return SessionExit::Shutdown,
+            }
+        }
+    };
+    let (_keepalive, context, mut events, output_hint) = match setup_result {
         Ok(Ok(t)) => t,
         Ok(Err(e)) => {
-            tracing::error!(error = %format!("{e:#}"), "libei: portal/EIS setup failed");
-            return;
+            tracing::warn!(error = %format!("{e:#}"), "libei: portal/EIS setup failed; will retry");
+            return SessionExit::SetupFailed;
         }
         Err(_) => {
             tracing::error!(
                     "libei: EIS setup timed out (headless approval needed / kde-authorized grant not seeded / gamescope socket never appeared)"
                 );
-            return;
+            return SessionExit::SetupTimedOut;
         }
     };
     tracing::info!("libei: EIS connected — awaiting devices");
@@ -134,34 +357,93 @@ async fn session_main(mut rx: UnboundedReceiver<InputEvent>, source: EiSource) {
     state.output_hint = output_hint;
     // Watchdog: a healthy EIS server adds + resumes an input device within a beat of the handshake.
     // If none has resumed by this deadline, the connection is dead-on-arrival (stale/half-ready
-    // gamescope socket the handshake passed but no real server is behind) — exit so the next
-    // inject() fails and InjectorService reopens against a fresh socket, instead of silently
-    // swallowing every event for the whole session.
+    // gamescope socket the handshake passed but no real server is behind). Reconnect internally
+    // while retaining the bounded pending queue.
     let resume_deadline = tokio::time::sleep(Duration::from_secs(5));
     tokio::pin!(resume_deadline);
+    let negotiation_deadline = tokio::time::sleep(Duration::from_secs(24 * 60 * 60));
+    tokio::pin!(negotiation_deadline);
     let mut resumed_once = false;
+    let mut negotiation_armed = false;
+    let mut negotiation_settled = false;
+    let exit;
     loop {
         tokio::select! {
             ei = events.next() => match ei {
+                Some(Ok(EiEvent::Disconnected(e))) => {
+                    tracing::info!(reason = ?e.reason, explanation = ?e.explanation, "libei: EIS disconnected");
+                    exit = SessionExit::Disconnected;
+                    break;
+                }
                 Some(Ok(ev)) => {
+                    let device_changed = matches!(
+                        &ev,
+                        EiEvent::DeviceAdded(_)
+                            | EiEvent::DeviceRemoved(_)
+                            | EiEvent::DeviceResumed(_)
+                            | EiEvent::DevicePaused(_)
+                    );
                     state.handle_ei(ev, &context);
-                    if !resumed_once && state.devices.iter().any(|d| d.resumed) {
+                    if state.devices.iter().any(|d| d.resumed) {
                         resumed_once = true;
+                        if device_changed {
+                            negotiation_settled = false;
+                            negotiation_armed = true;
+                            negotiation_deadline.as_mut().reset(
+                                tokio::time::Instant::now() + DEVICE_NEGOTIATION_SETTLE
+                            );
+                        }
+                    }
+                    if !flush_pending(pending, &mut state, &context, negotiation_settled) {
+                        exit = SessionExit::FlushFailed;
+                        break;
                     }
                 }
-                Some(Err(e)) => { tracing::warn!(error = %e, "libei: event stream error"); break; }
-                None => { tracing::info!("libei: EIS disconnected"); break; }
+                Some(Err(e)) => {
+                    tracing::warn!(error = %e, "libei: event stream error");
+                    exit = SessionExit::EventError;
+                    break;
+                }
+                None => {
+                    tracing::info!("libei: EIS disconnected");
+                    exit = SessionExit::Disconnected;
+                    break;
+                }
             },
             msg = rx.recv() => match msg {
-                Some(input) => state.inject(&input, &context),
-                None => { tracing::info!("libei: injector closed — ending session"); break; }
+                Some(input) => {
+                    if !pending.push(input) {
+                        tracing::warn!(
+                            limit = PENDING_INPUT_LIMIT,
+                            kind = ?input.kind,
+                            "libei: pending input is full; dropping the newest event"
+                        );
+                    }
+                    if !flush_pending(pending, &mut state, &context, negotiation_settled) {
+                        exit = SessionExit::FlushFailed;
+                        break;
+                    }
+                }
+                None => {
+                    tracing::info!("libei: injector closed, ending session");
+                    exit = SessionExit::Shutdown;
+                    break;
+                }
             },
             _ = &mut resume_deadline, if !resumed_once => {
                 tracing::warn!(
                     "libei: no input device resumed within 5s of connecting — treating the EIS \
                      connection as dead and reopening (stale or half-ready compositor socket)"
                 );
+                exit = SessionExit::ResumeTimedOut;
                 break;
+            },
+            _ = &mut negotiation_deadline, if negotiation_armed && !negotiation_settled => {
+                negotiation_settled = true;
+                if !flush_pending(pending, &mut state, &context, true) {
+                    exit = SessionExit::FlushFailed;
+                    break;
+                }
             }
         }
     }
@@ -170,6 +452,7 @@ async fn session_main(mut rx: UnboundedReceiver<InputEvent>, source: EiSource) {
     // focused app stops taking clicks until it is restarted. Release everything still
     // held before the EIS connection (and its devices) go away.
     state.release_all(&context);
+    exit
 }
 
 /// Tie down the verbose tuple the connect step returns. The keep-alive must stay alive for the
@@ -683,6 +966,7 @@ impl EiState {
                     pointer = dev.has_capability(DeviceCapability::Pointer),
                     pointer_abs = dev.has_capability(DeviceCapability::PointerAbsolute),
                     keyboard = dev.has_capability(DeviceCapability::Keyboard),
+                    touch = dev.has_capability(DeviceCapability::Touch),
                     button = dev.has_capability(DeviceCapability::Button),
                     scroll = dev.has_capability(DeviceCapability::Scroll),
                     // One region per logical monitor — which one absolute coords map into is
@@ -715,6 +999,44 @@ impl EiState {
             .position(|d| d.resumed && d.device.has_capability(cap))
     }
 
+    fn advertised_capabilities(&self) -> CapabilitySet {
+        let mut capabilities = CapabilitySet::default();
+        for slot in &self.devices {
+            for capability in [
+                DeviceCapability::Pointer,
+                DeviceCapability::PointerAbsolute,
+                DeviceCapability::Keyboard,
+                DeviceCapability::Touch,
+                DeviceCapability::Scroll,
+                DeviceCapability::Button,
+            ] {
+                if slot.device.has_capability(capability) {
+                    capabilities.insert(capability);
+                }
+            }
+        }
+        capabilities
+    }
+
+    fn resumed_capabilities(&self) -> CapabilitySet {
+        let mut capabilities = CapabilitySet::default();
+        for slot in self.devices.iter().filter(|slot| slot.resumed) {
+            for capability in [
+                DeviceCapability::Pointer,
+                DeviceCapability::PointerAbsolute,
+                DeviceCapability::Keyboard,
+                DeviceCapability::Touch,
+                DeviceCapability::Scroll,
+                DeviceCapability::Button,
+            ] {
+                if slot.device.has_capability(capability) {
+                    capabilities.insert(capability);
+                }
+            }
+        }
+        capabilities
+    }
+
     /// Ensure the device at `idx` is in `start_emulating` state before we emit on it.
     fn ensure_emulating(&mut self, idx: usize, dev: &ei::Device) {
         if !self.devices[idx].emulating {
@@ -731,12 +1053,12 @@ impl EiState {
     /// the normal [`EiState::inject`] Mouse* paths so region mapping, held-state tracking and
     /// [`EiState::release_all`] all apply. Only the FIRST finger drives the pointer; later
     /// fingers are ignored (a pointer has no second contact — a pinch degrades to a drag).
-    fn degrade_touch(&mut self, ev: &InputEvent, ctx: &ei::Context) {
+    fn degrade_touch(&mut self, ev: &InputEvent, ctx: &ei::Context) -> bool {
         const GS_BUTTON_LEFT: u32 = 1;
         match ev.kind {
             InputKind::TouchDown => {
                 if self.degraded_touch.is_some() {
-                    return; // secondary finger — single-pointer degradation
+                    return true; // Secondary fingers cannot map to the single pointer.
                 }
                 self.degraded_touch = Some(ev.code);
                 static NOTED: std::sync::atomic::AtomicBool =
@@ -748,14 +1070,16 @@ impl EiState {
                          gestures unavailable)"
                     );
                 }
-                self.inject(
+                if !self.inject(
                     &InputEvent {
                         kind: InputKind::MouseMoveAbs,
                         ..*ev
                     },
                     ctx,
-                );
-                self.inject(
+                ) {
+                    return false;
+                }
+                return self.inject(
                     &InputEvent {
                         kind: InputKind::MouseButtonDown,
                         code: GS_BUTTON_LEFT,
@@ -765,7 +1089,7 @@ impl EiState {
                 );
             }
             InputKind::TouchMove if self.degraded_touch == Some(ev.code) => {
-                self.inject(
+                return self.inject(
                     &InputEvent {
                         kind: InputKind::MouseMoveAbs,
                         ..*ev
@@ -775,7 +1099,7 @@ impl EiState {
             }
             InputKind::TouchUp if self.degraded_touch == Some(ev.code) => {
                 self.degraded_touch = None;
-                self.inject(
+                return self.inject(
                     &InputEvent {
                         kind: InputKind::MouseButtonUp,
                         code: GS_BUTTON_LEFT,
@@ -786,22 +1110,22 @@ impl EiState {
             }
             _ => {}
         }
+        true
     }
 
     /// Translate and emit one client input event, committing it as a single `frame`.
-    fn inject(&mut self, ev: &InputEvent, ctx: &ei::Context) {
+    fn inject(&mut self, ev: &InputEvent, ctx: &ei::Context) -> bool {
         // No ei_touchscreen device but an absolute pointer exists → degrade rather than drop
-        // (the game-mode "touch simply does not work" trap). Checked per event, not latched:
-        // a touchscreen device appearing later (compositor restart, capability change) takes
-        // over seamlessly on the next touch.
+        // (the game-mode "touch simply does not work" trap). A contact that starts on the
+        // pointer fallback stays there through TouchUp, even if a touch device resumes later.
         if matches!(
             ev.kind,
             InputKind::TouchDown | InputKind::TouchMove | InputKind::TouchUp
-        ) && self.device_for(DeviceCapability::Touch).is_none()
-            && self.device_for(DeviceCapability::PointerAbsolute).is_some()
+        ) && (self.degraded_touch.is_some()
+            || (self.device_for(DeviceCapability::Touch).is_none()
+                && self.device_for(DeviceCapability::PointerAbsolute).is_some()))
         {
-            self.degrade_touch(ev, ctx);
-            return;
+            return self.degrade_touch(ev, ctx);
         }
         let cap = match ev.kind {
             InputKind::MouseMove => DeviceCapability::Pointer,
@@ -816,10 +1140,10 @@ impl EiState {
             | InputKind::GamepadButton
             | InputKind::GamepadAxis
             | InputKind::GamepadRemove
-            | InputKind::GamepadArrival => return, // uinput path (later)
+            | InputKind::GamepadArrival => return true, // uinput path (later)
             // libei presses keycodes against the server's negotiated keymap — no committed-text
             // path (the HOST_CAP_TEXT_INPUT cap is not advertised on this backend).
-            InputKind::TextInput => return,
+            InputKind::TextInput => return true,
         };
         self.injected += 1;
         let n = self.injected;
@@ -851,13 +1175,12 @@ impl EiState {
                     std::sync::atomic::AtomicBool::new(false);
                 if !WARNED.swap(true, std::sync::atomic::Ordering::Relaxed) {
                     tracing::warn!(
-                        "touch received but the compositor's EIS exposed no touchscreen device — \
-                         touch is dropped (KWin's libei may not implement ei_touchscreen yet; \
-                         gamescope / a newer compositor may)"
+                        "touch received, but the compositor's EIS exposed neither a touchscreen \
+                         nor an absolute-pointer fallback; touch is dropped"
                     );
                 }
             }
-            return;
+            return true;
         };
         let dev = self.devices[idx].device.device().clone();
         self.ensure_emulating(idx, &dev);
@@ -1038,15 +1361,40 @@ impl EiState {
             }
             dev.frame(self.last_serial, self.now_us());
         }
-        if let Err(e) = ctx.flush() {
+        let connected = if let Err(e) = ctx.flush() {
             // In the per-input-event hot path: a dead EIS socket fails flush on every event
             // (mouse-move = 100s/s), so gate the warn behind the same `loud` sampler as its siblings.
             if loud {
                 tracing::warn!(error = %e, "libei: ctx.flush failed");
             }
-        }
+            false
+        } else {
+            true
+        };
         if loud {
             tracing::debug!(n, kind = ?ev.kind, idx, emitted, "libei: emitted");
+        }
+        connected
+    }
+}
+
+fn flush_pending(
+    pending: &mut PendingInput,
+    state: &mut EiState,
+    context: &ei::Context,
+    negotiation_settled: bool,
+) -> bool {
+    loop {
+        let resumed = state.resumed_capabilities();
+        let advertised = state.advertised_capabilities();
+        let Some((event, _decision)) =
+            pending.next_resolved(resumed, advertised, negotiation_settled)
+        else {
+            return true;
+        };
+        if !state.inject(&event, context) {
+            pending.push_front(event);
+            return false;
         }
     }
 }
@@ -1054,6 +1402,25 @@ impl EiState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn input(kind: InputKind, code: u32, x: i32, y: i32) -> InputEvent {
+        InputEvent {
+            kind,
+            _pad: [0; 3],
+            code,
+            x,
+            y,
+            flags: (1920 << 16) | 1080,
+        }
+    }
+
+    fn capabilities(values: &[DeviceCapability]) -> CapabilitySet {
+        let mut capabilities = CapabilitySet::default();
+        for capability in values {
+            capabilities.insert(*capability);
+        }
+        capabilities
+    }
 
     fn region(x: u32, y: u32, w: u32, h: u32, mapping_id: Option<&str>) -> reis::event::Region {
         reis::event::Region {
@@ -1063,6 +1430,97 @@ mod tests {
             height: h,
             scale: 1.0,
             mapping_id: mapping_id.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn startup_touch_preserves_down_before_coalesced_motion() {
+        let mut pending = PendingInput::new();
+        let down = input(InputKind::TouchDown, 7, 10, 20);
+        let latest_move = input(InputKind::TouchMove, 7, 30, 40);
+        assert!(pending.push(down));
+        assert!(pending.push(input(InputKind::TouchMove, 7, 20, 30)));
+        assert!(pending.push(latest_move));
+        assert_eq!(pending.events.len(), 2);
+
+        let resumed = capabilities(&[DeviceCapability::PointerAbsolute, DeviceCapability::Button]);
+        assert_eq!(
+            pending.next_resolved(resumed, resumed, false),
+            Some((down, PendingDecision::Ready))
+        );
+        assert_eq!(
+            pending.next_resolved(resumed, resumed, false),
+            Some((latest_move, PendingDecision::Ready))
+        );
+    }
+
+    #[test]
+    fn pending_input_is_bounded_without_evicting_touch_down() {
+        let mut pending = PendingInput::new();
+        let down = input(InputKind::TouchDown, 1, 0, 0);
+        assert!(pending.push(down));
+        for code in 0..PENDING_INPUT_LIMIT * 2 {
+            assert!(pending.push(input(InputKind::TouchMove, code as u32 + 2, code as i32, 0,)));
+        }
+        assert_eq!(pending.events.len(), PENDING_INPUT_LIMIT);
+        assert_eq!(pending.events.front(), Some(&down));
+
+        for code in 0..PENDING_INPUT_LIMIT {
+            pending.events[code] = input(InputKind::KeyDown, code as u32, 0, 0);
+        }
+        let replay = input(InputKind::TouchDown, 99, 1, 1);
+        pending.push_front(replay);
+        assert_eq!(pending.events.len(), PENDING_INPUT_LIMIT);
+        assert_eq!(pending.events.front(), Some(&replay));
+    }
+
+    #[test]
+    fn pending_input_does_not_reorder_around_a_waiting_front_event() {
+        let mut pending = PendingInput::new();
+        let key = input(InputKind::KeyDown, 30, 0, 0);
+        let touch = input(InputKind::TouchDown, 2, 10, 10);
+        assert!(pending.push(key));
+        assert!(pending.push(touch));
+        let pointer = capabilities(&[DeviceCapability::PointerAbsolute, DeviceCapability::Button]);
+
+        assert_eq!(pending.next_resolved(pointer, pointer, false), None);
+        assert_eq!(
+            pending.next_resolved(pointer, pointer, true),
+            Some((key, PendingDecision::Unsupported))
+        );
+        assert_eq!(
+            pending.next_resolved(pointer, pointer, true),
+            Some((touch, PendingDecision::Ready))
+        );
+    }
+
+    #[test]
+    fn touch_fallback_waits_for_absolute_motion_and_button() {
+        let touch = input(InputKind::TouchDown, 1, 10, 10);
+        let pointer = capabilities(&[DeviceCapability::PointerAbsolute]);
+        assert_eq!(
+            PendingInput::decision(&touch, pointer, pointer, true),
+            PendingDecision::Unsupported
+        );
+        let fallback = capabilities(&[DeviceCapability::PointerAbsolute, DeviceCapability::Button]);
+        assert_eq!(
+            PendingInput::decision(&touch, fallback, fallback, true),
+            PendingDecision::Ready
+        );
+    }
+
+    #[test]
+    fn only_channel_shutdown_stops_the_worker() {
+        assert!(!SessionExit::Shutdown.reconnect());
+        for exit in [
+            SessionExit::SetupFailed,
+            SessionExit::SetupTimedOut,
+            SessionExit::Disconnected,
+            SessionExit::EventError,
+            SessionExit::ResumeTimedOut,
+            SessionExit::FlushFailed,
+        ] {
+            assert!(exit.reconnect(), "{exit:?} should reconnect");
         }
     }
 

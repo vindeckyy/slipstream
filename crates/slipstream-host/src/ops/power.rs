@@ -5,7 +5,7 @@
 //! same binary + argv. Shutdown always exits this process without asking a supervisor to start
 //! it again.
 
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
@@ -67,19 +67,17 @@ fn try_supervisor_restart() -> Result<bool, String> {
             .map(|o| o.status.success())
             .unwrap_or(false);
         if !active {
-            return Ok(false);
+            return supervisor_decision(false, false, "");
         }
         let status = Command::new("systemctl")
             .args(["--user", "--no-block", "restart", "slipstream-host.service"])
             .status()
             .map_err(|e| format!("systemctl restart slipstream-host: {e}"))?;
-        if status.success() {
-            Ok(true)
-        } else {
-            Err(format!(
-                "systemctl restart slipstream-host failed with {status}"
-            ))
-        }
+        supervisor_decision(
+            true,
+            status.success(),
+            &format!("systemctl restart slipstream-host failed with {status}"),
+        )
     }
     #[cfg(target_os = "windows")]
     {
@@ -111,6 +109,20 @@ fn try_supervisor_restart() -> Result<bool, String> {
     }
 }
 
+fn supervisor_decision(
+    active: bool,
+    restart_succeeded: bool,
+    failure: &str,
+) -> Result<bool, String> {
+    if !active {
+        Ok(false)
+    } else if restart_succeeded {
+        Ok(true)
+    } else {
+        Err(failure.to_owned())
+    }
+}
+
 fn schedule_reexec() -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| format!("current_exe: {e}"))?;
     let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
@@ -124,6 +136,23 @@ fn schedule_reexec() -> Result<(), String> {
         // $0 / $@ are the exe + serve args passed after -c.
         let wait =
             format!("while kill -0 {parent} 2>/dev/null; do sleep 0.05; done; exec \"$0\" \"$@\"");
+        // The replacement must survive the terminal/service session that owns the parent. Closing
+        // its inherited stdio avoids a PTY hangup, and a fresh session prevents the terminal's
+        // process group from taking the waiter down with the host.
+        cmd.stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        use std::os::unix::process::CommandExt as _;
+        // SAFETY: this hook runs in the freshly forked child before `exec`; `setsid` only detaches
+        // that child from the parent's session and does not touch shared Rust state.
+        unsafe {
+            cmd.pre_exec(|| {
+                if libc::setsid() == -1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
         cmd.arg("-c").arg(wait).arg(&exe);
         for a in &args {
             cmd.arg(a);
@@ -156,6 +185,9 @@ fn schedule_reexec() -> Result<(), String> {
         }
         Command::new("powershell.exe")
             .args(["-NoProfile", "-Command", &ps])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .creation_flags(CREATE_BREAKAWAY_FROM_JOB | CREATE_NO_WINDOW)
             .spawn()
             .map_err(|e| format!("spawn replacement host waiter: {e}"))?;
@@ -164,6 +196,10 @@ fn schedule_reexec() -> Result<(), String> {
     {
         let mut child = Command::new(&exe);
         child.args(&args);
+        child
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
         child
             .spawn()
             .map_err(|e| format!("spawn replacement host: {e}"))?;
@@ -195,4 +231,27 @@ fn graceful_exit() {
     }
     crate::vdisplay::restore_takeover_now();
     std::process::exit(0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::supervisor_decision;
+
+    #[test]
+    fn inactive_supervisor_selects_reexec_fallback() {
+        assert_eq!(supervisor_decision(false, false, "unused"), Ok(false));
+    }
+
+    #[test]
+    fn active_supervisor_selects_managed_restart() {
+        assert_eq!(supervisor_decision(true, true, "unused"), Ok(true));
+    }
+
+    #[test]
+    fn active_supervisor_failure_stays_an_error() {
+        assert_eq!(
+            supervisor_decision(true, false, "restart failed"),
+            Err("restart failed".to_owned())
+        );
+    }
 }

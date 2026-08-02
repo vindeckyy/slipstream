@@ -103,17 +103,19 @@ Nine destinations in the sidebar (a **More** tab on a phone holds the last five)
   their codec, resolution, frame rate and bitrate, which games are running, and how many clients
   are paired. Buttons here stop a session or ask the encoder for a fresh keyframe.
 - **Host** — this host's identity (hostname, OS, local IP, version, unique id), the codecs it
-  advertises, its ports, the **Updates** card (see [Updating the Host](/docs/updating)), the
-  **GPUs** card — Automatic, or prefer one GPU for capture and encode, applied to the next session
-  — and the compositor backends it found.
+  advertises, its ports, a read-only **Preflight** card with the same checks as `slipstream-host
+  doctor`, the **Updates** card (see [Updating the Host](/docs/updating)), the **GPUs** card,
+  Automatic or a preferred GPU for capture and encode, applied to the next session, and the
+  compositor backends it found.
 - **Virtual displays** — the policy for the display each session gets, and the Streamed screen
   picker. See [Virtual displays](/docs/virtual-displays).
 - **Library** — the games every client sees: turn a launcher source on or off, add or edit a custom
   title with its own art and launch command. See [Your game library](/docs/game-library).
 - **Performance** — arm a capture, run a session, stop it, and read the recording back as
   per-stage latency, throughput and health graphs.
-- **Logs** — the host's recent log stream: follow it live, filter by level, search it, and download
-  or share it for a bug report.
+- **Logs** lets you follow the host's recent log stream live, filter by level, search it, download or
+  share it for a bug report, and create an owner-private redacted support bundle with the current
+  host state, recent logs, and performance summaries.
 - **Pairing** — arm a PIN, approve or deny devices waiting for approval, and unpair a device. A
   second PIN box for [Moonlight/GameStream](/docs/moonlight) clients appears only when this host
   runs the GameStream plane.

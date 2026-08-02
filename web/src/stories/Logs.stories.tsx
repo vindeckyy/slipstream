@@ -88,6 +88,7 @@ export const Following: Story = {
 				onClear={noop}
 				onDownload={noop}
 				onShare={noop}
+				onSupport={noop}
 				shareMode="copy"
 				dropped={false}
 			/>
@@ -105,6 +106,7 @@ export const PausedWithGap: Story = {
 				onClear={noop}
 				onDownload={noop}
 				onShare={noop}
+				onSupport={noop}
 				shareMode="share"
 				dropped
 			/>

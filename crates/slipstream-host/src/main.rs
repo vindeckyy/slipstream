@@ -317,6 +317,7 @@ fn is_management_cli(args: &[String]) -> bool {
         | Some("openapi")
         | Some("library")
         | Some("detect-conflicts")
+        | Some("doctor")
         // Reads the compositor's output list and exits — none of the host-startup work applies,
         // and it must not re-run the pin's own startup report while printing that same list.
         | Some("list-monitors")
@@ -428,6 +429,9 @@ fn real_main() -> Result<()> {
                 std::process::exit(1);
             }
         }
+        // Read-only installation and service preflight. The same report is available from the
+        // management API, but this form works before the host is running.
+        Some("doctor") => mgmt::diagnostics::run_cli(&args[1..]),
         // Install and run host plugins: `plugins add playnite`, `plugins enable`, … Package ops are
         // forwarded to the bun runner; enable/disable/status drive the systemd unit (Linux) or the
         // SlipstreamScripting scheduled task (Windows). See plugins.rs.
@@ -946,6 +950,7 @@ USAGE:
     slipstream-host tray <CMD>                 status-tray lifecycle (start, stop, status) — Windows;
                                               `start` is how you get the icon back without a re-logon
     slipstream-host openapi                    print the management API's OpenAPI document (codegen)
+    slipstream-host doctor [--json]            check host readiness before starting a stream
     slipstream-host slipstream1-host [OPTIONS]  native slipstream/1 host (QUIC control + UDP data plane)
     slipstream-host probe-compositor           exit 0 iff the compositor is up + ready (bringup gate)
     slipstream-host list-monitors              list the host's physical monitors (Linux) — the

@@ -53,6 +53,22 @@ object VideoDecoders {
     fun decodableCodecBits(): Int =
         1 or 2 or (if (pickDecoder("video/av01") != null) 4 else 0)
 
+    /** Return whether the ranked hardware decoder accepts a size and frame rate. */
+    fun supportsMode(mime: String, width: Int, height: Int, hz: Int): Boolean {
+        val decoder = pickDecoder(mime)?.name ?: return false
+        val info = runCatching {
+            MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
+                .firstOrNull { it.name == decoder }
+        }.getOrNull() ?: return false
+        val caps = runCatching { info.getCapabilitiesForType(mime) }.getOrNull() ?: return false
+        val video = caps.videoCapabilities ?: return false
+        val frameRate = hz.coerceAtLeast(1).toDouble()
+        return runCatching {
+            video.areSizeAndRateSupported(width, height, frameRate) ||
+                video.areSizeAndRateSupported(height, width, frameRate)
+        }.getOrDefault(false)
+    }
+
     /**
      * Whether EVERY decoder this device would use tolerates multi-slice access units — the
      * `VIDEO_CAP_MULTI_SLICE` advertisement (decoder truth, per the 0.17.0 field regression:

@@ -21,12 +21,28 @@ command — [`slipstream`](#slipstream-on-the-client-machine), which ships with 
 | [`hdr-p010-selftest`](#hdr-probe-and-probe-compositor) | Check the GPU's HDR capture colour conversion, with no display or session. | Windows |
 | [`probe-compositor`](#hdr-probe-and-probe-compositor) | Exit 0 when the compositor is up and can create a virtual output. | Linux |
 | [`detect-conflicts`](#detect-conflicts) | Report other Moonlight-compatible hosts on this machine. | all |
+| [`doctor`](#doctor) | Run read-only host readiness checks before starting a stream. | all |
 | `library` | Print [the resolved game library](/docs/game-library) as JSON — "does the host see my games?". | all |
 | `openapi` | Print the management API's OpenAPI document. | all |
 | `--version` | Print the host version. | all |
 
 `slipstream-host --help` prints the most-used of these. `plugins`, `service`, `driver` and `tray`
 print their own usage when you run them with no arguments.
+
+## `doctor`
+
+`doctor` runs the same read-only preflight report exposed in the web console. It checks config
+storage, saved settings, the detected encoder, running competing hosts, and the Linux compositor
+and capture environment. A blocked check exits with status 1, which makes it safe to use from a
+service install or recovery script.
+
+```sh
+slipstream-host doctor
+slipstream-host doctor --json
+```
+
+The JSON form is schema-versioned and contains stable check ids, status, detail, and one suggested
+operator action. It does not create a display, pair a client, or start a stream.
 
 ## `serve`
 

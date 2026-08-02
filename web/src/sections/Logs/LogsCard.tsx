@@ -1,8 +1,9 @@
 import { toast } from "@unom/ui/toast";
-import { Copy, Download, Pause, Play, Share2, Trash2 } from "lucide-react";
+import { Copy, Download, LifeBuoy, Pause, Play, Share2, Trash2 } from "lucide-react";
 import { type FC, useEffect, useMemo, useRef, useState } from "react";
 import { useLogsGet } from "@/api/gen/logs/logs";
 import type { LogEntry } from "@/api/gen/model/logEntry";
+import { createSupportBundle } from "@/api/support";
 import {
 	HelpTip,
 	OptionLabel,
@@ -141,6 +142,18 @@ export const LogsSection: FC = () => {
 				if (outcome === "copied") toast.success(m.logs_copied());
 				else if (outcome === "failed") toast.error(m.logs_share_failed());
 			}}
+			onSupport={async () => {
+				try {
+					const bundle = await createSupportBundle();
+					downloadText(
+						JSON.stringify(bundle, null, 2),
+						`slipstream-support-${bundle.id}.json`,
+					);
+					toast.success("Support bundle downloaded");
+				} catch (error) {
+					toast.error(error instanceof Error ? error.message : "Support bundle failed");
+				}
+			}}
 			shareMode={shareMode}
 			dropped={dropped}
 			error={query.error}
@@ -162,6 +175,7 @@ export const LogsCard: FC<{
 	onClear: () => void;
 	onDownload: (shown: LogEntry[]) => void;
 	onShare: (shown: LogEntry[]) => void;
+	onSupport: () => void;
 	shareMode: ShareMode | null;
 	dropped: boolean;
 	/** The poll's failure, if any — without it a broken /logs is indistinguishable from a quiet host. */
@@ -175,6 +189,7 @@ export const LogsCard: FC<{
 	onClear,
 	onDownload,
 	onShare,
+	onSupport,
 	shareMode,
 	dropped,
 	error,
@@ -309,6 +324,15 @@ export const LogsCard: FC<{
 								)}
 							</Button>
 						)}
+						<Button
+							size="icon"
+							variant="ghost"
+							title="Create a redacted support bundle"
+							aria-label="Create a redacted support bundle"
+							onClick={onSupport}
+						>
+							<LifeBuoy className="size-4" />
+						</Button>
 						<Button
 							size="sm"
 							variant={follow ? "secondary" : "outline"}
