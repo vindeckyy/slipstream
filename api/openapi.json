@@ -6797,6 +6797,13 @@
             "description": "FEC percentage for the native plane (`SLIPSTREAM_FEC_PCT`), when set.",
             "minimum": 0
           },
+          "gamestream": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Run and advertise the GameStream/Moonlight compatibility plane on the next host start."
+          },
           "mdns": {
             "type": "boolean",
             "description": "Advertise over mDNS (`SLIPSTREAM_MDNS`). Default on."

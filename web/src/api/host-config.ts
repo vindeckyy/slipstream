@@ -24,6 +24,7 @@ export type HostConfigFile = {
 	};
 	network: {
 		chacha20: boolean;
+		gamestream?: boolean | null;
 		mdns: boolean;
 		fec_pct?: number | null;
 	};
@@ -33,6 +34,8 @@ export type HostConfigFile = {
 		zerocopy?: boolean | null;
 	};
 };
+
+export const hostConfigQueryKey = ["host-config"] as const;
 
 export type HostConfigState = {
 	settings: HostConfigFile;

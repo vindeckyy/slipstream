@@ -11,6 +11,7 @@ import type { Loadable } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages";
 import { ConnectCard } from "./ConnectCard";
+import { MoonlightCard } from "./MoonlightCard";
 
 export const HostView: FC<{
 	host: Loadable<HostInfo>;
@@ -86,6 +87,7 @@ export const HostView: FC<{
 				{conflicts}
 				{preflight}
 				{h && <ConnectCard host={h} />}
+				{h && <MoonlightCard host={h} />}
 
 				<QueryState
 					isLoading={host.isLoading}

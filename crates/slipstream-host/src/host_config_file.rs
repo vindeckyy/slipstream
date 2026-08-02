@@ -95,6 +95,9 @@ pub struct NetworkConfig {
     /// Prefer ChaCha20-Poly1305 for soft-AES clients (`SLIPSTREAM_CHACHA20`).
     #[serde(default)]
     pub chacha20: bool,
+    /// Run and advertise the GameStream/Moonlight compatibility plane on the next host start.
+    #[serde(default)]
+    pub gamestream: Option<bool>,
     /// Advertise over mDNS (`SLIPSTREAM_MDNS`). Default on.
     #[serde(default = "default_true")]
     pub mdns: bool,
@@ -348,6 +351,9 @@ impl HostConfigFile {
             );
         }
         set_bool(&mut out, "SLIPSTREAM_CHACHA20", self.network.chacha20);
+        if let Some(gamestream) = self.network.gamestream {
+            set_bool(&mut out, "SLIPSTREAM_GAMESTREAM", gamestream);
+        }
         set_bool(&mut out, "SLIPSTREAM_MDNS", self.network.mdns);
         if let Some(pct) = self.network.fec_pct {
             set(&mut out, "SLIPSTREAM_FEC_PCT", &pct.to_string());
@@ -456,12 +462,14 @@ mod tests {
         cfg.general.perf = true;
         cfg.encoders.encoder = "nvenc".into();
         cfg.encoders.zerocopy = Some(false);
+        cfg.network.gamestream = Some(true);
         cfg.network.fec_pct = Some(30);
         let env = cfg.to_host_env();
         assert!(env.contains("SLIPSTREAM_HOST_NAME=Living Room"));
         assert!(env.contains("SLIPSTREAM_PERF=1"));
         assert!(env.contains("SLIPSTREAM_ENCODER=nvenc"));
         assert!(env.contains("SLIPSTREAM_ZEROCOPY=0"));
+        assert!(env.contains("SLIPSTREAM_GAMESTREAM=1"));
         assert!(env.contains("SLIPSTREAM_FEC_PCT=30"));
     }
 

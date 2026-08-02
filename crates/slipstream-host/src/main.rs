@@ -778,6 +778,17 @@ fn real_main() -> Result<()> {
     }
 }
 
+fn env_flag_enabled(name: &str) -> bool {
+    std::env::var(name)
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+        .unwrap_or(false)
+}
+
 /// `serve` options. The **native slipstream/1 plane + management API are the secure default and always
 /// run**; `--gamestream` additionally enables the GameStream/Moonlight-compat planes (opt-in — they
 /// carry the inherent on-path #5/#9 weaknesses, so only on a trusted LAN). Returns the mgmt options,
@@ -794,7 +805,7 @@ fn parse_serve(args: &[String]) -> Result<(mgmt::Options, native::NativeServe, b
         .ok()
         .and_then(|s| s.parse().ok());
     let mut open = false;
-    let mut gamestream = false;
+    let mut gamestream_flag = false;
     let mut no_mdns = false;
     // Did the operator pin the mgmt bind themselves? If not, we LAN-expose the read surface below so
     // paired clients can browse the game library out of the box (the bearer admin surface stays
@@ -843,7 +854,7 @@ fn parse_serve(args: &[String]) -> Result<(mgmt::Options, native::NativeServe, b
             }
             // Opt into the GameStream/Moonlight-compat planes (off by default — they carry the
             // inherent on-path #5/#9 weaknesses; only for a trusted LAN).
-            "--gamestream" | "--moonlight" => gamestream = true,
+            "--gamestream" | "--moonlight" => gamestream_flag = true,
             // Disable mandatory native pairing — any device can connect (trusted single-user
             // setups only). The default REQUIRES pairing.
             "--open" => open = true,
@@ -886,6 +897,12 @@ fn parse_serve(args: &[String]) -> Result<(mgmt::Options, native::NativeServe, b
         data_port,
         mdns: !no_mdns && discovery::mdns_enabled(),
     };
+    // A saved console preference wins over CLI and environment defaults, so the switch can turn
+    // GameStream off again after a restart.
+    let gamestream = crate::host_config_file::get()
+        .network
+        .gamestream
+        .unwrap_or_else(|| gamestream_flag || env_flag_enabled("SLIPSTREAM_GAMESTREAM"));
     Ok((opts, native, gamestream))
 }
 

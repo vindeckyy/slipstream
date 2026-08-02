@@ -18,6 +18,7 @@ import {
 } from "react";
 import {
 	getHostConfig,
+	hostConfigQueryKey,
 	type HostConfigFile,
 	setHostConfig,
 } from "@/api/host-config";
@@ -42,8 +43,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages";
-
-const QK = ["host-config"] as const;
 
 const fieldControlClass =
 	"h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 sm:w-56";
@@ -236,7 +235,7 @@ export const SectionConfig: FC = () => {
 	useLocale();
 	const qc = useQueryClient();
 	const q = useQuery({
-		queryKey: QK,
+		queryKey: hostConfigQueryKey,
 		queryFn: getHostConfig,
 		staleTime: 5_000,
 	});
@@ -254,7 +253,7 @@ export const SectionConfig: FC = () => {
 	const save = useMutation({
 		mutationFn: setHostConfig,
 		onSuccess: (state) => {
-			qc.setQueryData(QK, state);
+			qc.setQueryData(hostConfigQueryKey, state);
 			setDraft(structuredClone(state.settings));
 			toast.success("Configuration saved. Restart the host to apply.");
 		},
@@ -936,6 +935,19 @@ export const SectionConfig: FC = () => {
 												onChange={(v) =>
 													patch((d) => {
 														d.network.mdns = v;
+													})
+												}
+											/>
+											<ToggleRow
+												label="Moonlight broadcast"
+												hint="Expose the GameStream plane to Moonlight."
+												help="Starts the Moonlight-compatible GameStream services and advertises this host on the LAN after the next host restart. Enable only on a trusted network."
+												recommended="Off"
+												checked={draft.network.gamestream ?? false}
+												onChange={(v) =>
+													patch((d) => {
+														d.network.gamestream = v;
+														if (v) d.network.mdns = true;
 													})
 												}
 											/>
