@@ -20,6 +20,7 @@
 //! key events) is enough.
 
 use super::{gs_button_to_evdev, vk_to_evdev, InputInjector};
+use crate::touch::VirtualTouchscreen;
 use crate::AbsoluteAnchor;
 use anyhow::{anyhow, Result};
 use ashpd::desktop::{
@@ -123,6 +124,30 @@ enum PendingDecision {
     Ready,
     Waiting,
     Unsupported,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TouchBackend {
+    Eis,
+    Uinput,
+    Pointer,
+    Dropped,
+}
+
+fn choose_touch_backend(
+    eis_touch: bool,
+    allow_uinput: bool,
+    pointer_fallback: bool,
+) -> TouchBackend {
+    if eis_touch {
+        TouchBackend::Eis
+    } else if allow_uinput {
+        TouchBackend::Uinput
+    } else if pointer_fallback {
+        TouchBackend::Pointer
+    } else {
+        TouchBackend::Dropped
+    }
 }
 
 /// Bounded input retained across device negotiation and EIS reconnects. Motion is coalesced before
@@ -316,6 +341,7 @@ async fn session_main(
     source: EiSource,
     pending: &mut PendingInput,
 ) -> SessionExit {
+    let allow_uinput_touch = matches!(&source, EiSource::MutterEis);
     // Keep `_rd`/`_session` bound for the whole loop — dropping the portal session closes the
     // EIS connection. Bound the setup so a headless approval dialog (un-bypassed grant) can't
     // hang the worker forever.
@@ -353,7 +379,7 @@ async fn session_main(
     };
     tracing::info!("libei: EIS connected — awaiting devices");
 
-    let mut state = EiState::new();
+    let mut state = EiState::new(allow_uinput_touch);
     state.output_hint = output_hint;
     // Watchdog: a healthy EIS server adds + resumes an input device within a beat of the handshake.
     // If none has resumed by this deadline, the connection is dead-on-arrival (stale/half-ready
@@ -804,6 +830,13 @@ struct EiState {
     /// The touch id currently degraded to the absolute pointer ([`EiState::degrade_touch`]) —
     /// the "primary finger" while the EIS has no touchscreen device. `None` between touches.
     degraded_touch: Option<u32>,
+    /// GNOME's direct Mutter EIS path may have no touchscreen device even though `/dev/uinput`
+    /// can feed the compositor's normal libinput seat.
+    allow_uinput_touch: bool,
+    uinput_touch_failed: bool,
+    touchscreen: Option<VirtualTouchscreen>,
+    /// Keep a gesture on one injection path if EIS devices change while contacts are down.
+    touch_backend: Option<TouchBackend>,
     /// The compositor's output size (relay-file "WxH" hint) — scale target for absolute
     /// coordinates when the device's region is degenerate/absent (gamescope). Without it the
     /// fallback is raw client pixels, correct only when the stream runs at the output's size.
@@ -867,7 +900,7 @@ fn kind_bit(kind: InputKind) -> u32 {
 }
 
 impl EiState {
-    fn new() -> Self {
+    fn new(allow_uinput_touch: bool) -> Self {
         Self {
             devices: Vec::new(),
             last_serial: 0,
@@ -879,6 +912,10 @@ impl EiState {
             held_buttons: Vec::new(),
             held_touches: Vec::new(),
             degraded_touch: None,
+            allow_uinput_touch,
+            uinput_touch_failed: false,
+            touchscreen: None,
+            touch_backend: None,
             output_hint: None,
         }
     }
@@ -897,7 +934,8 @@ impl EiState {
             std::mem::take(&mut self.held_buttons),
             std::mem::take(&mut self.held_touches),
         );
-        if keys.is_empty() && buttons.is_empty() && touches.is_empty() {
+        if keys.is_empty() && buttons.is_empty() && touches.is_empty() && self.touchscreen.is_none()
+        {
             return;
         }
         tracing::info!(
@@ -923,6 +961,10 @@ impl EiState {
         for id in touches {
             self.inject(&release(InputKind::TouchUp, id), ctx);
         }
+        if let Some(touchscreen) = self.touchscreen.as_mut() {
+            touchscreen.release_all();
+        }
+        self.touch_backend = None;
     }
 
     fn now_us(&self) -> u64 {
@@ -1046,6 +1088,57 @@ impl EiState {
         }
     }
 
+    fn uinput_touch_capability(&self) -> bool {
+        self.allow_uinput_touch
+            && !self.uinput_touch_failed
+            && self.devices.iter().any(|device| device.resumed)
+    }
+
+    fn select_touch_backend(&mut self) -> TouchBackend {
+        if let Some(backend) = self.touch_backend {
+            return backend;
+        }
+
+        let eis_touch = self.device_for(DeviceCapability::Touch).is_some();
+        let pointer_fallback = self.device_for(DeviceCapability::PointerAbsolute).is_some()
+            && self.device_for(DeviceCapability::Button).is_some();
+        let mut backend = choose_touch_backend(
+            eis_touch,
+            self.allow_uinput_touch && !self.uinput_touch_failed,
+            pointer_fallback,
+        );
+        if backend == TouchBackend::Uinput && self.touchscreen.is_none() {
+            match VirtualTouchscreen::create() {
+                Ok(touchscreen) => self.touchscreen = Some(touchscreen),
+                Err(error) => {
+                    self.uinput_touch_failed = true;
+                    tracing::warn!(
+                        error = %format!("{error:#}"),
+                        "libei: Mutter has no EIS touchscreen and the uinput touchscreen could not be created"
+                    );
+                    backend = choose_touch_backend(eis_touch, false, pointer_fallback);
+                }
+            }
+        }
+        self.touch_backend = Some(backend);
+        backend
+    }
+
+    fn inject_uinput_touch(&mut self, event: &InputEvent) -> bool {
+        let Some(touchscreen) = self.touchscreen.as_mut() else {
+            return false;
+        };
+        touchscreen.apply(event);
+        match event.kind {
+            InputKind::TouchDown if !self.held_touches.contains(&event.code) => {
+                self.held_touches.push(event.code);
+            }
+            InputKind::TouchUp => self.held_touches.retain(|&id| id != event.code),
+            _ => {}
+        }
+        true
+    }
+
     /// Degrade touch to a single-finger ABSOLUTE POINTER on compositors whose EIS never
     /// creates a touchscreen device (gamescope's "Gamescope Virtual Input" advertises
     /// pointer/pointer_abs/button but no touch — observed live; headless KWin the same).
@@ -1115,17 +1208,26 @@ impl EiState {
 
     /// Translate and emit one client input event, committing it as a single `frame`.
     fn inject(&mut self, ev: &InputEvent, ctx: &ei::Context) -> bool {
-        // No ei_touchscreen device but an absolute pointer exists → degrade rather than drop
-        // (the game-mode "touch simply does not work" trap). A contact that starts on the
-        // pointer fallback stays there through TouchUp, even if a touch device resumes later.
         if matches!(
             ev.kind,
             InputKind::TouchDown | InputKind::TouchMove | InputKind::TouchUp
-        ) && (self.degraded_touch.is_some()
-            || (self.device_for(DeviceCapability::Touch).is_none()
-                && self.device_for(DeviceCapability::PointerAbsolute).is_some()))
-        {
-            return self.degrade_touch(ev, ctx);
+        ) {
+            match self.select_touch_backend() {
+                TouchBackend::Eis => {}
+                TouchBackend::Uinput => return self.inject_uinput_touch(ev),
+                TouchBackend::Pointer => return self.degrade_touch(ev, ctx),
+                TouchBackend::Dropped => {
+                    static WARNED: std::sync::atomic::AtomicBool =
+                        std::sync::atomic::AtomicBool::new(false);
+                    if !WARNED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                        tracing::warn!(
+                            "touch received, but no touchscreen or absolute-pointer fallback \
+                             is available"
+                        );
+                    }
+                    return true;
+                }
+            }
         }
         let cap = match ev.kind {
             InputKind::MouseMove => DeviceCapability::Pointer,
@@ -1140,7 +1242,7 @@ impl EiState {
             | InputKind::GamepadButton
             | InputKind::GamepadAxis
             | InputKind::GamepadRemove
-            | InputKind::GamepadArrival => return true, // uinput path (later)
+            | InputKind::GamepadArrival => return true, // uinput path
             // libei presses keycodes against the server's negotiated keymap — no committed-text
             // path (the HOST_CAP_TEXT_INPUT cap is not advertised on this backend).
             InputKind::TextInput => return true,
@@ -1385,8 +1487,12 @@ fn flush_pending(
     negotiation_settled: bool,
 ) -> bool {
     loop {
-        let resumed = state.resumed_capabilities();
-        let advertised = state.advertised_capabilities();
+        let mut resumed = state.resumed_capabilities();
+        let mut advertised = state.advertised_capabilities();
+        if state.uinput_touch_capability() {
+            resumed.insert(DeviceCapability::Touch);
+            advertised.insert(DeviceCapability::Touch);
+        }
         let Some((event, _decision)) =
             pending.next_resolved(resumed, advertised, negotiation_settled)
         else {
@@ -1655,5 +1761,22 @@ mod tests {
         assert_eq!(crate::absolute_anchor().unwrap().origin, Some((1920, 0)));
         crate::set_absolute_anchor(None);
         assert_eq!(crate::absolute_anchor(), None);
+    }
+
+    #[test]
+    fn touch_backend_prefers_mutter_uinput_before_pointer_degradation() {
+        assert_eq!(
+            choose_touch_backend(false, true, true),
+            TouchBackend::Uinput
+        );
+        assert_eq!(choose_touch_backend(true, true, true), TouchBackend::Eis);
+        assert_eq!(
+            choose_touch_backend(false, false, true),
+            TouchBackend::Pointer
+        );
+        assert_eq!(
+            choose_touch_backend(false, false, false),
+            TouchBackend::Dropped
+        );
     }
 }

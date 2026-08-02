@@ -147,6 +147,10 @@ Touch passthrough depends on the host being able to inject touch, and that varie
 | Sway, Hyprland and other wlroots compositors | Not injected — contacts are dropped |
 | gamescope Gaming Mode | Degraded to a single absolute pointer — see [gamescope](/docs/gamescope) |
 
+On GNOME/Mutter, Slipstream uses a virtual Linux touchscreen when Mutter's direct EIS session
+does not expose a touchscreen device. This needs the same `/dev/uinput` access used by virtual
+gamepads. Without that access, GNOME falls back to the single-pointer behavior described below.
+
 The gamescope row is a rule, not an exception: wherever the compositor offers no touchscreen device
 to drive, only the first finger is used, as an absolute pointer. Tapping still clicks; pinches and
 other multi-finger gestures do not survive.
@@ -180,9 +184,10 @@ The Linux, Windows, macOS and Apple TV clients do not send stylus input.
 - On **Windows**, a per-session synthetic pen pointer feeds Windows' normal pen system: pressure,
   tilt, rotation, the barrel button and the eraser. This needs **Windows 10 1809 or newer**.
 
-**Before it can work on Linux**, the host needs access to `/dev/uinput` — the same `input` group step
-the virtual gamepads need, covered under [After installing](/docs/install#after-installing). Without
-it the host never offers pen at all.
+**Before touch passthrough and pen input can work on Linux**, the host needs access to
+`/dev/uinput` — the same `input` group step the virtual gamepads need, covered under
+[After installing](/docs/install#after-installing). Without it, GNOME falls back to a single
+pointer and the host never offers pen input.
 
 **If the host is too old, or pen is switched off**, nothing breaks: the client keeps folding the
 stylus into its ordinary touch or pointer path. You can still draw — just without pressure and tilt.

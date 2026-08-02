@@ -123,6 +123,9 @@ pub fn spawn(state: Arc<AppState>) -> Result<()> {
                                 hdr_sent = false;
                                 // Unplug the session's virtual pads + tablet (destroying the
                                 // uinput pen releases any held tool/tip kernel-side).
+                                pointer.release_touches(|event| {
+                                    let _ = inj_tx.send(event);
+                                });
                                 pads = GamepadManager::new();
                                 pointer = super::pen::GsPointer::new();
                                 // The control stream is the session's liveness anchor — Moonlight
@@ -204,6 +207,9 @@ pub fn spawn(state: Arc<AppState>) -> Result<()> {
                         detected = None;
                         decrypt_fails = 0;
                         hdr_sent = false;
+                        pointer.release_touches(|event| {
+                            let _ = inj_tx.send(event);
+                        });
                         pads = GamepadManager::new();
                         pointer = super::pen::GsPointer::new();
                     }

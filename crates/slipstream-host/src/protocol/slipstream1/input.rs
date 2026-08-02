@@ -721,6 +721,7 @@ pub(super) fn input_thread(
     const MAX_HELD: usize = 256;
     let mut held_buttons: std::collections::HashSet<u32> = std::collections::HashSet::new();
     let mut held_keys: std::collections::HashSet<u32> = std::collections::HashSet::new();
+    let mut held_touches: std::collections::HashSet<u32> = std::collections::HashSet::new();
     let mut pen = PenSession::new();
     loop {
         // While a pen is in range/touching, wake at least every 100 ms so the stroke failsafe
@@ -855,6 +856,12 @@ pub(super) fn input_thread(
                         InputKind::KeyUp => {
                             held_keys.remove(&ev.code);
                         }
+                        InputKind::TouchDown if held_touches.len() < MAX_HELD => {
+                            held_touches.insert(ev.code);
+                        }
+                        InputKind::TouchUp => {
+                            held_touches.remove(&ev.code);
+                        }
                         _ => {}
                     }
                     // Pointer/keyboard → the host-lifetime injector service (one persistent
@@ -967,11 +974,12 @@ pub(super) fn input_thread(
     // session, so without this a button pressed at disconnect stays latched and breaks clicks for
     // the next session. Mirror of the injector's own release_all, but keyed off the session, which
     // is where a client actually vanishes mid-press.
-    if !held_buttons.is_empty() || !held_keys.is_empty() {
+    if !held_buttons.is_empty() || !held_keys.is_empty() || !held_touches.is_empty() {
         tracing::debug!(
             buttons = held_buttons.len(),
             keys = held_keys.len(),
-            "input: releasing held buttons/keys at session end"
+            touches = held_touches.len(),
+            "input: releasing held buttons, keys, and touches at session end"
         );
     }
     for code in held_buttons {
@@ -994,6 +1002,22 @@ pub(super) fn input_thread(
             flags: 0,
         });
     }
+    for event in release_touch_events(&held_touches) {
+        let _ = inj_tx.send(event);
+    }
+}
+
+fn release_touch_events(ids: &std::collections::HashSet<u32>) -> Vec<InputEvent> {
+    ids.iter()
+        .map(|&code| InputEvent {
+            kind: InputKind::TouchUp,
+            _pad: [0; 3],
+            code,
+            x: 0,
+            y: 0,
+            flags: 0,
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -1091,5 +1115,20 @@ mod tests {
         assert!(s.apply(&gp(InputKind::GamepadAxis, AXIS_LT, 9_999, 0)));
         assert_eq!(s.left_trigger, 255);
         assert!(!s.apply(&gp(InputKind::GamepadAxis, 42, 1, 0)));
+    }
+
+    #[test]
+    fn disconnect_releases_every_held_touch_id() {
+        let ids = std::collections::HashSet::from([7, 3]);
+        let mut events = release_touch_events(&ids);
+        events.sort_by_key(|event| event.code);
+
+        assert_eq!(
+            events
+                .iter()
+                .map(|event| (event.kind, event.code))
+                .collect::<Vec<_>>(),
+            vec![(InputKind::TouchUp, 3), (InputKind::TouchUp, 7)]
+        );
     }
 }

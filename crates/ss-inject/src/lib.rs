@@ -495,6 +495,11 @@ pub mod pen;
 #[cfg(target_os = "windows")]
 #[path = "input/windows/stream_target.rs"]
 pub mod stream_target;
+/// Linux: the "Slipstream Touchscreen" uinput virtual touchscreen used when Mutter's EIS
+/// connection does not expose a touchscreen device.
+#[cfg(target_os = "linux")]
+#[path = "input/linux/touch.rs"]
+pub mod touch;
 #[cfg(target_os = "windows")]
 pub use stream_target::set_stream_target;
 /// Stub — pen injection needs the Linux uinput tablet or Windows synthetic pointers;

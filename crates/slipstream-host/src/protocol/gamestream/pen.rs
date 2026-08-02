@@ -240,6 +240,20 @@ impl GsPointer {
             _ => {}
         }
     }
+
+    /// Lift every touch still owned by this GameStream control peer.
+    pub fn release_touches(&mut self, mut sink: impl FnMut(InputEvent)) {
+        for id in self.touch_ids.drain(..) {
+            sink(InputEvent {
+                kind: InputKind::TouchUp,
+                _pad: [0; 3],
+                code: id,
+                x: 0,
+                y: 0,
+                flags: 0,
+            });
+        }
+    }
 }
 
 #[cfg(test)]
@@ -367,5 +381,29 @@ mod tests {
         got.clear();
         g.apply_touch(&t(LI_TOUCH_EVENT_CANCEL_ALL, 0, 0.0), |e| got.push(e));
         assert!(got.is_empty());
+    }
+
+    #[test]
+    fn release_touches_lifts_contacts_when_the_control_peer_vanishes() {
+        let mut g = GsPointer::new();
+        let mut got = Vec::new();
+        let touch = |pointer_id| SsTouch {
+            event_type: LI_TOUCH_EVENT_DOWN,
+            rotation: 0,
+            pointer_id,
+            x: 0.5,
+            y: 0.5,
+            pressure_or_distance: 0.0,
+        };
+
+        g.apply_touch(&touch(2), |event| got.push(event));
+        g.apply_touch(&touch(5), |event| got.push(event));
+        got.clear();
+        g.release_touches(|event| got.push(event));
+
+        assert_eq!(got.len(), 2);
+        assert!(got.iter().all(|event| event.kind == InputKind::TouchUp));
+        assert!(got.iter().all(|event| event.flags == 0));
+        assert!(g.touch_ids.is_empty());
     }
 }
