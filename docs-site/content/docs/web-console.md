@@ -4,7 +4,8 @@ description: Enable the Slipstream browser console, read or change its login pas
 ---
 
 The web console is the browser UI for a Slipstream host — live status, pairing, display policy, the
-game library, logs, plugins and host updates. It ships as the **`slipstream-web`** systemd user unit
+game library, logs, plugins, host readiness, power controls and host updates. It ships as the
+**`slipstream-web`** systemd user unit
 on Linux and runs under the **Slipstream Host service** on Windows, and serves on **`https://<host-ip>:47992`**
 (HTTPS with the host's own self-signed identity cert — your browser warns once; trust it and
 continue). It's the surface you expose on the LAN to administer the host; the host's own management
@@ -106,7 +107,8 @@ Nine destinations in the sidebar (a **More** tab on a phone holds the last five)
   advertises, its ports, a read-only **Preflight** card with the same checks as `slipstream-host
   doctor`, the **Updates** card (see [Updating the Host](/docs/updating)), the **GPUs** card,
   Automatic or a preferred GPU for capture and encode, applied to the next session, and the
-  compositor backends it found.
+  compositor backends it found. The **Host power** card can restart or stop the Slipstream host
+  process after a confirmation; it does not power off the computer.
 - **Virtual displays** — the policy for the display each session gets, and the Streamed screen
   picker. See [Virtual displays](/docs/virtual-displays).
 - **Library** — the games every client sees: turn a launcher source on or off, add or edit a custom
@@ -114,8 +116,9 @@ Nine destinations in the sidebar (a **More** tab on a phone holds the last five)
 - **Performance** — arm a capture, run a session, stop it, and read the recording back as
   per-stage latency, throughput and health graphs.
 - **Logs** lets you follow the host's recent log stream live, filter by level, search it, download or
-  share it for a bug report, and create an owner-private redacted support bundle with the current
-  host state, recent logs, and performance summaries.
+  share it for a bug report, and create an owner-private redacted support bundle. The bundle contains
+  host state, recent logs, and performance summaries, downloads as JSON, and is also stored under the
+  host's private config directory. It is never uploaded by the console.
 - **Pairing** — arm a PIN, approve or deny devices waiting for approval, and unpair a device. A
   second PIN box for [Moonlight/GameStream](/docs/moonlight) clients appears only when this host
   runs the GameStream plane.
@@ -123,3 +126,13 @@ Nine destinations in the sidebar (a **More** tab on a phone holds the last five)
   runner switch; an installed plugin with a UI gets its own entry below. See
   [Plugins](/docs/plugins).
 - **Settings** — the console's language, and **Sign out**.
+
+### Preflight and host power
+
+The **Preflight** card runs read-only checks for configuration, storage, the encoder, the compositor,
+capture, and competing hosts. A blocked check includes an action that can resolve it. Use **Refresh**
+after changing the host setup.
+
+**Restart** restarts the Slipstream host process and waits for the console to reconnect. **Shutdown**
+stops the process without powering off the computer. Both actions end active sessions and require
+confirmation. Start the host service again on the machine after a shutdown.
