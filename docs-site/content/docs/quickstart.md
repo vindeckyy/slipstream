@@ -114,26 +114,43 @@ host.
 
 Worth knowing before you need it: on the desktop clients the stream *takes* your mouse and keyboard
 when it starts, and again whenever you click into it. **Ctrl+Alt+Shift+Q** (**⌃⌥⇧Q** on macOS) hands
-them back. The other in-stream shortcuts, and the mouse, touch and pen modes, are on
+them back. For remote desktop / office work, switch to **Desktop (absolute)** mouse
+(**Ctrl+Alt+Shift+M**) so the pointer is not locked — Capture mode is the default and is meant for
+games. The other in-stream shortcuts, and the mouse, touch and pen modes, are on
 [Mouse, touch and pen](/docs/input).
 
 ## Now that it works
 
-Slipstream does more than mirror a screen:
+Pick the path that matches what you hired Slipstream for.
 
-- Browse the host's installed games and launch one straight into the stream, 
+### Play
+
+- Browse the host's installed games and launch one straight into the stream,
   [Game library](/docs/game-library).
-- Save named stream settings, bind them to a host, and start a session from a shortcut or a script, 
-  [Profiles and links](/docs/profiles-and-links).
-- Copy on one machine and paste on the other, [Shared clipboard](/docs/clipboard).
-- Connect to a host that's asleep, [Wake-on-LAN](/docs/wake-on-lan).
+- Use Capture (game) mouse for mouse-look titles, [Mouse, touch and pen](/docs/input).
 - Get a 10-bit HDR picture where the whole chain allows it, [HDR](/docs/hdr).
+- Connect to a host that's asleep, [Wake-on-LAN](/docs/wake-on-lan).
+
+### Work
+
+- Follow the office checklist: VPN, Desktop mouse, clipboard, Workstation / Hot-desk,
+  [Desktop at work](/docs/desktop-at-work).
+- Reach the host from another network safely, [Network & VPN](/docs/network-and-vpn).
+- Copy on one machine and paste on the other, [Shared clipboard](/docs/clipboard).
+- Save a Work settings profile separate from your couch profile,
+  [Profiles and links](/docs/profiles-and-links).
+
+### Either way
+
+- Save named stream settings, bind them to a host, and start a session from a shortcut or a script,
+  [Profiles and links](/docs/profiles-and-links).
+- Tune resolution, refresh, bitrate, codec and HDR in
+  [client settings](/docs/client-settings); the host's own knobs are in
+  [Configuration](/docs/configuration).
 
 ## Keep it running
 
-- Tune the picture, resolution, refresh, bitrate, codec and HDR are all
-  [client settings](/docs/client-settings); the host's own knobs are in
-  [Configuration](/docs/configuration).
 - Make it always-on, no login, no monitor: [Running as a Service](/docs/running-as-a-service).
 - Keep it current with [Updating](/docs/updating); changed your mind? [Uninstall](/docs/uninstall).
-- Hit a snag? See [Troubleshooting](/docs/troubleshooting).
+- Hit a snag? See [Troubleshooting](/docs/troubleshooting), including
+  [Office / VPN](/docs/troubleshooting#office--vpn).

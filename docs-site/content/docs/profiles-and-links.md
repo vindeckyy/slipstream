@@ -90,6 +90,18 @@ Pin it in the host's edit sheet on Linux, Android and Apple, or from a card menu
 Apple, **Pin as card: ...** on Android, **Pin tiles** on Windows. A pinned card is a shortcut, not a
 second host: unpinning changes neither the profile nor the host's binding.
 
+### Work vs Play on the same host
+
+If one host is both your office desktop and your game PC, make two profiles and bind or pin them:
+
+| Profile | Typical overrides |
+|---|---|
+| **Work** | Desktop (absolute) mouse, HEVC, full chroma / 4:4:4 when the link allows, HDR off, bitrate high enough for sharp text |
+| **Play** | Capture (games) mouse, HDR as you like, bitrate / refresh for the title |
+
+Clipboard stays a per-host trust toggle, not a profile row — see [Clipboard](/docs/clipboard). The
+full office checklist is on [Desktop at work](/docs/desktop-at-work).
+
 ## Deleting a profile
 
 The confirmation tells you what breaks: how many hosts will fall back to **Default settings**, and

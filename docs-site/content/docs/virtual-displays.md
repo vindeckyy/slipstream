@@ -1,6 +1,6 @@
 ---
 title: Virtual displays
-description: Control how Slipstream creates, keeps alive, and arranges the virtual displays it streams, presets, keep-alive, exclusive vs. extend, and persistent per-client scaling.
+description: Control how Slipstream creates, keeps alive, and arranges the virtual displays it streams — office and gaming presets, keep-alive, exclusive vs. extend, and persistent per-client scaling.
 ---
 
 When a client connects, Slipstream creates a **virtual display** sized to exactly that client's
@@ -131,6 +131,91 @@ on, and prints the region it mapped into. `--none` runs the same walk unanchored
 The anchor rides the **libei** injector, the backend a GNOME/Mutter host uses. On KWin, Sway and
 Hyprland the host injects through a different protocol, and `anchor-test` stops with a message
 saying so rather than reporting a green run that proves nothing.
+
+## Which preset for your situation
+
+The five built-ins cover the setups people actually run: a family PC you also sit at, an office
+laptop that roams between devices, a multi-monitor daily driver you use from work, a dedicated
+couch or stream box, and "leave the defaults alone." Pick from the table below once you know which
+story matches; the rest of this section is the why.
+
+### Shared desktop — family PC you also sit at
+
+Use this when the host is a real desk machine people walk up to, and streaming must not fight the
+person in the room. The preset **extends** the virtual display alongside your physical monitors
+(nothing is blanked), tears the streamed display down as soon as the session ends (**keep-alive
+off**, so no leftover ghost), and gives extra viewers each their **own** screen rather than kicking
+whoever is already connected.
+
+Typical case: a living-room or study PC that someone games or works on remotely while another
+person still needs the monitors. Pair it with [Desktop at work](/docs/desktop-at-work) only if that
+machine is also your office remote; otherwise leave game-oriented client settings as they are.
+Do **not** stack a long or forever keep-alive with Exclusive topology on a shared machine, that
+combination is what leaves physical monitors dark after a disconnect (see
+[Keep alive](#keep-alive)).
+
+### Hot-desk — roam devices, one person, office laptop + tablet
+
+One person owns the box; they bounce between devices (laptop at the desk, tablet on the couch, phone
+on the train) and want a fast reconnect without reshuffling the desktop. Keep-alive lingers for
+**five minutes**, topology is **Exclusive** so the streamed surface *is* the desktop, a second
+person is **rejected** with a clean "host busy," and identity is **per client + resolution** so each
+device keeps its own scaling.
+
+This is the usual pick when you sit at an office laptop and occasionally switch to a tablet on the
+same host. For the full office path (VPN, clipboard, absolute mouse, Work vs Play profiles), start
+at [Desktop at work](/docs/desktop-at-work) and run the host as a
+[service](/docs/running-as-a-service) so it is there when you join the VPN.
+
+### Workstation — multi-monitor daily driver for remote work
+
+Your own desk machine, often several physical monitors, that you use as a remote desktop from the
+office or another room. Keep-alive is again a **five-minute** linger, topology **Exclusive**, extra
+clients each get a **separate** display (you can arrange them), identity is **per client**, and
+layout mode is **manual** so displays come back where you placed them on the Virtual displays page.
+
+Reach for Workstation when the host is *your* daily driver and you care about arrangement and
+per-client settings sticking across reconnects. Hot-desk is better when you only ever want one
+session at a time and roam resolutions; Workstation is better when several clients (or several
+resolutions you treat as monitors of one desktop) should coexist in a layout you own. Office
+checklist and honest limits: [Desktop at work](/docs/desktop-at-work).
+
+### Headless box — dedicated stream box / couch box
+
+A machine with no one sitting at it, or whose only job is to be streamed: a Steam Deck / Bazzite
+couch box, a living-room HTPC, a dedicated game host in a closet. Keep-alive is **forever** (the
+display and, on a gamescope game host, the game itself survive disconnects), topology is
+**Exclusive**, and the next client **steals** the box. Release the display from the console when
+you are done for the day, or the session (and on a couch box, often the TV picture) stays pinned.
+
+This is the gaming / appliance preset, not the office one. If you also do remote desktop from the
+same hardware, prefer a real desktop session (KDE / GNOME / Hyprland / Sway) for work and leave
+Headless box for the game-mode or dedicated-stream path.
+
+### Default — when to leave it alone
+
+Default is today's behavior made explicit: a short **10-second** keep-alive, **Automatic** topology
+(Exclusive on a normal Windows or KDE/GNOME desktop), extra viewers get **separate** displays, and
+per-client identity with an automatic row layout. Reconnects resume quickly; you do not have to
+think about forever pins, steal-on-connect, or manual layouts.
+
+Leave Default alone until you have a reason not to. The callout at the top of this page is the
+rule: reach for a named preset when you want a specific experience (shared desk, roaming office
+devices, multi-monitor workstation, or dedicated box). Switching presets never changes *Dedicated
+game sessions*; that axis stays whatever you set it to.
+
+### Office work and gamescope
+
+Presets only decide display policy. For pointing, clicking, and window chrome you also need
+**Desktop (absolute)** mouse on the client, and a host session that can accept it. **gamescope /
+Gaming Mode cannot take absolute pointer input**: ask for desktop mouse against one and the
+session quietly stays in capture mode ([Mouse modes](/docs/input#mouse-modes)). That is fine for
+games and a poor fit for office UI.
+
+For remote work, run a full desktop session on the host, not gamescope Game Mode; see
+[Desktop at work](/docs/desktop-at-work) and keep the host available with
+[Running as a Service](/docs/running-as-a-service). Input modes and the gamescope limit are covered
+on [Mouse, touch and pen](/docs/input).
 
 ## Pick a preset
 

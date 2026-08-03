@@ -265,6 +265,30 @@ names the clients and host sessions where nothing crosses no matter what you set
   the client. See [Pairing & Trust](/docs/pairing).
 - If you re-installed the host, its identity changed, re-pair the client.
 
+## Office / VPN
+
+Connecting from an office laptop to a home host is the same product path as LAN streaming, with a
+few networking twists. The full guides are [Desktop at work](/docs/desktop-at-work) and
+[Network & VPN](/docs/network-and-vpn). Quick checks:
+
+- **Host list is empty over VPN, but works on home Wi‑Fi.** mDNS usually does not cross a VPN.
+  Add the host by its VPN IP (Tailscale / WireGuard / LAN address reachable through the tunnel).
+- **Connect starts, then video stalls or never appears.** Confirm the VPN allows UDP to the host
+  (native control **9777**, plus the negotiated media port). Overly strict ACLs that allow only TCP
+  will break the stream. See [Video is slow to start, or fails across
+  subnets](#video-is-slow-to-start-or-fails-across-subnets).
+- **Mouse feels wrong for desk work.** Desktop clients default to **Capture (game)** mouse. Switch
+  to **Desktop (absolute)** with **Ctrl+Alt+Shift+M**, or set it in client Input settings. gamescope
+  / Gaming Mode hosts cannot take absolute mouse — use a full desktop session for office work
+  ([Input](/docs/input#mouse-modes)).
+- **Clipboard does nothing.** Both host `SLIPSTREAM_CLIPBOARD` and the per-host client switch must
+  be on ([Clipboard](/docs/clipboard)).
+- **Wake-on-LAN from the office does nothing.** WoL is a LAN broadcast; most VPNs will not deliver
+  it. Leave the machine on, wake it before you leave, or use another wake path
+  ([Wake-on-LAN](/docs/wake-on-lan)).
+- **Do not port-forward** Slipstream to the public internet. Use the VPN
+  ([Security](/docs/security)).
+
 ## The picture freezes for a moment, over and over (Windows)
 
 A freeze that comes back on a **rhythm**, every few seconds, every minute, always the same gap, is
