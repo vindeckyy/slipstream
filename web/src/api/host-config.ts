@@ -21,6 +21,9 @@ export type HostConfigFile = {
 		ten_bit: boolean;
 		four_four_four: boolean;
 		gamescope_hdr: boolean;
+		audio_fec?: boolean;
+		audio_gain?: number | null;
+		audio_capture?: string | null;
 	};
 	network: {
 		chacha20: boolean;

@@ -879,6 +879,83 @@ export const SectionConfig: FC = () => {
 													}
 												/>
 											</Row>
+										</FieldGroup>
+
+										<FieldGroup title="Audio">
+											<ToggleRow
+												label="Audio FEC"
+												hint="Rebuild lost audio instead of clicking."
+												help="RS erasure parity over groups of 5 ms Opus frames. A lost packet is rebuilt from its group's parity on wifi and other lossy links. Adds ~40 ms of buffered audio only when a client supports it. Leave on; off is an escape hatch."
+												recommended="On"
+												checked={draft.audio_video.audio_fec ?? true}
+												onChange={(v) =>
+													patch((d) => {
+														d.audio_video.audio_fec = v;
+													})
+												}
+											/>
+											<Row
+												label="Audio gain"
+												hint="0.0 to 4.0, blank = 1.0 (unchanged)."
+												help="Linear gain applied to captured audio before encoding. Raise it for quiet sources, lower it if the stream clips. 0.5 = half, 2.0 = double."
+												recommended="1.0"
+												htmlFor="cfg-audio-gain"
+												controlWidth="sm"
+											>
+												<Input
+													id="cfg-audio-gain"
+													className={cn(fieldControlClass, "sm:w-28")}
+													type="number"
+													min={0}
+													max={4}
+													step={0.1}
+													value={draft.audio_video.audio_gain ?? ""}
+													onChange={(e) =>
+														patch((d) => {
+															const n = Number(e.target.value);
+															d.audio_video.audio_gain = e.target.value
+																? n
+																: null;
+														})
+													}
+												/>
+											</Row>
+											<Row
+												label="Capture source"
+												hint="How host audio is captured on Linux."
+												help="Stream sink (default) creates a host-owned sink that apps play into directly, immune to hardware-sink changes. Monitor records the default sink's output instead — use it if a specific app won't play into the virtual sink."
+												recommended="Stream sink"
+												htmlFor="cfg-audio-capture"
+												controlWidth="sm"
+											>
+												<FieldSelect
+													id="cfg-audio-capture"
+													className={cn(fieldControlClass, "sm:w-40")}
+													value={draft.audio_video.audio_capture ?? "stream-sink"}
+													onChange={(e) =>
+														patch((d) => {
+															d.audio_video.audio_capture = e.target.value || null;
+														})
+													}
+												>
+													<HelpOption
+														value="stream-sink"
+														recommended
+														title="Host-owned sink apps play into directly."
+													>
+														Stream sink
+													</HelpOption>
+													<HelpOption
+														value="monitor"
+														title="Record the default sink's output."
+													>
+														Monitor
+													</HelpOption>
+												</FieldSelect>
+											</Row>
+										</FieldGroup>
+
+										<FieldGroup title="Stream preferences">
 											<ToggleRow
 												label="Prefer 10-bit"
 												hint="Allow HDR / Main10 when the client asks."

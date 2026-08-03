@@ -127,6 +127,13 @@ pub(super) fn audio_thread(
     // Sized for the largest surround frame (7.1 HQ ≈ 1.3 KB at 5 ms); ample for normal quality.
     let mut opus_buf = vec![0u8; 4096];
     let mut seq: u32 = 0;
+    // Optional linear gain for quiet capture sources (SLIPSTREAM_AUDIO_GAIN, default 1.0) —
+    // the native-plane twin of the GameStream path's gain. Applied per frame before encode.
+    let gain: f32 = std::env::var("SLIPSTREAM_AUDIO_GAIN")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|g: &f32| g.is_finite() && (0.0..=4.0).contains(g))
+        .unwrap_or(1.0);
     // Phase 8: bounded ring of full Opus frames awaiting send (the state-dependent cap). When
     // the capturer delivers a burst, older frames are dropped (drop-oldest) so the standing
     // audio age stays inside the transport state's budget.
@@ -209,7 +216,14 @@ pub(super) fn audio_thread(
         // Drain the ring into Opus datagrams — one Opus frame per packet, in order.
         while let Some(frame) = ring.pop_front() {
             let pts_ns = now_ns();
-            match enc.encode_float(&frame, &mut opus_buf) {
+            // Apply the operator gain (1.0 = no-op) before encoding.
+            let encoded = if gain != 1.0 {
+                let scaled: Vec<f32> = frame.iter().map(|s| s * gain).collect();
+                enc.encode_float(&scaled, &mut opus_buf)
+            } else {
+                enc.encode_float(&frame, &mut opus_buf)
+            };
+            match encoded {
                 Ok(n) => {
                     // FEC path: buffer into the group, emit data + parity when full.
                     // Plain path: emit the datagram immediately.

@@ -88,6 +88,20 @@ pub struct AudioVideoConfig {
     #[serde(default)]
     #[schema(minimum = 1, maximum = 500)]
     pub capture_max_age_ms: Option<u32>,
+    /// Audio FEC over the native plane (`SLIPSTREAM_AUDIO_FEC`). Default on: RS parity over
+    /// groups of 5 ms Opus frames so a lost packet is rebuilt instead of clicking. Off only
+    /// as an escape hatch.
+    #[serde(default = "default_true")]
+    pub audio_fec: bool,
+    /// Linear audio gain applied to captured samples (`SLIPSTREAM_AUDIO_GAIN`, default 1.0).
+    /// For quiet sources; 1.0 = unchanged, 0.5 = half, 2.0 = double.
+    #[serde(default)]
+    #[schema(minimum = 0.0, maximum = 4.0)]
+    pub audio_gain: Option<f32>,
+    /// Linux audio capture source (`SLIPSTREAM_STREAM_SINK`): `stream-sink` (default, a
+    /// host-owned sink apps play into) or `monitor` (record the default sink).
+    #[serde(default)]
+    pub audio_capture: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
@@ -225,6 +239,19 @@ impl HostConfigFile {
                 errors.push("audio_video.capture_max_age_ms must be between 1 and 500".into());
             }
         }
+        if let Some(value) = self.audio_video.audio_gain {
+            if !(0.0..=4.0).contains(&value) || !value.is_finite() {
+                errors.push("audio_video.audio_gain must be between 0 and 4".into());
+            }
+        }
+        if let Some(value) = self.audio_video.audio_capture.as_deref() {
+            if !matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "stream-sink" | "monitor"
+            ) {
+                errors.push("audio_video.audio_capture must be stream-sink or monitor".into());
+            }
+        }
         if let Some(value) = self.network.fec_pct {
             if value > 90 {
                 errors.push("network.fec_pct must be between 0 and 90".into());
@@ -349,6 +376,21 @@ impl HostConfigFile {
                 "SLIPSTREAM_CAPTURE_MAX_AGE_MS",
                 &value.to_string(),
             );
+        }
+        set_bool(&mut out, "SLIPSTREAM_AUDIO_FEC", self.audio_video.audio_fec);
+        if let Some(gain) = self.audio_video.audio_gain {
+            set(&mut out, "SLIPSTREAM_AUDIO_GAIN", &gain.to_string());
+        }
+        if let Some(src) = &self.audio_video.audio_capture {
+            let src = src.trim().to_ascii_lowercase();
+            if !src.is_empty() {
+                // stream-sink is the default; only the monitor fallback needs the env var.
+                if src == "monitor" {
+                    set(&mut out, "SLIPSTREAM_STREAM_SINK", "0");
+                } else {
+                    set(&mut out, "SLIPSTREAM_STREAM_SINK", "1");
+                }
+            }
         }
         set_bool(&mut out, "SLIPSTREAM_CHACHA20", self.network.chacha20);
         if let Some(gamestream) = self.network.gamestream {
