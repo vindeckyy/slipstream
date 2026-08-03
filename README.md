@@ -1,5 +1,10 @@
 <p align="center">
-  <img src="assets/slipstream-logo.png" alt="Slipstream" width="560" />
+<pre>
+▞▀▖▌  ▜▘▛▀▖▞▀▖▀▛▘▛▀▖▛▀▘▞▀▖▙▗▌
+▚▄ ▌  ▐ ▙▄▘▚▄  ▌ ▙▄▘▙▄ ▙▄▌▌▘▌
+▖ ▌▌  ▐ ▌  ▖ ▌ ▌ ▌▚ ▌  ▌ ▌▌ ▌
+▝▀ ▀▀▘▀▘▘  ▝▀  ▘ ▘ ▘▀▀▘▘ ▘▘ ▘
+</pre>
 </p>
 
 <p align="center"><b>Low-latency desktop and game streaming for Linux and Windows hosts.</b></p>
