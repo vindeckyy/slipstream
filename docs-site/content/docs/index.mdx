@@ -1,13 +1,20 @@
 ---
 title: Introduction
-description: Low-latency desktop and game streaming from a Linux or Windows host to any of your devices.
+description: Low-latency desktop and game streaming from a Linux or Windows host — for gamers and for people who need their desktop at work.
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card'
 
-**Slipstream** streams your desktop or games to your other devices, a laptop, a Mac, a tablet,
-a TV, at low latency and at **each device's own resolution and refresh rate**. Run the host on a
-Linux machine or a Windows PC, connect a client, and you're streaming.
+**Slipstream** streams your desktop or games to your other devices — a work laptop, a Mac, a
+tablet, a TV — at low latency and at **each device's own resolution and refresh rate**. Run the
+host on a Linux machine or a Windows PC, connect a client, and you're streaming.
+
+People use it two ways:
+
+- **Play** — stream games from a powerful host to the couch, a Steam Deck, or a phone, with a
+  self-filling game library and Moonlight compatibility when you want it.
+- **Work** — use your real home or workstation desktop from the office over a LAN or VPN, with
+  absolute mouse, clipboard, and Workstation / Hot-desk display presets.
 
 It's built for the things that make streaming feel native:
 
@@ -16,7 +23,7 @@ It's built for the things that make streaming feel native:
   No letterboxing, no scaling, no juggling your real monitors. On Windows that's Slipstream's own
   indirect display driver, frames pushed straight in, so there's no physical monitor or dummy HDMI
   plug to deal with, even on the secure desktop.
-- **Low latency, GPU end to end.** Frames go straight from the compositor to the GPU encoder, 
+- **Low latency, GPU end to end.** Frames go straight from the compositor to the GPU encoder,
   NVENC on NVIDIA, Vulkan Video or VAAPI on AMD and Intel on Linux, AMF or QSV on Windows, with no
   CPU copies on the paths where that's been validated (the
   [support matrix](/docs/support-matrix#zero-copy-capture-to-encode) says which), and over a
@@ -38,6 +45,7 @@ stream and links out to the detail as you need it. The rest of these are for whe
   <Card title="Support Matrix" href="/docs/support-matrix" description="What works where, every host desktop, GPU and client app, each cell read out of the code that decides it." />
   <Card title="Install the Host" href="/docs/install" description="Add the repo and install the package, Ubuntu, Fedora, Arch, Bazzite, SteamOS, NixOS, or Windows." />
   <Card title="Connect a Client" href="/docs/clients" description="Stream with the native app for your device, macOS, Linux, Windows, Android, or any Moonlight client." />
+  <Card title="Desktop at work" href="/docs/virtual-displays" description="Workstation and Hot-desk presets, keep-alive, and per-client displays for remote desktop work." />
   <Card title="Your Game Library" href="/docs/game-library" description="The host finds your installed games by itself, browse a paired host and launch a title straight into the stream." />
   <Card title="API Reference" href="/api" description="Interactive OpenAPI reference for the host's management REST API, status, devices, pairing, library." />
 </Cards>
@@ -51,7 +59,8 @@ stream and links out to the detail as you need it. The rest of these are for whe
   cursor, input, is in the [Support matrix](/docs/support-matrix).
 - A **client device** to stream to, there are native apps for **macOS, iOS/iPadOS, tvOS, Linux,
   Windows, and Android**, plus any device that runs **Moonlight**.
-- Both on the **same network** (LAN or VPN). Slipstream is designed for a trusted local network.
+- Both on the **same network** (LAN or VPN). Slipstream is designed for a trusted local network —
+  including the path from an office laptop back to a home desktop over a VPN.
 
 Ready? Head to the [Quick Start](/docs/quickstart).
 

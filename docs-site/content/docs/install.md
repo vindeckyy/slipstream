@@ -121,7 +121,7 @@ update, run `nix flake update slipstream` in your flake directory, then `sudo ni
 
 ## What the packages are
 
-- **`slipstream-host`**, the streaming host. Install this on your Linux gaming machine.
+- **`slipstream-host`**, the streaming host. Install this on the Linux machine you want to stream from (gaming PC, workstation, or streaming box).
 - **`slipstream-web`**, the browser management console (pairing + status). Recommended alongside the
   host. On apt and RPM the host package *recommends* it, so your package manager pulls it in by
   default when both packages are available, and the Bazzite sysext image already contains it when

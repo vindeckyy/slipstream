@@ -7,7 +7,7 @@
 </pre>
 </div>
 
-<p align="center"><b>Low-latency desktop and game streaming for Linux and Windows hosts.</b></p>
+<p align="center"><b>Low-latency desktop and game streaming for Linux and Windows hosts — play from the couch, or use your real desktop while you&apos;re at work.</b></p>
 
 <p align="center">
   <a href="#what-it-is">What it is</a> ·
@@ -23,9 +23,10 @@
 
 ## What it is
 
-Slipstream turns a Linux or Windows machine into a private game-streaming host. You install the
-host, pair a client once, and stream to any screen on your LAN at that screen's own resolution and
-refresh rate. No accounts, no cloud relay, no subscription.
+Slipstream turns a Linux or Windows machine into a private **desktop and game streaming** host.
+You install the host, pair a client once, and stream to any screen on your LAN or VPN at that
+screen's own resolution and refresh rate — for games on the couch, or for focused work on your
+real desktop from an office laptop. No accounts, no cloud relay, no subscription.
 
 The stack has three pieces that work together:
 
@@ -69,6 +70,8 @@ split, plus decode and display stages where the client can see them. The docs ex
 
 - **Per-client virtual display.** Exact WxH@Hz for each device. No letterboxing, no rearranging
   your real monitors.
+- **Play and work on the same host.** Stream games to a TV or Deck, or use Workstation / Hot-desk
+  presets, absolute mouse, and clipboard when you need the full desktop from the office.
 - **Display policy you control.** Keep a game alive across disconnects, dedicate a couch box, or
   extend the desktop. Presets live in the console.
 - **Windows IDD-push path.** Finished frames go into Slipstream's own indirect display driver,

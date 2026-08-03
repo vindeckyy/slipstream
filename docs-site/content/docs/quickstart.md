@@ -11,7 +11,8 @@ This is the shortest path to a working stream. Each step links to the details.
 
 ## 1. Set up the host
 
-On your gaming machine (NVIDIA, AMD, or Intel GPU), follow the install guide for your system:
+On the machine you want to stream from — a gaming PC, a workstation, or any supported host with an
+NVIDIA, AMD, or Intel GPU — follow the install guide for your system:
 
 - [Ubuntu](/docs/ubuntu)
 - [Fedora](/docs/fedora)

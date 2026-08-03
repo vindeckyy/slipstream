@@ -16,7 +16,7 @@
 -->
 <service>
   <short>Slipstream (GameStream / Moonlight)</short>
-  <description>Low-latency game-streaming host over the Moonlight-compatible GameStream protocol. Opens the fixed nvhttp (HTTPS/HTTP), RTSP, video RTP, ENet control/input and Opus audio ports, plus mDNS for auto-discovery.</description>
+  <description>Low-latency desktop and game streaming host over the Moonlight-compatible GameStream protocol. Opens the fixed nvhttp (HTTPS/HTTP), RTSP, video RTP, ENet control/input and Opus audio ports, plus mDNS for auto-discovery.</description>
   <port protocol="tcp" port="47984"/>  <!-- HTTPS nvhttp (paired, mutual TLS)         -->
   <port protocol="tcp" port="47989"/>  <!-- HTTP nvhttp (/serverinfo, /pair PIN flow) -->
   <port protocol="tcp" port="48010"/>  <!-- RTSP handshake                            -->

@@ -11,7 +11,9 @@ when you connect.
 When a client connects, the host asks your desktop to create a **new virtual display** at exactly the
 client's resolution and refresh rate, captures that display, and streams it. The virtual display is
 real to your desktop, apps can be moved onto it, games open on it, but it isn't tied to any physical
-monitor. When the client disconnects, the virtual display goes away.
+monitor. When the client disconnects, the virtual display goes away. That same path is what makes
+Slipstream work for remote desktop at the office: you get a full desktop session sized to your
+laptop, not a scaled mirror of a physical monitor.
 
 That's why a 1080p60 laptop and a 1440p120 desktop can stream from the same host **at the same time**,
 each at its own mode, they each get their own virtual display.

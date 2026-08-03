@@ -11,24 +11,27 @@ PackageUrl: https://github.com/vindeckyy/slipstream/tree/main/docs-site/content/
 License: MIT OR Apache-2.0
 LicenseUrl: https://github.com/vindeckyy/slipstream/blob/main/LICENSE-MIT
 Copyright: Copyright (c) unom
-ShortDescription: Low-latency game-streaming host — stream your PC's games to any Slipstream or Moonlight client.
+ShortDescription: Low-latency desktop and game streaming host — use your PC for games or remote desktop work from any Slipstream or Moonlight client.
 Description: |-
-  Slipstream Host turns a Windows 11 PC into a low-latency game-streaming server. It captures the
-  desktop or a dedicated virtual display, encodes with NVENC / AMF / QSV / Vulkan, and streams over
-  its native QUIC protocol to Slipstream clients on Windows, macOS, iOS, tvOS, Android and Linux —
-  or over GameStream to stock Moonlight clients.
+  Slipstream Host turns a Windows 11 PC into a low-latency desktop and game streaming server. It
+  captures the desktop or a dedicated virtual display, encodes with NVENC / AMF / QSV / Vulkan, and
+  streams over its native QUIC protocol to Slipstream clients on Windows, macOS, iOS, tvOS, Android
+  and Linux — or over GameStream to stock Moonlight clients. Use it to play from the couch or to
+  reach your real desktop from a work laptop on a trusted LAN or VPN.
 
   The installer bundles the ss-vdisplay virtual display driver (native-resolution and HDR streaming
   without a physical monitor), virtual DualSense / DualShock 4 / Xbox 360 gamepads, and a web
   management console served on port 47992.
 Moniker: slipstream-host
 Tags:
+  - desktop-streaming
   - game-streaming
   - remote-desktop
   - moonlight
   - gamestream
   - streaming
   - remote-play
+  - workstation
 ReleaseNotesUrl: https://github.com/vindeckyy/slipstream/blob/main/docs/releases/v0.19.2.md
 Documentations:
   - DocumentLabel: Windows Host Setup
