@@ -15,6 +15,32 @@ game-library browsing to paired clients.
 > New here? Read [Security & Safe Use](/docs/security) first, a streaming host is remote control of
 > the machine, so keep it on a trusted LAN or VPN and require pairing.
 
+## First-run walkthrough
+
+Do this once after install so the rest of the console has somewhere useful to point.
+
+1. **Enable the console** (Linux) or confirm the Windows / SteamOS install already started it —
+   commands in [Enable the console](#enable-the-console) below.
+2. From a device on the same trusted network, open `https://<host-ip>:47992`. Accept the
+   self-signed certificate warning for this host.
+3. **Choose the login password** when the setup screen appears (new Linux / SteamOS installs), or
+   log in with the password the Windows installer showed. Details:
+   [Login password](#login-password).
+4. Open **Host** and skim **Preflight**. Fix any blocked checks (missing `host.env`, encoder,
+   competing host) before you chase client issues.
+5. Open **Pairing** → **Pair a device**, then complete PIN entry (or approval) on your
+   [client](/docs/clients). Full trust model: [Pairing & Trust](/docs/pairing).
+6. Open **Virtual displays** and pick a preset that matches how you use the machine —
+   **Workstation** / **Hot-desk** for [Desktop at work](/docs/desktop-at-work), **Headless box** /
+   **Shared desktop** for [Play](/docs/play).
+7. Optional: **Library** to confirm launchers are visible; **Plugins** only if you intend to run
+   them ([Plugins](/docs/plugins) — they run code on the host).
+8. Start a stream from the client. Return to **Dashboard** to see the live session; use **Logs**
+   or **Performance** if something looks wrong.
+
+After first run, day-to-day office reconnects usually never need the console — only pairing a new
+device, changing display policy, reading logs, or updating the host.
+
 ## Enable the console
 
 - **Linux packages (apt / RPM / Bazzite):** on Ubuntu the host package is `slipstream-host`
@@ -43,6 +69,9 @@ game-library browsing to paired clients.
 
 - **SteamOS host:** the install script builds and starts the console as a user service for you. It
   prints the URL when it finishes.
+
+Reach the console over a VPN the same way you reach the host: use the VPN IP and open TCP
+**47992** on the host firewall (`slipstream-web`). See [Network & VPN](/docs/network-and-vpn).
 
 ## Login password
 
@@ -96,38 +125,115 @@ to connect it appears under **Waiting for approval** instead; approving it pairs
 PIN needed. See [Pairing & Trust](/docs/pairing) for the full trust model and how to approve or
 remove devices later.
 
-## What's in it
+## Guided tour
 
-Nine destinations in the sidebar (a **More** tab on a phone holds the last five):
+Nine destinations in the sidebar (a **More** tab on a phone holds the last five). Use this as a map;
+each subsection below matches what you actually click.
 
-- **Dashboard**, live status: whether video and audio are streaming, the active sessions with
-  their codec, resolution, frame rate and bitrate, which games are running, and how many clients
-  are paired. Buttons here stop a session or ask the encoder for a fresh keyframe.
-- **Host**, this host's identity (hostname, OS, local IP, version, unique id), the codecs it
-  advertises, its ports, a read-only **Preflight** card with the same checks as `slipstream-host
-  doctor`, the **Updates** card (see [Updating the Host](/docs/updating)), the **GPUs** card,
-  Automatic or a preferred GPU for capture and encode, applied to the next session, and the
-  compositor backends it found. The **Host power** card can restart or stop the Slipstream host
-  process after a confirmation; it does not power off the computer.
-- **Virtual displays**, the policy for the display each session gets, and the Streamed screen
-  picker. See [Virtual displays](/docs/virtual-displays).
-- **Library**, the games every client sees: turn a launcher source on or off, add or edit a custom
-  title with its own art and launch command. See [Your game library](/docs/game-library).
-- **Performance**, arm a capture, run a session, stop it, and read the recording back as
-  per-stage latency, throughput and health graphs.
-- **Logs** lets you follow the host's recent log stream live, filter by level, search it, download or
-  share it for a bug report, and create an owner-private redacted support bundle. The bundle contains
-  host state, recent logs, and performance summaries, downloads as JSON, and is also stored under the
-  host's private config directory. It is never uploaded by the console.
-- **Pairing**, arm a PIN, approve or deny devices waiting for approval, and unpair a device. A
-  second PIN box for [Moonlight/GameStream](/docs/moonlight) clients appears only when this host
-  runs the GameStream plane.
-- **Plugins**, the plugin store's **Browse**, **Installed** and **Sources** tabs plus the plugin
-  runner switch; an installed plugin with a UI gets its own entry below. See
-  [Plugins](/docs/plugins).
-- **Settings**, the console's language, and **Sign out**.
+### Dashboard
 
-### Preflight and host power
+Live status for the host you are administering:
+
+- Whether **video** and **audio** are streaming right now.
+- **Active sessions** with codec, resolution, frame rate, and bitrate — useful when diagnosing soft
+  text or stutter alongside the client's [stats overlay](/docs/stats) and
+  [Picture quality](/docs/picture-quality).
+- Which **games** are running and how many clients are **paired**.
+- Actions: **stop** a session, or ask the encoder for a **fresh keyframe** if the picture looks
+  stuck after a glitch.
+
+Open Dashboard after you connect from a client to confirm the host sees the same mode you asked
+for. For office work, you mainly care that a session is up and the resolution matches the laptop
+panel ([Desktop at work](/docs/desktop-at-work)).
+
+### Pairing
+
+Trust management for this host:
+
+- **Pair a device** — arms a 4-digit PIN for about **two minutes** (countdown + Cancel in the UI).
+- **Waiting for approval** — devices that already knocked; **Approve** (optional label) or
+  **Deny** (dismisses; not a permanent blocklist). Requests expire after **10 minutes**.
+- **Paired devices** — revoke access for a lost or retired client; re-pair is the same ceremony
+  again.
+- **Moonlight (GameStream) pairing** — PIN entry box appears **only** when this host runs the
+  GameStream plane. Direction is reversed vs native: Moonlight shows the PIN, you type it here.
+  See [Moonlight](/docs/moonlight) and [Pairing](/docs/pairing).
+
+Prefer native pairing for Work hosts; leave GameStream off if you do not need Moonlight
+([Security](/docs/security#gamestream--moonlight-compatibility-is-the-weak-crypto-path)).
+
+### Virtual displays
+
+Policy for the display each session gets, plus the **Streamed screen** picker when you pin a real
+monitor instead of a virtual one. Presets:
+
+| Preset | Typical use |
+|---|---|
+| **Workstation** / **Hot-desk** | Office remote desktop |
+| **Headless box** / **Shared desktop** | Couch / family play |
+| **Default** | Leave alone until you have a reason |
+
+Tune **keep-alive**, topology, and custom presets here when reconnects reshuffle the desktop or
+you need Forever + Release for a dedicated box. Full reference:
+[Virtual displays](/docs/virtual-displays). Office keep-alive habits:
+[Desktop at work](/docs/desktop-at-work). Play-oriented presets: [Play](/docs/play).
+
+### Library
+
+What every client sees as launchable titles:
+
+- Turn a **launcher source** on or off (Steam, Epic, GOG, Xbox, … as the host found them).
+- Add or edit a **custom** title with its own art and launch command.
+
+This is the same catalog native clients and Moonlight show as the game list. Details:
+[Your game library](/docs/game-library). Desk-only Work users can ignore Library until they also
+use the host for [Play](/docs/play).
+
+### Plugins
+
+Plugin store tabs **Browse**, **Installed**, and **Sources**, plus the plugin **runner** switch.
+An installed plugin with a UI gets its own sidebar entry below. Plugins run code on your host —
+read [Plugins](/docs/plugins) and the security notes in [Security](/docs/security#plugins-run-code-on-your-host)
+before enabling the runner on a machine that holds sensitive work data.
+
+### Logs and Performance
+
+**Logs** — follow the host's recent log stream live, filter by level, search, download or share for
+a bug report, and create an owner-private **redacted support bundle**. The bundle contains host
+state, recent logs, and performance summaries, downloads as JSON, and is also stored under the
+host's private config directory. It is **never uploaded** by the console.
+
+Search Logs for strings like `Wake-on-LAN`, `METRONOMIC`, or encoder errors when
+[Troubleshooting](/docs/troubleshooting) points you there.
+
+**Performance** — arm a capture, run a session, stop it, and read the recording back as per-stage
+latency, throughput, and health graphs. Use it when you need host-side evidence that a VPN or
+encode path is the bottleneck, alongside client [stats](/docs/stats).
+
+### Host
+
+Identity and readiness for this machine:
+
+- Hostname, OS, local IP, version, unique id.
+- Codecs the host **advertises**, ports it listens on.
+- **Preflight** — same checks as `slipstream-host doctor` (configuration, storage, encoder,
+  compositor, capture, competing hosts). Blocked checks include an action that can resolve them;
+  **Refresh** after you change setup.
+- **Updates** — [Updating the Host](/docs/updating).
+- **GPUs** — Automatic or a preferred GPU for capture and encode (applies to the **next**
+  session), plus compositor backends found.
+- **Host power** — **Restart** restarts the Slipstream host process and waits for the console to
+  reconnect; **Shutdown** stops the process **without** powering off the computer. Both end
+  active sessions and require confirmation. Start the host service again on the machine after a
+  shutdown.
+
+### Settings
+
+Console language, and **Sign out**. This page is about the browser UI session, not the host's
+stream encoder knobs — those live in [Configuration](/docs/configuration) / `host.env` and in
+client [profiles](/docs/profiles-and-links).
+
+## Preflight and host power (detail)
 
 The **Preflight** card runs read-only checks for configuration, storage, the encoder, the compositor,
 capture, and competing hosts. A blocked check includes an action that can resolve it. Use **Refresh**
@@ -136,3 +242,15 @@ after changing the host setup.
 **Restart** restarts the Slipstream host process and waits for the console to reconnect. **Shutdown**
 stops the process without powering off the computer. Both actions end active sessions and require
 confirmation. Start the host service again on the machine after a shutdown.
+
+## Related pages
+
+- [Quick Start](/docs/quickstart)
+- [Pairing & Trust](/docs/pairing)
+- [Virtual displays](/docs/virtual-displays)
+- [Your game library](/docs/game-library)
+- [Plugins](/docs/plugins)
+- [Desktop at work](/docs/desktop-at-work)
+- [Network & VPN](/docs/network-and-vpn)
+- [Forgot your Password?](/docs/forgot-password)
+- [Troubleshooting](/docs/troubleshooting)

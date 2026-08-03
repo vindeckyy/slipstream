@@ -6,77 +6,86 @@ import { baseOptions } from '@/lib/layout.shared'
 
 export const Route = createFileRoute('/')({ component: Home })
 
-const audiences = [
+const journeys = [
   {
     eyebrow: 'Play',
-    title: 'Games on the screen in front of you',
+    title: 'Games on every screen you own',
     description:
-      'Launch titles from your host library on a TV, Steam Deck, phone, or couch PC. Native Slipstream apps, plus Moonlight when you want GameStream.',
-    links: [
-      { label: 'Quick Start', slug: 'quickstart' },
+      'Stream from a powerful host to a TV, Steam Deck, phone, or couch PC. Launch from the game library, use Capture mouse for shooters, and keep Moonlight when you want it.',
+    href: 'play',
+    cta: 'Open the Play guide',
+    secondary: [
       { label: 'Game library', slug: 'game-library' },
-      { label: 'Moonlight', slug: 'moonlight' },
+      { label: 'Controllers', slug: 'controllers' },
+      { label: 'HDR', slug: 'hdr' },
     ],
   },
   {
     eyebrow: 'Work',
-    title: 'Your real desktop while you are at the office',
+    title: 'Your real desktop at the office',
     description:
-      'Reach the machine on your desk from a work laptop over LAN or VPN. Full desktop, absolute mouse, clipboard, and Workstation or Hot-desk display presets.',
-    links: [
-      { label: 'Quick Start', slug: 'quickstart' },
-      { label: 'Virtual displays', slug: 'virtual-displays' },
-      { label: 'Input', slug: 'input' },
+      'Reach the machine you left at home over a trusted VPN. Absolute mouse, clipboard, Workstation or Hot-desk presets, and picture settings tuned for sharp text.',
+    href: 'desktop-at-work',
+    cta: 'Open Desktop at work',
+    secondary: [
+      { label: 'Network & VPN', slug: 'network-and-vpn' },
+      { label: 'Picture quality', slug: 'picture-quality' },
       { label: 'Clipboard', slug: 'clipboard' },
     ],
   },
 ] as const
 
-const taskCards = [
+const steps = [
   {
     number: '01',
-    title: 'Start streaming',
-    description:
-      'Go from a fresh machine to your first desktop or game stream with the shortest setup path.',
-    slug: 'quickstart',
-    action: 'Open Quick Start',
+    title: 'Install the host',
+    description: 'Linux packages, Windows installer, Bazzite, SteamOS, or NixOS.',
+    slug: 'install',
   },
   {
     number: '02',
-    title: 'Install the host',
-    description:
-      'Choose the guide for Ubuntu, Fedora, Arch, SteamOS, or Windows.',
-    slug: 'install',
-    action: 'Choose an install guide',
+    title: 'Pair a client',
+    description: 'Native apps on every major platform, or Moonlight when you enable GameStream.',
+    slug: 'pairing',
   },
   {
     number: '03',
-    title: 'Connect a device',
-    description:
-      'Pick a native Slipstream app or connect any device that runs Moonlight.',
-    slug: 'clients',
-    action: 'Choose a client',
-  },
-  {
-    number: '04',
-    title: 'Open the browser console',
-    description:
-      'Pair devices, check host status, manage displays, and keep the host current.',
-    slug: 'web-console',
-    action: 'Open the console guide',
+    title: 'Tune the stream',
+    description: 'Displays, mouse mode, bitrate, HDR, clipboard, and Work vs Play profiles.',
+    slug: 'client-settings',
   },
 ] as const
 
-const referenceLinks = [
+const guides = [
   {
-    title: 'Check compatibility',
-    description: 'Compare host platforms, GPUs, encoders, and client features.',
+    title: 'How it works',
+    description: 'Virtual displays, capture to decode, native vs GameStream, pairing and discovery.',
+    slug: 'how-it-works',
+  },
+  {
+    title: 'Security',
+    description: 'Trusted LAN or VPN only. Pairing is the boundary. Never port-forward.',
+    slug: 'security',
+  },
+  {
+    title: 'Support matrix',
+    description: 'Host desktops, GPUs, encoders, and client features — read from the code.',
     slug: 'support-matrix',
   },
   {
-    title: 'Fix a rough edge',
-    description: 'Start from the symptom and work through the troubleshooting guide.',
+    title: 'Web console',
+    description: 'Pair devices, manage displays, library, plugins, and live host status.',
+    slug: 'web-console',
+  },
+  {
+    title: 'Troubleshooting',
+    description: 'Start from the symptom: discovery, black screen, input, stutter, Office / VPN.',
     slug: 'troubleshooting',
+  },
+  {
+    title: 'API reference',
+    description: 'Interactive OpenAPI for status, pairing, library, and host control.',
+    href: '/api',
   },
 ] as const
 
@@ -87,238 +96,232 @@ function Home() {
         <section className="relative overflow-hidden border-b border-fd-border">
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,color-mix(in_oklab,var(--ss-brand)_18%,transparent),transparent_55%),radial-gradient(ellipse_at_bottom_right,color-mix(in_oklab,var(--ss-brand-light)_12%,transparent),transparent_50%)]"
+            className="pointer-events-none absolute inset-0 ss-hero-glow"
           />
-          <div className="relative mx-auto grid w-full max-w-6xl gap-12 px-6 py-16 md:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)] md:px-8 md:py-24">
-            <div className="flex flex-col justify-center">
-              <div className="mb-8 flex items-center gap-4">
-                <BrandMark className="size-12 rounded-xl shadow-[0_8px_30px_rgba(8,145,178,0.28)] motion-safe:animate-[ss-rise_700ms_ease-out]" />
-                <Wordmark className="h-7 motion-safe:animate-[ss-rise_700ms_ease-out]" />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 ss-grid-fade opacity-[0.35] dark:opacity-[0.22]"
+          />
+          <div className="relative mx-auto flex w-full max-w-6xl flex-col px-6 py-20 md:px-8 md:py-28">
+            <div className="mb-10 flex items-center gap-4 motion-safe:animate-[ss-rise_700ms_ease-out]">
+              <BrandMark className="size-14 rounded-2xl shadow-[0_12px_40px_rgba(8,145,178,0.32)]" />
+              <div>
+                <Wordmark className="h-8 md:h-9" />
+                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.2em] text-fd-muted-foreground">
+                  Documentation
+                </p>
               </div>
-              <h1 className="max-w-3xl text-balance text-4xl font-semibold tracking-tight text-fd-foreground motion-safe:animate-[ss-rise_800ms_ease-out] md:text-5xl lg:text-6xl">
-                Play from the couch. Work from the office. Same desktop.
-              </h1>
-              <p className="mt-6 max-w-2xl text-lg leading-8 text-fd-muted-foreground motion-safe:animate-[ss-rise_900ms_ease-out]">
-                Slipstream is a private host for low-latency desktop and game streaming. Install
-                once, pair a device, and use your real machine for games at home or focused work
-                away from your desk — no cloud, no accounts.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-3 motion-safe:animate-[ss-rise_1s_ease-out]">
-                <Link
-                  to="/docs/$"
-                  params={{ _splat: 'quickstart' }}
-                  className="rounded-lg bg-brand px-5 py-3 font-medium text-white shadow-sm transition-colors hover:bg-brand/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                >
-                  Start with Quick Start
-                </Link>
-                <Link
-                  to="/docs/$"
-                  params={{ _splat: '' }}
-                  className="rounded-lg border border-fd-border bg-fd-card px-5 py-3 font-medium text-fd-foreground transition-colors hover:border-fd-primary hover:text-fd-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-primary"
-                >
-                  Browse all docs
-                </Link>
-              </div>
-              <p className="mt-5 text-sm text-fd-muted-foreground">
-                Native apps for every major platform, plus Moonlight compatibility when you need
-                it.
-              </p>
             </div>
 
-            <div className="flex items-center motion-safe:animate-[ss-rise_900ms_ease-out]">
-              <div className="w-full rounded-2xl border border-fd-border bg-fd-card/90 p-5 shadow-[0_18px_60px_rgba(8,145,178,0.12)] backdrop-blur-sm sm:p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <BrandMark className="size-10 rounded-xl" />
-                    <div>
-                      <Wordmark className="h-4" />
-                      <p className="mt-1 text-sm text-fd-muted-foreground">
-                        Desktop and game streaming host
-                      </p>
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-fd-primary/10 px-2.5 py-1 text-xs font-medium text-fd-primary">
-                    Local network
-                  </span>
-                </div>
-                <div className="mt-7 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-fd-border bg-fd-background p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-fd-muted-foreground">
-                      Host
-                    </p>
-                    <p className="mt-2 font-medium text-fd-foreground">Linux or Windows</p>
-                    <p className="mt-1 text-sm text-fd-muted-foreground">
-                      Capture, encode, and serve your desktop or games.
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-fd-border bg-fd-background p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-fd-muted-foreground">
-                      Client
-                    </p>
-                    <p className="mt-2 font-medium text-fd-foreground">Any screen you use</p>
-                    <p className="mt-1 text-sm text-fd-muted-foreground">
-                      Native Slipstream apps or Moonlight.
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-5 flex items-center gap-2 border-t border-fd-border pt-4 text-sm text-fd-muted-foreground">
-                  <span aria-hidden="true" className="size-2 rounded-full bg-emerald-400" />
-                  <span>Pair once, then reconnect with a pinned identity.</span>
-                </div>
-              </div>
+            <h1 className="max-w-4xl text-balance text-4xl font-semibold tracking-tight text-fd-foreground motion-safe:animate-[ss-rise_800ms_ease-out] md:text-6xl lg:text-[4.25rem] lg:leading-[1.05]">
+              Your desktop and your games, documented end to end.
+            </h1>
+            <p className="mt-7 max-w-2xl text-lg leading-8 text-fd-muted-foreground motion-safe:animate-[ss-rise_900ms_ease-out] md:text-xl md:leading-9">
+              Slipstream is a private host for low-latency desktop and game streaming. These guides
+              take you from install to a sharp work session or a couch stream — on a LAN or a VPN you
+              trust.
+            </p>
+
+            <div className="mt-10 flex flex-wrap gap-3 motion-safe:animate-[ss-rise_1s_ease-out]">
+              <Link
+                to="/docs/$"
+                params={{ _splat: 'quickstart' }}
+                className="rounded-lg bg-brand px-6 py-3.5 font-medium text-white shadow-sm transition-[transform,background-color] duration-200 hover:bg-brand/90 motion-safe:hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              >
+                Quick Start
+              </Link>
+              <Link
+                to="/docs/$"
+                params={{ _splat: 'play' }}
+                className="rounded-lg border border-fd-border bg-fd-card/80 px-6 py-3.5 font-medium text-fd-foreground backdrop-blur-sm transition-[transform,border-color,color] duration-200 hover:border-fd-primary hover:text-fd-primary motion-safe:hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-primary"
+              >
+                Play guide
+              </Link>
+              <Link
+                to="/docs/$"
+                params={{ _splat: 'desktop-at-work' }}
+                className="rounded-lg border border-fd-border bg-fd-card/80 px-6 py-3.5 font-medium text-fd-foreground backdrop-blur-sm transition-[transform,border-color,color] duration-200 hover:border-fd-primary hover:text-fd-primary motion-safe:hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-primary"
+              >
+                Work guide
+              </Link>
             </div>
+
+            <p className="mt-6 text-sm text-fd-muted-foreground motion-safe:animate-[ss-rise_1.05s_ease-out]">
+              Native clients for every major platform · Moonlight-compatible when you enable GameStream ·
+              No accounts, no cloud
+            </p>
           </div>
         </section>
 
-        <section className="border-b border-fd-border bg-fd-card/40">
+        <section className="border-b border-fd-border">
+          <div className="mx-auto grid w-full max-w-6xl gap-0 md:grid-cols-2">
+            {journeys.map((journey, index) => (
+              <div
+                key={journey.eyebrow}
+                className={`flex flex-col border-fd-border bg-fd-card/30 px-6 py-14 md:px-8 md:py-16 ${
+                  index === 0 ? 'md:border-r' : ''
+                }`}
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fd-primary">
+                  {journey.eyebrow}
+                </p>
+                <h2 className="mt-4 max-w-md text-3xl font-semibold tracking-tight text-fd-foreground md:text-4xl">
+                  {journey.title}
+                </h2>
+                <p className="mt-4 max-w-md text-base leading-7 text-fd-muted-foreground">
+                  {journey.description}
+                </p>
+                <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
+                  <Link
+                    to="/docs/$"
+                    params={{ _splat: journey.href }}
+                    className="font-medium text-fd-primary underline-offset-4 transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-primary"
+                  >
+                    {journey.cta}
+                  </Link>
+                  {journey.secondary.map((link) => (
+                    <Link
+                      key={link.slug}
+                      to="/docs/$"
+                      params={{ _splat: link.slug }}
+                      className="text-sm text-fd-muted-foreground underline-offset-4 transition-colors hover:text-fd-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-primary"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="mx-auto w-full max-w-6xl px-6 py-16 md:px-8 md:py-20">
+          <div className="max-w-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fd-primary">
+              First stream
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-fd-foreground md:text-4xl">
+              Three steps. Then pick Play or Work.
+            </h2>
+            <p className="mt-4 text-base leading-7 text-fd-muted-foreground">
+              The shared path is short. Audience-specific tuning comes after the picture is up.
+            </p>
+          </div>
+
+          <ol className="mt-12 grid gap-8 md:grid-cols-3 md:gap-6">
+            {steps.map((step) => (
+              <li key={step.slug} className="relative">
+                <Link
+                  to="/docs/$"
+                  params={{ _splat: step.slug }}
+                  className="group block focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-primary"
+                >
+                  <span className="text-xs font-semibold tracking-[0.2em] text-fd-primary">
+                    {step.number}
+                  </span>
+                  <h3 className="mt-4 text-xl font-semibold text-fd-foreground transition-colors group-hover:text-fd-primary">
+                    {step.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-fd-muted-foreground">
+                    {step.description}
+                  </p>
+                </Link>
+              </li>
+            ))}
+          </ol>
+
+          <div className="mt-10">
+            <Link
+              to="/docs/$"
+              params={{ _splat: 'quickstart' }}
+              className="inline-flex rounded-lg border border-fd-border bg-fd-card px-5 py-3 text-sm font-medium text-fd-foreground transition-colors hover:border-fd-primary hover:text-fd-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-primary"
+            >
+              Open the full Quick Start
+            </Link>
+          </div>
+        </section>
+
+        <section className="border-y border-fd-border bg-fd-card/40">
           <div className="mx-auto w-full max-w-6xl px-6 py-16 md:px-8 md:py-20">
-            <div className="max-w-2xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fd-primary">
-                Who it is for
-              </p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-fd-foreground md:text-4xl">
-                Built for gamers and for people who need their desktop at work.
-              </h2>
-              <p className="mt-4 text-base leading-7 text-fd-muted-foreground">
-                Same private host. Two jobs people actually hire it for.
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fd-primary">
+                  Guides
+                </p>
+                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-fd-foreground md:text-4xl">
+                  Everything else, by job.
+                </h2>
+              </div>
+              <p className="max-w-md text-sm leading-6 text-fd-muted-foreground md:text-right">
+                Architecture, security, compatibility, the browser console, recovery, and the API.
               </p>
             </div>
 
-            <div className="mt-10 grid gap-6 md:grid-cols-2">
-              {audiences.map((audience) => (
-                <div
-                  key={audience.eyebrow}
-                  className="rounded-2xl border border-fd-border bg-fd-background p-6 transition-transform duration-300 motion-safe:hover:-translate-y-0.5 md:p-8"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fd-primary">
-                    {audience.eyebrow}
-                  </p>
-                  <h3 className="mt-4 text-2xl font-semibold tracking-tight text-fd-foreground">
-                    {audience.title}
-                  </h3>
-                  <p className="mt-3 max-w-md leading-7 text-fd-muted-foreground">
-                    {audience.description}
-                  </p>
-                  <div className="mt-6 flex flex-wrap gap-x-4 gap-y-2">
-                    {audience.links.map((link) => (
-                      <Link
-                        key={link.slug}
-                        to="/docs/$"
-                        params={{ _splat: link.slug }}
-                        className="text-sm font-medium text-fd-primary underline-offset-4 transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-primary"
-                      >
-                        {link.label}
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              ))}
+            <div className="mt-10 grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+              {guides.map((guide) =>
+                'href' in guide && guide.href ? (
+                  <a
+                    key={guide.title}
+                    href={guide.href}
+                    className="group block border-t border-fd-border pt-5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-primary"
+                  >
+                    <h3 className="font-semibold text-fd-foreground transition-colors group-hover:text-fd-primary">
+                      {guide.title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-fd-muted-foreground">
+                      {guide.description}
+                    </p>
+                  </a>
+                ) : (
+                  <Link
+                    key={guide.title}
+                    to="/docs/$"
+                    params={{ _splat: guide.slug! }}
+                    className="group block border-t border-fd-border pt-5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-primary"
+                  >
+                    <h3 className="font-semibold text-fd-foreground transition-colors group-hover:text-fd-primary">
+                      {guide.title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-fd-muted-foreground">
+                      {guide.description}
+                    </p>
+                  </Link>
+                ),
+              )}
             </div>
           </div>
         </section>
 
         <section className="mx-auto w-full max-w-6xl px-6 py-16 md:px-8 md:py-20">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fd-primary">
-                Choose a task
-              </p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-fd-foreground md:text-4xl">
-                The shortest route to a working stream.
-              </h2>
-            </div>
-            <p className="max-w-md text-sm leading-6 text-fd-muted-foreground md:text-right">
-              Start with the job in front of you. Each guide links to the deeper reference when
-              you need it.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-4 md:grid-cols-2">
-            {taskCards.map((task) => (
-              <Link
-                key={task.slug}
-                to="/docs/$"
-                params={{ _splat: task.slug }}
-                className="group rounded-2xl border border-fd-border bg-fd-card p-6 transition-colors hover:border-fd-primary hover:bg-fd-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-primary"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <span className="text-xs font-semibold tracking-[0.18em] text-fd-primary">
-                    {task.number}
-                  </span>
-                  <span className="text-xs text-fd-muted-foreground group-hover:text-fd-primary">
-                    {task.action}
-                  </span>
-                </div>
-                <h3 className="mt-10 text-xl font-semibold text-fd-foreground">{task.title}</h3>
-                <p className="mt-2 max-w-md leading-7 text-fd-muted-foreground">
-                  {task.description}
-                </p>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section className="border-y border-fd-border bg-fd-card/40">
-          <div className="mx-auto w-full max-w-6xl px-6 py-14 md:px-8 md:py-16">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fd-primary">
-                  Keep moving
-                </p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-fd-foreground md:text-3xl">
-                  Reference for the parts that need a closer look.
+          <div className="relative overflow-hidden rounded-2xl border border-fd-border bg-fd-primary/5 px-6 py-10 md:px-10 md:py-12">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 ss-hero-glow opacity-60" />
+            <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+              <div className="max-w-2xl">
+                <h2 className="text-2xl font-semibold tracking-tight text-fd-foreground md:text-3xl">
+                  Keep the host on a trusted network.
                 </h2>
-              </div>
-              <p className="max-w-md text-sm leading-6 text-fd-muted-foreground md:text-right">
-                Compatibility, recovery, and automation live here once the first stream is working.
-              </p>
-            </div>
-
-            <div className="mt-8 grid gap-4 md:grid-cols-3">
-              {referenceLinks.map((item) => (
-                <Link
-                  key={item.slug}
-                  to="/docs/$"
-                  params={{ _splat: item.slug }}
-                  className="rounded-xl border border-fd-border bg-fd-background p-5 transition-colors hover:border-fd-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-primary"
-                >
-                  <h3 className="font-semibold text-fd-foreground">{item.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-fd-muted-foreground">
-                    {item.description}
-                  </p>
-                </Link>
-              ))}
-              <a
-                href="/api"
-                className="rounded-xl border border-fd-border bg-fd-background p-5 transition-colors hover:border-fd-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-primary"
-              >
-                <h3 className="font-semibold text-fd-foreground">Build against the host</h3>
-                <p className="mt-2 text-sm leading-6 text-fd-muted-foreground">
-                  Use the interactive management API reference for status, pairing, and library
-                  control.
+                <p className="mt-3 text-base leading-7 text-fd-muted-foreground">
+                  Slipstream is built for a LAN or a private VPN — including office laptop to home
+                  desktop. Pairing is the security boundary. Do not port-forward to the public internet.
                 </p>
-              </a>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-3">
+                <Link
+                  to="/docs/$"
+                  params={{ _splat: 'security' }}
+                  className="rounded-lg border border-fd-border bg-fd-background px-4 py-2.5 text-sm font-medium text-fd-foreground transition-colors hover:border-fd-primary hover:text-fd-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-primary"
+                >
+                  Security guide
+                </Link>
+                <Link
+                  to="/docs/$"
+                  params={{ _splat: 'network-and-vpn' }}
+                  className="rounded-lg border border-fd-border bg-fd-background px-4 py-2.5 text-sm font-medium text-fd-foreground transition-colors hover:border-fd-primary hover:text-fd-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-primary"
+                >
+                  Network &amp; VPN
+                </Link>
+              </div>
             </div>
-          </div>
-        </section>
-
-        <section className="mx-auto w-full max-w-6xl px-6 py-14 md:px-8 md:py-16">
-          <div className="flex flex-col gap-5 rounded-2xl border border-fd-border bg-fd-primary/5 p-6 md:flex-row md:items-center md:justify-between md:p-8">
-            <div>
-              <h2 className="text-xl font-semibold text-fd-foreground">Keep the host on a trusted network.</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-fd-muted-foreground">
-                Slipstream is built for a LAN or VPN — including the path from an office laptop back
-                to a home desktop. Read the security guide before exposing a host beyond devices you
-                trust.
-              </p>
-            </div>
-            <Link
-              to="/docs/$"
-              params={{ _splat: 'security' }}
-              className="shrink-0 rounded-lg border border-fd-border bg-fd-background px-4 py-2.5 text-sm font-medium text-fd-foreground transition-colors hover:border-fd-primary hover:text-fd-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-primary"
-            >
-              Read Security &amp; Safe Use
-            </Link>
           </div>
         </section>
       </main>

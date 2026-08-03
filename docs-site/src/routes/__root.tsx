@@ -55,7 +55,18 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="flex flex-col min-h-screen">
-        <RootProvider>
+        <RootProvider
+          search={{
+            links: [
+              ['Quick Start', '/docs/quickstart'],
+              ['Play', '/docs/play'],
+              ['Desktop at work', '/docs/desktop-at-work'],
+              ['Install the host', '/docs/install'],
+              ['Troubleshooting', '/docs/troubleshooting'],
+              ['API reference', '/api'],
+            ],
+          }}
+        >
           {children}
           <Footer />
         </RootProvider>
