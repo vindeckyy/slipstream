@@ -62,7 +62,7 @@ export const LoginView: FC<{
 					}}
 					className="relative z-10 flex w-full max-w-[22.5rem] flex-col items-center"
 				>
-					<div className="mb-8 w-[9.5rem] sm:mb-10 sm:w-[10.5rem]">
+					<div className="mb-8 w-[19rem] sm:mb-10 sm:w-[20rem]">
 						<Logo />
 					</div>
 

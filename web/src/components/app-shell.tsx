@@ -22,6 +22,7 @@ import { useGetHostInfo, useGetStatus } from "@/api/gen/host/host";
 import { useHostEvents } from "@/api/events";
 import { pluginIcon, uiPlugins, usePlugins } from "@/api/plugins";
 import { CommandPalette } from "@/components/command-palette";
+import { Wordmark } from "@/components/wordmark";
 import {
 	Tooltip,
 	TooltipContent,
@@ -191,12 +192,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 							aria-label={m.app_name()}
 							className="flex items-center rounded-md px-1.5 py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1 focus-visible:ring-offset-card"
 						>
-							<img
-								src="/slipstream-logo.png"
-								alt={m.app_name()}
-								className="h-12 w-auto max-w-full object-contain"
-								draggable={false}
-							/>
+							<Wordmark className="text-[12px]" />
 						</Link>
 
 						<motion.nav
@@ -228,12 +224,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 				<div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
 					{/* Mobile top bar (< sm): brand + language. The sidebar is hidden here. */}
 					<header className="flex items-center gap-2 border-b border-border/80 bg-card px-3 py-2.5 sm:hidden">
-						<img
-							src="/slipstream-logo.png"
-							alt={m.app_name()}
-							className="h-7 w-auto max-w-[70%]"
-							draggable={false}
-						/>
+						<Wordmark className="text-[9px]" />
 						<div className="ml-auto shrink-0">
 							<LanguageSwitcher />
 						</div>
