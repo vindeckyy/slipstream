@@ -9,33 +9,43 @@
    Tailwind 4 scan so their utilities aren't purged. */
 @source "../node_modules/@unom/ui/dist/**/*.{js,mjs}";
 
-/* Slipstream console: cyan stream on cool slate, Material 3 tonal surfaces,
-   Google Cloud operator density. Dark-first; light tokens kept for parity. */
+/* Slipstream console: a broadcast control room fused with a creator-hardware desk instrument.
+   Gunmetal chassis ground, bone/putty keycap surfaces, the ASCII blocky mark as a silkscreened
+   label. Cyan is reserved for the ON AIR signal, safety orange for the one action that matters,
+   amber for the always-on instrument status. See DESIGN.md. */
 :root {
 	color-scheme: light;
 	--radius: 0.5rem;
 
-	/* Brand - cyan stream from the Slipstream logo. */
+	/* Brand - ON AIR cyan (the live signal, never decoration). */
 	--ss-brand: #0891b2;
-	--ss-brand-light: #22d3ee;
-	--ss-highlight: #a5f3fc;
+	--ss-brand-light: #0e7490;
+	--ss-highlight: #67e8f9;
 
-	/* Surfaces - light / cool slate with a cyan tint. */
-	--background: #eef3f6;
-	--foreground: #0a1620;
-	--card: #ffffff;
-	--card-foreground: #0a1620;
-	--popover: #ffffff;
-	--popover-foreground: #0a1620;
-	--muted: #e2ebf0;
-	--muted-foreground: #4d6672;
-	--secondary: #d3e2e9;
-	--secondary-foreground: #0a1620;
+	/* The one safety-orange action per surface. */
+	--ss-action: #ea580c;
+	--ss-action-light: #c2410c;
+
+	/* Always-on instrument status (amber). */
+	--ss-status: #b45309;
+	--ss-status-light: #d97706;
+
+	/* Surfaces - bone / putty keycaps on a cool chalk chassis (light). */
+	--background: #e9e6df;
+	--foreground: #1a1c20;
+	--card: #f4f1ea;
+	--card-foreground: #1a1c20;
+	--popover: #faf8f3;
+	--popover-foreground: #1a1c20;
+	--muted: #dcd8cf;
+	--muted-foreground: #5d6168;
+	--secondary: #d3cec2;
+	--secondary-foreground: #1a1c20;
 	--accent: var(--ss-brand);
 	--accent-foreground: #ffffff;
 	/* ~3:1 against white for UI chrome (WCAG 1.4.11). */
-	--border: #849098;
-	--input: #849098;
+	--border: #8a8f98;
+	--input: #8a8f98;
 	--ring: var(--ss-brand);
 	--focus-ring: var(--ring);
 	--focus-ring-offset: var(--card);
@@ -59,7 +69,7 @@
 	--outline-subtle: color-mix(in oklab, var(--border) 55%, transparent);
 	--outline-strong: color-mix(in oklab, var(--border) 85%, var(--foreground));
 
-	/* Primary = the brand (buttons, active nav, default badges). */
+	/* Primary = the ON AIR cyan (buttons, active nav, default badges). */
 	--primary: var(--ss-brand);
 	--primary-foreground: #ffffff;
 
@@ -67,7 +77,7 @@
 	--success-foreground: #ffffff;
 	/* Amber - "needs your attention but nothing is broken" (unsaved edits), the badge
 	   counterpart of the inline amber warning text. */
-	--warning: oklch(0.57 0.14 75);
+	--warning: var(--ss-status);
 	--warning-foreground: #17120a;
 	--info: oklch(0.54 0.14 230);
 	--info-foreground: #ffffff;
@@ -114,43 +124,43 @@
 	--radius-card-min: 0.375rem;
 }
 
-/* Dark / Material surface ladder on cool near-black. Overrides only the raw
-   values - the indirection tokens in :root resolve to these automatically. */
+/* Dark / gunmetal chassis. Overrides only the raw values - the indirection tokens
+   in :root resolve to these automatically. */
 .dark {
 	color-scheme: dark;
 
-	/* surface / canvas */
-	--background: #060a0f;
-	--foreground: #e8eef2;
+	/* surface / canvas - the chassis */
+	--background: #0d1117;
+	--foreground: #e6e1d8;
 
-	/* surface-container */
-	--card: #0d141c;
-	--card-foreground: #e8eef2;
+	/* surface-container - keycaps */
+	--card: #161b22;
+	--card-foreground: #e6e1d8;
 
 	/* surface-container-high (menus, dialogs) */
-	--popover: #121a24;
-	--popover-foreground: #e8eef2;
+	--popover: #1c232c;
+	--popover-foreground: #e6e1d8;
 
 	/* surface-container-low (wells, chips) */
-	--muted: #111820;
-	--muted-foreground: #93a7b5;
+	--muted: #12181f;
+	--muted-foreground: #8b949e;
 
 	/* surface-container-highest (selected / nested accent) */
-	--secondary: #18222d;
-	--secondary-foreground: #e8eef2;
+	--secondary: #1e2630;
+	--secondary-foreground: #e6e1d8;
 
 	/* Outline ~3:1 against card for operator borders + inputs. */
-	--border: #526472;
-	--input: #526472;
+	--border: #4a5560;
+	--input: #4a5560;
 	--ring: var(--ss-brand-light);
 	--focus-ring: var(--ring);
 	--focus-ring-offset: var(--card);
 
 	--accent: var(--ss-brand-light);
-	--accent-foreground: #060a0f;
+	--accent-foreground: #0d1117;
 
 	--primary: var(--ss-brand-light);
-	--primary-foreground: #060a0f;
+	--primary-foreground: #0d1117;
 
 	--success: oklch(0.54 0.14 160);
 	--success-foreground: #ffffff;
@@ -159,7 +169,7 @@
 	--info: oklch(0.7 0.14 230);
 	--info-foreground: #061017;
 	--destructive: oklch(0.68 0.19 18);
-	--destructive-foreground: #060a0f;
+	--destructive-foreground: #0d1117;
 }
 
 /* Map the palette to Tailwind colour/util tokens - both the shadcn vocabulary
@@ -257,6 +267,22 @@
 	--animate-collapsible-up: collapsible-up var(--duration-emphasized)
 		var(--ease-emphasized);
 
+	/* The ON AIR lamp: a slow cyan pulse while streaming (broadcast desk). */
+	--animate-onair: onair-pulse 2.2s ease-in-out infinite;
+
+	@keyframes onair-pulse {
+		0%,
+		100% {
+			opacity: 1;
+			box-shadow: 0 0 0 0 color-mix(in oklab, var(--ss-brand) 45%, transparent);
+		}
+		50% {
+			opacity: 0.72;
+			box-shadow: 0 0 10px 2px
+				color-mix(in oklab, var(--ss-brand) 40%, transparent);
+		}
+	}
+
 	@keyframes accordion-down {
 		from {
 			height: 0;
@@ -307,12 +333,21 @@
 
 	body {
 		background-color: var(--surface-canvas);
-		/* Subtle page atmosphere: a single low-chroma wash, not glass or neon. */
-		background-image: radial-gradient(
-			ellipse 110% 70% at 50% -25%,
-			color-mix(in oklab, var(--ss-brand) 11%, transparent),
-			transparent 58%
-		);
+		/* Instrument atmosphere: a low amber status glow at the top (the always-on desk
+		   lamp), not a cyan wash. The chassis grain keeps the ground from reading flat. */
+		background-image:
+			radial-gradient(
+				ellipse 110% 60% at 50% -20%,
+				color-mix(in oklab, var(--ss-status-light) 12%, transparent),
+				transparent 55%
+			),
+			repeating-linear-gradient(
+				0deg,
+				transparent 0px,
+				transparent 2px,
+				color-mix(in oklab, var(--foreground) 1.6%, transparent) 2px,
+				color-mix(in oklab, var(--foreground) 1.6%, transparent) 3px
+			);
 		background-attachment: fixed;
 		color: var(--foreground);
 		font-family: var(--font-sans);

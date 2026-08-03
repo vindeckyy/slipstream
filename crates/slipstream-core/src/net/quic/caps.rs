@@ -111,6 +111,22 @@ pub const CLIENT_CAP_CURSOR: u8 = 0x01;
 /// simply ignored — no behavior change in either direction.
 pub const CLIENT_CAP_PHASE_LOCK: u8 = 0x02;
 
+/// `Hello.client_caps` bit: this client can decode **audio FEC** (RS parity over groups of
+/// `0xC9` audio datagrams, design/audio-resilience.md). It requests the resilience mode; the
+/// host answers with [`HOST_CAP_AUDIO_FEC`] only when it will actually send parity, so the
+/// client rebuilds lost audio frames only toward a host that agreed. `0x04` — `0x02` is
+/// [`CLIENT_CAP_PHASE_LOCK`], `0x01` is [`CLIENT_CAP_CURSOR`].
+pub const CLIENT_CAP_AUDIO_FEC: u8 = 0x04;
+
+/// [`Welcome::host_caps`] bit: the host sends RS **audio FEC** (parity datagrams over groups of
+/// `0xC9` audio datagrams) and a small send-side reorder window so a lost 5 ms Opus packet can
+/// be rebuilt from its group's parity instead of becoming a click/PLC gap. Set only when the
+/// client asked via [`CLIENT_CAP_AUDIO_FEC`] AND the host is not disabled by the
+/// `SLIPSTREAM_AUDIO_FEC=0` kill-switch; toward every other client the host keeps the plain
+/// datagram stream. `0x20` — `0x10` is [`HOST_CAP_PEN`], `0x08` is [`HOST_CAP_CURSOR`],
+/// `0x04` is [`HOST_CAP_TEXT_INPUT`], `0x01`/`0x02` are gamepad-state / clipboard.
+pub const HOST_CAP_AUDIO_FEC: u8 = 0x20;
+
 /// [`Welcome::host_caps`] bit: the host CAN forward the cursor out-of-band (it captures cursor
 /// metadata separately from the frame — the Linux portal `SPA_META_Cursor` path; NOT gamescope,
 /// whose capture carries no cursor, and NOT Windows yet, where DWM composites into the IDD

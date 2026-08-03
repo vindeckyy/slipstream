@@ -29,26 +29,16 @@ export const LoginView: FC<{
 	return (
 		<TooltipProvider>
 			<div className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden bg-background px-4 py-10 sm:px-6 sm:py-16">
-				{/* Quiet ambient depth: cool slate with a soft brand wash. */}
+				{/* Desk atmosphere: the amber instrument lamp + a faint chassis grain (not a
+				    cyan SaaS wash). See DESIGN.md. */}
 				<div
 					aria-hidden
 					className="pointer-events-none absolute inset-0"
 					style={{
 						background: `
-						radial-gradient(ellipse 80% 50% at 50% -20%, color-mix(in oklab, var(--ss-brand) 18%, transparent), transparent 70%),
-						radial-gradient(ellipse 60% 40% at 50% 120%, color-mix(in oklab, var(--ss-brand-light) 8%, transparent), transparent 65%)
+						radial-gradient(ellipse 80% 50% at 50% -20%, color-mix(in oklab, var(--ss-status-light) 16%, transparent), transparent 70%),
+						repeating-linear-gradient(0deg, transparent 0px, transparent 2px, color-mix(in oklab, var(--foreground) 1.4%, transparent) 2px, color-mix(in oklab, var(--foreground) 1.4%, transparent) 3px)
 					`,
-					}}
-				/>
-				<div
-					aria-hidden
-					className="pointer-events-none absolute inset-0 opacity-[0.35]"
-					style={{
-						backgroundImage:
-							"radial-gradient(color-mix(in oklab, var(--foreground) 6%, transparent) 1px, transparent 1px)",
-						backgroundSize: "24px 24px",
-						maskImage:
-							"radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 75%)",
 					}}
 				/>
 
@@ -132,9 +122,10 @@ export const LoginView: FC<{
 									)}
 								</div>
 
+								{/* The one commit action on this surface: safety orange. */}
 								<Button
 									type="submit"
-									className="mt-1 w-full"
+									className="mt-1 w-full bg-[var(--ss-action)] text-white hover:bg-[var(--ss-action-light)]"
 									disabled={!canSubmit}
 									aria-busy={busy || undefined}
 								>

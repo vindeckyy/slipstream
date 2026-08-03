@@ -622,7 +622,7 @@ const DisplayForm: FC<{
 			{isCustom && (
 				<div
 					className={cn(
-						"space-y-6 rounded-xl border border-l-2 border-border/70 border-l-primary/50 bg-muted/10 p-5",
+						"space-y-6 rounded-xl border border-border/70 bg-muted/10 p-5",
 						dirty && "border-[var(--warning)] bg-warning/5",
 					)}
 				>

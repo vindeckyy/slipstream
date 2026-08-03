@@ -336,6 +336,15 @@
 // 16-byte AEAD authentication tag appended by either session cipher.
 #define TAG_LEN 16
 
+// Audio packets per FEC group. 8 × 5 ms = 40 ms — large enough to amortize the parity
+// overhead and ride out a wifi burst, small enough that a group's shards stay well under
+// the codec's shard-count ceiling and the parity datagram stays tiny.
+#define AUDIO_GROUP_LEN 8
+
+// The strongest parity a sender emits per group (2 shards → recovers up to 2 lost data
+// packets per 40 ms). The host scales this down to 1 on LAN where loss is near zero.
+#define AUDIO_MAX_PARITY 2
+
 // Wire tag distinguishing an input datagram from a video packet.
 #define INPUT_MAGIC 200
 
@@ -625,6 +634,26 @@
 // the bit the host never arms the phase controller; toward an older host the reports are
 // simply ignored — no behavior change in either direction.
 #define CLIENT_CAP_PHASE_LOCK 2
+#endif
+
+#if defined(SLIPSTREAM_FEATURE_QUIC)
+// `Hello.client_caps` bit: this client can decode **audio FEC** (RS parity over groups of
+// `0xC9` audio datagrams, design/audio-resilience.md). It requests the resilience mode; the
+// host answers with [`HOST_CAP_AUDIO_FEC`] only when it will actually send parity, so the
+// client rebuilds lost audio frames only toward a host that agreed. `0x04` — `0x02` is
+// [`CLIENT_CAP_PHASE_LOCK`], `0x01` is [`CLIENT_CAP_CURSOR`].
+#define CLIENT_CAP_AUDIO_FEC 4
+#endif
+
+#if defined(SLIPSTREAM_FEATURE_QUIC)
+// [`Welcome::host_caps`] bit: the host sends RS **audio FEC** (parity datagrams over groups of
+// `0xC9` audio datagrams) and a small send-side reorder window so a lost 5 ms Opus packet can
+// be rebuilt from its group's parity instead of becoming a click/PLC gap. Set only when the
+// client asked via [`CLIENT_CAP_AUDIO_FEC`] AND the host is not disabled by the
+// `SLIPSTREAM_AUDIO_FEC=0` kill-switch; toward every other client the host keeps the plain
+// datagram stream. `0x20` — `0x10` is [`HOST_CAP_PEN`], `0x08` is [`HOST_CAP_CURSOR`],
+// `0x04` is [`HOST_CAP_TEXT_INPUT`], `0x01`/`0x02` are gamepad-state / clipboard.
+#define HOST_CAP_AUDIO_FEC 32
 #endif
 
 #if defined(SLIPSTREAM_FEATURE_QUIC)
@@ -965,6 +994,22 @@
 // (lightbar, player LEDs, adaptive triggers) — the rich analog of [`RUMBLE_MAGIC`]. See
 // [`HidOutput`].
 #define HIDOUT_MAGIC 205
+#endif
+
+#if defined(SLIPSTREAM_FEATURE_QUIC)
+// The FEC tail's data-kind byte.
+#define AUDIO_FEC_DATA 0
+#endif
+
+#if defined(SLIPSTREAM_FEATURE_QUIC)
+// The FEC tail's parity-kind byte: a parity datagram carries `group_id` + `parity_count`
+// + the group's concatenated parity shards (no Opus payload).
+#define AUDIO_FEC_PARITY 1
+#endif
+
+#if defined(SLIPSTREAM_FEATURE_QUIC)
+// Tail length in bytes: `group_id` + `parity_count` + `kind`.
+#define AUDIO_FEC_TAIL_LEN 3
 #endif
 
 #if defined(SLIPSTREAM_FEATURE_QUIC)

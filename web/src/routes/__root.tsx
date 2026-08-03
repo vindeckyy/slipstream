@@ -139,9 +139,20 @@ function RootComponent() {
 				<HeadContent />
 			</head>
 			<body className="min-h-screen">
-				{/* Motion defaults to `reducedMotion: "never"`, so every card, nav item and button
-				    animated at full strength even for someone whose OS asks for less. "user" honours
-				    the OS setting. */}
+				{/* Direction contract (impeccable seed 802fa826): a broadcast control room fused with
+				    a creator-hardware desk instrument. THESIS: a streaming host console that reads as a
+				    physical broadcast desk — signal meters, program/preview monitors, keycap controls —
+				    refusing the generic SaaS cyan-card dashboard. OWN-WORLD: deep charcoal gunmetal
+				    ground, bone/putty keycap surfaces, the Slipstream ASCII blocky mark as a silkscreened
+				    chassis label, cyan reserved for the live/on-air signal, one safety-orange action per
+				    surface, amber as the always-on status glow. STORY: the operator sees the host as a
+				    broadcast desk — what is on air, what is ready, and one obvious action — and the
+				    console feels like a physical instrument, not a web template. FIRST VIEWPORT: a
+				    gunmetal chassis frame with the ASCII wordmark as a brushed label, a program/preview
+				    monitor pair for stream state, keycap nav, signal-meter status tiles, and the amber
+				    status line. FORM: broadcast control room (structure) fused with creator-hardware desk
+				    (material), seed key 802fa826. FINISH: unreviewed and undocumented is unfinished; this
+				    build ends with the finish review, the verdict, and DESIGN.md. */}
 				<MotionConfig reducedMotion="user">
 					{isAuthScreen ? (
 						<Outlet />

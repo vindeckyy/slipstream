@@ -161,15 +161,16 @@ const MOBILE_OVERFLOW: readonly NavItem[] = [
 	navPluginStore,
 ];
 
-/** Dense M3 / console nav row: tonal active fill + leading indicator rail. */
+/** Keycap nav: crisp top edge, subtle bottom shadow, press travel. The active key is
+    lit cyan (ON AIR) with a mono silkscreen label — not a side border. */
 const navItemClass =
-	"group relative flex min-h-8 items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] leading-snug text-muted-foreground outline-none transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:bg-muted/70 focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1 focus-visible:ring-offset-card";
+	"group relative flex min-h-8 items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] leading-snug text-muted-foreground outline-none shadow-[0_1px_0_rgba(0,0,0,0.35),inset_0_1px_0_color-mix(in_oklab,var(--card)_85%,white)] transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:bg-muted/70 focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1 focus-visible:ring-offset-card active:shadow-none active:translate-y-px";
 
 const navItemActiveClass =
 	"bg-primary/12 text-foreground font-medium hover:bg-primary/15";
 
 const sectionLabelClass =
-	"px-2.5 pb-1 pt-0.5 text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground/65";
+	"px-2.5 pb-1 pt-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/65";
 
 export function AppShell({ children }: { children: ReactNode }) {
 	// Read the locale so the whole shell re-renders on a language switch.
@@ -186,7 +187,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 			    stretch that would otherwise grow it (and push the language switcher) below the
 			    fold. overflow-y-auto lets the nav itself scroll on very short viewports. */}
 				<aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col overflow-y-auto border-r border-border/80 bg-card sm:flex">
-					<div className="flex flex-col gap-6 px-3 pb-4 pt-4">
+					{/* Chassis top: the ASCII wordmark as a silkscreened label on a brushed strip. */}
+					<div className="flex flex-col gap-6 border-b border-border/70 bg-muted/30 px-3 pb-4 pt-4">
 						<Link
 							to="/"
 							aria-label={m.app_name()}
@@ -260,12 +262,7 @@ function NavTooltipLink({ item }: { item: NavItem }) {
 					className={navItemClass}
 					activeProps={{ className: navItemActiveClass }}
 				>
-					{/* TanStack Link sets data-status="active" on the active route. */}
-					<span
-						aria-hidden
-						className="pointer-events-none absolute inset-y-1 left-0 w-0.5 rounded-full bg-primary opacity-0 [[data-status=active]_&]:opacity-100"
-					/>
-					<Icon className="relative size-4 shrink-0 opacity-80 [[data-status=active]_&]:opacity-100" />
+					<Icon className="relative size-4 shrink-0 opacity-80 transition-colors [[data-status=active]_&]:text-primary [[data-status=active]_&]:opacity-100" />
 					<span className="relative min-w-0 flex-1 truncate">{label()}</span>
 				</MLink>
 			</TooltipTrigger>
@@ -349,12 +346,15 @@ function ConsoleStatusHeader() {
 					role="status"
 					aria-live="polite"
 				>
+					{/* The ON AIR lamp: cyan + slow pulse while streaming, amber when idle,
+					    red on error. The label always carries the meaning — color is not the
+					    only signal. */}
 					<span
 						aria-hidden
 						className={cn(
 							"size-1.5 rounded-full bg-muted-foreground/60",
 							status.isError && "bg-destructive",
-							isActive && "bg-primary",
+							isActive && "animate-onair bg-primary",
 						)}
 					/>
 					{statusLabel}
@@ -417,11 +417,7 @@ function PluginNavSection() {
 							className={navItemClass}
 							activeProps={{ className: navItemActiveClass }}
 						>
-							<span
-								aria-hidden
-								className="pointer-events-none absolute inset-y-1 left-0 w-0.5 rounded-full bg-primary opacity-0 [[data-status=active]_&]:opacity-100"
-							/>
-							<Icon className="relative size-4 shrink-0 opacity-80 [[data-status=active]_&]:opacity-100" />
+							<Icon className="relative size-4 shrink-0 opacity-80 transition-colors [[data-status=active]_&]:text-primary [[data-status=active]_&]:opacity-100" />
 							<span className="relative min-w-0 flex-1 truncate">
 								{p.title}
 							</span>

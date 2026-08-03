@@ -155,7 +155,12 @@ pub(super) async fn connect_and_handshake(args: &WorkerArgs) -> Result<Handshake
                 // NOT unconditional like HOST_TIMING above: CLIENT_CAP_CURSOR makes the host
                 // stop compositing the pointer, so only an embedder that actually renders the
                 // cursor locally may set it (the embedder decides, we pass through).
-                client_caps: args.client_caps,
+                // CLIENT_CAP_AUDIO_FEC IS unconditional: the shared demux rebuilds a lost audio
+                // packet from its group's parity whenever the host answers with
+                // HOST_CAP_AUDIO_FEC; toward a host that doesn't (or an operator kill-switch)
+                // the audio datagrams arrive untailed and the plain path applies — no
+                // behavior change, so every NativeClient build can ask.
+                client_caps: args.client_caps | crate::quic::CLIENT_CAP_AUDIO_FEC,
             }
             .encode(),
         )

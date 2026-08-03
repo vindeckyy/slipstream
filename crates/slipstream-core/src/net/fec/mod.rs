@@ -5,9 +5,13 @@
 //! 5120×1440@240 is hit around 1 Gbps. GF(2¹⁶) raises that ceiling to 65535 shards and
 //! runs in O(n log n) with SIMD, so the per-frame shard count stops being the limiter.
 
+mod audio;
 mod gf16;
 mod gf8;
 
+pub use audio::{
+    audio_coder, AudioFecData, AUDIO_GROUP_LEN, AUDIO_MAX_PARITY, generate_parity, rebuild,
+};
 pub use gf16::Gf16Coder;
 pub use gf8::Gf8Coder;
 

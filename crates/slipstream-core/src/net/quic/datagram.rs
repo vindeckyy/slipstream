@@ -23,6 +23,14 @@ pub const HIDOUT_MAGIC: u8 = 0xCD;
 
 /// Audio datagram, host → client: `[0xC9][u32 seq LE][u64 pts_ns LE][opus payload]`.
 /// One Opus frame per datagram (5 ms — well under any MTU); QUIC already encrypts.
+///
+/// When the session negotiated audio FEC (`CLIENT_CAP_AUDIO_FEC` ∩ `HOST_CAP_AUDIO_FEC`), the
+/// host appends a 3-byte tail after the payload: `[u8 group_id][u8 parity_count][u8 kind]`
+/// where `kind` is [`AUDIO_FEC_DATA`] (this datagram) or [`AUDIO_FEC_PARITY`] (a parity
+/// datagram, which carries the group's parity shards concatenated with no Opus payload). The
+/// tail is a strict prefix-extension: an older client that never negotiated FEC decodes the
+/// same 13-byte header and ignores the tail bytes, and a new client decoding a pre-FEC host's
+/// datagram (no tail) falls back to the plain path.
 pub fn encode_audio_datagram(seq: u32, pts_ns: u64, opus: &[u8]) -> Vec<u8> {
     let mut b = Vec::with_capacity(13 + opus.len());
     b.push(AUDIO_MAGIC);
@@ -32,6 +40,29 @@ pub fn encode_audio_datagram(seq: u32, pts_ns: u64, opus: &[u8]) -> Vec<u8> {
     b
 }
 
+/// Encode an audio data datagram with the FEC tail (see [`encode_audio_datagram`]).
+pub fn encode_audio_datagram_fec(
+    seq: u32,
+    pts_ns: u64,
+    opus: &[u8],
+    group_id: u8,
+    parity_count: u8,
+) -> Vec<u8> {
+    let mut b = encode_audio_datagram(seq, pts_ns, opus);
+    b.push(group_id);
+    b.push(parity_count);
+    b.push(AUDIO_FEC_DATA);
+    b
+}
+
+/// The FEC tail's data-kind byte.
+pub const AUDIO_FEC_DATA: u8 = 0x00;
+/// The FEC tail's parity-kind byte: a parity datagram carries `group_id` + `parity_count`
+/// + the group's concatenated parity shards (no Opus payload).
+pub const AUDIO_FEC_PARITY: u8 = 0x01;
+/// Tail length in bytes: `group_id` + `parity_count` + `kind`.
+pub const AUDIO_FEC_TAIL_LEN: usize = 3;
+
 /// Parse an audio datagram → `(seq, pts_ns, opus payload)`. `None` on bad tag/length.
 pub fn decode_audio_datagram(b: &[u8]) -> Option<(u32, u64, &[u8])> {
     if b.len() < 13 || b[0] != AUDIO_MAGIC {
@@ -40,6 +71,53 @@ pub fn decode_audio_datagram(b: &[u8]) -> Option<(u32, u64, &[u8])> {
     let seq = u32::from_le_bytes(b[1..5].try_into().unwrap());
     let pts_ns = u64::from_le_bytes(b[5..13].try_into().unwrap());
     Some((seq, pts_ns, &b[13..]))
+}
+
+/// The FEC metadata tail of an audio datagram, when the session negotiated audio FEC and the
+/// host appended it. `None` for a plain (pre-FEC) datagram or a truncated tail.
+pub struct AudioFecTail {
+    pub group_id: u8,
+    pub parity_count: u8,
+    pub kind: u8,
+}
+
+/// Parse the FEC tail of an audio datagram. `data` is the raw datagram (must start with
+/// [`AUDIO_MAGIC`]); `fec` is whether this session negotiated audio FEC — the tail is only
+/// ever appended toward a client that negotiated it, so a `fec = false` call treats the
+/// whole datagram as an untailed plain frame (an old host never sends tails).
+///
+/// Returns `(seq, pts_ns, payload, Some(tail))` when FEC is on and the tail is present;
+/// `(seq, pts_ns, payload, None)` when FEC is off or the datagram is short of a tail.
+/// `None` on a bad tag or too-short header.
+pub fn decode_audio_datagram_fec(
+    b: &[u8],
+    fec: bool,
+) -> Option<(u32, u64, &[u8], Option<AudioFecTail>)> {
+    let (seq, pts_ns, _) = decode_audio_datagram(b)?;
+    if !fec || b.len() < 13 + AUDIO_FEC_TAIL_LEN {
+        // FEC off, or no room for a tail — a plain datagram.
+        return Some((seq, pts_ns, &b[13..], None));
+    }
+    let tail = AudioFecTail {
+        group_id: b[b.len() - 3],
+        parity_count: b[b.len() - 2],
+        kind: b[b.len() - 1],
+    };
+    let payload = &b[13..b.len() - 3];
+    Some((seq, pts_ns, payload, Some(tail)))
+}
+
+/// Parse a parity datagram's body: `(group_id, parity_count, shards)` where `shards` is the
+/// concatenated equal-length parity shards. `None` for a datagram whose tail is missing or
+/// whose kind isn't parity, or a malformed length. Only meaningful when the session
+/// negotiated audio FEC (see [`decode_audio_datagram_fec`]).
+pub fn decode_audio_parity_datagram(b: &[u8]) -> Option<(u8, u8, &[u8])> {
+    let (_, _, payload, tail) = decode_audio_datagram_fec(b, true)?;
+    let t = tail?;
+    if t.kind != AUDIO_FEC_PARITY {
+        return None;
+    }
+    Some((t.group_id, t.parity_count, payload))
 }
 
 /// Legacy rumble datagram (v1), host → client: `[0xCA][u16 pad LE][u16 low LE][u16 high LE]`.
@@ -818,6 +896,57 @@ mod tests {
         let header_only = encode_audio_datagram(0, 0, &[]);
         let (_, _, empty) = decode_audio_datagram(&header_only).unwrap();
         assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn audio_fec_datagram_roundtrip_and_back_compat() {
+        let opus = [0x42u8; 97];
+        // New (FEC) form: data kind with the 3-byte tail.
+        let d = encode_audio_datagram_fec(7, 1_000_000_123, &opus, 0xAB, 1);
+        assert_eq!(d[0], AUDIO_MAGIC);
+        let (seq, pts, payload, tail) = decode_audio_datagram_fec(&d, true).unwrap();
+        assert_eq!((seq, pts), (7, 1_000_000_123));
+        assert_eq!(payload, opus);
+        let t = tail.expect("FEC tail present");
+        assert_eq!((t.group_id, t.parity_count, t.kind), (0xAB, 1, AUDIO_FEC_DATA));
+
+        // Old decode (no tail knowledge) sees the tail as trailing payload bytes — expected,
+        // and harmless: an old client never negotiates FEC, so it never receives tailed
+        // datagrams (the host only appends the tail when both sides agreed).
+        let (old_seq, old_pts, old_payload) = decode_audio_datagram(&d).unwrap();
+        assert_eq!((old_seq, old_pts), (7, 1_000_000_123));
+        assert_eq!(&old_payload[..opus.len()], opus);
+        assert_eq!(old_payload.len(), opus.len() + AUDIO_FEC_TAIL_LEN);
+
+        // A FEC-off decode (an old host, or FEC not negotiated) never strips a tail: the
+        // same tailed datagram reads back as the full untailed payload.
+        let (s, p, pay, t) = decode_audio_datagram_fec(&d, false).unwrap();
+        assert_eq!((s, p), (7, 1_000_000_123));
+        assert_eq!(pay.len(), opus.len() + AUDIO_FEC_TAIL_LEN);
+        assert!(t.is_none());
+
+        // A genuinely plain (untailed) datagram decodes with tail = None under FEC-off.
+        let plain = encode_audio_datagram(3, 9, &opus);
+        let (s, p, pay, t) = decode_audio_datagram_fec(&plain, false).unwrap();
+        assert_eq!((s, p), (3, 9));
+        assert_eq!(pay, opus);
+        assert!(t.is_none());
+
+        // A parity datagram: header, then the shards, then the tail (kind = parity).
+        let shards = [vec![1u8, 2, 3], vec![4u8, 5, 6]];
+        let mut pdat = encode_audio_datagram(0, 0, &shards.concat());
+        pdat.push(0xAB); // group_id
+        pdat.push(2); // parity_count
+        pdat.push(AUDIO_FEC_PARITY);
+        let (gid, pcnt, payload) = decode_audio_parity_datagram(&pdat).unwrap();
+        assert_eq!((gid, pcnt), (0xAB, 2));
+        assert_eq!(payload, &[1, 2, 3, 4, 5, 6]);
+        // A data-kind datagram is not a parity datagram.
+        assert!(decode_audio_parity_datagram(&d).is_none());
+        // A parity datagram without the tail (old form) is not a parity datagram.
+        assert!(decode_audio_parity_datagram(&encode_audio_datagram(0, 0, &[])).is_none());
+        // Truncated header still rejected.
+        assert!(decode_audio_datagram_fec(&d[..12], true).is_none());
     }
 
     #[test]

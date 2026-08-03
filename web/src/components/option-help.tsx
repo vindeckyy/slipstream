@@ -4,11 +4,16 @@ import { Badge } from "@/components/ui/badge";
 import {
 	Tooltip,
 	TooltipContent,
+	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-/** Compact ? button that shows a hover/focus description for a control. */
+/** Compact ? button that shows a hover/focus description for a control.
+ *
+ * Self-contained: wraps its own `TooltipProvider` so a HelpTip renders correctly in any
+ * context (a page, a card, a story) without an ancestor provider. Nesting providers is
+ * safe — the app shell's provider still governs the rest of the tree. */
 export function HelpTip({
 	label,
 	text,
@@ -19,24 +24,26 @@ export function HelpTip({
 	className?: string;
 }) {
 	return (
-		<Tooltip>
-			<TooltipTrigger asChild>
-				<button
-					type="button"
-					className={cn(
-						"inline-flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50",
-						className,
-					)}
-					aria-label={`About ${label}`}
-					title={text}
-				>
-					<CircleHelp className="size-3.5" aria-hidden="true" />
-				</button>
-			</TooltipTrigger>
-			<TooltipContent side="top" align="start">
-				{text}
-			</TooltipContent>
-		</Tooltip>
+		<TooltipProvider>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<button
+						type="button"
+						className={cn(
+							"inline-flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50",
+							className,
+						)}
+						aria-label={`About ${label}`}
+						title={text}
+					>
+						<CircleHelp className="size-3.5" aria-hidden="true" />
+					</button>
+				</TooltipTrigger>
+				<TooltipContent side="top" align="start">
+					{text}
+				</TooltipContent>
+			</Tooltip>
+		</TooltipProvider>
 	);
 }
 

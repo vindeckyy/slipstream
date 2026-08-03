@@ -78,7 +78,7 @@ export function MetricCard({
 				{icon ? (
 					<span
 						aria-hidden="true"
-						className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted/50 text-muted-foreground"
+						className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40 text-muted-foreground shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]"
 					>
 						{icon}
 					</span>
@@ -97,7 +97,8 @@ export function MetricCard({
 					<>
 						{showValue ? (
 							<div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-								<span className="text-3xl font-semibold tracking-tight tabular-nums">
+								{/* Signal readout: mono tabular numerals, the broadcast meter register. */}
+								<span className="font-mono text-3xl font-medium tracking-tight tabular-nums">
 									{value}
 								</span>
 								{unit ? (

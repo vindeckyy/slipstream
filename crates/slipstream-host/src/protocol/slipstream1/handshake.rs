@@ -8,6 +8,18 @@
 
 use super::*;
 
+/// Whether this session enables audio FEC (design/audio-resilience.md): the client asked
+/// ([`CLIENT_CAP_AUDIO_FEC`](slipstream_core::quic::CLIENT_CAP_AUDIO_FEC)) AND the host's
+/// `SLIPSTREAM_AUDIO_FEC=0` operator kill-switch allows (default on). The Welcome's
+/// `HOST_CAP_AUDIO_FEC` bit is computed from it; `serve_session` reads that bit back to arm
+/// the audio thread's FEC/reorder path.
+pub(super) fn audio_fec_enabled(client_caps: u8) -> bool {
+    if client_caps & slipstream_core::quic::CLIENT_CAP_AUDIO_FEC == 0 {
+        return false;
+    }
+    std::env::var("SLIPSTREAM_AUDIO_FEC").as_deref() != Ok("0")
+}
+
 /// Whether this session forwards the cursor out-of-band (design/remote-desktop-sweep.md M2):
 /// the client asked ([`CLIENT_CAP_CURSOR`](slipstream_core::quic::CLIENT_CAP_CURSOR)) AND the
 /// capture path can deliver cursor metadata separately from the frame — the Linux portal
@@ -542,6 +554,14 @@ pub(super) async fn negotiate(
             // refuses toward us if we don't set it).
             | if crate::inject::pen_supported() {
                 slipstream_core::quic::HOST_CAP_PEN
+            } else {
+                0
+            }
+            // Audio FEC (design/audio-resilience.md): the client asked AND the operator
+            // kill-switch (SLIPSTREAM_AUDIO_FEC=0) allows. When set, the audio thread appends
+            // the FEC tail + sends group parity; otherwise it emits the plain datagram stream.
+            | if audio_fec_enabled(hello.client_caps) {
+                slipstream_core::quic::HOST_CAP_AUDIO_FEC
             } else {
                 0
             },

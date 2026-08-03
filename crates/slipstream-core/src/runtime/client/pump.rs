@@ -160,6 +160,9 @@ pub(super) async fn run_pump(args: WorkerArgs) {
     );
 
     // Datagram demux (see [`datagram_task`]): host → client audio/rumble/HID/HDR/timing planes.
+    // Audio FEC is on only when both sides negotiated it (the client asked AND the host
+    // answered with HOST_CAP_AUDIO_FEC in the Welcome).
+    let audio_fec = host_caps & crate::quic::HOST_CAP_AUDIO_FEC != 0;
     tokio::spawn(datagram_task::run(
         conn.clone(),
         audio_tx,
@@ -170,6 +173,7 @@ pub(super) async fn run_pump(args: WorkerArgs) {
         host_timing_tx,
         encode_lat.clone(),
         cursor_state_tx,
+        audio_fec,
     ));
 
     // Clipboard task: the fetch-stream accept loop (host pulls what we offered) + outbound fetches

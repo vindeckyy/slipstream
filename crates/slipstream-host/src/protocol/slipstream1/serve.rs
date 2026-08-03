@@ -576,9 +576,23 @@ pub(super) async fn serve_session(
         let cap = audio_cap.clone();
         let channels = welcome.audio_channels;
         let transport_policy_audio = transport_policy.clone();
+        // Audio FEC (design/audio-resilience.md): the client asked for it AND the host agreed
+        // in the Welcome. The host's own kill-switch is folded into the Welcome already (the
+        // handshake sets HOST_CAP_AUDIO_FEC only when not disabled), so this single bit is the
+        // whole gate.
+        let audio_fec = welcome.host_caps & slipstream_core::quic::HOST_CAP_AUDIO_FEC != 0;
         std::thread::Builder::new()
             .name("slipstream1-audio".into())
-            .spawn(move || audio_thread(conn, stop, cap, channels, transport_policy_audio))
+            .spawn(move || {
+                audio_thread(
+                    conn,
+                    stop,
+                    cap,
+                    channels,
+                    transport_policy_audio,
+                    audio_fec,
+                )
+            })
             .map_err(|e| tracing::warn!(error = %e, "audio thread spawn failed — session continues without audio"))
             .ok()
     } else {
