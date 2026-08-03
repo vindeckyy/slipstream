@@ -51,6 +51,15 @@ fn stream_sink_enabled() -> bool {
         .unwrap_or(true)
 }
 
+fn subtract_ring_samples(counter: &AtomicUsize, amount: usize) {
+    if amount == 0 {
+        return;
+    }
+    let _ = counter.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+        Some(current.saturating_sub(amount))
+    });
+}
+
 pub struct PwAudioCapturer {
     chunks: Receiver<Vec<f32>>,
     channels: u32,
@@ -174,13 +183,12 @@ impl Drop for PwAudioCapturer {
 
 impl AudioCapturer for PwAudioCapturer {
     fn next_chunk(&mut self) -> Result<Vec<f32>> {
-        use std::sync::atomic::Ordering;
         let chunk = match self.chunks.recv_timeout(Duration::from_secs(5)) {
             Ok(c) => {
                 // Phase 8 ring telemetry: `ring_samples` is the producer's standing-occupancy
                 // counter (incremented per chunk in the process callback); a successful recv
                 // drains one chunk, so decrement it here.
-                self.ring_samples.fetch_sub(240, Ordering::Relaxed);
+                subtract_ring_samples(&self.ring_samples, c.len() / self.channels as usize);
                 Ok(c)
             }
             // A quiet sink (paused game, idle desktop) is NOT a failure — return an empty chunk so the
@@ -201,7 +209,9 @@ impl AudioCapturer for PwAudioCapturer {
     }
 
     fn drain(&mut self) {
-        while self.chunks.try_recv().is_ok() {}
+        while let Ok(c) = self.chunks.try_recv() {
+            subtract_ring_samples(&self.ring_samples, c.len() / self.channels as usize);
+        }
         // A parked capturer being reused = a new session starting: re-claim the default sink
         // (released by `idle()` when the previous session parked us).
         if let (Some(name), false) = (&self.sink_name, self.claimed) {
@@ -834,17 +844,20 @@ fn pw_thread(
                     let region = &buf[offset..(offset + size).min(buf.len())];
                     // Negotiated as F32LE; reinterpret the byte region as interleaved f32.
                     let n = region.len() / 4;
-                    static FIRST: std::sync::atomic::AtomicBool =
-                        std::sync::atomic::AtomicBool::new(true);
-                    if FIRST.swap(false, std::sync::atomic::Ordering::Relaxed) {
-                        tracing::info!(samples = n, "audio first capture buffer");
-                        // Phase 8: the first buffer's sample count IS the negotiated quantum
-                        // (the buffer PipeWire drives us at) — expose it as the actual latency.
-                        let samples_per_ch = n as f64 / channels as f64;
-                        quantum_ms.store(
-                            (samples_per_ch * 1000.0 / SAMPLE_RATE as f64 * 100.0) as u64,
+                    let samples_per_ch = n / channels as usize;
+                    let quantum_x100 =
+                        (samples_per_ch as f64 * 1000.0 / SAMPLE_RATE as f64 * 100.0) as u64;
+                    if quantum_ms
+                        .compare_exchange(
+                            0,
+                            quantum_x100,
                             std::sync::atomic::Ordering::Relaxed,
-                        );
+                            std::sync::atomic::Ordering::Relaxed,
+                        )
+                        .is_ok()
+                    {
+                        tracing::info!(samples = n, "audio first capture buffer");
+                        // The first buffer's sample count is the actual PipeWire quantum.
                     }
                     let mut samples = Vec::with_capacity(n);
                     for i in 0..n {
@@ -857,13 +870,16 @@ fn pw_thread(
                         samples.push(f32::from_le_bytes(b));
                     }
                     // Phase 8 ring telemetry: the sync_channel's occupancy (drained by the audio
-                    // thread) is the standing capture ring.
-                    ring_capacity.store(64, std::sync::atomic::Ordering::Relaxed);
+                    // thread) is the standing capture ring. Report capacity per channel.
+                    ring_capacity.store(
+                        64usize.saturating_mul(samples_per_ch),
+                        std::sync::atomic::Ordering::Relaxed,
+                    );
                     // The `try_send` below drops when the consumer is behind — track the drop as
                     // an overflow, and the accepted chunk as standing ring occupancy.
-                    if tx.try_send(samples).is_ok() {
-                        ring_samples.fetch_add(240, std::sync::atomic::Ordering::Relaxed);
-                    } else {
+                    ring_samples.fetch_add(samples_per_ch, std::sync::atomic::Ordering::Relaxed);
+                    if tx.try_send(samples).is_err() {
+                        subtract_ring_samples(&ring_samples, samples_per_ch);
                         overflow_dropped.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     }
                 }));

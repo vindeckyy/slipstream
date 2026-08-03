@@ -5,7 +5,7 @@
 //! stub, so a dev build streams video-only rather than failing to compile.
 
 use super::*;
-use slipstream_core::fec::{AudioFecData, AUDIO_GROUP_LEN, AUDIO_MAX_PARITY, generate_parity};
+use slipstream_core::fec::{generate_parity, AudioFecData, AUDIO_GROUP_LEN, AUDIO_MAX_PARITY};
 
 /// Opus encoder for the native audio plane: a plain stereo encoder (the live-validated,
 /// byte-identical path) or a libopus *multistream* encoder for 5.1/7.1, both behind one
@@ -53,6 +53,39 @@ impl NativeAudioEnc {
     }
 }
 
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[derive(Default)]
+struct AudioPacer {
+    next_send: Option<std::time::Instant>,
+}
+
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+impl AudioPacer {
+    const FRAME_INTERVAL: std::time::Duration = std::time::Duration::from_millis(5);
+
+    fn wait_for_next(&mut self) {
+        let scheduled = self.next_send.take();
+        if let Some(deadline) = scheduled {
+            let now = std::time::Instant::now();
+            if deadline > now {
+                std::thread::sleep(deadline - now);
+            }
+        }
+        let now = std::time::Instant::now();
+        self.next_send = Some(match scheduled {
+            Some(deadline) => {
+                let next = deadline + Self::FRAME_INTERVAL;
+                if next > now {
+                    next
+                } else {
+                    now + Self::FRAME_INTERVAL
+                }
+            }
+            None => now + Self::FRAME_INTERVAL,
+        });
+    }
+}
+
 /// The audio thread: desktop capture → Opus (48 kHz, 5 ms, CBR — same tuning as the GameStream
 /// path) → `AUDIO_MAGIC` datagrams, at the negotiated `channels` (2 stereo / 6 = 5.1 / 8 = 7.1,
 /// canonical wire order FL FR FC LFE RL RR SL SR). QUIC already encrypts; no extra layer. The
@@ -75,13 +108,13 @@ pub(super) fn audio_thread(
     use crate::audio::SAMPLE_RATE;
     const FRAME_MS: usize = 5;
     const SAMPLES_PER_FRAME: usize = SAMPLE_RATE as usize * FRAME_MS / 1000; // 240
-    // Audio is latency-critical: raise this thread's priority (nice -10 on Linux) so a
-    // CPU-saturating game can't deschedule capture → encode → send and starve the audio
-    // pipeline (the same boost the capture/encode video threads get). Best-effort: silently
-    // no-ops without CAP_SYS_NICE / RLIMIT_NICE.
+                                                                             // Audio is latency-critical: raise this thread's priority (nice -10 on Linux) so a
+                                                                             // CPU-saturating game can't deschedule capture → encode → send and starve the audio
+                                                                             // pipeline (the same boost the capture/encode video threads get). Best-effort: silently
+                                                                             // no-ops without CAP_SYS_NICE / RLIMIT_NICE.
     ss_frame::thread_qos::boost_thread_priority(true);
     // Phase 8 ring cap (in Opus frames): 2 on LAN, 3 on WAN — the standing-audio budget. The
-    // cap is read per drain so a transport-state change applies immediately.
+    // cap is expanded for a larger PipeWire quantum so a capture burst is not truncated.
     const RING_CAP_LAN: usize = 2;
     const RING_CAP_WAN: usize = 3;
     let want = slipstream_core::audio::normalize_channels(channels);
@@ -137,13 +170,15 @@ pub(super) fn audio_thread(
     // Phase 8: bounded ring of full Opus frames awaiting send (the state-dependent cap). When
     // the capturer delivers a burst, older frames are dropped (drop-oldest) so the standing
     // audio age stays inside the transport state's budget.
-    let mut ring: std::collections::VecDeque<Vec<f32>> = std::collections::VecDeque::with_capacity(RING_CAP_WAN + 1);
+    let mut ring: std::collections::VecDeque<Vec<f32>> =
+        std::collections::VecDeque::with_capacity(RING_CAP_WAN + 1);
     // Audio FEC (design/audio-resilience.md): when negotiated, buffer a whole group of
     // encoded frames and emit the group + its RS parity together. The group is the send-side
     // reorder window: data always lands before its parity (they're sent back-to-back), and a
     // lost 5 ms packet can be rebuilt by the client from the group's survivors + parity.
     // One group of 8 × 5 ms = 40 ms of added latency, only on the negotiated path.
     let mut fec: Option<FecSender> = audio_fec.then(|| FecSender::new(transport_policy.clone()));
+    let mut pacer = AudioPacer::default();
     // Reopen-with-backoff: hold the capturer in an Option so a mid-session capture-thread death
     // (device unplug, daemon restart) — or a first open lost to session-start churn above —
     // reopens instead of muting the rest of a multi-hour session. A quiet sink is NOT a death —
@@ -198,16 +233,18 @@ pub(super) fn audio_thread(
             }
         };
         acc.extend_from_slice(&chunk);
+        let capture_frames = acc.len() / frame_len;
+        let base_cap = if transport_policy.fec_floor() >= 10 {
+            RING_CAP_WAN
+        } else {
+            RING_CAP_LAN
+        };
+        // PipeWire may deliver one large quantum even when the stream requested 5 ms. Admit the
+        // complete burst, then pace it onto the wire at one Opus frame every 5 ms.
+        let cap = base_cap.max(capture_frames);
         while acc.len() >= frame_len {
             let frame: Vec<f32> = acc.drain(..frame_len).collect();
             ring.push_back(frame);
-            // The transport-state-dependent ring cap: WAN keeps 3 frames, LAN 2, and the
-            // budget shrinks as the measured state tightens (drop-oldest = the stale tail).
-            let cap = if transport_policy.fec_floor() >= 10 {
-                RING_CAP_WAN
-            } else {
-                RING_CAP_LAN
-            };
             while ring.len() > cap {
                 ring.pop_front();
                 overflow_dropped += 1;
@@ -228,8 +265,9 @@ pub(super) fn audio_thread(
                     // FEC path: buffer into the group, emit data + parity when full.
                     // Plain path: emit the datagram immediately.
                     let ok = if let Some(f) = &mut fec {
-                        f.push(&conn, seq, pts_ns, &opus_buf[..n])
+                        f.push(&conn, seq, pts_ns, &opus_buf[..n], &mut pacer)
                     } else {
+                        pacer.wait_for_next();
                         let d = slipstream_core::quic::encode_audio_datagram(
                             seq,
                             pts_ns,
@@ -263,10 +301,7 @@ pub(super) fn audio_thread(
         // burst left after a congested drain; playout age is approximated from the overflow
         // drops and the current frame age. Recorded separately from video latency.
         if last_telemetry.elapsed() >= std::time::Duration::from_secs(5) {
-            let tel = capturer
-                .as_ref()
-                .map(|c| c.telemetry())
-                .unwrap_or_default();
+            let tel = capturer.as_ref().map(|c| c.telemetry()).unwrap_or_default();
             let (fec_frames, fec_parity) = fec
                 .as_ref()
                 .map(|f| (f.frames_buffered, f.parity_sent))
@@ -288,7 +323,7 @@ pub(super) fn audio_thread(
     // Flush any partial FEC group at session end so the last few packets aren't stranded
     // (a group is emitted only when full; the tail would otherwise be dropped on teardown).
     if let Some(f) = &mut fec {
-        let _ = f.flush(&conn);
+        let _ = f.flush(&conn, &mut pacer);
     }
     // Park the live capturer for the next session (None if it died and never reopened),
     // releasing its session-scoped routing claim (Linux: the default sink moves back;
@@ -352,7 +387,7 @@ impl FecSender {
 
     /// Emit the buffered group: data datagrams (in order), then the parity datagram(s).
     /// Returns `false` if the connection is gone (the caller ends the session).
-    fn flush(&mut self, conn: &quinn::Connection) -> bool {
+    fn flush(&mut self, conn: &quinn::Connection, pacer: &mut AudioPacer) -> bool {
         if self.frames.is_empty() {
             return true;
         }
@@ -370,6 +405,7 @@ impl FecSender {
         let group_id = self.group_id;
         // Data datagrams, in order.
         for (seq, pts_ns, opus) in self.frames.iter() {
+            pacer.wait_for_next();
             let d = slipstream_core::quic::encode_audio_datagram_fec(
                 *seq,
                 *pts_ns,
@@ -385,11 +421,7 @@ impl FecSender {
         // shards as the payload, then the FEC tail with kind = AUDIO_FEC_PARITY.
         if let Ok(parity) = parity {
             if !parity.is_empty() {
-                let mut d = slipstream_core::quic::encode_audio_datagram(
-                    0,
-                    0,
-                    &parity.concat(),
-                );
+                let mut d = slipstream_core::quic::encode_audio_datagram(0, 0, &parity.concat());
                 d.push(group_id);
                 d.push(parity_count as u8);
                 d.push(slipstream_core::quic::AUDIO_FEC_PARITY);
@@ -407,11 +439,18 @@ impl FecSender {
 
     /// Add one encoded frame to the current group; flushes + emits when the group fills.
     /// Returns `false` if the connection is gone.
-    fn push(&mut self, conn: &quinn::Connection, seq: u32, pts_ns: u64, opus: &[u8]) -> bool {
+    fn push(
+        &mut self,
+        conn: &quinn::Connection,
+        seq: u32,
+        pts_ns: u64,
+        opus: &[u8],
+        pacer: &mut AudioPacer,
+    ) -> bool {
         self.frames.push((seq, pts_ns, opus.to_vec()));
         self.frames_buffered += 1;
         if self.full() {
-            self.flush(conn)
+            self.flush(conn, pacer)
         } else {
             true
         }
