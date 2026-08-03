@@ -341,7 +341,12 @@ unsafe fn open_vaapi_encoder_mode(
     // sw view (pix_fmt overridden to VAAPI below): NV12, or P010 for the 10-bit HDR session.
     video.set_format(if ten_bit { Pixel::P010LE } else { Pixel::NV12 });
     // Fixed rate, CBR, no B-frames, ~1-frame VBV — the shared low-latency RC contract.
-    apply_low_latency_rc(&mut video, fps, bitrate_bps);
+    apply_low_latency_rc(
+        &mut video,
+        fps,
+        bitrate_bps,
+        crate::LatencyProfile::current().config().vbv_frames,
+    );
     // SAFETY: `as_mut_ptr` hands back the `AVCodecContext` behind the `video` encoder allocated
     // just above, which outlives every write here (it is moved into the return value). The
     // colour/gop/pix_fmt stores are in-bounds scalar field writes on that live context. The two
@@ -1665,6 +1670,7 @@ mod tests {
                 format: PixelFormat::Bgrx,
                 payload: FramePayload::Cpu(buf),
                 cursor: None,
+                stage_ns: ss_frame::CaptureStageTimes::default(),
             };
             enc.submit(&frame).expect("submit");
             while let Some(au) = enc.poll().expect("poll") {

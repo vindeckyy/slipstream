@@ -61,6 +61,13 @@ pub struct PwAudioCapturer {
     /// active). Toggled by open/[`drain`](AudioCapturer::drain) (claim) and
     /// [`idle`](AudioCapturer::idle)/Drop (release).
     claimed: bool,
+    /// Phase-8 telemetry: the negotiated quantum (ms) and the ring's occupancy, shared with
+    /// the capture thread so `telemetry()` reads them lock-free.
+    quantum_ms: Arc<std::sync::atomic::AtomicU64>,
+    ring_samples: Arc<std::sync::atomic::AtomicUsize>,
+    ring_capacity: Arc<std::sync::atomic::AtomicUsize>,
+    underruns: Arc<std::sync::atomic::AtomicU64>,
+    overflow_dropped: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl PwAudioCapturer {
@@ -89,10 +96,37 @@ impl PwAudioCapturer {
         // mode the sink node must exist before we claim the default to its name.
         let (ready_tx, ready_rx) = sync_channel::<Result<()>>(1);
         let thread_sink_name = sink_name.clone();
+        // Phase-8 telemetry atomics, shared with the capture thread.
+        let quantum_ms = std::sync::atomic::AtomicU64::new(0);
+        let ring_samples = std::sync::atomic::AtomicUsize::new(0);
+        let ring_capacity = std::sync::atomic::AtomicUsize::new(0);
+        let underruns = std::sync::atomic::AtomicU64::new(0);
+        let overflow_dropped = std::sync::atomic::AtomicU64::new(0);
+        let t_quantum = Arc::new(quantum_ms);
+        let t_ring_samples = Arc::new(ring_samples);
+        let t_ring_capacity = Arc::new(ring_capacity);
+        let t_underruns = Arc::new(underruns);
+        let t_overflow = Arc::new(overflow_dropped);
+        let c_quantum = t_quantum.clone();
+        let c_ring_samples = t_ring_samples.clone();
+        let c_ring_capacity = t_ring_capacity.clone();
+        let c_underruns = t_underruns.clone();
+        let c_overflow = t_overflow.clone();
         thread::Builder::new()
             .name("slipstream-pw-audio".into())
             .spawn(move || {
-                if let Err(e) = pw_thread(tx, quit_rx, channels, thread_sink_name, ready_tx) {
+                if let Err(e) = pw_thread(
+                    tx,
+                    quit_rx,
+                    channels,
+                    thread_sink_name,
+                    ready_tx,
+                    c_quantum,
+                    c_ring_samples,
+                    c_ring_capacity,
+                    c_underruns,
+                    c_overflow,
+                ) {
                     tracing::error!(error = %format!("{e:#}"), "pipewire audio thread failed");
                 }
             })
@@ -117,6 +151,11 @@ impl PwAudioCapturer {
             quit: quit_tx,
             sink_name,
             claimed,
+            quantum_ms: t_quantum,
+            ring_samples: t_ring_samples,
+            ring_capacity: t_ring_capacity,
+            underruns: t_underruns,
+            overflow_dropped: t_overflow,
         })
     }
 }
@@ -135,13 +174,26 @@ impl Drop for PwAudioCapturer {
 
 impl AudioCapturer for PwAudioCapturer {
     fn next_chunk(&mut self) -> Result<Vec<f32>> {
-        match self.chunks.recv_timeout(Duration::from_secs(5)) {
-            Ok(c) => Ok(c),
+        use std::sync::atomic::Ordering;
+        let chunk = match self.chunks.recv_timeout(Duration::from_secs(5)) {
+            Ok(c) => {
+                // Phase 8 ring telemetry: `ring_samples` is the producer's standing-occupancy
+                // counter (incremented per chunk in the process callback); a successful recv
+                // drains one chunk, so decrement it here.
+                self.ring_samples.fetch_sub(240, Ordering::Relaxed);
+                Ok(c)
+            }
             // A quiet sink (paused game, idle desktop) is NOT a failure — return an empty chunk so the
             // caller keeps the capturer alive. Only a dead capture thread is an Err (→ caller reopens).
-            Err(RecvTimeoutError::Timeout) => Ok(Vec::new()),
+            Err(RecvTimeoutError::Timeout) => {
+                // The 5 s idle timeout means the producer stopped — that is an underrun of the
+                // capture ring (no audio for a long stretch).
+                self.underruns.fetch_add(1, Ordering::Relaxed);
+                Ok(Vec::new())
+            }
             Err(RecvTimeoutError::Disconnected) => Err(anyhow!("pipewire audio thread ended")),
-        }
+        };
+        chunk
     }
 
     fn channels(&self) -> u32 {
@@ -162,6 +214,24 @@ impl AudioCapturer for PwAudioCapturer {
         if self.claimed {
             self.claimed = false;
             stream_sink::release();
+        }
+    }
+
+    fn telemetry(&self) -> crate::audio::AudioTelemetry {
+        use std::sync::atomic::Ordering;
+        let quantum_x100 = self.quantum_ms.load(Ordering::Relaxed);
+        let samples = self.ring_samples.load(Ordering::Relaxed);
+        crate::audio::AudioTelemetry {
+            quantum_ms: quantum_x100 as f64 / 100.0,
+            ring_samples: samples,
+            ring_capacity: self.ring_capacity.load(Ordering::Relaxed),
+            underruns: self.underruns.load(Ordering::Relaxed),
+            overflow_dropped: self.overflow_dropped.load(Ordering::Relaxed),
+            playout_age_ms: if samples > 0 {
+                samples as f64 / SAMPLE_RATE as f64 * 1000.0
+            } else {
+                0.0
+            },
         }
     }
 }
@@ -637,6 +707,11 @@ fn pw_thread(
     channels: u32,
     sink_name: Option<String>,
     ready: std::sync::mpsc::SyncSender<Result<()>>,
+    quantum_ms: Arc<std::sync::atomic::AtomicU64>,
+    ring_samples: Arc<std::sync::atomic::AtomicUsize>,
+    ring_capacity: Arc<std::sync::atomic::AtomicUsize>,
+    _underruns: Arc<std::sync::atomic::AtomicU64>,
+    overflow_dropped: Arc<std::sync::atomic::AtomicU64>,
 ) -> Result<()> {
     use pipewire as pw;
     use pw::{properties::properties, spa};
@@ -738,7 +813,7 @@ fn pw_thread(
                     );
                 }
             })
-            .process(|stream, tx| {
+            .process(move |stream, tx| {
                 let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     let Some(mut buffer) = stream.dequeue_buffer() else {
                         return;
@@ -763,6 +838,13 @@ fn pw_thread(
                         std::sync::atomic::AtomicBool::new(true);
                     if FIRST.swap(false, std::sync::atomic::Ordering::Relaxed) {
                         tracing::info!(samples = n, "audio first capture buffer");
+                        // Phase 8: the first buffer's sample count IS the negotiated quantum
+                        // (the buffer PipeWire drives us at) — expose it as the actual latency.
+                        let samples_per_ch = n as f64 / channels as f64;
+                        quantum_ms.store(
+                            (samples_per_ch * 1000.0 / SAMPLE_RATE as f64 * 100.0) as u64,
+                            std::sync::atomic::Ordering::Relaxed,
+                        );
                     }
                     let mut samples = Vec::with_capacity(n);
                     for i in 0..n {
@@ -774,7 +856,16 @@ fn pw_thread(
                         ];
                         samples.push(f32::from_le_bytes(b));
                     }
-                    let _ = tx.try_send(samples); // drop if the encoder is behind
+                    // Phase 8 ring telemetry: the sync_channel's occupancy (drained by the audio
+                    // thread) is the standing capture ring.
+                    ring_capacity.store(64, std::sync::atomic::Ordering::Relaxed);
+                    // The `try_send` below drops when the consumer is behind — track the drop as
+                    // an overflow, and the accepted chunk as standing ring occupancy.
+                    if tx.try_send(samples).is_ok() {
+                        ring_samples.fetch_add(240, std::sync::atomic::Ordering::Relaxed);
+                    } else {
+                        overflow_dropped.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    }
                 }));
                 if outcome.is_err() {
                     tracing::error!("panic in pipewire audio callback — chunk dropped");

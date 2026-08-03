@@ -1,6 +1,7 @@
 //! Probe session: connect, verify/stream, and input-plane exercise paths.
 
 use crate::args::{codec_ext, hex, load_or_create_identity, now_ns, Args};
+use crate::artifact::{ClientArtifact, FrameRecord, PresentWaitInfo};
 use anyhow::{anyhow, Context, Result};
 use slipstream_core::config::Role;
 use slipstream_core::input::{InputEvent, InputKind};
@@ -880,6 +881,7 @@ pub(crate) async fn session(args: Args) -> Result<()> {
     // is then only valid same-host, as before).
     let clock_offset = clock_offset_ns.unwrap_or(0);
     let skew_corrected = clock_offset_ns.is_some();
+    let best_rtt_us = first_skew.as_ref().map(|s| s.rtt_ns / 1000).unwrap_or(0);
 
     // Data plane on a blocking thread (native threads only on the frame path).
     let result = tokio::task::spawn_blocking(move || -> Result<()> {
@@ -901,6 +903,7 @@ pub(crate) async fn session(args: Args) -> Result<()> {
             )),
             None => None,
         };
+        let mut artifact = ClientArtifact::open(PresentWaitInfo::unavailable());
 
         let mut ok = 0u32;
         let mut mismatched = 0u32;
@@ -975,9 +978,10 @@ pub(crate) async fn session(args: Args) -> Result<()> {
                         continue;
                     }
                     bytes += frame.data.len() as u64;
-                    // capture→received: our receive instant in the host clock (now + offset)
-                    // minus the host's capture pts. offset is 0 same-host / old host.
-                    let lat = (now_ns() as i128 + clock_offset as i128 - frame.pts_ns as i128)
+                    // capture→received: the frame's own reassembly-completion stamp in the
+                    // host clock (received_ns + offset) minus the host's capture pts. offset
+                    // is 0 same-host / old host.
+                    let lat = (frame.received_ns as i128 + clock_offset as i128 - frame.pts_ns as i128)
                         .max(0) as u64;
                     if lat > 0 && lat < 10_000_000_000 {
                         latencies_us.push(lat / 1000);
@@ -985,6 +989,35 @@ pub(crate) async fn session(args: Args) -> Result<()> {
                         if pending_split.len() > 1024 {
                             pending_split.pop_front();
                         }
+                    }
+                    if let Some(a) = artifact.as_mut() {
+                        a.record_frame(&FrameRecord {
+                            frame_id: frame.frame_index,
+                            pts_ns: frame.pts_ns,
+                            received_ns: frame.received_ns,
+                            // The probe has no decoder/display (it dumps the bitstream), so the
+                            // decode/present/display stages stay 0/false — the GUI clients fill
+                            // them (Phase 9: present-wait + display stages live there). The
+                            // receive, clock-sync and drop fields are real.
+                            decoded_ns: 0,
+                            decode_queue_displacement: 0,
+                            presenter_queue_displacement: 0,
+                            displayed_ns: 0,
+                            display_timing_valid: false,
+                            present_mode: "unknown".into(),
+                            clock_offset_ns: clock_offset,
+                            best_rtt_us,
+                            // The skew handshake's uncertainty is ≈ RTT/2 (the min-RTT sample
+                            // bounds how wrong the offset can be) — the Phase 9 clock field.
+                            clock_uncertainty_us: best_rtt_us / 2,
+                            // Age of the connect-time skew estimate: the probe does one handshake
+                            // per run, so the estimate ages monotonically with the session.
+                            resync_age_us: started.elapsed().as_micros() as u64,
+                            drops_network: session.stats().frames_dropped,
+                            drops_decode: 0,
+                            drops_presenter: 0,
+                            drops_display: 0,
+                        });
                     }
                     // Match any host timings (0xCF) that have arrived: host = the reported
                     // capture→sent, network = our capture→received minus it (per-frame tiling).
@@ -1055,6 +1088,7 @@ pub(crate) async fn session(args: Args) -> Result<()> {
         };
         tracing::info!(
             frames = ok,
+            received_ns_based = true,
             mismatched,
             mb = bytes / 1_000_000,
             lat_p50_us = pct(0.50),

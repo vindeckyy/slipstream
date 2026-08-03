@@ -21,5 +21,8 @@ pub use core::metronome;
 pub use core::session_tuning;
 pub use core::thread_qos;
 
+#[cfg(target_os = "linux")]
+pub use core::worker_qos;
+
 #[cfg(target_os = "windows")]
 pub use core::dxgi;

@@ -73,7 +73,7 @@ pub extern "system" fn JNI_OnLoad(
 /// scaffold's proof that `System.loadLibrary` found the `.so`, the JNI symbol resolved, and the
 /// linked `slipstream-core` is the one we expect.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_abiVersion(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_abiVersion(
     _env: JNIEnv,
     _this: JObject,
 ) -> jint {
@@ -82,7 +82,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_abiVersion(
 
 /// `NativeBridge.coreVersion(): String` — the crate version, proving JNI string marshaling works.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_coreVersion<'local>(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_coreVersion<'local>(
     env: JNIEnv<'local>,
     _this: JObject<'local>,
 ) -> jni::sys::jstring {

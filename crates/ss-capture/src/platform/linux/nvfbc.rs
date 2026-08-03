@@ -556,6 +556,7 @@ impl NvFbcCapturer {
             format: PixelFormat::Bgra,
             payload: FramePayload::Cuda(destination),
             cursor: None,
+            stage_ns: ss_frame::CaptureStageTimes::default(),
         })
     }
 

@@ -4392,6 +4392,7 @@ dependencies = [
  "slipstream-core",
  "ss-capture",
  "ss-driver-proto",
+ "ss-frame",
  "ss-host-config",
  "ss-paths",
  "ss-win-display",

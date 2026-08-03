@@ -139,13 +139,18 @@ pub(crate) enum PollOutcome {
 ///
 /// The caller still owns `set_format` (pixel format) and `gop_size` (GOP policy differs: NVENC's
 /// infinite/intra-refresh wave vs the VAAPI/AMF `i32::MAX`), since those are backend-specific.
-pub(crate) fn apply_low_latency_rc(video: &mut encoder::video::Video, fps: u32, bitrate_bps: u64) {
+pub(crate) fn apply_low_latency_rc(
+    video: &mut encoder::video::Video,
+    fps: u32,
+    bitrate_bps: u64,
+    vbv_frames: f64,
+) {
     video.set_time_base(Rational(1, fps as i32));
     video.set_frame_rate(Some(Rational(fps as i32, 1)));
     video.set_bit_rate(bitrate_bps as usize);
     video.set_max_bit_rate(bitrate_bps as usize);
     video.set_max_b_frames(0);
-    let vbv_bits = ((bitrate_bps as f64 / fps.max(1) as f64) * crate::vbv_frames_env())
+    let vbv_bits = ((bitrate_bps as f64 / fps.max(1) as f64) * vbv_frames)
         .clamp(1.0, i32::MAX as f64);
     // SAFETY: `video` wraps a freshly-allocated `AVCodecContext` we hold by value and have not opened
     // yet; `as_mut_ptr()` returns that non-null, aligned, exclusively-owned context. Writing the plain

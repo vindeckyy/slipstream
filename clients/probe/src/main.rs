@@ -48,6 +48,7 @@
 #![forbid(unsafe_code)]
 
 mod args;
+mod artifact;
 mod discover;
 mod session;
 

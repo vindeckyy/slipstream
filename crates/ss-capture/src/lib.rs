@@ -40,6 +40,13 @@ pub struct CaptureTelemetry {
     pub height: u32,
     /// Negotiated modifier, or zero for linear/unknown.
     pub modifier: u64,
+    /// Frames dropped because the implicit fence did not signal within the deadline budget
+    /// (Phase 3 — the producer was still rendering; the frame was never read).
+    pub fence_timeouts: u64,
+    /// Whether this capture delivers GPU frames (zero-copy) and why not when it doesn't —
+    /// the Phase-3 zero-copy diagnostic (never silently presenting a copy path as equivalent).
+    pub zerocopy: bool,
+    pub zerocopy_reason: &'static str,
 }
 
 /// Wall-clock nanoseconds used for the capture timestamp carried through the encoder and wire
@@ -309,6 +316,7 @@ impl Capturer for SyntheticCapturer {
             format: PixelFormat::Bgrx,
             payload: FramePayload::Cpu(self.buf.clone()),
             cursor: None,
+            stage_ns: ss_frame::CaptureStageTimes::default(),
         })
     }
 }
@@ -381,6 +389,7 @@ impl Capturer for FastSyntheticCapturer {
             format: PixelFormat::Bgrx,
             payload: FramePayload::Cpu(self.buf.clone()),
             cursor: None,
+            stage_ns: ss_frame::CaptureStageTimes::default(),
         })
     }
 }

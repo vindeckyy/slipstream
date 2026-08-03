@@ -54,9 +54,18 @@ const INJECTOR_REOPEN_BACKOFF: std::time::Duration = std::time::Duration::from_s
 /// backend never builds up a queue of stale relative-mouse/scroll events (latency) — while button,
 /// key, and absolute-move ordering is preserved exactly.
 fn injector_service_thread(rx: std::sync::mpsc::Receiver<InputEvent>) {
+    // Phase 7: opt-in low-latency performance profile — input injection is a stream worker.
+    ss_frame::worker_qos::apply_worker_qos(
+        "slipstream-injector",
+        ss_frame::worker_qos::WorkerClass::Background,
+    );
     let mut injector: Option<Box<dyn InputInjector>> = None;
     let mut open_backend: Option<Backend> = None;
     let mut last_failed: Option<std::time::Instant> = None;
+    // Phase 8: host injection delay — the standing queue age at injection, sampled per batch.
+    // The delay is measured separately from video latency (never inferred from it).
+    let mut inject_delay_us: Vec<u64> = Vec::new();
+    let mut last_delay_log = std::time::Instant::now();
     while let Ok(first) = rx.recv() {
         // Drain everything already queued behind `first` so we coalesce a whole burst at once.
         let mut batch = vec![first];
@@ -98,6 +107,7 @@ fn injector_service_thread(rx: std::sync::mpsc::Receiver<InputEvent>) {
             }
         }
         if let Some(inj) = injector.as_mut() {
+            let t_inject = std::time::Instant::now();
             for ev in coalesce(batch) {
                 if let Err(e) = inj.inject(&ev) {
                     // The backend's worker (portal session / EIS socket) died — drop it and reopen on
@@ -108,6 +118,25 @@ fn injector_service_thread(rx: std::sync::mpsc::Receiver<InputEvent>) {
                     last_failed = Some(std::time::Instant::now());
                     break; // abandon the rest of this batch; the next one reopens
                 }
+            }
+            // Phase 8: sample the injection delay (queue age) and log a compact percentile line
+            // every 5 s — the host-injection-delay metric, separate from video latency.
+            inject_delay_us.push(t_inject.elapsed().as_micros() as u64);
+            if last_delay_log.elapsed() >= std::time::Duration::from_secs(5)
+                && !inject_delay_us.is_empty()
+            {
+                let mut d = inject_delay_us.clone();
+                d.sort_unstable();
+                let p = |q: f64| d[(q * (d.len() - 1) as f64) as usize];
+                tracing::info!(
+                    samples = d.len(),
+                    inject_p50_us = p(0.5),
+                    inject_p95_us = p(0.95),
+                    inject_max_us = d.last().copied().unwrap_or(0),
+                    "input injection delay (host receive→inject)"
+                );
+                inject_delay_us.clear();
+                last_delay_log = std::time::Instant::now();
             }
         }
     }

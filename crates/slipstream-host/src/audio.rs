@@ -41,6 +41,32 @@ pub trait AudioCapturer: Send {
     /// the real output again between streams; the claim returns with the next
     /// [`drain`](Self::drain) (reuse) or a fresh open. Default: no-op.
     fn idle(&mut self) {}
+
+    /// The audio backend's telemetry (latency plan Phase 8): negotiated quantum, ring
+    /// occupancy, underruns, and playout age. Defaults to zero/unknown — a backend that
+    /// doesn't measure reports nothing, and the audio thread logs what it can.
+    fn telemetry(&self) -> AudioTelemetry {
+        AudioTelemetry::default()
+    }
+}
+
+/// Reset-on-read audio backend telemetry (latency plan Phase 8). The host audio thread folds
+/// this into its periodic health line so underruns, ring occupancy, and playout age are
+/// recorded — never inferred from the video latency statistic.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct AudioTelemetry {
+    /// The negotiated PipeWire quantum in milliseconds (0 = unknown / not a PipeWire backend).
+    pub quantum_ms: f64,
+    /// Samples currently buffered in the capture ring, per channel (0 = no ring).
+    pub ring_samples: usize,
+    /// Ring capacity in samples, per channel (0 = no ring).
+    pub ring_capacity: usize,
+    /// How many times the ring drained empty and re-primed (an underrun).
+    pub underruns: u64,
+    /// How many chunks were dropped by the ring's overflow cap (drop-oldest on congestion).
+    pub overflow_dropped: u64,
+    /// The age of the oldest buffered sample, in milliseconds (playout age = standing latency).
+    pub playout_age_ms: f64,
 }
 
 /// Open a live capturer for system output via PipeWire, asking for `channels` interleaved

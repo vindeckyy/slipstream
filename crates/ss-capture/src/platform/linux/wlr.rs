@@ -595,6 +595,7 @@ impl WlrCapturer {
             format,
             payload: FramePayload::Cpu(data),
             cursor: None,
+            stage_ns: ss_frame::CaptureStageTimes::default(),
         })
     }
 }

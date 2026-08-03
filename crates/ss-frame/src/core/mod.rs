@@ -6,5 +6,8 @@ pub mod metronome;
 pub mod session_tuning;
 pub mod thread_qos;
 
+#[cfg(target_os = "linux")]
+pub mod worker_qos;
+
 #[cfg(target_os = "windows")]
 pub mod dxgi;

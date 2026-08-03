@@ -226,6 +226,17 @@ notes for context.
 | `SLIPSTREAM_GPU_PRIORITY_CLASS` | `off` · `normal` · `high` · `realtime` · `auto` | **(Windows)** GPU scheduling priority for capture/encode under a GPU-saturating game. Default `auto` (starts `high`, upgrades to `realtime` when it's safe — e.g. HAGS off); `high` pins the static pre-gate behaviour; `realtime` is the strongest lever but can freeze NVENC on some setups. |
 | `SLIPSTREAM_IDD_DEPTH` | `N` (default `2`) | **(Windows)** IDD-push pipeline depth. `1` cuts latency once GPU priority is raised; higher smooths a contended GPU. |
 
+## Linux performance profile
+
+| Setting | Values | Meaning |
+|---|---|---|
+| `SLIPSTREAM_PERFORMANCE_PROFILE` | `off` *(default)* · `low_latency` | **Opt-in Linux low-latency profile.** Raises the capture, encode-submit, send, and input-injection workers to a realtime scheduling class: RTKit first (the same mechanism PipeWire uses), then an explicit `SCHED_FIFO` if `SLIPSTREAM_SCHED_FIFO=1`, else a documented `SCHED_OTHER` + nice fallback. Never changes system-wide settings silently — GPU power policy and governors are untouched, PipeWire's own RT module is never outranked, and whether each worker's request was applied or rejected is recorded (see the outcome table in stream diagnostics). |
+| `SLIPSTREAM_WORKER_AFFINITY` | e.g. `2,3` | **Explicit only** — pin the stream workers to specific CPU IDs. Never steals CPUs from the game or compositor automatically; unset = no affinity change. |
+| `SLIPSTREAM_SCHED_FIFO` | `1` | Allow the raw `SCHED_FIFO` path (RTKit is preferred and tried first). Requires `CAP_SYS_NICE` / a raised `RLIMIT_RTPRIO`; otherwise falls back to nice. |
+| `SLIPSTREAM_SCHED_PRIO` | `1`–`99` *(default `10`)* | The priority for the RTKit / `SCHED_FIFO` request. |
+| `SLIPSTREAM_LATENCY_PROFILE` | `balanced` *(default)* · `low_latency` | The encoder-side latency contract. `low_latency` pins the stronger constraints (1-frame VBV ceiling, depth-one encoder ring, capability-gated sub-frame output, zero-copy preference) across every Linux encoder backend. |
+| `SLIPSTREAM_NETWORK_POLICY` | `auto` *(default)* · `lan` · `wan` | The transport-state starting point: `auto` measures and classifies the link, `lan`/`wan` start from the named state. |
+
 ## Diagnostics
 
 | Setting | Values | Meaning |

@@ -207,6 +207,87 @@ impl From<Stats> for SlipstreamStats {
     }
 }
 
+/// Current layout version of [`SlipstreamStatsV2`] (independent of [`crate::ABI_VERSION`] — this
+/// surface is append-only and additive to [`SlipstreamStats`]).
+const SLIPSTREAM_STATS_V2_VERSION: u32 = 1;
+
+/// Append-only v2 stats snapshot: `struct_size`/`version`/`_reserved` header, then every
+/// [`SlipstreamStats`] field in the same order, then the Phase-1 latency/drop counters (default 0
+/// now — populated by later phases). Filled through [`slipstream_get_stats_v2`] with a caller-sized
+/// `out_len`, so an embedder built against an OLDER (smaller) layout still receives the shared
+/// leading fields — that is the append-only contract; compare `struct_size` against your own
+/// `sizeof` to detect a layout mismatch.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct SlipstreamStatsV2 {
+    /// Bytes the CALLER's struct occupies (their view). The host writes
+    /// `size_of::<SlipstreamStatsV2>()` (what WE put there); the caller compares against its own.
+    pub struct_size: u64,
+    /// Layout version — [`SLIPSTREAM_STATS_V2_VERSION`] (currently 1).
+    pub version: u32,
+    pub _reserved: u32,
+    pub frames_submitted: u64,
+    pub frames_completed: u64,
+    pub frames_dropped: u64,
+    pub packets_sent: u64,
+    pub packets_received: u64,
+    pub packets_dropped: u64,
+    pub packets_send_dropped: u64,
+    pub fec_recovered_shards: u64,
+    pub bytes_sent: u64,
+    pub bytes_received: u64,
+    /// Dropped past deadline before FEC/seal.
+    pub frames_stale_dropped: u64,
+    /// Dropped because the send channel was full.
+    pub frames_backpressure_dropped: u64,
+    /// Capture fence wait timed out.
+    pub frames_fence_timeout: u64,
+    /// Dropped during a recovery gap.
+    pub frames_recovery_dropped: u64,
+    /// Kernel ENOBUFS/EAGAIN send rejections.
+    pub send_rejections: u64,
+    /// Total time blocked enqueueing to the send channel.
+    pub enqueue_blocked_us: u64,
+    /// High-water mark of the send channel.
+    pub send_queue_occupancy_max: u64,
+    /// Actual SO_SNDBUF after the last set.
+    pub socket_sndbuf_bytes: u64,
+    /// 0/1: SO_TXTIME/ETF pacing active.
+    pub so_txtime_active: u64,
+    /// 0/1: UDP GSO active.
+    pub gso_active: u64,
+}
+
+impl From<Stats> for SlipstreamStatsV2 {
+    fn from(s: Stats) -> Self {
+        SlipstreamStatsV2 {
+            struct_size: std::mem::size_of::<SlipstreamStatsV2>() as u64,
+            version: SLIPSTREAM_STATS_V2_VERSION,
+            _reserved: 0,
+            frames_submitted: s.frames_submitted,
+            frames_completed: s.frames_completed,
+            frames_dropped: s.frames_dropped,
+            packets_sent: s.packets_sent,
+            packets_received: s.packets_received,
+            packets_dropped: s.packets_dropped,
+            packets_send_dropped: s.packets_send_dropped,
+            fec_recovered_shards: s.fec_recovered_shards,
+            bytes_sent: s.bytes_sent,
+            bytes_received: s.bytes_received,
+            frames_stale_dropped: s.frames_stale_dropped,
+            frames_backpressure_dropped: s.frames_backpressure_dropped,
+            frames_fence_timeout: s.frames_fence_timeout,
+            frames_recovery_dropped: s.frames_recovery_dropped,
+            send_rejections: s.send_rejections,
+            enqueue_blocked_us: s.enqueue_blocked_us,
+            send_queue_occupancy_max: s.send_queue_occupancy_max,
+            socket_sndbuf_bytes: s.socket_sndbuf_bytes,
+            so_txtime_active: s.so_txtime_active,
+            gso_active: s.gso_active,
+        }
+    }
+}
+
 /// Host-side callback invoked for each input event drained by `slipstream_host_poll_input`.
 pub type SlipstreamInputCb = extern "C" fn(event: *const InputEvent, user: *mut c_void);
 
@@ -612,6 +693,66 @@ pub unsafe extern "C" fn slipstream_get_stats(
         // SAFETY: per the ABI contract - a caller-owned out-param, non-null on this path, written
         // once by value.
         unsafe { *out = SlipstreamStats::from(stats) };
+        SlipstreamStatus::Ok
+    })
+}
+
+/// Size in bytes of the current [`SlipstreamStatsV2`] layout — what a caller compiled against the
+/// SAME header passes as `out_len`, and what the host writes into `struct_size`.
+#[no_mangle]
+pub extern "C" fn slipstream_stats_v2_size() -> usize {
+    std::mem::size_of::<SlipstreamStatsV2>()
+}
+
+/// Current [`SlipstreamStatsV2`] layout version (1). Independent of
+/// [`slipstream_abi_version`] — this surface is additive and append-only.
+#[no_mangle]
+pub extern "C" fn slipstream_stats_v2_version() -> u32 {
+    SLIPSTREAM_STATS_V2_VERSION
+}
+
+/// Copy session counters into `*out` as the append-only [`SlipstreamStatsV2`] layout.
+///
+/// `out_len` is the size of the CALLER's buffer — its struct view. The host fills
+/// `min(out_len, size_of::<SlipstreamStatsV2>())` bytes: an embedder built against an older
+/// (smaller) layout still receives the shared leading fields, and one built against a larger
+/// layout receives everything we emit. `struct_size` is written as the host's own layout size;
+/// the caller compares it with its own expectation to detect a mismatch.
+///
+/// `out_len` must be at least 16 (the `struct_size` + `version` + `_reserved` header); a smaller
+/// buffer cannot even carry the version handshake and is rejected with `InvalidArg`.
+///
+/// # Safety
+/// `s` is a valid handle; `out` is non-NULL and writable for at least `out_len` bytes.
+#[no_mangle]
+pub unsafe extern "C" fn slipstream_get_stats_v2(
+    s: *mut SlipstreamSession,
+    out: *mut c_void,
+    out_len: usize,
+) -> SlipstreamStatus {
+    guard(|| {
+        // SAFETY: per the ABI contract - an opaque handle from a `*_new`/`*_pair` that the caller
+        // has not yet freed, or null, which `as_mut`/`as_ref` reports as `None` and the `match`
+        // here handles.
+        let s = match unsafe { s.as_ref() } {
+            Some(s) => s,
+            None => return SlipstreamStatus::NullPointer,
+        };
+        if out.is_null() || out_len < 16 {
+            return SlipstreamStatus::InvalidArg;
+        }
+        let stats = SlipstreamStatsV2::from(s.inner.stats());
+        let n = out_len.min(std::mem::size_of::<SlipstreamStatsV2>());
+        // SAFETY: per the ABI contract - `out` is a caller-owned out-param writable for
+        // `out_len` bytes and non-null on this path; `n <= out_len`, and the source is a
+        // stack-local value of the same type.
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                (&stats as *const SlipstreamStatsV2).cast::<u8>(),
+                out.cast::<u8>(),
+                n,
+            );
+        }
         SlipstreamStatus::Ok
     })
 }

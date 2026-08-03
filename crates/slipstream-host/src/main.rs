@@ -108,6 +108,7 @@ mod power {
 // platform with neither (macOS, which has no launch path either) the module is an empty shell.
 mod procscan;
 mod send_pacing;
+mod transport_state;
 #[cfg(target_os = "windows")]
 #[path = "windows/service.rs"]
 mod service;

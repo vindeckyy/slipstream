@@ -33,6 +33,12 @@ pub(super) async fn run(
     // Phase-locked capture bridge: client PhaseReports land here latest-wins; the encode loop's
     // controller drains at its own ~1 Hz cadence (design/phase-locked-capture.md).
     phase_ctl: Arc<super::stream::PhaseCtl>,
+    // Phase 6: the measured transport-state machine + its published policy. The control task
+    // feeds one window per LossReport (RTT from the QUIC connection, loss from the report,
+    // capacity from the probe bursts) and publishes the policy on every state change.
+    conn: quinn::Connection,
+    transport_state: Arc<std::sync::Mutex<crate::transport_state::TransportStateMachine>>,
+    transport_policy: Arc<crate::transport_state::TransportPolicyShared>,
     reconfig_tx: std::sync::mpsc::Sender<slipstream_core::Mode>,
     keyframe_tx: std::sync::mpsc::Sender<()>,
     rfi_tx: std::sync::mpsc::Sender<(u32, u32)>,
@@ -53,6 +59,12 @@ pub(super) async fn run(
     // Set once `clip_offer_rx` closes (coordinator gone / inert handle) so its `select!` branch
     // stops firing on a perpetually-ready `None`.
     let mut clip_offer_closed = false;
+    // Phase 6 measurement state: the last window feed, the probe-measured capacity, and the
+    // smoothed RTT + variation the machine classifies on.
+    let mut last_transport_feed = std::time::Instant::now();
+    let mut last_capacity_bps: u64 = 0;
+    let mut rtt_ewma_ms: f64 = 0.0;
+    let mut rtt_var_ms: f64 = 0.0;
     let mut active = initial_mode;
     // Host-side switch rate limit (a backstop against a hostile/broken client spamming
     // Reconfigure into pipeline-rebuild churn — the drain-to-newest in the data plane already
@@ -131,6 +143,20 @@ pub(super) async fn run(
                     // Adaptive FEC: size recovery to the loss the client is seeing. The data-plane
                     // send loop reads `fec_target_ctl` and applies it per frame. Ignored when FEC
                     // is pinned via SLIPSTREAM_FEC_PCT.
+                    // Phase 6: feed the transport-state machine one measurement window
+                    // (RTT from the QUIC control connection, loss from this report, capacity
+                    // from the latest probe burst). Publishes the state's policy on change.
+                    feed_transport(
+                        &transport_state,
+                        &transport_policy,
+                        &conn,
+                        u64::from(rep.loss_ppm),
+                        last_capacity_bps,
+                        live_bitrate.load(Ordering::Relaxed) as u64 * 1000,
+                        &mut last_transport_feed,
+                        &mut rtt_ewma_ms,
+                        &mut rtt_var_ms,
+                    );
                     if adaptive_fec {
                         // Fast attack, slow decay: jump straight to what the reported loss
                         // needs, but come DOWN only one point per clean report (~750 ms). The
@@ -140,9 +166,12 @@ pub(super) async fn run(
                         // unprotected stream — an unrecoverable frame, a freeze, and a
                         // recovery-IDR burst, once per cycle. Decaying over ~10 windows keeps
                         // the stream covered across the gap while still converging to FEC_MIN
-                        // on a genuinely clean link.
+                        // on a genuinely clean link. The transport state's policy is the floor
+                        // (a WAN state never drops below its FEC protection).
                         let prev = fec_target_ctl.load(Ordering::Relaxed);
-                        let target = adapt_fec(rep.loss_ppm).max(prev.saturating_sub(1));
+                        let target = adapt_fec(rep.loss_ppm)
+                            .max(prev.saturating_sub(1))
+                            .max(transport_policy.fec_floor());
                         fec_target_ctl.store(target, Ordering::Relaxed);
                         if prev != target {
                             tracing::debug!(
@@ -310,6 +339,12 @@ pub(super) async fn run(
             }
             result = probe_result_rx.recv() => {
                 let Some(result) = result else { break }; // data plane gone
+                // Phase 6: the probe burst MEASURES link capacity — record it for the
+                // transport-state machine's next window.
+                if result.duration_ms > 0 {
+                    last_capacity_bps =
+                        result.bytes_sent.saturating_mul(8) * 1000 / result.duration_ms as u64;
+                }
                 if io::write_msg(&mut ctrl_send, &result.encode()).await.is_err() {
                     break;
                 }
@@ -350,5 +385,64 @@ pub(super) async fn run(
                 }
             }
         }
+    }
+}
+
+/// Feed the transport-state machine one measurement window (~750 ms cadence, driven by the
+/// client's LossReports). RTT comes from the QUIC control connection (same path as the data
+/// plane, measured — never assumed); variation is an EWMA of the RTT deltas; capacity comes
+/// from the latest speed-test probe burst (0 = not yet measured). On a state change, the new
+/// state's policy is published to the send path.
+fn feed_transport(
+    state: &Arc<std::sync::Mutex<crate::transport_state::TransportStateMachine>>,
+    policy: &Arc<crate::transport_state::TransportPolicyShared>,
+    conn: &quinn::Connection,
+    loss_ppm: u64,
+    capacity_bps: u64,
+    target_bps: u64,
+    last_feed: &mut std::time::Instant,
+    rtt_ewma_ms: &mut f64,
+    rtt_var_ms: &mut f64,
+) {
+    use crate::transport_state::{TransportPolicy, TransportSample};
+    let now = std::time::Instant::now();
+    let elapsed = now.duration_since(*last_feed);
+    *last_feed = now;
+    // Minimum spacing — don't classify on a burst of reports inside one window.
+    if elapsed < std::time::Duration::from_millis(500) {
+        return;
+    }
+    let rtt_ms = conn.rtt().as_secs_f64() * 1000.0;
+    if *rtt_ewma_ms == 0.0 {
+        *rtt_ewma_ms = rtt_ms;
+        *rtt_var_ms = 0.0;
+    } else {
+        let d = (rtt_ms - *rtt_ewma_ms).abs();
+        *rtt_var_ms = 0.8 * *rtt_var_ms + 0.2 * d;
+        *rtt_ewma_ms = 0.8 * *rtt_ewma_ms + 0.2 * rtt_ms;
+    }
+    let mut machine = state.lock().unwrap_or_else(|e| e.into_inner());
+    let before = machine.state();
+    let after = machine.feed(
+        TransportSample {
+            rtt_ms: *rtt_ewma_ms,
+            rtt_var_ms: *rtt_var_ms,
+            loss_ppm,
+            capacity_bps,
+            target_bps,
+        },
+        elapsed,
+    );
+    if after != before {
+        tracing::info!(
+            from = before.label(),
+            to = after.label(),
+            rtt_ms = format!("{:.1}", *rtt_ewma_ms),
+            var_ms = format!("{:.1}", *rtt_var_ms),
+            loss_ppm,
+            capacity_mbps = capacity_bps / 1_000_000,
+            "transport state changed (measured)"
+        );
+        policy.apply(TransportPolicy::for_state(after));
     }
 }

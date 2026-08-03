@@ -496,6 +496,8 @@ fn retrieve_loop(
     work_rx: mpsc::Receiver<RetrieveJob>,
     done_tx: mpsc::Sender<RetrieveDone>,
 ) {
+    // Phase 7: opt-in low-latency performance profile — encode-submit/retrieve is critical.
+    ss_frame::worker_qos::apply_worker_qos("ss-nvenc-out", ss_frame::worker_qos::WorkerClass::Critical);
     ss_frame::thread_qos::boost_thread_priority(false);
     // The session is bound to the shared process-wide CUDA context; make it current here the
     // same way the encode thread does before its own NVENC calls.
@@ -1233,6 +1235,7 @@ impl NvencCudaEncoder {
                 },
                 hdr: self.hdr,
                 rfi_supported: self.rfi_supported,
+                vbv_frames: crate::LatencyProfile::current().config().vbv_frames,
                 slices: self.slices,
             },
         );
@@ -2088,6 +2091,9 @@ impl Encoder for NvencCudaEncoder {
             intra_refresh: false,
             intra_refresh_recovery: false,
             intra_refresh_period: 0,
+            // Ordered slice readback is armed only when the live session resolved sub-frame
+            // output on (capability-gated by `query_caps`).
+            subframe_output: self.subframe_on,
         }
     }
 

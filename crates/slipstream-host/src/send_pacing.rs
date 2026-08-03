@@ -31,10 +31,25 @@ use std::time::{Duration, Instant};
 /// One paced send's outcome: how long the frame's packets took to leave (`spread_us`) and
 /// whether any were paced (vs the whole frame fitting the microburst and going out
 /// immediately). The native plane feeds it to the SLIPSTREAM_PERF histogram so the pacing tail
-/// is visible per-frame.
+/// is visible per-frame; the send-time stamps and packet counts feed the Phase 1a latency
+/// artifact (`crates/slipstream-core/src/latency.rs`), whose per-frame record wants the first
+/// and last actual socket hand-off and the frame's FEC/data split.
 pub(crate) struct PaceStat {
     pub(crate) spread_us: u32,
     pub(crate) paced: bool,
+    /// Wall-clock (UNIX epoch ns, [`slipstream_core::latency::now_ns`]) of the first packet's
+    /// send — stamped right before the first actual send call. `0` = no packets were sent.
+    pub(crate) first_sent_ns: u64,
+    /// Wall-clock of the last packet's send — stamped right after the last actual send call
+    /// (before the final chunk's trailing sleep, so it is the true wire hand-off). `0` = no
+    /// packets were sent.
+    pub(crate) last_sent_ns: u64,
+    /// Packets handed to the send path this frame (after the loss-injection knob; `0` on an
+    /// empty frame).
+    pub(crate) total_packets: u32,
+    /// FEC/parity packets among them — filled by the native plane's `pace_sealed` header pass
+    /// (0 on the GameStream plane, whose RTP packets carry no parity marks).
+    pub(crate) fec_packets: u32,
 }
 
 /// How a frame's packets split into send chunks.
@@ -181,10 +196,25 @@ pub(crate) fn pace_frame<T: AsRef<[u8]>, E>(
         PaceBudget::Fixed(d) => d,
     };
     let sched = schedule(packets, cfg, budget_est);
-    for chunk in packets[..sched.burst_len].chunks(sched.chunk) {
-        send(chunk)?;
-    }
     let paced = sched.burst_len < packets.len();
+    // Send-side latency stamps (Phase 1a): the first and last actual send call, wall-clock —
+    // the pacing loop is the only place that knows when packets truly leave. Two clock reads
+    // per frame regardless of the artifact's state; every other new timestamp is gated on it.
+    let total_chunks =
+        packets[..sched.burst_len].chunks(sched.chunk).len() + if paced { sched.steps } else { 0 };
+    let mut sent_chunks = 0usize;
+    let mut first_sent_ns = 0u64;
+    let mut last_sent_ns = 0u64;
+    for chunk in packets[..sched.burst_len].chunks(sched.chunk) {
+        if sent_chunks == 0 {
+            first_sent_ns = slipstream_core::latency::now_ns();
+        }
+        send(chunk)?;
+        sent_chunks += 1;
+        if sent_chunks == total_chunks {
+            last_sent_ns = slipstream_core::latency::now_ns();
+        }
+    }
     if paced {
         let pace_start = Instant::now();
         let budget = match budget {
@@ -200,7 +230,14 @@ pub(crate) fn pace_frame<T: AsRef<[u8]>, E>(
             PaceBudget::Fixed(d) => d,
         };
         for (j, chunk) in packets[sched.burst_len..].chunks(sched.chunk).enumerate() {
+            if sent_chunks == 0 {
+                first_sent_ns = slipstream_core::latency::now_ns();
+            }
             send(chunk)?;
+            sent_chunks += 1;
+            if sent_chunks == total_chunks {
+                last_sent_ns = slipstream_core::latency::now_ns();
+            }
             // Sleep toward this chunk's slice of the budget; skip sub-floor waits (jitter).
             let target = pace_start + budget.mul_f64((j + 1) as f64 / sched.steps as f64);
             if let Some(ahead) = target.checked_duration_since(Instant::now()) {
@@ -213,6 +250,10 @@ pub(crate) fn pace_frame<T: AsRef<[u8]>, E>(
     Ok(PaceStat {
         spread_us: start.elapsed().as_micros() as u32,
         paced,
+        first_sent_ns,
+        last_sent_ns,
+        total_packets: packets.len() as u32,
+        fec_packets: 0,
     })
 }
 

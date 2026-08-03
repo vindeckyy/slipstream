@@ -34,17 +34,38 @@ pub(crate) const TARGET_SOCKBUF: usize = 32 * 1024 * 1024;
 /// stream just runs lossier); a grant far below the request means the OS cap is too low for clean
 /// 4K/5K streaming, so warn with the knob to raise.
 pub fn grow_socket_buffers(socket: &UdpSocket) {
-    let sock = socket2::SockRef::from(socket);
-    let _ = sock.set_send_buffer_size(TARGET_SOCKBUF);
-    let _ = sock.set_recv_buffer_size(TARGET_SOCKBUF);
-    // The kernel reports back the (possibly clamped, Linux-doubled) granted size.
-    let granted = sock
+    set_socket_buffers(socket, TARGET_SOCKBUF, TARGET_SOCKBUF);
+}
+
+/// The `LatencyProfile::LowLatency` send-buffer target: approximately TWO frame payloads,
+/// bounded between 256 KiB and 4 MiB — the opposite of the 32 MiB balanced queue, which lets a
+/// WAN burst hide behind the socket.
+pub fn low_latency_send_target(frame_bytes: usize) -> usize {
+    frame_bytes.saturating_mul(2).clamp(256 * 1024, 4 * 1024 * 1024)
+}
+
+/// Apply a send-buffer target and report the granted `SO_SNDBUF` (post kernel clamping). The
+/// receive buffer keeps the balanced target (recv buffering is the client's problem, and
+/// clamping it here would only add host-side loss).
+pub fn set_send_buffer(socket: &UdpSocket, send_target: usize) -> u64 {
+    set_socket_buffers(socket, send_target, TARGET_SOCKBUF);
+    socket2::SockRef::from(socket)
         .send_buffer_size()
-        .unwrap_or(0)
-        .min(sock.recv_buffer_size().unwrap_or(0));
-    if granted < TARGET_SOCKBUF / 4 {
+        .unwrap_or(0) as u64
+}
+
+/// Set `SO_SNDBUF`/`SO_RCVBUF` to `send_target`/`recv_target` and warn when the grant falls far
+/// short of the send target (the OS cap is the usual cause — `net.core.wmem_max`).
+fn set_socket_buffers(socket: &UdpSocket, send_target: usize, recv_target: usize) {
+    let sock = socket2::SockRef::from(socket);
+    let _ = sock.set_send_buffer_size(send_target);
+    let _ = sock.set_recv_buffer_size(recv_target);
+    // The kernel reports back the (possibly clamped, Linux-doubled) granted size.
+    let granted = sock.send_buffer_size().unwrap_or(0);
+    if granted < send_target / 4 {
         tracing::warn!(
             granted_kb = granted / 1024,
+            target_kb = send_target / 1024,
             "UDP socket buffer capped well below target — high-resolution streaming may drop \
              frames; raise net.core.wmem_max / net.core.rmem_max (Linux) for clean 4K/5K"
         );

@@ -16,7 +16,7 @@ use crate::input::InputEvent;
 use crate::packet::{
     PacketHeader, Packetizer, Reassembler, ReassemblerLimits, StreamedAu, MAX_DATAGRAM_BYTES,
 };
-use crate::stats::{Stats, StatsCounters};
+use crate::stats::{FrameDropReason, Stats, StatsCounters};
 use crate::transport::Transport;
 use zerocopy::IntoBytes;
 
@@ -216,6 +216,37 @@ impl Session {
 
     pub fn stats(&self) -> Stats {
         self.stats.snapshot()
+    }
+
+    /// Count one dropped frame with its reason (Phase 5 — every drop has a reason; the host
+    /// calls this from the send thread when it drops a stale/backpressured/recovery frame).
+    pub fn note_frame_drop(&self, reason: FrameDropReason) {
+        self.stats.note_frame_drop(reason);
+    }
+
+    /// Record enqueue-block time (µs) and the send channel's high-water mark (Phase 5).
+    pub fn note_send_backlog(&self, blocked_us: u64, max_occupancy: u64) {
+        self.stats.note_enqueue_blocked(blocked_us);
+        self.stats.note_send_occupancy_max(max_occupancy);
+    }
+
+    /// Record the granted socket send-buffer size and the pacing-option latches (Phase 5).
+    pub fn note_socket_state(&self, sndbuf_bytes: u64, so_txtime: bool, gso: bool) {
+        self.stats.set_socket_sndbuf(sndbuf_bytes);
+        self.stats.set_pacing_flags(so_txtime, gso);
+    }
+
+    /// Apply the low-latency send-buffer target (≈2 frame payloads, 256 KiB..4 MiB) when the
+    /// transport supports it; returns the granted `SO_SNDBUF`.
+    pub fn set_latency_send_buffer(&mut self, frame_bytes: usize) -> u64 {
+        let target = self.transport.latency_send_buffer_target(frame_bytes);
+        self.transport.set_send_buffer_target(target);
+        self.transport.send_buffer_granted()
+    }
+
+    /// The kernel's send-queue occupancy estimate, when the transport can report one (Phase 5).
+    pub fn kernel_send_queue_bytes(&self) -> Option<u64> {
+        self.transport.kernel_send_queue_bytes()
     }
 
     /// Wrap a packet for the wire: when encrypting, prepend the 8-byte big-endian

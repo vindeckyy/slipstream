@@ -38,7 +38,9 @@ mod env;
 
 use std::sync::OnceLock;
 
-pub use config::HostConfig;
+pub use config::{
+    HostConfig, LatencyProfile, NetworkPolicy, PerformanceProfile,
+};
 pub use env::env_on;
 
 /// The process-wide host configuration, parsed once on first access.
@@ -73,5 +75,41 @@ mod tests {
         assert_eq!(c.game_fps(30), 30);
         // An invalid rate stays invalid rather than being laundered into a real one.
         assert_eq!(c.game_fps(0), 0);
+    }
+
+    #[test]
+    fn performance_profile_parses_exactly_low_latency() {
+        assert_eq!(
+            PerformanceProfile::parse("low_latency"),
+            PerformanceProfile::LowLatency
+        );
+        assert_eq!(
+            PerformanceProfile::parse("Low_Latency"),
+            PerformanceProfile::LowLatency
+        );
+        assert_eq!(PerformanceProfile::parse(" low_latency "), PerformanceProfile::LowLatency);
+        for v in ["", "off", "balanced", "warp"] {
+            assert_eq!(PerformanceProfile::parse(v), PerformanceProfile::Off);
+        }
+    }
+
+    #[test]
+    fn latency_profile_parses_exactly_low_latency() {
+        assert_eq!(
+            LatencyProfile::parse("low_latency"),
+            LatencyProfile::LowLatency
+        );
+        for v in ["", "balanced", "high"] {
+            assert_eq!(LatencyProfile::parse(v), LatencyProfile::Balanced);
+        }
+    }
+
+    #[test]
+    fn network_policy_parses_lan_wan_auto() {
+        assert_eq!(NetworkPolicy::parse("lan"), NetworkPolicy::Lan);
+        assert_eq!(NetworkPolicy::parse("WAN"), NetworkPolicy::Wan);
+        for v in ["", "auto", "fast", "0"] {
+            assert_eq!(NetworkPolicy::parse(v), NetworkPolicy::Auto);
+        }
     }
 }

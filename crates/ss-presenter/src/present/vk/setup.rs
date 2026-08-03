@@ -605,6 +605,106 @@ pub fn list_adapters() -> Result<Vec<String>> {
     Ok(names)
 }
 
+/// Snapshot of the device's `VK_KHR_present_wait` on-glass timing support (latency plan
+/// T0.2): whether a physical device offers both extensions with their features enabled, and
+/// the device/driver name.
+pub struct PresentWaitInfo {
+    /// True when `VK_KHR_present_id` + `VK_KHR_present_wait` are enabled on the device.
+    pub available: bool,
+    /// Physical-device driver name (`vkGetPhysicalDeviceProperties::deviceName`); empty when
+    /// no device was reachable.
+    pub driver: String,
+}
+
+/// Probe the first enumerated physical device for present-wait on-glass timing support.
+/// Additive and best-effort: `available: false` when libvulkan can't be loaded, instance
+/// creation fails, no physical device enumerates, or the device lacks the extensions —
+/// never an error.
+pub fn present_wait_capabilities() -> PresentWaitInfo {
+    let unavailable = PresentWaitInfo {
+        available: false,
+        driver: String::new(),
+    };
+    // SAFETY: per the Vulkan contract above - a create/allocate call on the live device, over
+    // builder structs that are locals outliving the call; the handle it returns is owned by
+    // the value being built here.
+    let entry = match unsafe { ash::Entry::load() } {
+        Ok(e) => e,
+        Err(_) => return unavailable,
+    };
+    let app_name = CString::new("slipstream-presenter").unwrap();
+    let app_info = vk::ApplicationInfo::default()
+        .application_name(&app_name)
+        .api_version(vk::API_VERSION_1_3);
+    // SAFETY: per the Vulkan contract above - the Vulkan handles used here are owned by this
+    // type and live for the call, and every builder struct is a local that outlives it.
+    let instance = match unsafe {
+        entry.create_instance(
+            &vk::InstanceCreateInfo::default().application_info(&app_info),
+            None,
+        )
+    } {
+        Ok(i) => i,
+        Err(_) => return unavailable,
+    };
+    // SAFETY: per the Vulkan contract above - a read-only query on the live instance/device,
+    // filling locals returned by value.
+    let pdev = match unsafe { instance.enumerate_physical_devices() } {
+        Ok(mut list) => list.pop(),
+        Err(_) => None,
+    };
+    let (available, driver) = match pdev {
+        Some(p) => present_wait_on_device(&instance, p),
+        None => (false, String::new()),
+    };
+    // SAFETY: per the Vulkan contract above - this destroys objects this type owns, and the
+    // GPU is known idle for them (the fence/queue-wait on the path here, or the swapchain
+    // being retired), which is the obligation that makes a destroy sound rather than the
+    // handle merely being non-null.
+    unsafe { instance.destroy_instance(None) };
+    PresentWaitInfo { available, driver }
+}
+
+/// Present-wait support on one physical device: both extensions listed and both features
+/// enabled, plus the driver name.
+fn present_wait_on_device(
+    instance: &ash::Instance,
+    pdev: vk::PhysicalDevice,
+) -> (bool, String) {
+    // SAFETY: per the Vulkan contract above - a read-only query on the live instance/device,
+    // filling locals returned by value.
+    let props = unsafe { instance.get_physical_device_properties(pdev) };
+    let driver = props
+        .device_name_as_c_str()
+        .map(|c| c.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    // SAFETY: per the Vulkan contract above - a read-only query on the live instance/device,
+    // filling locals returned by value.
+    let exts = match unsafe { instance.enumerate_device_extension_properties(pdev) } {
+        Ok(e) => e,
+        Err(_) => return (false, driver),
+    };
+    let has = |name: &std::ffi::CStr| {
+        exts.iter()
+            .any(|e| e.extension_name_as_c_str() == Ok(name))
+    };
+    if !(has(ash::khr::present_id::NAME) && has(ash::khr::present_wait::NAME)) {
+        return (false, driver);
+    }
+    let mut pid = vk::PhysicalDevicePresentIdFeaturesKHR::default();
+    let mut pwait = vk::PhysicalDevicePresentWaitFeaturesKHR::default();
+    let mut f2 = vk::PhysicalDeviceFeatures2::default()
+        .push_next(&mut pid)
+        .push_next(&mut pwait);
+    // SAFETY: per the Vulkan contract above - a read-only query on the live instance/device,
+    // filling locals returned by value.
+    unsafe { instance.get_physical_device_features2(pdev, &mut f2) };
+    (
+        pid.present_id == vk::TRUE && pwait.present_wait == vk::TRUE,
+        driver,
+    )
+}
+
 /// First physical device with a queue family that does graphics + present here;
 /// `SLIPSTREAM_VK_DEVICE=<index>` overrides on multi-GPU boxes.
 fn pick_device(

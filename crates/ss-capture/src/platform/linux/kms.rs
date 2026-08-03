@@ -601,6 +601,7 @@ impl KmsCapturer {
                 stride: framebuffer.pitch,
             }),
             cursor,
+            stage_ns: ss_frame::CaptureStageTimes::default(),
         })
     }
 

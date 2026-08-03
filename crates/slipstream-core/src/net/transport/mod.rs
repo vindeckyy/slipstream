@@ -14,6 +14,10 @@ pub use qos::{grow_socket_buffers, set_dscp_default, set_media_qos, MediaClass, 
 #[cfg(target_os = "windows")]
 pub use udp::send_uso_all;
 pub use udp::{spawn_data_punch, UdpTransport, PUNCH_MAGIC};
+// Phase 5: the pacing-capability probe + GSO gate + low-latency socket-buffer target, surfaced
+// for the host's send thread (records them in the session stats / latency artifact).
+#[cfg(target_os = "linux")]
+pub use udp::{gso_enabled, low_latency_send_target_bytes, pacing_capabilities};
 
 /// A datagram transport. `recv` is non-blocking: it returns `Ok(None)` when no packet
 /// is currently available, so the caller (decode/present thread) never blocks here.
@@ -75,5 +79,26 @@ pub trait Transport: Send + Sync {
             }
             None => Ok(0),
         }
+    }
+
+    /// The send-buffer target the transport should apply when the low-latency profile asks
+    /// (Phase 5): the default is the balanced 32 MiB. The `UdpTransport` override maps
+    /// `frame_bytes` to ≈2 frame payloads clamped to 256 KiB..4 MiB.
+    fn latency_send_buffer_target(&self, frame_bytes: usize) -> usize {
+        let _ = frame_bytes;
+        crate::transport::qos::TARGET_SOCKBUF
+    }
+
+    /// Best-effort `SO_SNDBUF` apply. Default no-op — only the UDP transport has a socket.
+    fn set_send_buffer_target(&mut self, _bytes: usize) {}
+
+    /// The granted `SO_SNDBUF` (post-clamping) or 0 when the transport can't report one.
+    fn send_buffer_granted(&self) -> u64 {
+        0
+    }
+
+    /// The kernel's send-queue occupancy estimate (bytes), when the transport can report one.
+    fn kernel_send_queue_bytes(&self) -> Option<u64> {
+        None
     }
 }

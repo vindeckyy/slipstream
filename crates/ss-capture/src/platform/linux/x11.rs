@@ -165,6 +165,7 @@ impl X11Capturer {
             format: self.format,
             payload: FramePayload::Cpu(data),
             cursor: None,
+            stage_ns: ss_frame::CaptureStageTimes::default(),
         })
     }
 }

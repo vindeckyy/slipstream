@@ -385,6 +385,11 @@ pub(super) async fn serve_session(
     // stray fetch streams.
     let clip = ss_clipboard::start(conn.clone(), clip_enabled.clone(), compositor.is_some()).await;
     let clip_available = clip.available;
+    // Phase 6: the measured transport-state machine (control task feeds it, send path reads
+    // its policy). One per session — the classification is link-private.
+    let transport_state =
+        Arc::new(std::sync::Mutex::new(crate::transport_state::TransportStateMachine::default()));
+    let transport_policy = Arc::new(crate::transport_state::TransportPolicyShared::from_env());
     tokio::spawn(control::run(
         ctrl_send,
         ctrl_recv,
@@ -398,6 +403,9 @@ pub(super) async fn serve_session(
         cadence_degraded.clone(),
         fec_target_ctl,
         phase_ctl_control,
+        conn.clone(),
+        transport_state.clone(),
+        transport_policy.clone(),
         reconfig_tx,
         keyframe_tx,
         rfi_tx,
@@ -567,9 +575,10 @@ pub(super) async fn serve_session(
         let stop = stop.clone();
         let cap = audio_cap.clone();
         let channels = welcome.audio_channels;
+        let transport_policy_audio = transport_policy.clone();
         std::thread::Builder::new()
             .name("slipstream1-audio".into())
-            .spawn(move || audio_thread(conn, stop, cap, channels))
+            .spawn(move || audio_thread(conn, stop, cap, channels, transport_policy_audio))
             .map_err(|e| tracing::warn!(error = %e, "audio thread spawn failed — session continues without audio"))
             .ok()
     } else {
@@ -839,6 +848,8 @@ pub(super) async fn serve_session(
                         rfi: rfi_rx,
                         bitrate_rx,
                         compositor,
+                        transport_state: transport_state.clone(),
+                        transport_policy: transport_policy.clone(),
                         gamescope_route,
                         bitrate_kbps,
                         live_bitrate,

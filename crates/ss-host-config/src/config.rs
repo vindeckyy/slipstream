@@ -1,10 +1,108 @@
 use crate::env::env_on;
 
+/// The opt-in Linux performance profile (latency plan Phase 7). See [`HostConfig::performance_profile`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PerformanceProfile {
+    /// The default: existing behavior, no scheduling/affinity changes.
+    #[default]
+    Off,
+    /// Realtime-clean the stream workers: RTKit or explicit `SCHED_FIFO`, with a documented
+    /// `SCHED_OTHER` + nice fallback, and explicit-CPU affinity only when configured.
+    LowLatency,
+}
+
+impl PerformanceProfile {
+    /// Parse the `SLIPSTREAM_PERFORMANCE_PROFILE` value (`low_latency` = on; anything else = off).
+    pub fn from_env() -> PerformanceProfile {
+        Self::parse(&std::env::var("SLIPSTREAM_PERFORMANCE_PROFILE").unwrap_or_default())
+    }
+
+    /// Pure value parse, split out so tests can exercise it without touching the process env.
+    pub(crate) fn parse(v: &str) -> PerformanceProfile {
+        if v.trim().eq_ignore_ascii_case("low_latency") {
+            PerformanceProfile::LowLatency
+        } else {
+            PerformanceProfile::Off
+        }
+    }
+}
+
+/// The encoder-side latency contract (latency plan Phase 7). See [`HostConfig::latency_profile`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LatencyProfile {
+    /// The existing default contract (CBR, zero B-frames, no lookahead, ~1-frame VBV).
+    #[default]
+    Balanced,
+    /// The pinned low-latency contract (1-frame VBV ceiling, depth-one encoder ring, zero-copy).
+    LowLatency,
+}
+
+impl LatencyProfile {
+    /// Parse the `SLIPSTREAM_LATENCY_PROFILE` value (`low_latency` = on; anything else = balanced).
+    pub fn from_env() -> LatencyProfile {
+        Self::parse(&std::env::var("SLIPSTREAM_LATENCY_PROFILE").unwrap_or_default())
+    }
+
+    /// Pure value parse, split out so tests can exercise it without touching the process env.
+    pub(crate) fn parse(v: &str) -> LatencyProfile {
+        if v.trim().eq_ignore_ascii_case("low_latency") {
+            LatencyProfile::LowLatency
+        } else {
+            LatencyProfile::Balanced
+        }
+    }
+}
+
+/// The transport-state starting point (latency plan Phase 7). See [`HostConfig::network_policy`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NetworkPolicy {
+    /// Measure the link and classify (the default).
+    #[default]
+    Auto,
+    /// Treat the link as Fast LAN from the start.
+    Lan,
+    /// Treat the link as WAN from the start.
+    Wan,
+}
+
+impl NetworkPolicy {
+    /// Parse the `SLIPSTREAM_NETWORK_POLICY` value (`lan`/`wan` = forced; anything else = auto).
+    pub fn from_env() -> NetworkPolicy {
+        Self::parse(&std::env::var("SLIPSTREAM_NETWORK_POLICY").unwrap_or_default())
+    }
+
+    /// Pure value parse, split out so tests can exercise it without touching the process env.
+    pub(crate) fn parse(v: &str) -> NetworkPolicy {
+        match v.trim().to_ascii_lowercase().as_str() {
+            "lan" => NetworkPolicy::Lan,
+            "wan" => NetworkPolicy::Wan,
+            _ => NetworkPolicy::Auto,
+        }
+    }
+}
+
 /// Resolved host configuration. Holds the genuinely-constant operator/dispatch knobs (see module docs for
 /// what is deliberately excluded). Fields read on only one platform are kept alive cross-platform by the
 /// derived `Debug` impl, so the parser can stay a single platform-neutral function.
 #[derive(Debug, Clone, Default)]
 pub struct HostConfig {
+    /// `SLIPSTREAM_PERFORMANCE_PROFILE` — opt-in Linux low-latency performance profile (latency
+    /// plan Phase 7). `low_latency` raises the capture / encode-submit / send / input-injection
+    /// workers to a realtime scheduling policy (RTKit or an explicit `SCHED_FIFO`), with a
+    /// documented `SCHED_OTHER` + nice fallback when permissions are unavailable, and applies the
+    /// worker CPU affinity only when explicitly configured. It never changes system-wide settings
+    /// silently: GPU power policy and governors are untouched, and PipeWire's own RT module is
+    /// never outranked. Anything else (including unset) is `off` — the default, and exactly the
+    /// existing behavior.
+    pub performance_profile: PerformanceProfile,
+    /// `SLIPSTREAM_LATENCY_PROFILE` — the encoder-side latency contract: `balanced` (the existing
+    /// default contract) or `low_latency` (pins the stronger constraints — see `ss-encode::profile`).
+    /// The process-wide `LatencyProfile::current()` resolves this; kept here as the parsed surface
+    /// so the operator-facing config table and the encoder agree on one resolved value.
+    pub latency_profile: LatencyProfile,
+    /// `SLIPSTREAM_NETWORK_POLICY` — the transport-state starting point: `auto` (measure and
+    /// classify, the default), `lan` (treat the link as Fast LAN), or `wan` (treat it as WAN).
+    pub network_policy: NetworkPolicy,
     /// `SLIPSTREAM_HOST_NAME` — the name this host shows up under in Moonlight (the serverinfo
     /// `<hostname>` element) and in Slipstream's own clients (the mDNS service *instance* name both
     /// adverts carry). Unset/blank = the machine's own hostname, which is what it always was. Free
@@ -184,6 +282,9 @@ impl HostConfig {
         // String value: `var(k).ok()` — `Some` (possibly empty) when set with valid UTF-8, else `None`.
         let val = |k: &str| std::env::var(k).ok();
         Self {
+            performance_profile: PerformanceProfile::from_env(),
+            latency_profile: LatencyProfile::from_env(),
+            network_policy: NetworkPolicy::from_env(),
             // (`SLIPSTREAM_IDD_PUSH` was removed: IDD-push is the sole Windows capture path, so the knob
             // only split dispatch — capture ignored it while the vdisplay manager obeyed it, and `=0`
             // produced dead-swap-chain reuse on reconnect. A stale setting in an old host.env is ignored.)

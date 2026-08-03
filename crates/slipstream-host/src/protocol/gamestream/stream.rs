@@ -814,7 +814,8 @@ use stream_data::stream_body;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use stream_data::{spawn_sender, PacketBatch};
+    use stream_data::{spawn_sender, PacketBatch, WireBatch};
+    use slipstream_core::latency::{FrameTimings, LatencyArtifact};
 
     fn entry(title: &str, cmd: Option<&str>) -> super::super::apps::AppEntry {
         super::super::apps::AppEntry {
@@ -873,13 +874,14 @@ mod tests {
         tx_sock.connect(rx_sock.local_addr().unwrap()).unwrap();
 
         let running = Arc::new(AtomicBool::new(true));
-        let (tx, rx) = std::sync::mpsc::sync_channel::<PacketBatch>(2);
+        let (tx, rx) = std::sync::mpsc::sync_channel::<WireBatch>(2);
         spawn_sender(
             tx_sock,
             rx,
             Duration::from_millis(8), // ~120fps frame interval
             running.clone(),
             Arc::new(|| {}),
+            Arc::new(std::sync::Mutex::new(None::<LatencyArtifact>)),
         )
         .unwrap();
 
@@ -900,7 +902,11 @@ mod tests {
                 })
                 .collect();
             sent.extend(batch.iter().cloned());
-            tx.send(batch).unwrap();
+            tx.send(WireBatch {
+                pkts: batch,
+                timings: FrameTimings::new("synthetic"),
+            })
+            .unwrap();
         }
         drop(tx); // sender drains then exits
 

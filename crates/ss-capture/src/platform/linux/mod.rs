@@ -129,6 +129,13 @@ struct CaptureSignals {
     frames_published: Arc<AtomicU64>,
     frames_overwritten: Arc<AtomicU64>,
     buffers_drained: Arc<AtomicU64>,
+    /// Frames the consumer has TAKEN out of the slot (Phase 3: guards the CPU de-pad buffer
+    /// pool's reuse — a pooled buffer is only refilled once a take proves the consumer is
+    /// draining).
+    frames_taken: Arc<AtomicU64>,
+    /// Frames dropped because the implicit fence did not signal within the deadline budget
+    /// (Phase 3 — the old behavior proceeded mid-render).
+    fence_timeouts: Arc<AtomicU64>,
     negotiated_width: Arc<AtomicU64>,
     negotiated_height: Arc<AtomicU64>,
     negotiated_modifier: Arc<AtomicU64>,
@@ -149,6 +156,8 @@ impl CaptureSignals {
             frames_published: Arc::new(AtomicU64::new(0)),
             frames_overwritten: Arc::new(AtomicU64::new(0)),
             buffers_drained: Arc::new(AtomicU64::new(0)),
+            frames_taken: Arc::new(AtomicU64::new(0)),
+            fence_timeouts: Arc::new(AtomicU64::new(0)),
             negotiated_width: Arc::new(AtomicU64::new(0)),
             negotiated_height: Arc::new(AtomicU64::new(0)),
             negotiated_modifier: Arc::new(AtomicU64::new(0)),
@@ -186,6 +195,11 @@ pub struct PortalCapturer {
     /// `want_hdr`. Read by the negotiation-timeout diagnosis (a failed HDR offer latches the
     /// process-wide SDR downgrade) and by [`hdr_meta`](Capturer::hdr_meta).
     hdr_offer: bool,
+    /// Phase-3 zero-copy diagnostic (mirrors the `UserData` facts the thread runs on): whether
+    /// this capture delivers GPU frames, and why not when it doesn't. Surfaced through
+    /// `telemetry()` so a copy path is never silently presented as equivalent.
+    zerocopy: bool,
+    zerocopy_reason: &'static str,
     /// Which HDR source this capturer is — the latch a failed [`hdr_offer`](Self::hdr_offer)
     /// belongs to. See [`super::HdrSource`] for why the latch is not one process-wide flag.
     hdr_source: super::HdrSource,
@@ -397,6 +411,9 @@ struct PwHandles {
     vaapi_dmabuf: bool,
     /// This capture ran the HDR offer (see [`PortalCapturer::hdr_offer`]).
     hdr_offer: bool,
+    /// Phase-3 zero-copy diagnostic (see [`PortalCapturer::zerocopy`]).
+    zerocopy: bool,
+    zerocopy_reason: &'static str,
     quit: ::pipewire::channel::Sender<()>,
     join: thread::JoinHandle<()>,
 }
@@ -419,6 +436,8 @@ impl PwHandles {
             stall_since: None,
             vaapi_dmabuf: self.vaapi_dmabuf,
             hdr_offer: self.hdr_offer,
+            zerocopy: self.zerocopy,
+            zerocopy_reason: self.zerocopy_reason,
             hdr_source,
             node_id,
             quit: Some(self.quit),
@@ -497,6 +516,11 @@ fn spawn_pipewire(
     let join = thread::Builder::new()
         .name("slipstream-pipewire".into())
         .spawn(move || {
+            // Phase 7: opt-in low-latency performance profile — capture is the critical path.
+            ss_frame::worker_qos::apply_worker_qos(
+                "slipstream-pipewire",
+                ss_frame::worker_qos::WorkerClass::Critical,
+            );
             if let Err(e) = pipewire::pipewire_thread(
                 fd,
                 node_id,
@@ -520,6 +544,21 @@ fn spawn_pipewire(
         signals,
         vaapi_dmabuf,
         hdr_offer: want_hdr,
+        // Phase-3 zero-copy diagnostic, derived from the SAME resolved plan the thread runs on.
+        zerocopy: plan.vaapi_passthrough || plan.build_importer,
+        zerocopy_reason: if force_shm {
+            "cpu de-pad (SLIPSTREAM_FORCE_SHM)"
+        } else if plan.raw_dmabuf_latched {
+            "cpu de-pad (raw dmabuf passthrough latched)"
+        } else if plan.gpu_import_latched {
+            "cpu de-pad (gpu import latched)"
+        } else if plan.vaapi_passthrough {
+            "raw dmabuf passthrough"
+        } else if plan.build_importer {
+            "egl-cuda import"
+        } else {
+            "cpu de-pad (negotiation)"
+        },
         quit: quit_tx,
         join,
     })
@@ -539,6 +578,9 @@ impl Capturer for PortalCapturer {
             width: self.signals.negotiated_width.load(Ordering::Relaxed) as u32,
             height: self.signals.negotiated_height.load(Ordering::Relaxed) as u32,
             modifier: self.signals.negotiated_modifier.load(Ordering::Relaxed),
+            fence_timeouts: self.signals.fence_timeouts.load(Ordering::Relaxed),
+            zerocopy: self.zerocopy,
+            zerocopy_reason: self.zerocopy_reason,
         }
     }
 
@@ -747,7 +789,13 @@ impl PortalCapturer {
 
     /// Take the mailbox's frame, if the producer has published one since the last take.
     fn take_frame(&self) -> Option<CapturedFrame> {
-        self.slot.lock().ok().and_then(|mut s| s.take())
+        let frame = self.slot.lock().ok().and_then(|mut s| s.take());
+        if frame.is_some() {
+            self.signals
+                .frames_taken
+                .fetch_add(1, Ordering::Relaxed);
+        }
+        frame
     }
 
     /// The [`frame_within`](Self::frame_within) budget expired (or the thread ended) — turn it

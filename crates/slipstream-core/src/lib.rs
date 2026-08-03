@@ -19,6 +19,7 @@
 //! - [`config`] / [`error`] / [`stats`] — session configuration, the shared error/status
 //!   vocabulary, and the counters snapshot.
 //! - [`input`] — the wire input-event vocabulary (keyboard/mouse/touch, gamepad snapshots).
+//! - [`latency`] — the opt-in per-frame latency artifact (JSONL host-side records).
 //! - [`reject`] — typed application-close rejection codes · [`reanchor`] — the post-loss
 //!   freeze-until-reanchor client gate · [`render_scale`] — the shared render-scale setting ·
 //!   [`audio`] — Opus PCM decode for C-ABI embedders · [`wol`] — Wake-on-LAN.
@@ -66,6 +67,7 @@ pub mod error;
 pub mod fec;
 #[path = "runtime/input.rs"]
 pub mod input;
+pub mod latency;
 #[path = "net/packet/mod.rs"]
 pub mod packet;
 #[path = "runtime/phase.rs"]

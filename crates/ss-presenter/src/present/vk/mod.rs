@@ -33,7 +33,7 @@ mod reconfig;
 mod resources;
 mod setup;
 
-pub use setup::list_adapters;
+pub use setup::{list_adapters, present_wait_capabilities, PresentWaitInfo};
 
 /// One presenter iteration's video input.
 pub enum FrameInput<'a> {

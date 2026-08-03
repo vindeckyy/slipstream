@@ -136,6 +136,36 @@ pub struct UdpTransport {
     /// the flow membership before the socket closes. Always `None` off-Windows.
     _qos_flow: Option<super::qos::QosFlow>,
     socket: UdpSocket,
+    /// Per-session GSO scratch buffer (Phase 5): the GSO path concatenates ≤64 equal-size
+    /// datagrams into one super-buffer before `sendmsg`; the scratch is preallocated ONCE per
+    /// transport instead of per send, so a GSO send never allocates. `Mutex` because the
+    /// `Transport` trait sends through `&self` (the socket is `Send + Sync`); the critical
+    /// section is one clear+extend+sendmsg. Linux-only.
+    #[cfg(target_os = "linux")]
+    gso_scratch: std::sync::Mutex<Vec<u8>>,
+}
+
+/// Linux `SO_TXTIME`/`SO_BUSY_POLL` capability report `(txtime, busy_poll)` — detection only,
+/// never enabling (see the probe docs in `linux.rs`).
+#[cfg(target_os = "linux")]
+pub use linux::pacing_capabilities;
+
+/// Whether Linux UDP GSO is active for this process (the `SLIPSTREAM_GSO` gate, latched off
+/// permanently after a GSO error). `false` off-Linux and on Windows (USO has its own gate).
+pub fn gso_enabled() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        linux::gso::active()
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        false
+    }
+}
+
+/// The `LowLatency` send-buffer target in bytes (≈2 frame payloads, clamped 256 KiB..4 MiB).
+pub fn low_latency_send_target_bytes(frame_bytes: usize) -> usize {
+    super::qos::low_latency_send_target(frame_bytes)
 }
 
 impl UdpTransport {
@@ -160,6 +190,8 @@ impl UdpTransport {
         Ok(UdpTransport {
             _qos_flow: qos_flow,
             socket,
+            #[cfg(target_os = "linux")]
+            gso_scratch: std::sync::Mutex::new(gso_scratch_capacity()),
         })
     }
 
@@ -251,6 +283,8 @@ impl UdpTransport {
             UdpTransport {
                 _qos_flow: qos_flow,
                 socket,
+                #[cfg(target_os = "linux")]
+                gso_scratch: std::sync::Mutex::new(gso_scratch_capacity()),
             },
             punched,
         ))
@@ -267,6 +301,45 @@ impl UdpTransport {
     pub fn local_addr(&self) -> std::io::Result<std::net::SocketAddr> {
         self.socket.local_addr()
     }
+
+    /// The kernel's current send-queue occupancy estimate for this socket (bytes) — Linux
+    /// `SIOCOUTQ` (0x5411), the "how much is actually sitting in the kernel's send buffer" probe
+    /// the latency artifact records. `None` off-Linux or when the ioctl is unavailable.
+    pub fn kernel_send_queue_bytes(&self) -> Option<u64> {
+        #[cfg(target_os = "linux")]
+        {
+            use std::os::fd::AsRawFd;
+            const SIOCOUTQ: libc::c_ulong = 0x5411;
+            let mut queued: libc::c_int = 0;
+            // SAFETY: `self.socket` is a live socket and `&mut queued` is a correctly-sized
+            // out-param for `SIOCOUTQ`; the ioctl only writes the int and returns the status.
+            let r = unsafe { libc::ioctl(self.socket.as_raw_fd(), SIOCOUTQ, &mut queued) };
+            let ok = r == 0 && queued > 0;
+            ok.then_some(queued as u64)
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            None
+        }
+    }
+
+    /// The granted `SO_SNDBUF` (bytes, after kernel clamping/doubling) — the actual socket-buffer
+    /// setting the artifact records, never the requested one.
+    pub fn send_buffer_granted(&self) -> u64 {
+        socket2::SockRef::from(&self.socket)
+            .send_buffer_size()
+            .unwrap_or(0) as u64
+    }
+}
+
+/// The per-session GSO scratch capacity: the kernel's UDP super-buffer ceiling (IPv6-tight,
+/// 65507 minus the v6/IP headers — the same bound `send_gso` enforces) so the scratch never
+/// reallocates for any valid GSO train. Preallocated once per transport (Phase 5).
+#[cfg(target_os = "linux")]
+fn gso_scratch_capacity() -> Vec<u8> {
+    let mut v = Vec::new();
+    v.try_reserve_exact(65535 - 40 - 8).ok();
+    v
 }
 
 impl Transport for UdpTransport {
@@ -324,8 +397,7 @@ impl Transport for UdpTransport {
             // A read that fills the whole buffer means the datagram was larger than any
             // valid packet — drop it rather than hand a truncated, corrupt packet up.
             Ok(n) if n >= RECV_BUF => Ok(None),
-            Ok(n) => {
-                buf.truncate(n);
+            Ok(n) => {                buf.truncate(n);
                 Ok(Some(buf))
             }
             Err(e) if is_transient_io(&e) => Ok(None),
@@ -355,6 +427,24 @@ impl Transport for UdpTransport {
     #[cfg(all(unix, not(any(target_os = "linux", target_os = "android"))))]
     fn recv_batch(&self, out: &mut [Vec<u8>], lens: &mut [usize]) -> std::io::Result<usize> {
         apple::recv_batch(self, out, lens)
+    }
+
+    /// Phase 5 low-latency send-buffer target: ≈2 frame payloads, clamped to 256 KiB..4 MiB —
+    /// the antidote to the 32 MiB balanced queue, which lets WAN bursts hide behind the socket.
+    fn latency_send_buffer_target(&self, frame_bytes: usize) -> usize {
+        super::qos::low_latency_send_target(frame_bytes)
+    }
+
+    fn set_send_buffer_target(&mut self, bytes: usize) {
+        super::qos::set_send_buffer(&self.socket, bytes);
+    }
+
+    fn send_buffer_granted(&self) -> u64 {
+        UdpTransport::send_buffer_granted(self)
+    }
+
+    fn kernel_send_queue_bytes(&self) -> Option<u64> {
+        UdpTransport::kernel_send_queue_bytes(self)
     }
 }
 

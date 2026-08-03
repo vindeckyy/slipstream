@@ -199,6 +199,13 @@ impl VideoPacketizer {
         }
         packets
     }
+
+    /// Number of data (non-parity) shards `packetize` will emit for an AU of `au_len` bytes —
+    /// the packetizer's own `total_data` formula, exposed so the latency artifact can count the
+    /// parity shards among a frame's packets without duplicating the block math.
+    pub(crate) fn data_shard_count(&self, au_len: usize) -> usize {
+        (8 + au_len).div_ceil(self.payload_per_shard).max(1)
+    }
 }
 
 /// `fecInfo` (u32, little-endian): `dataShards<<22 | fecIndex<<12 | fecPercentage<<4`.

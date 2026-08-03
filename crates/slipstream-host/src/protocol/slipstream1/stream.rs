@@ -6,6 +6,7 @@
 //! bounded retry. `serve_session` stands a session up and hands it a [`SessionContext`].
 
 use super::*;
+use slipstream_core::latency::FrameTimings;
 
 /// Advance the intra-refresh wave position and decide whether this emitted AU is a wave boundary
 /// that should carry [`USER_FLAG_RECOVERY_POINT`](slipstream_core::packet::USER_FLAG_RECOVERY_POINT).
@@ -196,8 +197,9 @@ fn service_probes(
 
 /// T1.1 frame-driven encode trigger (latency plan): `SLIPSTREAM_FRAME_DRIVEN=0` restores the
 /// legacy fixed-cadence tick everywhere (backends without an arrival wait keep it regardless —
-/// see [`ss_capture::Capturer::supports_arrival_wait`]).
-fn frame_driven_enabled() -> bool {
+/// see [`ss_capture::Capturer::supports_arrival_wait`]). Shared with the GameStream plane
+/// (its arrival-driven rollout, Phase 2).
+pub(crate) fn frame_driven_enabled() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| std::env::var("SLIPSTREAM_FRAME_DRIVEN").as_deref() != Ok("0"))
 }
@@ -471,22 +473,25 @@ fn paced_submit(
     deadline: std::time::Instant,
     burst_cap: Option<usize>,
     pace_rate_bps: u64,
+    track: bool,
 ) -> Result<PaceStat> {
     let wires = session
         .seal_frame_at(data, pts_ns, flags, frame_index)
         .map_err(|e| anyhow!("seal_frame: {e:?}"))?;
-    pace_sealed(session, wires, deadline, burst_cap, pace_rate_bps)
+    pace_sealed(session, wires, deadline, burst_cap, pace_rate_bps, track)
 }
 
 /// The pace-and-send half of [`paced_submit`], for wires that are ALREADY sealed — shared with
 /// the streamed-AU path, whose seal happens per encoder chunk ([`handle_chunk`]) under the same
-/// microburst policy and frame deadline.
+/// microburst policy and frame deadline. `track` arms the Phase 1a FEC-packet header pass (only
+/// when the latency artifact is on — never on the disabled hot path).
 fn pace_sealed(
     session: &mut Session,
     wires: Vec<Vec<u8>>,
     deadline: std::time::Instant,
     burst_cap: Option<usize>,
     pace_rate_bps: u64,
+    track: bool,
 ) -> Result<PaceStat> {
     let mut refs: Vec<&[u8]> = wires.iter().map(|w| w.as_slice()).collect();
     // FEC/recovery test knob (SLIPSTREAM_VIDEO_DROP) — same knob the GameStream plane honors.
@@ -508,6 +513,13 @@ fn pace_sealed(
     } else {
         std::time::Duration::MAX
     };
+    // Phase 1a FEC accounting (armed only when the latency artifact is on): the packetizer
+    // emits parity shards at `data_shards + r`, so a wire packet is FEC iff its header's
+    // shard index sits at/after the block's data-shard count.
+    let mut fec_packets = 0u32;
+    if track {
+        fec_packets = slipstream_core::latency::fec_packet_count(&refs);
+    }
     // Time the socket handoff per chunk and fold it into the session's SealPerf split — the
     // sleeps between chunks stay excluded, so sock_ns is pure send_gso/sendmmsg time.
     let mut sock_ns = 0u64;
@@ -529,7 +541,9 @@ fn pace_sealed(
     drop(refs); // release the borrow of `wires` so it can return to the seal pool
     session.reclaim_wires(wires);
     session.note_sock_ns(sock_ns);
-    result.map_err(|e| anyhow!("send_sealed: {e:?}"))
+    let mut stat = result.map_err(|e| anyhow!("send_sealed: {e:?}"))?;
+    stat.fec_packets = fec_packets;
+    Ok(stat)
 }
 
 /// One encoded frame handed from the capture/encode thread to the send thread (the encode|send
@@ -547,6 +561,11 @@ struct FrameMsg {
     /// When this frame's packets should have fully left (the next frame's due time) = the pacing
     /// budget. In the past when the send thread is behind → immediate send (catch up).
     deadline: std::time::Instant,
+    /// The staleness boundary (Phase 5): `capture_pts + one frame period`. Under the
+    /// `LowLatency` profile a frame still in the channel at this instant is DROPPED before
+    /// FEC/seal — a frame that old is latency, not video; the `Balanced` profile keeps the
+    /// legacy catch-up immediate-send instead (its backlog is bounded by the channel depth).
+    stale_at: std::time::Instant,
     /// submit→encoded latency (µs), measured on the encode thread, carried for the perf histogram.
     encode_us: u32,
     /// Capture-delivery → encoder-submit age (µs) of a fresh frame — the PipeWire delivery +
@@ -574,6 +593,12 @@ struct FrameMsg {
     /// instead of re-reading `is_armed()`, so a capture that arms while frames are already in flight
     /// doesn't fold their zeroed splits into the first window's percentiles.
     was_measured: bool,
+    /// Phase 1a latency record (slipstream-core `latency`): the capture/encode-thread anchors
+    /// filled here (`publish_ns`/`encode_submit_ns`/`first|last_enc_pkt_ns`/`frame_id`/`pts_ns`/
+    /// `capture_backend`, `enqueue_ns`), the send-side fields (`dequeue_ns`, first/last sent,
+    /// spread, packet counts, `backpressure`) filled by the send thread. Emitted only when the
+    /// `SLIPSTREAM_LATENCY_ARTIFACT` artifact is armed; zero fields otherwise.
+    timings: FrameTimings,
 }
 
 /// What the encode thread hands the send thread: a whole AU (the legacy path — every session
@@ -592,12 +617,28 @@ fn send_msg_until_stop(
     tx: &std::sync::mpsc::SyncSender<SendMsg>,
     mut msg: SendMsg,
     stop: &AtomicBool,
+    backlog: &BacklogTrack,
 ) -> bool {
+    let blocked_at = std::time::Instant::now();
     loop {
         match tx.try_send(msg) {
-            Ok(()) => return true,
+            Ok(()) => {
+                // Phase 5: occupancy bookkeeping — this frame is in the channel now.
+                backlog
+                    .blocked_us
+                    .fetch_add(blocked_at.elapsed().as_micros() as u64, Ordering::Relaxed);
+                let n = backlog.inflight.fetch_add(1, Ordering::Relaxed) + 1;
+                backlog.max_inflight.fetch_max(n, Ordering::Relaxed);
+                return true;
+            }
             Err(std::sync::mpsc::TrySendError::Disconnected(_)) => return false,
-            Err(std::sync::mpsc::TrySendError::Full(returned)) => {
+            Err(std::sync::mpsc::TrySendError::Full(mut returned)) => {
+                // Phase 1a: the channel was ever Full for this frame — the artifact's
+                // backpressure flag (a pure bool on the record; free when unarmed).
+                match &mut returned {
+                    SendMsg::Frame(f) => f.timings.backpressure = true,
+                    SendMsg::Chunk(c) => c.timings.backpressure = true,
+                }
                 if stop.load(Ordering::SeqCst) {
                     return false;
                 }
@@ -620,6 +661,8 @@ struct ChunkMsg {
     flags: u32,
     frame_index: u32,
     deadline: std::time::Instant,
+    /// The staleness boundary (Phase 5) — see [`FrameMsg::stale_at`].
+    stale_at: std::time::Instant,
     encode_us: u32,
     queue_us: u32,
     cap_us: u32,
@@ -627,6 +670,10 @@ struct ChunkMsg {
     wait_us: u32,
     repeat: bool,
     was_measured: bool,
+    /// Phase 1a latency record, filled exactly like [`FrameMsg::timings`]: the capture anchors on
+    /// every chunk of an AU, `first_enc_pkt_ns` on the AU's first chunk, `last_enc_pkt_ns` +
+    /// `enqueue_ns` on its last; the send thread merges them per AU in [`StreamedOpen`].
+    timings: FrameTimings,
 }
 
 /// A streamed AU the send thread has open: the core's incremental sealer plus the pace
@@ -636,6 +683,35 @@ struct StreamedOpen {
     au: slipstream_core::packet::StreamedAu,
     spread_us: u32,
     paced: bool,
+    /// First actual send across the AU's pace calls (`0` until the first real send).
+    first_sent_ns: u64,
+    /// Last actual send across the AU's pace calls (the last chunk's, or the tail's).
+    last_sent_ns: u64,
+    /// Wire packets sent across all the AU's chunk flushes.
+    total_packets: u32,
+    /// FEC/parity packets among them.
+    fec_packets: u32,
+    /// The AU's latency record: capture anchors + `dequeue_ns` from its first chunk, the
+    /// chunk-side flags merged across chunks.
+    timings: FrameTimings,
+}
+
+impl StreamedOpen {
+    /// Fold one chunk's pace-call outcome into the AU aggregation: spreads sum, the first/last
+    /// send anchors keep the first and last REAL sends (an empty pace call — a fully-chunked
+    /// tail — contributes nothing), and the packet counts sum across the chunk flushes.
+    fn merge_pace(&mut self, stat: &PaceStat) {
+        self.spread_us = self.spread_us.saturating_add(stat.spread_us);
+        self.paced |= stat.paced;
+        self.total_packets += stat.total_packets;
+        self.fec_packets += stat.fec_packets;
+        if stat.first_sent_ns != 0 {
+            if self.first_sent_ns == 0 {
+                self.first_sent_ns = stat.first_sent_ns;
+            }
+            self.last_sent_ns = stat.last_sent_ns;
+        }
+    }
 }
 
 /// Feed one [`ChunkMsg`] through the streamed sealer: open at `first`, seal + pace every FEC
@@ -649,6 +725,7 @@ fn handle_chunk(
     slice_wire: bool,
     burst_cap: Option<usize>,
     pace_rate_bps: u64,
+    track: bool,
 ) -> Result<Option<(FrameMsg, PaceStat)>> {
     if c.first {
         if open.take().is_some() {
@@ -675,6 +752,13 @@ fn handle_chunk(
                 .map_err(|e| anyhow!("begin_streamed_frame: {e:?}"))?,
             spread_us: 0,
             paced: false,
+            first_sent_ns: 0,
+            last_sent_ns: 0,
+            total_packets: 0,
+            fec_packets: 0,
+            // The AU's latency record seeds from its first chunk: the capture anchors, the
+            // encode-thread stamps and the send thread's `dequeue_ns` (this chunk's recv).
+            timings: c.timings,
         });
     }
     let Some(s) = open.as_mut() else {
@@ -689,10 +773,10 @@ fn handle_chunk(
         .seal_streamed_chunk(&mut s.au, &c.data, true)
         .map_err(|e| anyhow!("seal_streamed_chunk: {e:?}"))?;
     if !wires.is_empty() {
-        let stat = pace_sealed(session, wires, c.deadline, burst_cap, pace_rate_bps)?;
-        s.spread_us = s.spread_us.saturating_add(stat.spread_us);
-        s.paced |= stat.paced;
+        let stat = pace_sealed(session, wires, c.deadline, burst_cap, pace_rate_bps, track)?;
+        s.merge_pace(&stat);
     }
+    s.timings.backpressure |= c.timings.backpressure;
     if !c.last {
         return Ok(None);
     }
@@ -700,7 +784,13 @@ fn handle_chunk(
     let tail = session
         .seal_streamed_finish(s.au)
         .map_err(|e| anyhow!("seal_streamed_finish: {e:?}"))?;
-    let stat = pace_sealed(session, tail, c.deadline, burst_cap, pace_rate_bps)?;
+    let stat = pace_sealed(session, tail, c.deadline, burst_cap, pace_rate_bps, track)?;
+    // `s.au` was consumed by the sealer — fold the tail's stat and the last chunk's record
+    // fields in by hand (the remaining fields are all Copy; same merge as `merge_pace`).
+    let mut timings = s.timings;
+    timings.last_enc_pkt_ns = c.timings.last_enc_pkt_ns;
+    timings.enqueue_ns = c.timings.enqueue_ns;
+    timings.backpressure |= c.timings.backpressure;
     Ok(Some((
         FrameMsg {
             data: Vec::new(), // already on the wire — accounting only
@@ -708,6 +798,7 @@ fn handle_chunk(
             flags: c.flags,
             frame_index: c.frame_index,
             deadline: c.deadline,
+            stale_at: c.stale_at,
             encode_us: c.encode_us,
             queue_us: c.queue_us,
             cap_us: c.cap_us,
@@ -715,12 +806,52 @@ fn handle_chunk(
             wait_us: c.wait_us,
             repeat: c.repeat,
             was_measured: c.was_measured,
+            timings,
         },
         PaceStat {
             spread_us: s.spread_us.saturating_add(stat.spread_us),
             paced: s.paced || stat.paced,
+            first_sent_ns: if s.first_sent_ns == 0 {
+                stat.first_sent_ns
+            } else {
+                s.first_sent_ns
+            },
+            last_sent_ns: if stat.first_sent_ns == 0 {
+                s.last_sent_ns
+            } else {
+                stat.last_sent_ns
+            },
+            total_packets: s.total_packets + stat.total_packets,
+            fec_packets: s.fec_packets + stat.fec_packets,
         },
     )))
+}
+
+/// Phase 5 send-channel instrumentation, shared between the encode thread (enqueue side) and the
+/// send thread (dequeue side): live occupancy, its high-water mark, and the cumulative time the
+/// encode thread blocked on a full channel. The send thread folds these into the session stats
+/// (and resets the accumulators) on its stats boundary.
+#[derive(Default)]
+struct BacklogTrack {
+    inflight: std::sync::atomic::AtomicU64,
+    max_inflight: std::sync::atomic::AtomicU64,
+    blocked_us: std::sync::atomic::AtomicU64,
+}
+
+/// Phase 5 staleness boundary for an AU: the capture anchor (wall clock `cap_ns`) plus ONE frame
+/// period — the `LowLatency` age limit for a frame entering the send channel. A frame still
+/// queued at this instant is latency, not video.
+fn stale_boundary(
+    cap_ns: u64,
+    interval: std::time::Duration,
+    queue_age_frames: f64,
+) -> std::time::Instant {
+    std::time::Instant::now()
+        .checked_sub(std::time::Duration::from_nanos(
+            now_ns().saturating_sub(cap_ns),
+        ))
+        .unwrap_or_else(std::time::Instant::now)
+        + interval.mul_f64(queue_age_frames.max(0.25))
 }
 
 /// The dedicated send thread: it owns the whole [`Session`] (so no socket clone or shared stats are
@@ -750,6 +881,9 @@ struct SendStats {
     /// send thread owns the session and emits the aggregate stats sample, while only the encode
     /// thread owns the live capturer.
     capture: Arc<SharedCaptureTelemetry>,
+    /// One-shot force-keyframe flag — the encode loop's `force_idr` handle, shared so the send
+    /// thread can request a recovery IDR after dropping an inter-frame AU (Phase 5).
+    force_idr: Arc<AtomicBool>,
 }
 
 #[derive(Default)]
@@ -810,7 +944,8 @@ fn send_loop(
     // Streamed AUs go out as slice-granularity blocks ([`USER_FLAG_SLICE_STREAM`]'s contract)
     // instead of the legacy full-FEC-block shape.
     slice_wire: bool,
-    burst_cap: Option<usize>,
+    // Phase 6: the measured transport policy (burst cap + pacing factor per transport state).
+    transport_policy: Arc<crate::transport_state::TransportPolicyShared>,
     fec_target: Arc<AtomicU8>,
     stats: SendStats,
     // `Some` = the client advertised VIDEO_CAP_HOST_TIMING: emit one 0xCF datagram per AU right
@@ -821,17 +956,15 @@ fn send_loop(
     // The client advertised VIDEO_CAP_PROBE_SEQ — mid-session speed-test bursts may run in the
     // probe index space (else they're declined; see `run_probe_burst`).
     probe_seq: bool,
+    // Phase 5 send-channel instrumentation (occupancy/blocked time, folded into session stats).
+    backlog: Arc<BacklogTrack>,
 ) {
     boost_thread_priority(false); // transmit thread: above-normal (Apollo's encoder-thread level)
                                   // T1.2 front-loaded pacing: the paced overflow drains at `factor ×` the live encoder
-                                  // bitrate instead of stretching to the frame deadline. 3× default (the link carries 1×
-                                  // sustained, so a bounded 3× excursion is safe — WebRTC's pacer uses 2.5×);
-                                  // `SLIPSTREAM_PACE_FACTOR=0` restores the legacy deadline-only spread.
-    let pace_factor: f64 = std::env::var("SLIPSTREAM_PACE_FACTOR")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .filter(|f: &f64| f.is_finite() && *f >= 0.0)
-        .unwrap_or(3.0);
+                                  // bitrate instead of stretching to the frame deadline. The factor comes from the
+                                  // measured transport policy (Phase 6) — 3× on a clean LAN, tighter on WAN —
+                                  // seeded by `SLIPSTREAM_PACE_FACTOR` (the Auto default; `=0` restores the
+                                  // legacy deadline-only spread).
     let mut last_perf = std::time::Instant::now();
     let mut last_bytes = 0u64;
     let mut last_send_dropped = 0u64;
@@ -855,9 +988,54 @@ fn send_loop(
     // The streamed AU currently open (VIDEO_CAP_STREAMED_AU chunked sends) — `Some` strictly
     // between a `ChunkMsg::first` and its `last`.
     let mut streamed: Option<StreamedOpen> = None;
+    // Phase 1a latency artifact: one JSONL record per video AU when `SLIPSTREAM_LATENCY_ARTIFACT`
+    // names a file (read once per session). `artifact_on` gates every new per-frame stamp —
+    // with the artifact off, the only added hot-path cost is the two send-stamp clock reads in
+    // the pacing loop.
+    let mut artifact = slipstream_core::latency::LatencyArtifact::from_env();
+    if let Some(a) = artifact.as_mut() {
+        let (_, capture_backend) = stats.capture.read();
+        let (w, h, hz) = unpack_mode(stats.mode.load(Ordering::Relaxed));
+        let _ = a.write_header(&capture_backend, stats.codec, &stats.client, w, h, hz);
+    }
+    let artifact_on = artifact.is_some();
+    // Phase 5: the `LowLatency` profile gates the send path — stale-deadline drops, the
+    // recovery-gap state machine, the ≈2-frame-payload socket buffer — while `Balanced` keeps
+    // the legacy catch-up behavior (a backlog sends immediately rather than dropping).
+    let low_latency = crate::encode::LatencyProfile::current()
+        == crate::encode::LatencyProfile::LowLatency;
+    // Recovery-gap state (Phase 5): set when an inter-frame AU is dropped (stale/backpressure).
+    // While set, dependent (non-key) AUs are dropped — the client cannot decode them without the
+    // lost reference — and the encode loop is asked for a recovery IDR; the gap closes only when
+    // that recovery AU is actually sent.
+    let mut recovery_required = false;
+    let mut recovery_since: Option<std::time::Instant> = None;
+    // The low-latency socket buffer is applied lazily — the live encoder bitrate drives the
+    // ≈2-frame-payload target, and it may read 0 at session start.
+    let mut socket_buffered = false;
     loop {
         if stop.load(Ordering::SeqCst) {
             break;
+        }
+        if low_latency && !socket_buffered && stats.bitrate_kbps.load(Ordering::Relaxed) > 0 {
+            let (_, _, hz) = unpack_mode(stats.mode.load(Ordering::Relaxed));
+            let bps = stats.bitrate_kbps.load(Ordering::Relaxed) as u64 * 1000;
+            let frame_bytes = (bps / 8 / hz.max(1) as u64) as usize;
+            let target = slipstream_core::transport::low_latency_send_target_bytes(frame_bytes);
+            let granted = session.set_latency_send_buffer(frame_bytes);
+            // SO_TXTIME/ETF pacing stays OFF by default (capability-recorded only — it has not
+            // yet beaten the user-space pacer on the benchmark matrix).
+            session.note_socket_state(
+                granted,
+                false,
+                slipstream_core::transport::gso_enabled(),
+            );
+            tracing::info!(
+                granted_kb = granted / 1024,
+                target_kb = target / 1024,
+                "low-latency socket buffer applied"
+            );
+            socket_buffered = true;
         }
         // Probes run here (they need the Session); a burst pauses video — the encode thread blocks
         // on the full frame channel meanwhile, which is exactly the intended pause. Never mid-AU:
@@ -870,11 +1048,94 @@ fn send_loop(
         apply_fec_target(&mut session, &fec_target);
         // Short timeout so we keep re-checking `stop` + probes when no frames are flowing.
         match frame_rx.recv_timeout(std::time::Duration::from_millis(50)) {
-            Ok(send_msg) => {
+            Ok(mut send_msg) => {
+                // Phase 5: this frame left the channel — drop it from the occupancy count.
+                backlog.inflight.fetch_sub(1, Ordering::Relaxed);
+                // Phase 1a: stamp the channel pull into the record (gated — no clock read when
+                // the artifact is off). For a streamed AU this anchors at its first chunk.
+                if artifact_on {
+                    let d = now_ns();
+                    match &mut send_msg {
+                        SendMsg::Frame(m) => m.timings.dequeue_ns = d,
+                        SendMsg::Chunk(c) => c.timings.dequeue_ns = d,
+                    }
+                }
+                // Phase 5: stale-deadline + recovery-gap gating (`LowLatency` profile only). A
+                // frame still in the channel past `stale_at` is latency, not video — drop it
+                // before FEC/seal. Dropping an INTER-frame AU breaks the reference chain (the
+                // encoder advanced past it, the client never got it), so the session enters a
+                // recovery gap: dependent frames are dropped and the encode loop is asked for a
+                // recovery IDR; the gap closes only when that recovery AU is actually sent.
+                let mut drop_reason: Option<slipstream_core::stats::FrameDropReason> = None;
+                if low_latency {
+                    let (is_key, stale_at) = match &send_msg {
+                        SendMsg::Frame(m) => (m.flags & FLAG_SOF as u32 != 0, m.stale_at),
+                        SendMsg::Chunk(c) => (c.flags & FLAG_SOF as u32 != 0, c.stale_at),
+                    };
+                    if recovery_required {
+                        if is_key {
+                            recovery_required = false;
+                            if let Some(since) = recovery_since.take() {
+                                tracing::info!(
+                                    gap_us = since.elapsed().as_micros(),
+                                    "recovery AU sent — recovery gap closed"
+                                );
+                            }
+                        } else {
+                            drop_reason = Some(
+                                slipstream_core::stats::FrameDropReason::EncoderRecovery,
+                            );
+                        }
+                    } else if std::time::Instant::now() >= stale_at {
+                        drop_reason =
+                            Some(slipstream_core::stats::FrameDropReason::StaleDeadline);
+                        if !is_key {
+                            recovery_required = true;
+                            recovery_since = Some(std::time::Instant::now());
+                            // Ask the encode loop for a recovery IDR (it owns the keyframe path).
+                            stats.force_idr.store(true, Ordering::SeqCst);
+                            tracing::warn!(
+                                "stale inter-frame dropped — recovery IDR requested"
+                            );
+                        }
+                    }
+                }
+                if let Some(reason) = drop_reason {
+                    // Every drop has a reason + recovery state: count it, record it in the
+                    // artifact (with the frame's flags set), and skip FEC/seal/send.
+                    let record_drop = |timings: &mut FrameTimings| {
+                        timings.stale = reason
+                            == slipstream_core::stats::FrameDropReason::StaleDeadline;
+                        timings.recovery_drop = reason
+                            == slipstream_core::stats::FrameDropReason::EncoderRecovery;
+                    };
+                    match &mut send_msg {
+                        SendMsg::Frame(m) => {
+                            session.note_frame_drop(reason);
+                            if let Some(a) = artifact.as_mut() {
+                                record_drop(&mut m.timings);
+                                let _ = a.write_frame(&m.timings);
+                            }
+                        }
+                        // Count a chunked AU's drop once (on its first chunk) but record every
+                        // chunk's flag — the sealer never saw the AU.
+                        SendMsg::Chunk(c) => {
+                            if c.first {
+                                session.note_frame_drop(reason);
+                                if let Some(a) = artifact.as_mut() {
+                                    record_drop(&mut c.timings);
+                                    let _ = a.write_frame(&c.timings);
+                                }
+                            }
+                        }
+                    }
+                    continue;
+                }
                 // Live ABR-tracked encoder bitrate → pace rate; 0 (not yet known) = uncapped.
+                // The multiplier is the measured transport state's (Phase 6).
                 let pace_rate = (stats.bitrate_kbps.load(Ordering::Relaxed) as f64
                     * 1000.0
-                    * pace_factor) as u64;
+                    * transport_policy.pace_factor()) as u64;
                 // `Ok(Some(..))` = an AU fully left the socket (a whole frame, or a streamed
                 // AU's last chunk) — run the per-AU accounting; `Ok(None)` = mid-AU chunk.
                 let outcome = match send_msg {
@@ -885,8 +1146,9 @@ fn send_loop(
                         msg.flags,
                         msg.frame_index,
                         msg.deadline,
-                        burst_cap,
+                        transport_policy.burst_bytes(),
                         pace_rate,
+                        artifact_on,
                     )
                     .map(|stat| Some((msg, stat))),
                     SendMsg::Chunk(c) => handle_chunk(
@@ -894,14 +1156,15 @@ fn send_loop(
                         &mut streamed,
                         c,
                         slice_wire,
-                        burst_cap,
+                        transport_policy.burst_bytes(),
                         pace_rate,
+                        artifact_on,
                     ),
                 };
                 match outcome {
                     // Mid-AU chunk: sealed + on the wire; the per-AU accounting runs at `last`.
                     Ok(None) => {}
-                    Ok(Some((msg, stat))) => {
+                    Ok(Some((mut msg, stat))) => {
                         // First VIDEO packets are on the wire — complete the bring-up trace (P0.1;
                         // once-only, no-op on every later frame). Speed-test filler isn't video.
                         if msg.flags & FLAG_PROBE as u32 == 0 {
@@ -939,6 +1202,25 @@ fn send_loop(
                                 let _ = tc.send_datagram(
                                     slipstream_core::quic::encode_host_timing_datagram(&t).into(),
                                 );
+                            }
+                        }
+                        // Phase 1a latency artifact: fold this send's outcome into the AU's
+                        // record and emit it (best-effort, like the 0xCF datagram; skipped for
+                        // speed-test filler). For a streamed AU the record already carries the
+                        // chunk-merged anchors from `handle_chunk` — the accounting below is
+                        // identical for both paths.
+                        if let Some(a) = artifact.as_mut() {
+                            if msg.flags & FLAG_PROBE as u32 == 0 {
+                                let t = &mut msg.timings;
+                                t.first_sent_ns = stat.first_sent_ns;
+                                t.last_sent_ns = stat.last_sent_ns;
+                                t.pace_spread_us = stat.spread_us;
+                                t.total_packets = stat.total_packets;
+                                t.fec_packets = stat.fec_packets;
+                                // Phase 5: the kernel's send-queue occupancy at send time.
+                                t.kernel_queue_bytes =
+                                    session.kernel_send_queue_bytes().unwrap_or(0);
+                                let _ = a.write_frame(t);
                             }
                         }
                         if perf || stats.rec.is_armed() {
@@ -981,6 +1263,13 @@ fn send_loop(
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break, // encode thread done
         }
         if last_perf.elapsed() >= std::time::Duration::from_secs(2) {
+            // Phase 5: fold the send-channel instrumentation (enqueue-block time + occupancy
+            // high-water) into the session counters, then reset the accumulators.
+            let blocked = backlog.blocked_us.swap(0, Ordering::Relaxed);
+            let max_occ = backlog.max_inflight.swap(0, Ordering::Relaxed);
+            if blocked > 0 || max_occ > 0 {
+                session.note_send_backlog(blocked, max_occ);
+            }
             let s = session.stats();
             let secs = last_perf.elapsed().as_secs_f64();
             // Attempted (sealed) transmit rate; `send_dropped` is what didn't reach the wire.
@@ -1237,6 +1526,11 @@ pub(super) struct SessionContext {
     /// Accepted mid-stream bitrate changes (adaptive bitrate, already clamped) — the encoder
     /// alone is rebuilt in place at the new rate; capture + virtual output are untouched.
     pub(super) bitrate_rx: std::sync::mpsc::Receiver<u32>,
+    /// Phase 6: the measured transport-state machine (fed by the control task) and its
+    /// published policy (read by the encode + send loops per frame).
+    pub(super) transport_state:
+        Arc<std::sync::Mutex<crate::transport_state::TransportStateMachine>>,
+    pub(super) transport_policy: Arc<crate::transport_state::TransportPolicyShared>,
     /// The resolved compositor backend (moot on Windows — `vdisplay::open` ignores it there).
     pub(super) compositor: crate::vdisplay::Compositor,
     /// This session's resolved gamescope sub-mode, or `None` for every other backend. Carried here
@@ -1449,6 +1743,8 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         rfi,
         bitrate_rx,
         compositor,
+        transport_state: _,
+        transport_policy,
         gamescope_route,
         mut bitrate_kbps,
         live_bitrate,
@@ -1776,18 +2072,29 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
     // Microburst cap (applied in send_loop/paced_submit): a frame ≤ the cap bursts out
     // immediately; only a bigger frame's overflow is spread. `None` = auto — max(128 KB, the
     // AU's wire bytes / 4), so the burst stays a bounded fraction of high-rate frames instead
-    // of swallowing them whole (plan Phase 1.3). SLIPSTREAM_PACE_BURST_KB pins an absolute cap.
-    let burst_cap: Option<usize> = std::env::var("SLIPSTREAM_PACE_BURST_KB")
-        .ok()
-        .and_then(|s| s.parse::<usize>().ok())
-        .map(|kb| kb * 1024);
+    // of swallowing them whole (plan Phase 1.3). SLIPSTREAM_PACE_BURST_KB pins an absolute cap
+    // (seeded into the Phase-6 transport policy — the initial `Auto` value, superseded by the
+    // measured state's own table once classified).
 
     // Encode|send split: this thread captures+encodes (the GPU work) + handles reconfig, and hands
     // each AU to a dedicated send thread that owns the Session and does FEC+seal+paced-send — so the
     // encode of frame N+1 overlaps the paced transmit of frame N instead of waiting behind its tail.
     // The bounded channel applies backpressure (the encode thread blocks if the send falls behind,
     // so frames slow down rather than a dropped frame freezing the infinite-GOP stream).
-    let (frame_tx, frame_rx) = std::sync::mpsc::sync_channel::<SendMsg>(3);
+    //
+    // Phase 5 depth policy: `LowLatency` runs depth ONE — a frame is never allowed to sit behind
+    // a second one (the channel is the low-latency queue; depth 1 is its bound); `Balanced` keeps
+    // depth TWO as the maximum fallback. Depth THREE was the silent latency buffer — an older
+    // frame's whole pipeline residency became latency the moment a burst landed; it is not
+    // retained in any profile.
+    let channel_depth = if crate::encode::LatencyProfile::current()
+        == crate::encode::LatencyProfile::LowLatency
+    {
+        1
+    } else {
+        2
+    };
+    let (frame_tx, frame_rx) = std::sync::mpsc::sync_channel::<SendMsg>(channel_depth);
     // `live_bitrate` (SessionContext) is shared with the send thread's stats sample AND the
     // control task: a mid-stream adaptive bitrate change (bitrate_rx below) stores the
     // encoder-APPLIED rate, so the console, pacer and climb-refusal acks all see the truth.
@@ -1807,6 +2114,9 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
     let force_idr = Arc::new(AtomicBool::new(false));
     // The send thread emits the web-console stats sample (it owns `session.stats()`); clone the
     // recorder so the capture loop keeps its own handle for the per-frame `is_armed()` gate.
+    // Phase 5: the shared send-channel instrumentation (encode thread enqueues, send thread
+    // dequeues and folds into the session counters).
+    let backlog = Arc::new(BacklogTrack::default());
     let send_stats = SendStats {
         rec: stats.clone(),
         mode: live_mode.clone(),
@@ -1815,13 +2125,19 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         bitrate_kbps: live_bitrate.clone(),
         bringup: bringup.clone(),
         capture: capture_diag.clone(),
+        force_idr: force_idr.clone(),
     };
     let send_thread = std::thread::Builder::new()
         .name("slipstream-send".into())
         .spawn({
             let stop = stop.clone();
             let phase_send = phase.clone();
+            let backlog_send = backlog.clone();
+            let transport_policy_send = transport_policy.clone();
             move || {
+                // Phase 7: opt-in low-latency performance profile — raise this send worker's
+                // scheduling class (RTKit / SCHED_FIFO / nice fallback) when configured.
+                ss_frame::worker_qos::apply_worker_qos("slipstream-send", ss_frame::worker_qos::WorkerClass::Background);
                 send_loop(
                     session,
                     frame_rx,
@@ -1830,12 +2146,13 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                     stop,
                     perf,
                     slice_wire,
-                    burst_cap,
+                    transport_policy_send,
                     fec_target,
                     send_stats,
                     timing_conn,
                     phase_send,
                     probe_seq,
+                    backlog_send,
                 )
             }
         })
@@ -2025,6 +2342,10 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
     let mut ahead_run: u32 = 0;
     let mut deescalate_not_before: Option<std::time::Instant> = None;
     let mut deescalate_backoff = DEESCALATE_BACKOFF_START;
+    // Phase 1a latency artifact gate (read once per session): with the artifact off, every new
+    // timestamp below is skipped entirely — the only added hot-path cost is the pacing loop's
+    // two send-stamp clock reads.
+    let latency_on = slipstream_core::latency::latency_artifact_enabled();
     while !stop.load(Ordering::SeqCst) && std::time::Instant::now() < deadline {
         // Mid-stream session switch (the box flipped Gaming↔Desktop): rebuild the WHOLE backend in
         // place — a different compositor at the SAME client mode — keeping the Session + send thread
@@ -3208,8 +3529,15 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
             // encoder's chunked poll live, forward each slice chunk to the send thread the
             // moment it's readable, so packetize/FEC/pacing overlap the encode tail. Re-queried
             // per AU (never cached): a pipelined-retrieve escalation or a session rebuild turns
-            // the mode off and the next AU falls back to the whole-AU path below.
-            if streamed_wire && enc.supports_chunked_poll() {
+            // the mode off and the next AU falls back to the whole-AU path below. `LowLatency`
+            // additionally requires the encoder's EXPLICIT sub-frame capability (Phase 4 —
+            // capability-gated sub-frame output, never assumed from `supports_chunked_poll`
+            // alone).
+            let ll_gate = crate::encode::LatencyProfile::current().config();
+            if streamed_wire
+                && enc.supports_chunked_poll()
+                && (!ll_gate.subframe_capability_gated || enc.caps().subframe_output)
+            {
                 let t_wait = std::time::Instant::now();
                 let mut first_chunk_us = 0u32;
                 let mut au_flags = 0u32;
@@ -3226,6 +3554,9 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                     // Every chunk proves the encoder is alive.
                     last_au_at = std::time::Instant::now();
                     encoder_resets = 0;
+                    // Phase 1a: this slice's readback stamp (gated — skipped when the artifact
+                    // is off).
+                    let chunk_poll_ns = if latency_on { now_ns() } else { 0 };
                     if c.first {
                         first_chunk_us = t_wait.elapsed().as_micros() as u32;
                         au_flags = if c.keyframe {
@@ -3264,7 +3595,8 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                     let (cap_ns, sub_ns, deadline) = *inflight.front().expect("inflight non-empty");
                     let wait_total_us = t_wait.elapsed().as_micros() as u32;
                     let encode_us = (now_ns().saturating_sub(sub_ns) / 1000) as u32;
-                    let msg = ChunkMsg {
+                    let stale_at = stale_boundary(cap_ns, interval, transport_policy.queue_age_frames());
+                    let mut msg = ChunkMsg {
                         data: c.data,
                         first: c.first,
                         last,
@@ -3272,6 +3604,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                         flags: au_flags,
                         frame_index: au_seq,
                         deadline,
+                        stale_at,
                         encode_us,
                         queue_us,
                         cap_us,
@@ -3279,8 +3612,44 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                         wait_us: if measure { wait_total_us } else { 0 },
                         repeat,
                         was_measured: measure,
+                        timings: FrameTimings::new(""),
                     };
-                    if !send_msg_until_stop(&frame_tx, SendMsg::Chunk(msg), &stop) {
+                    if latency_on {
+                        let t = &mut msg.timings;
+                        t.capture_backend = capturer.backend_name();
+                        t.sampling = if frame_driven_enabled() && capturer.supports_arrival_wait()
+                        {
+                            "arrival_wait"
+                        } else {
+                            "fixed_tick"
+                        };
+                        t.publish_ns = cap_ns;
+                        t.encode_submit_ns = sub_ns;
+                        // Per-slice readback stamp: the AU-level first/last pair is resolved in
+                        // `handle_chunk` (first chunk's first, last chunk's last).
+                        t.first_enc_pkt_ns = chunk_poll_ns;
+                        t.last_enc_pkt_ns = chunk_poll_ns;
+                        t.frame_id = au_seq;
+                        t.pts_ns = cap_ns;
+                        // Phase 3: the capture pipeline's stage stamps ride the frame (PipeWire
+                        // fills them; other backends leave them zero).
+                        let s = &frame.stage_ns;
+                        if s.callback_entry_ns != 0 {
+                            t.cap_cb_entry_ns = s.callback_entry_ns;
+                            t.producer_ns = s.newest_selection_ns;
+                            t.fence_wait_start_ns = s.fence_wait_start_ns;
+                            t.fence_wait_end_ns = s.fence_wait_end_ns;
+                            t.import_end_ns = s.import_end_ns;
+                            t.depad_end_ns = s.depad_end_ns;
+                            t.convert_end_ns = s.convert_end_ns;
+                            t.cursor_end_ns = s.cursor_end_ns;
+                            t.source_meta_flags = s.source_meta_flags;
+                            t.source_meta_pts_ns = s.source_meta_pts_ns;
+                        }
+                    }
+                    let enqueue_ns = if latency_on { now_ns() } else { 0 };
+                    msg.timings.enqueue_ns = enqueue_ns;
+                    if !send_msg_until_stop(&frame_tx, SendMsg::Chunk(msg), &stop, &backlog) {
                         send_gone = true;
                         break;
                     }
@@ -3339,6 +3708,9 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
             // The encoder is alive: feed the stall watchdog, clear the consecutive-reset counter.
             last_au_at = std::time::Instant::now();
             encoder_resets = 0;
+            // Phase 1a: the AU's readback completion stamp (gated — skipped when the artifact
+            // is off).
+            let enc_poll_ns = if latency_on { now_ns() } else { 0 };
             let (cap_ns, sub_ns, deadline) = inflight.pop_front().expect("inflight non-empty");
             let mut flags = if au.keyframe {
                 (FLAG_PIC | FLAG_SOF) as u32
@@ -3377,12 +3749,14 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                 }
             }
             let encode_us = (now_ns().saturating_sub(sub_ns) / 1000) as u32;
-            let msg = FrameMsg {
+            let stale_at = stale_boundary(cap_ns, interval, transport_policy.queue_age_frames());
+            let mut msg = FrameMsg {
                 data: au.data,
                 capture_ns: cap_ns,
                 flags,
                 frame_index: au_seq,
                 deadline,
+                stale_at,
                 encode_us,
                 queue_us,
                 cap_us,
@@ -3390,11 +3764,44 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                 wait_us,
                 repeat,
                 was_measured: measure,
+                timings: FrameTimings::new(""),
             };
+            if latency_on {
+                let t = &mut msg.timings;
+                t.capture_backend = capturer.backend_name();
+                t.sampling = if frame_driven_enabled() && capturer.supports_arrival_wait() {
+                    "arrival_wait"
+                } else {
+                    "fixed_tick"
+                };
+                t.publish_ns = cap_ns;                t.encode_submit_ns = sub_ns;
+                // Single-AU poll: the readback completion instant anchors both ends of the pair.
+                t.first_enc_pkt_ns = enc_poll_ns;
+                t.last_enc_pkt_ns = enc_poll_ns;
+                t.frame_id = au_seq;
+                t.pts_ns = cap_ns;
+                // Phase 3: the capture pipeline's stage stamps ride the frame (PipeWire fills
+                // them; other backends leave them zero).
+                let s = &frame.stage_ns;
+                if s.callback_entry_ns != 0 {
+                    t.cap_cb_entry_ns = s.callback_entry_ns;
+                    t.producer_ns = s.newest_selection_ns;
+                    t.fence_wait_start_ns = s.fence_wait_start_ns;
+                    t.fence_wait_end_ns = s.fence_wait_end_ns;
+                    t.import_end_ns = s.import_end_ns;
+                    t.depad_end_ns = s.depad_end_ns;
+                    t.convert_end_ns = s.convert_end_ns;
+                    t.cursor_end_ns = s.cursor_end_ns;
+                    t.source_meta_flags = s.source_meta_flags;
+                    t.source_meta_pts_ns = s.source_meta_pts_ns;
+                }
+            }
+            let enqueue_ns = if latency_on { now_ns() } else { 0 };
+            msg.timings.enqueue_ns = enqueue_ns;
             // Hand to the send thread; this blocks (backpressure) if it's behind. An Err means it
             // exited (send failure / stop) — end the encode loop too.
             bringup.mark("first_au"); // P0.1 (first-crossing only; free afterwards)
-            if !send_msg_until_stop(&frame_tx, SendMsg::Frame(msg), &stop) {
+            if !send_msg_until_stop(&frame_tx, SendMsg::Frame(msg), &stop, &backlog) {
                 send_gone = true;
                 break;
             }
@@ -3578,6 +3985,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
     // reach the client instead of being dropped on the way out.
     while let Some((cap_ns, sub_ns, deadline)) = inflight.pop_front() {
         let Ok(Some(au)) = enc.poll() else { break };
+        let enc_poll_ns = if latency_on { now_ns() } else { 0 };
         let flags = if au.keyframe {
             (FLAG_PIC | FLAG_SOF) as u32
         } else {
@@ -3586,12 +3994,14 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         let encode_us = (now_ns().saturating_sub(sub_ns) / 1000) as u32;
         // End-of-stream tail drain: the per-stage split isn't measured here (the capture loop has
         // exited), so leave it zero — these last few frames are negligible for the aggregates.
-        let msg = FrameMsg {
+        let stale_at = stale_boundary(cap_ns, interval, transport_policy.queue_age_frames());
+        let mut msg = FrameMsg {
             data: au.data,
             capture_ns: cap_ns,
             flags,
             frame_index: au_seq,
             deadline,
+            stale_at,
             encode_us,
             queue_us: 0,
             cap_us: 0,
@@ -3599,8 +4009,26 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
             wait_us: 0,
             repeat: false,
             was_measured: false,
+            timings: FrameTimings::new(""),
         };
-        if !send_msg_until_stop(&frame_tx, SendMsg::Frame(msg), &stop) {
+        if latency_on {
+            let t = &mut msg.timings;
+            t.capture_backend = capturer.backend_name();
+            t.sampling = if frame_driven_enabled() && capturer.supports_arrival_wait() {
+                "arrival_wait"
+            } else {
+                "fixed_tick"
+            };
+            t.publish_ns = cap_ns;
+            t.encode_submit_ns = sub_ns;
+            t.first_enc_pkt_ns = enc_poll_ns;
+            t.last_enc_pkt_ns = enc_poll_ns;
+            t.frame_id = au_seq;
+            t.pts_ns = cap_ns;
+        }
+        let enqueue_ns = if latency_on { now_ns() } else { 0 };
+        msg.timings.enqueue_ns = enqueue_ns;
+        if !send_msg_until_stop(&frame_tx, SendMsg::Frame(msg), &stop, &backlog) {
             break;
         }
         au_seq = au_seq.wrapping_add(1);
@@ -4327,7 +4755,8 @@ fn build_pipeline(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+use super::*;
+use slipstream_core::latency::FrameTimings;
 
     #[test]
     fn pacing_never_exceeds_the_session_rate_or_the_display() {
@@ -4440,6 +4869,7 @@ mod tests {
             flags: 0,
             frame_index: 0,
             deadline: std::time::Instant::now(),
+            stale_at: std::time::Instant::now(),
             encode_us: 0,
             queue_us: 0,
             cap_us: 0,
@@ -4447,9 +4877,11 @@ mod tests {
             wait_us: 0,
             repeat: false,
             was_measured: false,
+            timings: FrameTimings::new(""),
         });
 
-        assert!(!send_msg_until_stop(&tx, msg, &stop));
+        let backlog = BacklogTrack::default();
+        assert!(!send_msg_until_stop(&tx, msg, &stop, &backlog));
     }
 
     #[test]

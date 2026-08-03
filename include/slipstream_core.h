@@ -1780,6 +1780,51 @@ typedef struct {
     uint32_t send_dropped;
 } SlipstreamProbeResult;
 
+// Append-only v2 stats snapshot: `struct_size`/`version`/`_reserved` header, then every
+// [`SlipstreamStats`] field in the same order, then the Phase-1 latency/drop counters (default 0
+// now — populated by later phases). Filled through [`slipstream_get_stats_v2`] with a caller-sized
+// `out_len`, so an embedder built against an OLDER (smaller) layout still receives the shared
+// leading fields — that is the append-only contract; compare `struct_size` against your own
+// `sizeof` to detect a layout mismatch.
+typedef struct {
+    // Bytes the CALLER's struct occupies (their view). The host writes
+    // `size_of::<SlipstreamStatsV2>()` (what WE put there); the caller compares against its own.
+    uint64_t struct_size;
+    // Layout version — [`SLIPSTREAM_STATS_V2_VERSION`] (currently 1).
+    uint32_t version;
+    uint32_t _reserved;
+    uint64_t frames_submitted;
+    uint64_t frames_completed;
+    uint64_t frames_dropped;
+    uint64_t packets_sent;
+    uint64_t packets_received;
+    uint64_t packets_dropped;
+    uint64_t packets_send_dropped;
+    uint64_t fec_recovered_shards;
+    uint64_t bytes_sent;
+    uint64_t bytes_received;
+    // Dropped past deadline before FEC/seal.
+    uint64_t frames_stale_dropped;
+    // Dropped because the send channel was full.
+    uint64_t frames_backpressure_dropped;
+    // Capture fence wait timed out.
+    uint64_t frames_fence_timeout;
+    // Dropped during a recovery gap.
+    uint64_t frames_recovery_dropped;
+    // Kernel ENOBUFS/EAGAIN send rejections.
+    uint64_t send_rejections;
+    // Total time blocked enqueueing to the send channel.
+    uint64_t enqueue_blocked_us;
+    // High-water mark of the send channel.
+    uint64_t send_queue_occupancy_max;
+    // Actual SO_SNDBUF after the last set.
+    uint64_t socket_sndbuf_bytes;
+    // 0/1: SO_TXTIME/ETF pacing active.
+    uint64_t so_txtime_active;
+    // 0/1: UDP GSO active.
+    uint64_t gso_active;
+} SlipstreamStatsV2;
+
 
 
 
@@ -1882,6 +1927,29 @@ int32_t slipstream_host_poll_input(SlipstreamSession *s);
 // # Safety
 // `s` is a valid handle; `out` points to a writable `SlipstreamStats`.
 SlipstreamStatus slipstream_get_stats(SlipstreamSession *s, SlipstreamStats *out);
+
+// Size in bytes of the current [`SlipstreamStatsV2`] layout — what a caller compiled against the
+// SAME header passes as `out_len`, and what the host writes into `struct_size`.
+uintptr_t slipstream_stats_v2_size(void);
+
+// Current [`SlipstreamStatsV2`] layout version (1). Independent of
+// [`slipstream_abi_version`] — this surface is additive and append-only.
+uint32_t slipstream_stats_v2_version(void);
+
+// Copy session counters into `*out` as the append-only [`SlipstreamStatsV2`] layout.
+//
+// `out_len` is the size of the CALLER's buffer — its struct view. The host fills
+// `min(out_len, size_of::<SlipstreamStatsV2>())` bytes: an embedder built against an older
+// (smaller) layout still receives the shared leading fields, and one built against a larger
+// layout receives everything we emit. `struct_size` is written as the host's own layout size;
+// the caller compares it with its own expectation to detect a mismatch.
+//
+// `out_len` must be at least 16 (the `struct_size` + `version` + `_reserved` header); a smaller
+// buffer cannot even carry the version handshake and is rejected with `InvalidArg`.
+//
+// # Safety
+// `s` is a valid handle; `out` is non-NULL and writable for at least `out_len` bytes.
+SlipstreamStatus slipstream_get_stats_v2(SlipstreamSession *s, void *out, uintptr_t out_len);
 
 #if defined(SLIPSTREAM_FEATURE_QUIC)
 // Trust: `pin_sha256` (NULL or 32 bytes) is the expected SHA-256 fingerprint of the host's

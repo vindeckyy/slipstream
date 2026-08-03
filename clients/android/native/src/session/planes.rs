@@ -20,7 +20,7 @@ use super::{jni_guard, SessionHandle};
 /// No-op if already started.
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeStartVideo(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeStartVideo(
     mut env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -88,11 +88,11 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeStartVideo
 
 /// `NativeBridge.nativeVideoMime(handle): String` — the MediaCodec MIME for the codec the host
 /// resolved (`"video/hevc"` / `"video/avc"` / `"video/av01"`), so Kotlin can rank `MediaCodecList`
-/// decoders for it before calling [`Java_io_unom_slipstream_kit_NativeBridge_nativeStartVideo`].
+/// decoders for it before calling [`Java_io_slipstream_kit_NativeBridge_nativeStartVideo`].
 /// Empty string on a `0` handle. Cheap; safe on the UI thread.
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeVideoMime<'local>(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeVideoMime<'local>(
     env: JNIEnv<'local>,
     _this: JObject<'local>,
     handle: jlong,
@@ -112,12 +112,12 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeVideoMime<
 
 /// `NativeBridge.nativeVideoCodecLabel(handle): String` — a short human label for the codec the
 /// host resolved (`"H.264"` / `"HEVC"` / `"AV1"` / `"PyroWave"`), for the stats HUD's video-feed
-/// line. Distinct from [`Java_io_unom_slipstream_kit_NativeBridge_nativeVideoMime`] because the MIME
+/// line. Distinct from [`Java_io_slipstream_kit_NativeBridge_nativeVideoMime`] because the MIME
 /// collapses PyroWave onto `video/hevc` and can't name it. Empty string on a `0` handle. Cheap;
 /// safe on the UI thread. Android-gated (reads `crate::decode`), matching `nativeVideoMime`.
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeVideoCodecLabel<'local>(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeVideoCodecLabel<'local>(
     env: JNIEnv<'local>,
     _this: JObject<'local>,
     handle: jlong,
@@ -141,7 +141,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeVideoCodec
 /// android-gated — pure `jni` + a lock, so it links on the host build too (Kotlin only calls it on
 /// device).
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeVideoDecoderLabel<'local>(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeVideoDecoderLabel<'local>(
     env: JNIEnv<'local>,
     _this: JObject<'local>,
     handle: jlong,
@@ -162,7 +162,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeVideoDecod
 /// `NativeBridge.nativeStopVideo(handle)` — stop + join the decode thread (without closing the
 /// session). No-op on `0`.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeStopVideo(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeStopVideo(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -208,7 +208,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeStopVideo(
 /// resets the measurement window. Not android-gated — pure `jni` + connector reads, so it links on
 /// the host build too (Kotlin only ever calls it on device).
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeVideoStats(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeVideoStats(
     env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -301,7 +301,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeVideoStats
 /// on a `0` handle. Not android-gated — pure `jni` + a connector read, so it links on the host
 /// build too. Cheap; safe on the UI thread.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeVideoSize(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeVideoSize(
     env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -335,7 +335,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeVideoSize(
 /// session (survives video stop/start across surface recreation). No-op on `0`. Not android-gated —
 /// pure `jni` + an atomic store, so it links on the host build too.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSetVideoStatsEnabled(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSetVideoStatsEnabled(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -362,7 +362,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSetVideoSt
 /// streaming.
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeStartAudio(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeStartAudio(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -387,7 +387,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeStartAudio
 /// closing the session). No-op on `0`.
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeStopAudio(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeStopAudio(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -411,7 +411,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeStopAudio(
 /// the rest of the session streaming.
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeStartMic(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeStartMic(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -446,7 +446,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeStartMic(
 /// surface recreate stops and restarts the mic, and a user who muted must stay muted through it.
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeStopMic(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeStopMic(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -478,7 +478,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeStopMic(
 /// lit while muted, because the mic really is still open. What stops is the encode and the send —
 /// no captured audio leaves the process.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSetMicMuted(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSetMicMuted(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -501,7 +501,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSetMicMute
 /// lie about a mic that is being heard. `false` on a `0` handle. Cheap (one uncontended lock).
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeMicActive(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeMicActive(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,

@@ -355,6 +355,7 @@ mod tests {
             format: PixelFormat::Bgrx,
             payload: FramePayload::Cpu(vec![0x80u8; (w * h * 4) as usize]),
             cursor: None,
+            stage_ns: ss_frame::CaptureStageTimes::default(),
         };
         enc.submit(&frame).expect("submit");
         let au = enc.poll().expect("poll").expect("an AU");
@@ -498,6 +499,7 @@ mod tests {
             format: PixelFormat::Bgrx,
             payload: FramePayload::Cpu(vec![0x80u8; (w * h * 4) as usize]),
             cursor: None,
+            stage_ns: ss_frame::CaptureStageTimes::default(),
         };
         enc.submit(&frame).expect("submit");
         let au = enc.poll().expect("poll").expect("an AU");

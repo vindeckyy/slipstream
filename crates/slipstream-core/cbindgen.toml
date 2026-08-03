@@ -18,6 +18,9 @@ parse_deps = false
 # undefined and the C harness fails to compile: the Apple batched recv (transport/udp.rs
 # `recvmsg_x` + `MsghdrX`) and the Android bionic mmsg bindings (`android_mmsg` module).
 exclude = ["MsghdrX", "recvmsg_x", "mmsghdr", "sendmmsg", "recvmmsg"]
+# The V2 stats surface is filled through `void *out` (append-only caller-sized contract), so
+# nothing in the exported fn signatures reaches the struct — include it explicitly.
+include = ["SlipstreamStatsV2"]
 
 [export.rename]
 "InputEvent" = "SlipstreamInputEvent"

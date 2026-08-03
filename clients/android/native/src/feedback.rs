@@ -38,7 +38,7 @@ const TAG_HID_RAW: u8 = 0x05;
 /// back to the controller holding that wire `pad` index (multi-pad rumble). Run from a Kotlin
 /// poll thread.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeNextRumble(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeNextRumble(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -74,7 +74,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeNextRumble
 ///   Trigger    → `[pad][0x03][which][effect…]`  (len 3 + effect.len())
 /// Returns the byte count written, or `-1` on timeout / session closed / buffer too small.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeNextHidout(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeNextHidout(
     env: JNIEnv,
     _this: JObject,
     handle: jlong,

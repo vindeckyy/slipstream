@@ -12,13 +12,30 @@ use crate::capture::Capturer;
 use crate::encode;
 use crate::send_pacing::percentile;
 use anyhow::{Context, Result};
+use slipstream_core::latency::{now_ns, latency_artifact_enabled, FrameTimings, LatencyArtifact};
 use std::net::UdpSocket;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
+
+/// Phase-2 GameStream arrival-driven gate: opt-in (`SLIPSTREAM_GS_FRAME_DRIVEN=1`), defaulting
+/// OFF — the native plane's `SLIPSTREAM_FRAME_DRIVEN` stays a separate knob so the GameStream
+/// rollout can be measured against the fixed-tick baseline before it becomes the default
+/// (rollout order: flag → measure → default).
+fn gs_frame_driven_enabled() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| std::env::var("SLIPSTREAM_GS_FRAME_DRIVEN").as_deref() == Ok("1"))
+}
 
 /// One frame's packets, handed from the encode thread to the send thread.
 pub(super) type PacketBatch = Vec<Vec<u8>>;
+
+/// One packetized frame handed to the paced sender: the wire batch plus the frame's latency
+/// record (Phase 2 — the sender completes the send-side stamps and writes the artifact record).
+pub(super) struct WireBatch {
+    pub(super) pkts: PacketBatch,
+    pub(super) timings: FrameTimings,
+}
 
 /// Send `pkts` with as few syscalls as possible (`sendmmsg`, up to 64 per call). The socket is
 /// connected, so no per-message address. Returns an error on the first send failure.
@@ -105,6 +122,10 @@ pub(super) struct RawFrame {
     /// Moonlight sees across mid-stream encoder rebuilds.
     aus: Vec<(Vec<u8>, FrameType, u32)>,
     ts: u32,
+    /// Phase-2 latency record: the encode loop fills capture/submit/poll/enqueue stamps, the
+    /// packetizer completes FEC/parity counts, the sender completes dequeue/send stamps and
+    /// writes the artifact record.
+    timings: FrameTimings,
 }
 
 /// Packetizer thread: turns each [`RawFrame`]'s access units into wire datagrams (data + Reed–Solomon
@@ -116,7 +137,7 @@ pub(super) struct RawFrame {
 /// window. Exits when either neighbor's channel closes (session teardown / client gone).
 pub(super) fn spawn_packetizer(
     rx: std::sync::mpsc::Receiver<RawFrame>,
-    tx: std::sync::mpsc::SyncSender<PacketBatch>,
+    tx: std::sync::mpsc::SyncSender<WireBatch>,
     mut pk: VideoPacketizer,
     goodput: Arc<std::sync::atomic::AtomicU64>,
 ) -> Result<()> {
@@ -125,17 +146,27 @@ pub(super) fn spawn_packetizer(
         .spawn(move || {
             // Above-normal, like the send thread — this stage is on the per-frame critical path.
             crate::native::boost_thread_priority(false);
-            while let Ok(frame) = rx.recv() {
+            while let Ok(mut frame) = rx.recv() {
                 let mut batch: PacketBatch = Vec::new();
                 for (au, ft, idx) in frame.aus {
+                    let data = pk.data_shard_count(au.len());
+                    let before = batch.len();
                     batch.extend(pk.packetize(&au, ft, frame.ts, Some(idx)));
+                    frame.timings.fec_packets += (batch.len() - before) as u32 - data as u32;
                 }
                 if batch.is_empty() {
                     continue;
                 }
+                frame.timings.total_packets = batch.len() as u32;
                 let bytes: u64 = batch.iter().map(|p| p.len() as u64).sum();
                 // Blocking send: propagates the paced sender's backpressure upstream (see above).
-                if tx.send(batch).is_err() {
+                if tx
+                    .send(WireBatch {
+                        pkts: batch,
+                        timings: frame.timings,
+                    })
+                    .is_err()
+                {
                     break; // sender exited (client gone)
                 }
                 goodput.fetch_add(bytes, std::sync::atomic::Ordering::Relaxed);
@@ -155,10 +186,11 @@ pub(super) fn spawn_packetizer(
 /// launch state would wedge the next connect (see `AppState::end_session`).
 pub(super) fn spawn_sender(
     sock: UdpSocket,
-    rx: std::sync::mpsc::Receiver<PacketBatch>,
+    rx: std::sync::mpsc::Receiver<WireBatch>,
     frame_interval: Duration,
     running: Arc<AtomicBool>,
     on_lost: OnSessionLost,
+    artifact: Arc<Mutex<Option<LatencyArtifact>>>,
 ) -> Result<()> {
     std::thread::Builder::new()
         .name("slipstream-send".into())
@@ -177,14 +209,16 @@ pub(super) fn spawn_sender(
             };
             let mut sent: u64 = 0;
             let mut dropped: u64 = 0;
-            while let Ok(mut batch) = rx.recv() {
+            while let Ok(mut wb) = rx.recv() {
+                // The frame left the send channel — the send-side latency anchor (Phase 2).
+                wb.timings.dequeue_ns = now_ns();
                 // FEC test knob (SLIPSTREAM_VIDEO_DROP) — same knob the native plane honors.
-                dropped += crate::send_pacing::inject_video_drop(&mut batch);
-                if batch.is_empty() {
+                dropped += crate::send_pacing::inject_video_drop(&mut wb.pkts);
+                if wb.pkts.is_empty() {
                     continue;
                 }
                 let r = crate::send_pacing::pace_frame(
-                    &batch,
+                    &wb.pkts,
                     crate::send_pacing::PaceBudget::Fixed(budget),
                     &cfg,
                     |chunk| {
@@ -193,11 +227,23 @@ pub(super) fn spawn_sender(
                         Ok::<(), std::io::Error>(())
                     },
                 );
-                if let Err(e) = r {
-                    tracing::info!(error = %e, sent, "video: client unreachable — ending session");
-                    running.store(false, Ordering::SeqCst);
-                    on_lost();
-                    return;
+                match r {
+                    Ok(stat) => {
+                        if let Some(a) = artifact.lock().unwrap().as_mut() {
+                            let t = &mut wb.timings;
+                            t.first_sent_ns = stat.first_sent_ns;
+                            t.last_sent_ns = stat.last_sent_ns;
+                            t.pace_spread_us = stat.spread_us;
+                            t.total_packets = wb.pkts.len() as u32; // post-injection
+                            let _ = a.write_frame(t);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::info!(error = %e, sent, "video: client unreachable — ending session");
+                        running.store(false, Ordering::SeqCst);
+                        on_lost();
+                        return;
+                    }
                 }
             }
             tracing::debug!(sent, dropped, "video sender exiting");
@@ -297,13 +343,29 @@ pub(super) fn stream_body(
     // waits. Goodput (bytes handed to the wire) is tallied by the packetizer into `goodput`, read at
     // the encode loop's 1 s stats boundary (the old inline batch-byte sum moved with packetization).
     let goodput = Arc::new(std::sync::atomic::AtomicU64::new(0));
-    let (batch_tx, batch_rx) = std::sync::mpsc::sync_channel::<PacketBatch>(2);
+    let (batch_tx, batch_rx) = std::sync::mpsc::sync_channel::<WireBatch>(2);
+    // Phase-2 latency artifact: opt-in (`SLIPSTREAM_LATENCY_ARTIFACT`), shared with the send
+    // thread (it completes and writes each frame's record). Disabled = a None in the mutex and
+    // no per-frame stamp work beyond the existing stage timings.
+    let latency_on = latency_artifact_enabled();
+    let artifact = Arc::new(Mutex::new(LatencyArtifact::from_env()));
+    if let Some(a) = artifact.lock().unwrap().as_mut() {
+        let _ = a.write_header(
+            capturer.backend_name(),
+            cfg.codec.label(),
+            client_label,
+            cfg.width,
+            cfg.height,
+            cfg.fps,
+        );
+    }
     spawn_sender(
         sock.try_clone().context("clone video socket")?,
         batch_rx,
         Duration::from_secs_f64(1.0 / target_fps as f64),
         running.clone(),
         on_lost.clone(),
+        artifact.clone(),
     )?;
     let (raw_tx, raw_rx) = std::sync::mpsc::sync_channel::<RawFrame>(2);
     spawn_packetizer(raw_rx, batch_tx, pk, goodput.clone())?;
@@ -449,6 +511,12 @@ pub(super) fn stream_body(
             }
         }
         let t_cap = tick.elapsed();
+        // Phase 2: the frame-driven trigger, evaluated per iteration (a capture rebuild can swap
+        // the backend — `supports_arrival_wait` is per-backend). When true, the tail of the loop
+        // sleeps to the rate floor and then wakes on the producer's arrival instead of sampling
+        // on a free-running tick; backends without a trait-level arrival wake (wlroots screencopy,
+        // X11) stay on the fixed tick and the artifact records `fixed_tick` per frame.
+        let arrival_driven = gs_frame_driven_enabled() && capturer.supports_arrival_wait();
         // Honor a client recovery request. Prefer reference-frame invalidation (the encoder
         // re-references an older still-valid frame — no costly IDR spike); if the encoder can't
         // invalidate (range too old, or no NVENC RFI) it returns false and we force a keyframe.
@@ -494,6 +562,7 @@ pub(super) fn stream_body(
                 tracing::debug!("video: keyframe request coalesced (IDR still in flight)");
             }
         }
+        let sub_ns = if latency_on { now_ns() } else { 0 };
         if let Err(e) = enc.submit_indexed(&frame, au_seq.wrapping_add(enc_inflight)) {
             // The input half of an encode stall (see native/stream.rs): rebuild the encoder in
             // place instead of ending the stream. A backend without an in-place rebuild
@@ -537,6 +606,10 @@ pub(super) fn stream_body(
         // stamped with its wire frameIndex here (`au_seq + position`); the numbering only
         // ADVANCES if the batch is actually enqueued below (a dropped batch consumes none).
         let mut aus: Vec<(Vec<u8>, FrameType, u32)> = Vec::new();
+        // Phase-2 poll stamps: the first and last AU drained off the encoder (one stamp on a
+        // single-AU poll; the full span on a multi-AU chunked drain).
+        let mut first_poll_ns = 0u64;
+        let mut last_poll_ns = 0u64;
         // A poll error is the output half of an encode stall (e.g. a bounded fence timeout from
         // a wedged GPU) — carry it to the shared stall recovery below, after the AUs already
         // drained are handed off, instead of killing the session outright.
@@ -550,6 +623,11 @@ pub(super) fn stream_body(
                     break;
                 }
             };
+            let poll_ns = if latency_on { now_ns() } else { 0 };
+            if first_poll_ns == 0 {
+                first_poll_ns = poll_ns;
+            }
+            last_poll_ns = poll_ns;
             let ft = if au.keyframe {
                 FrameType::Idr
             } else {
@@ -569,7 +647,39 @@ pub(super) fn stream_body(
         // client) and keep encoding, so a downstream stall can never cap the encode rate.
         if !aus.is_empty() {
             let batch_len = aus.len() as u32;
-            match raw_tx.try_send(RawFrame { aus, ts }) {
+            let mut timings = FrameTimings::new(capturer.backend_name());
+            if latency_on {
+                let t = &mut timings;
+                t.transport = "gamestream";
+                t.sampling = if arrival_driven { "arrival_wait" } else { "fixed_tick" };
+                t.publish_ns = frame.pts_ns;
+                t.encode_submit_ns = sub_ns;
+                t.first_enc_pkt_ns = first_poll_ns;
+                t.last_enc_pkt_ns = last_poll_ns;
+                t.enqueue_ns = now_ns();
+                t.frame_id = au_seq;
+                t.pts_ns = frame.pts_ns;
+                // Phase 3: the capture pipeline's stage stamps ride the frame (PipeWire fills
+                // them; other backends leave them zero).
+                let s = &frame.stage_ns;
+                if s.callback_entry_ns != 0 {
+                    t.cap_cb_entry_ns = s.callback_entry_ns;
+                    t.producer_ns = s.newest_selection_ns;
+                    t.fence_wait_start_ns = s.fence_wait_start_ns;
+                    t.fence_wait_end_ns = s.fence_wait_end_ns;
+                    t.import_end_ns = s.import_end_ns;
+                    t.depad_end_ns = s.depad_end_ns;
+                    t.convert_end_ns = s.convert_end_ns;
+                    t.cursor_end_ns = s.cursor_end_ns;
+                    t.source_meta_flags = s.source_meta_flags;
+                    t.source_meta_pts_ns = s.source_meta_pts_ns;
+                }
+            }
+            match raw_tx.try_send(RawFrame {
+                aus,
+                ts,
+                timings,
+            }) {
                 Ok(()) => {
                     sent_batches += 1;
                     au_seq = au_seq.wrapping_add(batch_len);
@@ -749,11 +859,28 @@ pub(super) fn stream_body(
         }
         // Single pacing authority: hold a steady cadence at the target rate from an absolute
         // clock. No double-sleep. If a slow frame put us behind, resync to now rather than
-        // bursting to catch up.
-        next_frame += frame_interval;
-        match next_frame.checked_duration_since(Instant::now()) {
-            Some(d) => std::thread::sleep(d),
-            None => next_frame = Instant::now(),
+        // bursting to catch up. Frame-driven mode (Phase 2, mirroring the native plane): sleep
+        // only to the rate floor, then wake on the capture's actual arrival — sampling on a
+        // free-running tick holds a frame that arrived just after the previous sample for up to
+        // a full interval (~half on average), and the arrival wake deletes that hold. The
+        // 0.9×interval floor (anchored at THIS frame's arrival, `tick + t_cap`) caps the encode
+        // rate at ~1.11× target when the source runs faster than the session; the
+        // +0.5×interval keepalive deadline keeps a static desktop re-encoding (bitrate shape,
+        // client liveness) at the same bounded cadence the fixed tick used — a source that
+        // produces nothing is never re-encoded more often than before.
+        if arrival_driven {
+            let earliest = tick + t_cap + frame_interval.mul_f32(0.9);
+            if let Some(d) = earliest.checked_duration_since(Instant::now()) {
+                std::thread::sleep(d);
+            }
+            next_frame = Instant::now() + frame_interval;
+            capturer.wait_arrival(next_frame + frame_interval.mul_f32(0.5));
+        } else {
+            next_frame += frame_interval;
+            match next_frame.checked_duration_since(Instant::now()) {
+                Some(d) => std::thread::sleep(d),
+                None => next_frame = Instant::now(),
+            }
         }
     }
     Ok(())

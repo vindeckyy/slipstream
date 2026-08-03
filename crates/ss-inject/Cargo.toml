@@ -18,6 +18,8 @@ slipstream-core = { path = "../slipstream-core", features = ["quic"] }
 ss-driver-proto = { path = "../ss-driver-proto" }
 ss-host-config = { path = "../ss-host-config" }
 ss-paths = { path = "../ss-paths" }
+# The shared frame vocabulary — `worker_qos` (Phase-7 opt-in worker scheduling) rides here.
+ss-frame = { path = "../ss-frame" }
 # The Windows gamepad-channel bootstrap reuses the IDD-push WUDFHost verification + the resident-mouse
 # compose-kick hook (both live in ss-capture).
 ss-capture = { path = "../ss-capture" }

@@ -37,7 +37,7 @@ fn note_error(e: &slipstream_core::error::SlipstreamError) {
 /// `nativeConnect`/`nativePair`, cleared on read (`""` when none). Call right after a `0`
 /// handle / `""` fingerprint.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeTakeLastError<'local>(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeTakeLastError<'local>(
     env: JNIEnv<'local>,
     _this: JObject<'local>,
 ) -> jni::sys::jstring {
@@ -52,7 +52,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeTakeLastEr
 /// Returns `"<certPem>\n-----SLIPSTREAM-KEY-----\n<keyPem>"`, or `""` on failure (logged). Kotlin
 /// persists it (Keystore-wrapped) and only calls this again when the store is genuinely empty.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeGenerateIdentity<'local>(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeGenerateIdentity<'local>(
     env: JNIEnv<'local>,
     _this: JObject<'local>,
 ) -> jni::sys::jstring {
@@ -75,7 +75,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeGenerateId
 /// creation); Kotlin's one connect choke point (`HostConnect.connectToHost`) does. The rest of the
 /// toggle rides explicit per-session parameters (`nativeStartVideo` / `nativeStartAudio`).
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSetLowLatencyMode(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSetLowLatencyMode(
     _env: JNIEnv,
     _this: JObject,
     enabled: jboolean,
@@ -122,7 +122,7 @@ fn force_parts_sysprop() -> bool {
 /// rather than timing the client out first. Returns an opaque handle, or 0 on failure.
 #[no_mangle]
 #[allow(clippy::too_many_arguments)]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeConnect<'local>(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeConnect<'local>(
     mut env: JNIEnv<'local>,
     _this: JObject<'local>,
     host: JString<'local>,
@@ -308,10 +308,10 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeConnect<'l
 /// down the connector). No-op on `0`.
 ///
 /// # Safety contract
-/// `handle` must be `0` or a live handle from [`Java_io_unom_slipstream_kit_NativeBridge_nativeConnect`],
+/// `handle` must be `0` or a live handle from [`Java_io_slipstream_kit_NativeBridge_nativeConnect`],
 /// closed exactly once and not concurrently with other calls on the same handle (Kotlin owns this).
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeClose(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeClose(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -330,10 +330,10 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeClose(
 /// plain drop / app-background keeps the linger). The handle is only BORROWED (not freed). No-op on `0`.
 ///
 /// # Safety contract
-/// `handle` must be `0` or a live handle from [`Java_io_unom_slipstream_kit_NativeBridge_nativeConnect`],
+/// `handle` must be `0` or a live handle from [`Java_io_slipstream_kit_NativeBridge_nativeConnect`],
 /// not freed / closed concurrently with this call (Kotlin still owns it and closes it via `nativeClose`).
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeDisconnectQuit(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeDisconnectQuit(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -352,7 +352,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeDisconnect
 /// presented on this connection. Valid after a successful `nativeConnect`; Kotlin pins it on a TOFU
 /// connect. `""` on a `0` handle.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeHostFingerprint<'local>(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeHostFingerprint<'local>(
     env: JNIEnv<'local>,
     _this: JObject<'local>,
     handle: jlong,
@@ -377,7 +377,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeHostFinger
 /// the user can Wake-on-LAN the host) instead of stranding them on a frozen frame. `false` on a `0`
 /// handle. Cheap (one atomic load); safe on the UI thread.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSessionEnded(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSessionEnded(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -398,7 +398,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSessionEnd
 /// `""` (logged). Blocking — Kotlin calls it off the UI thread.
 #[no_mangle]
 #[allow(clippy::too_many_arguments)]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativePair<'local>(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativePair<'local>(
     mut env: JNIEnv<'local>,
     _this: JObject<'local>,
     host: JString<'local>,

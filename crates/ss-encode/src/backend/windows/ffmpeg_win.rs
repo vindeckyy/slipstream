@@ -355,7 +355,12 @@ unsafe fn open_win_encoder(
     // D3D11/QSV below; libavcodec still uses this as `sw_pix_fmt`.
     video.set_format(Pixel::from(sw_pix_fmt));
     // Fixed rate, CBR, no B-frames, ~1-frame VBV — the shared low-latency RC contract.
-    apply_low_latency_rc(&mut video, fps, bitrate_bps);
+    apply_low_latency_rc(
+        &mut video,
+        fps,
+        bitrate_bps,
+        crate::LatencyProfile::current().config().vbv_frames,
+    );
     // SAFETY: `as_mut_ptr` hands back the `AVCodecContext` behind the `video` encoder allocated just
     // above, which outlives every write here (it is opened and returned below). The gop/colour/
     // pix_fmt stores are in-bounds scalar field writes on that live context. `device_ref` and

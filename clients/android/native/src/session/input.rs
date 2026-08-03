@@ -36,7 +36,7 @@ fn send_event(handle: jlong, kind: InputKind, code: u32, x: i32, y: i32, flags: 
 
 /// `NativeBridge.nativeSendPointerMove(handle, dx, dy)` — relative mouse motion (screen +y down).
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendPointerMove(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendPointerMove(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -52,7 +52,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendPointe
 /// region (it drops the event if that size is zero). This is the touch "direct pointing" path — the
 /// cursor jumps to the finger — and matches the Apple client's absolute touch forwarding.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendPointerAbs(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendPointerAbs(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -69,7 +69,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendPointe
 /// `NativeBridge.nativeSendPointerButton(handle, button, down)` — one button transition.
 /// `button`: GameStream id (1=left, 2=middle, 3=right, 4=X1, 5=X2). `down`: 1=press, 0=release.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendPointerButton(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendPointerButton(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -87,7 +87,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendPointe
 /// `NativeBridge.nativeSendScroll(handle, axis, delta)` — one scroll step. `axis`: 0=vertical,
 /// 1=horizontal. `delta`: signed, WHEEL_DELTA(120)-scaled, +=up/right.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendScroll(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendScroll(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -104,7 +104,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendScroll
 /// packing to MouseMoveAbs). On up only the id matters. The host injects a real touch contact
 /// (libei touchscreen / wlroots / SendInput).
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendTouch(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendTouch(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -129,7 +129,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendTouch(
 /// Virtual-Key code (0 = unmapped → dropped). `down`: 1=press, 0=release. `mods`: VK modifier
 /// bitmask (0 for now — the host folds modifiers from the L/R modifier key events themselves).
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendKey(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendKey(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -152,7 +152,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendKey(
 /// `HOST_CAP_TEXT_INPUT` (its inject backend types committed text), so the Kotlin side can pick
 /// the real IME `InputConnection` over the TYPE_NULL raw-key fallback. `0` handle → false.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeTextInputSupported(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeTextInputSupported(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -169,7 +169,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeTextInputS
 /// Kotlin side splits stylus pointers out of the touch path onto the pen plane
 /// (design/pen-tablet-input.md §7). `0` handle → false.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeHostSupportsPen(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeHostSupportsPen(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -198,7 +198,7 @@ const PEN_JNI_MAX_SAMPLES: usize = PEN_BATCH_MAX * 8;
 /// against a [`nativeHostSupportsPen`] host; the client heartbeats the last sample ≤100 ms
 /// while in range (Kotlin side — see `StylusStream`).
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendPen(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendPen(
     env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -263,9 +263,9 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendPen(
 /// `NativeBridge.nativeSendText(handle, text)` — committed IME text, one `TextInput` event per
 /// Unicode scalar (`code` = the scalar; multi-char commits are consecutive events in order).
 /// Control characters are skipped — Enter/Backspace/Tab ride the VK key path. Call only when
-/// [`Java_io_unom_slipstream_kit_NativeBridge_nativeTextInputSupported`] returned true.
+/// [`Java_io_slipstream_kit_NativeBridge_nativeTextInputSupported`] returned true.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendText(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendText(
     mut env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -297,7 +297,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendText(
 /// wire pad index `pad`. `bit`: a `gamepad::BTN_*` bit (e.g. BTN_A = 0x1000). `down`: 1=press,
 /// 0=release. `pad`: wire pad index 0..15 (rides `flags`).
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendGamepadButton(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendGamepadButton(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -319,7 +319,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendGamepa
 /// pad index `pad`. `axisId`: a `gamepad::AXIS_*` id (LS_X=0..RT=5). `value`: stick i16
 /// (−32768..32767, +y=up) or trigger 0..255. `pad`: wire pad index 0..15 (rides `flags`).
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendGamepadAxis(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendGamepadAxis(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -344,7 +344,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendGamepa
 /// it a few times against datagram loss, and an older host ignores the unknown tag (that pad then uses
 /// the session-default kind from the handshake — the pre-existing single-pad behaviour on pad 0).
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendGamepadArrival(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendGamepadArrival(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -366,7 +366,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendGamepa
 /// core stamps the per-pad seq (in the snapshot seq space, so a reordered snapshot can't resurrect the
 /// pad) and arms a re-send burst against datagram loss. An older host ignores the unknown tag.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendGamepadRemove(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendGamepadRemove(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -382,7 +382,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendGamepa
 /// `len` is clamped to the 64-byte wire body. Called from the capture thread at the controller's
 /// own report rate (~250–500 Hz) — the direct-buffer read avoids a JNI array copy per report.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendPadHidReport(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendPadHidReport(
     env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -422,7 +422,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendPadHid
 /// host's DualSense-family backends scale onto the virtual pad's touch surface. On-change only —
 /// the capture diffs, the host holds per-slot state.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendPadTouch(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendPadTouch(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -453,7 +453,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendPadTou
 /// controller's report rate.
 #[no_mangle]
 #[allow(clippy::too_many_arguments)]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSendPadMotion(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendPadMotion(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,

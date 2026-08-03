@@ -206,6 +206,42 @@ pub struct CapturedFrame {
     /// visible cursor or the pixels were already composited on the CPU de-pad path. See
     /// [`CursorOverlay`].
     pub cursor: Option<CursorOverlay>,
+    /// Per-stage capture timings (Phase 3): wall-clock ns per capture-pipeline stage, filled by
+    /// the PipeWire backend; all zero on backends without stage instrumentation. Copied into the
+    /// host's per-frame latency artifact record by the encode loop.
+    pub stage_ns: CaptureStageTimes,
+}
+
+/// Wall-clock nanosecond stamps for the capture pipeline stages (latency Phase 3). All fields are
+/// ns since the UNIX epoch; `0` = the stage did not run or is not instrumented. Filled on the
+/// capture thread (PipeWire callback); consumed by the host encode loop, which copies them into
+/// the per-frame artifact record.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CaptureStageTimes {
+    /// 1. Capture callback entry (`.process`/buffer arrival).
+    pub callback_entry_ns: u64,
+    /// 2. Newest-buffer selection complete (the frame this record describes is known).
+    pub newest_selection_ns: u64,
+    /// 3a. Implicit-fence wait start.
+    pub fence_wait_start_ns: u64,
+    /// 3b. Implicit-fence wait end (signaled or budget expired).
+    pub fence_wait_end_ns: u64,
+    /// 4. DMA-BUF / EGL / CUDA import completion (the encoder-facing surface is ready).
+    pub import_end_ns: u64,
+    /// 5. CUDA or Vulkan handoff completion (raw passthrough publish on the GPU path).
+    pub handoff_end_ns: u64,
+    /// 6a. CPU row-copy (de-pad) completion.
+    pub depad_end_ns: u64,
+    /// 6b. CPU colour conversion completion (same stage as 6a when the copy IS the conversion).
+    pub convert_end_ns: u64,
+    /// 7. Cursor composition completion.
+    pub cursor_end_ns: u64,
+    /// 8. Publish to the newest-frame slot (== the frame's `pts_ns` anchor).
+    pub publish_ns: u64,
+    /// SPA_META_Header flags when the compositor supplied the meta (0 = none).
+    pub source_meta_flags: u32,
+    /// SPA_META_Header pts when supplied (producer's clock domain; 0 = none).
+    pub source_meta_pts_ns: u64,
 }
 
 /// A captured frame still living in a DMA-BUF. Packed RGB uses one plane. Native Linux NV12

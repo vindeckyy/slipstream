@@ -11,7 +11,7 @@ use jni::JNIEnv;
 /// mDNS `mac` TXT while it was online); `lastIp` is the host's last-known IPv4 (or empty).
 /// Returns true if at least one datagram went out.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeWakeOnLan<'local>(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeWakeOnLan<'local>(
     mut env: JNIEnv<'local>,
     _this: JObject<'local>,
     macs_csv: JString<'local>,

@@ -64,7 +64,7 @@ fn mmsghdrs(iovs: &mut [libc::iovec]) -> Vec<mmsghdr> {
 /// `SLIPSTREAM_GSO=0` explicitly disables (it used to key on env *presence*, so `=0` ENABLED
 /// it here while disabling Windows USO).
 #[cfg(target_os = "linux")]
-mod gso {
+pub(crate) mod gso {
     use std::sync::atomic::{AtomicU8, Ordering};
     static STATE: AtomicU8 = AtomicU8::new(0); // 0 = uninit, 1 = on, 2 = off
 
@@ -74,6 +74,9 @@ mod gso {
             2 => false,
             _ => {
                 // Opt-in: on only when SLIPSTREAM_GSO is set to something other than "0".
+                // The 2026-07-14 A/B measured a real throughput regression on a 2.5GbE hop
+                // (2452 → 1909 Mbps, 0.4% loss), so the default stays opt-in until the netem
+                // matrix proves the trains clean on the target fabric (Phase 5 rollout gate).
                 let on = std::env::var("SLIPSTREAM_GSO").is_ok_and(|v| v != "0");
                 STATE.store(if on { 1 } else { 2 }, Ordering::Relaxed);
                 on
@@ -105,6 +108,69 @@ fn gso_unsupported(e: &std::io::Error) -> bool {
             | Some(libc::EIO)
             | Some(libc::EMSGSIZE)
     )
+}
+
+/// Capability probes for the optional pacing/NAPI surfaces (Phase 5): `SO_TXTIME` (earliest-TX
+/// / ETF pacing) and `SO_BUSY_POLL` (receive/send tail latency). Detection only — NEITHER is
+/// ever enabled here: both stay behind their own capability probe until they beat the
+/// user-space pacer on the benchmark matrix (`SO_TXTIME`/ETF and `SO_BUSY_POLL` may reduce
+/// tail latency while increasing CPU). Results are cached once per process and reported by
+/// [`pacing_capabilities`](super::pacing_capabilities).
+///
+/// The constants are the Linux socket options (`SO_TXTIME = 61`, `SO_BUSY_POLL = 46`); older
+/// libc bindings may not name them, so they are spelled here with the kernel's values.
+#[cfg(target_os = "linux")]
+mod pacing_probe {
+    use std::os::fd::AsRawFd;
+    use std::sync::OnceLock;
+
+    const SO_TXTIME: libc::c_int = 61;
+    const SO_BUSY_POLL: libc::c_int = 46;
+
+    /// Whether the kernel accepts `opt` on a fresh UDP socket. A throwaway socket: if the
+    /// option is unavailable the setsockopt fails with ENOPROTOOPT/EOPNOTSUPP; the data socket
+    /// is never touched.
+    fn option_available(fd: libc::c_int, opt: libc::c_int, value: libc::c_int) -> bool {
+        // SAFETY: `fd` is the caller's live probe socket; `&value` is a correctly-sized in-param
+        // the setsockopt copies, never written.
+        let r = unsafe {
+            libc::setsockopt(
+                fd,
+                libc::SOL_SOCKET,
+                opt,
+                &value as *const libc::c_int as *const libc::c_void,
+                std::mem::size_of::<libc::c_int>() as libc::socklen_t,
+            )
+        };
+        r == 0
+    }
+
+    pub fn probe() -> (bool, bool) {
+        static RESULT: OnceLock<(bool, bool)> = OnceLock::new();
+        *RESULT.get_or_init(|| match std::net::UdpSocket::bind("127.0.0.1:0") {
+            Ok(socket) => {
+                let fd = socket.as_raw_fd();
+                let txtime = option_available(fd, SO_TXTIME, 1);
+                let busy_poll = option_available(fd, SO_BUSY_POLL, 50); // µs — probe only
+                (txtime, busy_poll)
+            }
+            Err(_) => (false, false),
+        })
+    }
+}
+
+/// The cached [`SO_TXTIME`]/[`SO_BUSY_POLL`] capability report `(txtime, busy_poll)`. Probing
+/// happens on the first call (a throwaway socket — the data socket is never touched). The host
+/// records the report in the latency artifact; neither option is enabled by this probe.
+pub fn pacing_capabilities() -> (bool, bool) {
+    #[cfg(target_os = "linux")]
+    {
+        pacing_probe::probe()
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        (false, false)
+    }
 }
 
 /// One `sendmsg` carrying a `UDP_SEGMENT` control message: the kernel splits `buf` (a back-to-back
@@ -217,10 +283,12 @@ pub(super) fn send_gso(t: &UdpTransport, packets: &[&[u8]]) -> std::io::Result<u
     // process-wide, silently forfeiting the multi-Gbps lever over a local arithmetic slip.
     const GSO_MAX_PAYLOAD: usize = 65535 - 40 - 8;
     let max_seg = (GSO_MAX_PAYLOAD / seg).clamp(1, 64);
-    let mut scratch: Vec<u8> = Vec::with_capacity(seg * max_seg);
+    // Phase 5: the super-buffer scratch is preallocated per transport session (see
+    // `UdpTransport::gso_scratch`) — no per-send allocation on the GSO path.
+    let mut scratch = t.gso_scratch.lock().unwrap_or_else(|e| e.into_inner());
+    scratch.clear();
     let mut sent = 0usize;
     for chunk in packets.chunks(max_seg) {
-        scratch.clear();
         for p in chunk {
             scratch.extend_from_slice(p);
         }
@@ -236,6 +304,7 @@ pub(super) fn send_gso(t: &UdpTransport, packets: &[&[u8]]) -> std::io::Result<u
             }
             Err(e) => return Err(e),
         }
+        scratch.clear();
     }
     Ok(sent)
 }

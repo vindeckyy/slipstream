@@ -1,0 +1,9 @@
+{
+  "encode_us_p50": 250,
+  "encode_us_p99": 500,
+  "lat_us_p50": 4500,
+  "lat_us_p95": 6500,
+  "lat_us_p99": 9000,
+  "tx_mbps": 20,
+  "send_dropped_total": 0
+}

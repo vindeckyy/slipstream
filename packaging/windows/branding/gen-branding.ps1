@@ -3,16 +3,16 @@
   Generate the slipstream host installer branding assets (wizard BMPs + setup .ico).
 
 .DESCRIPTION
-  Renders the slipstream brand mark - the two overlapping circles ("lens") from
-  web/src/components/brand-mark.tsx (the canonical flattened geometry, shared with the Apple icon,
-  the marketing site and the docs) - into the assets Inno Setup consumes:
+  Renders the slipstream brand mark - the blue 3-swoosh S from assets/slipstream-mark.png
+  (the SS.png-derived square mark, the same one the tray icons and the web console use) - into
+  the assets Inno Setup consumes:
 
     wizard-image-*.bmp   welcome/finish page side panel (164x314 base, 100..200% DPI variants);
-                         dark violet gradient panel + the mark + the lowercase wordmark. The panel
+                         dark panel + the mark + the lowercase wordmark. The panel
                          is self-contained dark, so it reads correctly in BOTH the light and dark
                          (WizardStyle=dynamic) wizard appearances.
     wizard-small-*.bmp   header tile on the inner pages (55x55 base, 100..200% DPI variants);
-                         the square brand tile (mark on #1C1530), matching the MSIX client tile.
+                         the square brand tile (mark on black), matching the MSIX client tile.
     slipstream.ico        multi-size icon (16..256, PNG-compressed entries - Vista+ format, we
                          require Windows 10) for SetupIconFile + the Apps & Features entry.
 
@@ -28,50 +28,25 @@ param([string]$OutDir = $PSScriptRoot)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 
-# --- brand constants (colors from brand-mark.tsx; tile background from the MSIX assets) -------
-$colLight = [System.Drawing.Color]::FromArgb(255, 0xA7, 0x9F, 0xF8)   # large circle
-$colDeep = [System.Drawing.Color]::FromArgb(255, 0x6C, 0x5B, 0xF3)   # small circle
-$colHi = [System.Drawing.Color]::FromArgb(255, 0xD2, 0xC9, 0xFB)   # lens overlap highlight
-$colTile = [System.Drawing.Color]::FromArgb(255, 0x1C, 0x15, 0x30)   # brand tile background
-$colPanelTop = [System.Drawing.Color]::FromArgb(255, 0x27, 0x1E, 0x46)   # wizard panel gradient
-$colPanelBot = [System.Drawing.Color]::FromArgb(255, 0x11, 0x0D, 0x1F)
-$colText = [System.Drawing.Color]::FromArgb(255, 0xEA, 0xE6, 0xFB)   # wordmark on the panel
+# --- brand constants (colors from the SS.png-derived mark; tile background from the MSIX assets) --
+$colTile = [System.Drawing.Color]::FromArgb(255, 0x05, 0x0A, 0x0F)   # brand tile background (black)
+$colPanelTop = [System.Drawing.Color]::FromArgb(255, 0x0B, 0x12, 0x18)   # wizard panel gradient
+$colPanelBot = [System.Drawing.Color]::FromArgb(255, 0x02, 0x05, 0x08)
+$colText = [System.Drawing.Color]::FromArgb(255, 0xC9, 0xE8, 0xFB)   # wordmark on the panel
 
-# Mark geometry in the 1000-unit viewbox of brand-mark.tsx: two r=194.41 circles at (403.04,597.26)
-# (light, behind) and (597.81,402.85) (deep, in front), their intersection filled as the highlight.
-$R = 194.41
-$c1x = 403.037; $c1y = 597.262
-$c2x = 597.8075; $c2y = 402.8525
-# Mark bounding box -> center/span, so callers can place it by center + size.
-$bbMinX = $c1x - $R; $bbMaxX = $c2x + $R
-$bbMinY = $c2y - $R; $bbMaxY = $c1y + $R
-$markCx = ($bbMinX + $bbMaxX) / 2.0
-$markCy = ($bbMinY + $bbMaxY) / 2.0
-$markSpan = $bbMaxX - $bbMinX   # == $bbMaxY - $bbMinY (the bbox is square)
+# The brand mark (the blue 3-swoosh S) comes from the committed square mark PNG —
+# assets/slipstream-mark.png (SS.png-derived). Drawn onto the tile, not analytic circles.
+$markPath = Join-Path $PSScriptRoot '../../assets/slipstream-mark.png'
+$markSource = [System.Drawing.Image]::FromFile((Resolve-Path $markPath))
 
 # Draw the mark onto $g centered at ($cx,$cy) with bounding-box size $size (device pixels).
 function Draw-Mark([System.Drawing.Graphics]$g, [double]$cx, [double]$cy, [double]$size) {
-    $s = $size / $markSpan
-    function ellRect([double]$ecx, [double]$ecy) {
-        $r = $R * $s
-        [System.Drawing.RectangleF]::new(
-            [float]($cx + ($ecx - $markCx) * $s - $r), [float]($cy + ($ecy - $markCy) * $s - $r),
-            [float](2 * $r), [float](2 * $r))
-    }
-    $r1 = ellRect $c1x $c1y
-    $r2 = ellRect $c2x $c2y
-    $b = New-Object System.Drawing.SolidBrush($colLight)
-    $g.FillEllipse($b, $r1); $b.Dispose()
-    $b = New-Object System.Drawing.SolidBrush($colDeep)
-    $g.FillEllipse($b, $r2); $b.Dispose()
-    # Highlight = intersection: clip to circle 1, fill circle 2. The clip edge is not antialiased,
-    # but every caller renders 4x supersampled and downscales, which smooths it.
-    $p1 = New-Object System.Drawing.Drawing2D.GraphicsPath
-    $p1.AddEllipse($r1)
-    $g.SetClip($p1)
-    $b = New-Object System.Drawing.SolidBrush($colHi)
-    $g.FillEllipse($b, $r2); $b.Dispose()
-    $g.ResetClip(); $p1.Dispose()
+    $s = $size / $markSource.Width
+    $x = [float]($cx - $size / 2.0)
+    $y = [float]($cy - $size / 2.0)
+    $w = [float]$size
+    $h = [float]$size
+    $g.DrawImage($markSource, $x, $y, $w, $h)
 }
 
 # New 32bpp canvas + antialiased Graphics.
@@ -232,4 +207,5 @@ $bw.Dispose(); $ico.Dispose()
 $probe = New-Object System.Drawing.Icon($icoPath)
 $probe.Dispose()
 Write-Host "  wrote $icoPath ($($icoSizes -join ',')) - verified loadable"
+$markSource.Dispose()
 Write-Host "==> branding assets generated in $OutDir"

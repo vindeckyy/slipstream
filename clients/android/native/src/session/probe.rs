@@ -14,17 +14,17 @@ use jni::objects::JObject;
 use jni::sys::{jboolean, jdoubleArray, jint, jlong};
 use jni::JNIEnv;
 
-/// The `DoubleArray` [`Java_io_unom_slipstream_kit_NativeBridge_nativeProbeResult`] returns. Kept in
+/// The `DoubleArray` [`Java_io_slipstream_kit_NativeBridge_nativeProbeResult`] returns. Kept in
 /// one place because Kotlin indexes it positionally; see the Kotlin doc for the field order.
 const PROBE_RESULT_LEN: usize = 6;
 
 /// `NativeBridge.nativeSpeedTest(handle, targetKbps, durationMs): Boolean` — ask the host to burst
 /// filler at `targetKbps` of goodput for `durationMs` (each clamped host-side to ≤ 3 Gbps / ≤ 5 s),
 /// **briefly pausing video**. Non-blocking: poll
-/// [`Java_io_unom_slipstream_kit_NativeBridge_nativeProbeResult`] until its `done` element is 1.
+/// [`Java_io_slipstream_kit_NativeBridge_nativeProbeResult`] until its `done` element is 1.
 /// Starting a probe resets any prior measurement. `false` on a `0` handle or a closed session.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSpeedTest(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSpeedTest(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -55,7 +55,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeSpeedTest(
 /// Layout (doubles so one array carries both the counts and the percentages):
 /// `[done, throughputKbps, lossPct, hostDropPct, elapsedMs, recvBytes]`.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeProbeResult<'local>(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeProbeResult<'local>(
     env: JNIEnv<'local>,
     _this: JObject<'local>,
     handle: jlong,

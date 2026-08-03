@@ -320,6 +320,7 @@ mod tests {
             hdr: false,
             rfi_supported: false,
             slices: 0,
+            vbv_frames: crate::LatencyProfile::current().config().vbv_frames,
         }
     }
 
@@ -620,6 +621,9 @@ pub(super) struct LowLatencyConfig {
     /// Resolved per-frame slice count ([`resolve_slices`] — env override, else the backend
     /// default). ≤ 1 leaves the preset's single slice untouched.
     pub slices: u32,
+    /// The VBV window in frames — `LatencyProfile::LowLatency` pins it to 1; `Balanced` keeps
+    /// the env-tuned default (Phase 4).
+    pub vbv_frames: f64,
 }
 
 /// Author the shared `NV_ENC_INITIALIZE_PARAMS` (P1/ULL preset, PTD, the session dimensions/rate)
@@ -692,8 +696,10 @@ pub(super) unsafe fn apply_low_latency_config(cfg: &mut nv::NV_ENC_CONFIG, c: Lo
     // Shrink the VBV with the bitrate (NVENC validates it against the same level ceiling), but only
     // when the GPU advertises custom-VBV support — else keep the preset default.
     if c.custom_vbv {
-        // ~1-frame VBV by default; SLIPSTREAM_VBV_FRAMES scales it (parity with AMF/VAAPI/QSV).
-        let vbv = ((c.bitrate as f64 / c.fps.max(1) as f64) * crate::vbv_frames_env())
+        // ~1-frame VBV by default; `LatencyProfile::LowLatency` pins it to 1 frame, the
+        // profile's env override (`SLIPSTREAM_VBV_FRAMES`) scales it on `Balanced` — parity
+        // with AMF/VAAPI/QSV.
+        let vbv = ((c.bitrate as f64 / c.fps.max(1) as f64) * c.vbv_frames)
             .clamp(1.0, u32::MAX as f64) as u32;
         cfg.rcParams.vbvBufferSize = vbv;
         cfg.rcParams.vbvInitialDelay = vbv;

@@ -17,6 +17,60 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use spa::param::video::{VideoFormat, VideoInfoRaw};
 use spa::pod::Pod;
 
+/// Wall-clock nanoseconds since the UNIX epoch — the stage-stamp clock for the latency artifact.
+fn now_ns() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(0)
+}
+
+/// CPU de-pad buffer pool (latency Phase 3): a small ring of preallocated frame buffers, reused
+/// in strict rotation, that eliminates the per-frame `vec![0; row*h]` malloc from the steady-state
+/// CPU path. A buffer is refilled only when BOTH hold:
+///   - `pool.len()` frames have been published since it was last filled (strict rotation — so a
+///     refill happens at least `pool.len()` frame periods after the previous occupant was handed
+///     out), AND
+///   - the consumer has taken at least one frame since that fill (`taken` advanced).
+/// Under the depth-one pipeline (the documented normal state), a taken frame's pixels are read for
+/// at most ~2 frame periods (take + the ≤1-interval phase-lock hold before submit), so a buffer
+/// refilled ≥3 periods later is safe to overwrite; the take-guard additionally forbids reuse while
+/// a stalled consumer holds frames — those publishes fall back to a fresh allocation rather than
+/// risk corruption. Buffers grow (never shrink) when a larger mode arrives.
+struct TightPool {
+    bufs: Vec<Vec<u8>>,
+    next: usize,
+    taken_at_fill: Vec<u64>,
+}
+
+impl TightPool {
+    fn new() -> TightPool {
+        TightPool {
+            bufs: Vec::new(),
+            next: 0,
+            taken_at_fill: Vec::new(),
+        }
+    }
+
+    /// Take a `size`-byte zeroed buffer: a pooled one when rotation + take-guard allow, else a
+    /// fresh allocation (the safe fallback while the consumer is stalled).
+    fn get(&mut self, size: usize, taken: u64) -> Vec<u8> {
+        if !self.bufs.is_empty() {
+            for _ in 0..self.bufs.len() {
+                let i = self.next;
+                self.next = (self.next + 1) % self.bufs.len();
+                if self.taken_at_fill[i] < taken {
+                    let mut b = std::mem::take(&mut self.bufs[i]);
+                    self.taken_at_fill[i] = taken;
+                    b.resize(size, 0);
+                    return b;
+                }
+            }
+        }
+        vec![0u8; size]
+    }
+}
+
 /// Convert the configured video latency hint to PipeWire's fraction syntax.
 ///
 /// PipeWire treats `node.latency` as seconds. The host configuration already clamps this value,
@@ -98,6 +152,15 @@ struct UserData {
     /// into the first-frame-timeout retry loop; the promised renegotiation normally lands
     /// within a frame or two).
     gate_since: Option<std::time::Instant>,
+    /// The session's target frame rate (the capture mode's fps; 0 = unknown → the fence budget
+    /// falls back to its 8 ms ceiling). Phase 3: the implicit-fence wait is deadline-bounded by
+    /// `clamp(0.5 * frame_period, 2 ms, 8 ms)`.
+    fps: f64,
+    /// CPU de-pad buffer pool (see [`TightPool`]) — kills the per-frame CPU-path malloc.
+    pool: TightPool,
+    /// The in-progress stage record for the frame being consumed right now (Phase 3); published
+    /// into the `CapturedFrame` when it leaves `consume_frame`.
+    stage: ss_frame::CaptureStageTimes,
 }
 
 impl UserData {
@@ -110,6 +173,8 @@ impl UserData {
     /// slot is the truth), and a poisoned mutex is unreachable in practice (the only critical
     /// sections are a `take` and this store).
     fn publish(&self, frame: CapturedFrame) {
+        let mut frame = frame;
+        frame.stage_ns.publish_ns = now_ns();
         self.signals
             .last_frame_ns
             .store(frame.pts_ns, Ordering::Relaxed);
@@ -328,6 +393,10 @@ impl Drop for DmabufMap {
 /// via the same transparent cast libspa's `Buffer::datas_mut` performs, so the safe `Data`
 /// accessors (`.type_()`, `.chunk()`, `.data()`, `.fd()`, `.as_raw()`) keep working.
 fn consume_frame(ud: &mut UserData, spa_buf: *mut spa::sys::spa_buffer) {
+    // Phase-3 stage stamp 1: capture callback entry.
+    let stage = &mut ud.stage;
+    *stage = ss_frame::CaptureStageTimes::default();
+    stage.callback_entry_ns = now_ns();
     // No active stream: release the buffer without the (expensive at 5K) de-pad.
     if !ud.signals.active.load(Ordering::Relaxed) {
         return;
@@ -364,28 +433,94 @@ fn consume_frame(ud: &mut UserData, spa_buf: *mut spa::sys::spa_buffer) {
         return; // format not negotiated yet
     }
 
+    // Phase-3 stage stamp 2: newest-buffer selection is done — this is the frame the record
+    // describes. (The caller selected the newest drained buffer before invoking us.)
+    stage.newest_selection_ns = now_ns();
+
+    // Producer explicit-sync metadata: when the compositor stamps SPA_META_Header (pts/flags),
+    // record it on the frame (the artifact + host diagnostics surface it); the consumer-side
+    // implicit-fence wait below is retained regardless — it is the fallback that closes the
+    // NVIDIA no-explicit-sync race, and a producer that DOES timestamp still carries the fence.
+    // SAFETY: `spa_buffer_find_meta_data` scans the held buffer's metadata array for a
+    // `SPA_META_Header` of at least `size_of::<spa_meta_header>()` bytes and returns a pointer
+    // into it (or null); the size matches the struct we cast to, and the pointer stays valid
+    // while the buffer is held (until requeue). Null is handled by the guard.
+    let hdr = unsafe {
+        spa::sys::spa_buffer_find_meta_data(
+            spa_buf,
+            spa::sys::SPA_META_Header,
+            std::mem::size_of::<spa::sys::spa_meta_header>(),
+        ) as *const spa::sys::spa_meta_header
+    };
+    if !hdr.is_null() {
+        // SAFETY: `hdr` is non-null and points to a `spa_meta_header` inside the live buffer's
+        // metadata (returned for a size >= `size_of::<spa_meta_header>()`, so `.flags`/`.pts`
+        // are in bounds). Field loads while the buffer is still held, single-threaded.
+        let meta = unsafe { &*hdr };
+        stage.source_meta_flags = meta.flags;
+        stage.source_meta_pts_ns = meta.pts.max(0) as u64;
+    }
+
     // Implicit-fence wait: Mutter renders into the dmabuf and hands it over at
     // GPU-submit time; with no producer explicit sync (Mutter+NVIDIA can't) we snapshot
     // the buffer's implicit fence and wait the producer's render before sampling —
     // closing the stale/old-frame race on NVIDIA. No-op for shm buffers or drivers that
     // attach no fence. Covers both the GPU import and the CPU mmap read below.
+    //
+    // Phase 3: the wait is DEADLINE-BOUNDED — `clamp(0.5 * frame_period, 2 ms, 8 ms)` instead
+    // of the old unconditional 100 ms — and a timeout DROPS the frame (increments
+    // `fence_timeouts`, never blocks the next callback, never CPU-reads a buffer the producer
+    // may still be rendering).
     if datas[0].type_() == pw::spa::buffer::DataType::DmaBuf {
-        match ss_zerocopy::dmabuf_fence::wait_read_ready(datas[0].fd(), 100) {
+        let budget_ms = if ud.fps > 0.0 {
+            (0.5 * 1000.0 / ud.fps).clamp(2.0, 8.0) as i32
+        } else {
+            8
+        };
+        stage.fence_wait_start_ns = now_ns();
+        match ss_zerocopy::dmabuf_fence::wait_read_ready(datas[0].fd(), budget_ms) {
             Ok(outcome) => {
-                static F1: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
-                if F1.swap(false, Ordering::Relaxed) {
-                    tracing::info!(
-                        ?outcome,
-                        "dmabuf implicit-fence sync active (Signaled → driver fences the \
-                         render, race closed; NoFence → no implicit fence, zero-copy may \
-                         still show stale frames; TimedOut → fence pending past 100ms, \
-                         proceeded anyway)"
-                    );
+                stage.fence_wait_end_ns = now_ns();
+                match outcome {
+                    ss_zerocopy::dmabuf_fence::WaitOutcome::TimedOut => {
+                        ud.signals
+                            .fence_timeouts
+                            .fetch_add(1, Ordering::Relaxed);
+                        warn_once(
+                            "dmabuf implicit fence did not signal within the deadline \
+                             (clamp(0.5 frame, 2..8 ms)) — frame dropped; the producer is \
+                             still rendering this buffer",
+                        );
+                        return; // drop the frame — never read a mid-render buffer
+                    }
+                    ss_zerocopy::dmabuf_fence::WaitOutcome::Signaled => {
+                        static F1: std::sync::atomic::AtomicBool =
+                            std::sync::atomic::AtomicBool::new(true);
+                        if F1.swap(false, Ordering::Relaxed) {
+                            tracing::info!(
+                                budget_ms,
+                                "dmabuf implicit-fence sync active (Signaled → driver fences \
+                                 the render, race closed)"
+                            );
+                        }
+                    }
+                    ss_zerocopy::dmabuf_fence::WaitOutcome::NoFence => {
+                        static F2: std::sync::atomic::AtomicBool =
+                            std::sync::atomic::AtomicBool::new(true);
+                        if F2.swap(false, Ordering::Relaxed) {
+                            tracing::info!(
+                                "no implicit fence (driver attaches none) — zero-copy may \
+                                 still show stale frames without producer explicit sync"
+                            );
+                        }
+                    }
                 }
             }
             Err(e) => {
-                static F2: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
-                if F2.swap(false, Ordering::Relaxed) {
+                stage.fence_wait_end_ns = now_ns();
+                static F3: std::sync::atomic::AtomicBool =
+                    std::sync::atomic::AtomicBool::new(true);
+                if F3.swap(false, Ordering::Relaxed) {
                     tracing::warn!(
                         error = %e,
                         "dmabuf EXPORT_SYNC_FILE failed — no implicit-fence sync; NVIDIA \
@@ -451,6 +586,11 @@ fn consume_frame(ud: &mut UserData, spa_buf: *mut spa::sys::spa_buffer) {
                             .duration_since(UNIX_EPOCH)
                             .map(|d| d.as_nanos() as u64)
                             .unwrap_or(0);
+                        // Phase-3 stage stamp 5: the encoder-facing handoff is ready (the frame
+                        // leaves the capture thread as a raw dmabuf). Copy the stage out — the
+                        // publish call below borrows `ud` whole.
+                        stage.handoff_end_ns = now_ns();
+                        let stage_copy = *stage;
                         ud.publish(CapturedFrame {
                             width: w as u32,
                             height: h as u32,
@@ -471,6 +611,7 @@ fn consume_frame(ud: &mut UserData, spa_buf: *mut spa::sys::spa_buffer) {
                             // Cursor-as-metadata is blended only by RGB→NV12 backends. Gamescope
                             // embeds its pointer in the produced pixels, so native NV12 has none.
                             cursor: ud.cursor.overlay(),
+                            stage_ns: stage_copy,
                         });
                         static ONCE: std::sync::atomic::AtomicBool =
                             std::sync::atomic::AtomicBool::new(true);
@@ -581,6 +722,10 @@ fn consume_frame(ud: &mut UserData, spa_buf: *mut spa::sys::spa_buffer) {
                                 "zero-copy: dmabuf imported to CUDA (no CPU copy)"
                             );
                         }
+                        // Phase-3 stage stamp 4: the CUDA import (with any GPU CSC) is complete.
+                        // Copy the stage out — the publish call below borrows `ud` whole.
+                        stage.import_end_ns = now_ns();
+                        let stage_copy = *stage;
                         let pts_ns = SystemTime::now()
                             .duration_since(UNIX_EPOCH)
                             .map(|d| d.as_nanos() as u64)
@@ -600,6 +745,7 @@ fn consume_frame(ud: &mut UserData, spa_buf: *mut spa::sys::spa_buffer) {
                             // Cursor-as-metadata: blended by the CUDA encoder into its owned
                             // device surface. (RGB LINEAR-import case; YUV sessions blend planes.)
                             cursor: ud.cursor.overlay(),
+                            stage_ns: stage_copy,
                         });
                         return;
                     }
@@ -780,15 +926,23 @@ fn consume_frame(ud: &mut UserData, spa_buf: *mut spa::sys::spa_buffer) {
         return;
     }
     let region = &buf[region_off..region_off + size.min(avail)];
-    // De-pad into a tightly-packed buffer (chunk stride may exceed w*bpp).
-    let mut tight = vec![0u8; row * h];
+    // De-pad into a tightly-packed buffer from the pool (chunk stride may exceed w*bpp) —
+    // Phase 3: pooled instead of a per-frame `vec!`, guarded by the consumer's take count.
+    let mut tight = ud
+        .pool
+        .get(row * h, ud.signals.frames_taken.load(Ordering::Relaxed));
+    // Phase-3 stage stamp 6a: the CPU row-copy (de-pad) completion.
     for y in 0..h {
         tight[y * row..y * row + row].copy_from_slice(&region[y * stride..y * stride + row]);
     }
+    stage.depad_end_ns = now_ns();
     // Cursor-as-metadata: blit the latched pointer into the frame (no-op when hidden or when
     // the layout isn't packed RGB). This is the CPU path's counterpart to the producer's
     // hardware cursor plane, which stays out of the captured buffer.
     composite_cursor(&mut tight, w, h, fmt, &ud.cursor);
+    // Phase-3 stage stamps 6b+7: conversion (here the same call as the cursor blit) done.
+    stage.convert_end_ns = now_ns();
+    stage.cursor_end_ns = stage.convert_end_ns;
     let pts_ns = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
@@ -801,6 +955,7 @@ fn consume_frame(ud: &mut UserData, spa_buf: *mut spa::sys::spa_buffer) {
         payload: FramePayload::Cpu(tight),
         // Already composited inline into `tight` above — nothing for the encoder to blend.
         cursor: None,
+        stage_ns: *stage,
     };
     // Overwrite whatever the consumer has not taken yet — never block the pipewire loop.
     ud.publish(frame);
@@ -1017,6 +1172,9 @@ pub fn pipewire_thread(
         },
         gate_skips: 0,
         gate_since: None,
+        fps: preferred.map(|(_, _, f)| f as f64).unwrap_or(0.0),
+        pool: TightPool::new(),
+        stage: ss_frame::CaptureStageTimes::default(),
     };
 
     let node_latency = requested_node_latency();

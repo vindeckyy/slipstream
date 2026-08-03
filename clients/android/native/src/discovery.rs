@@ -8,7 +8,7 @@
 //! Wi-Fi `MulticastLock` for the browse lifetime (raw multicast *reception* needs it) and owns the
 //! permission UX; this module owns the socket + resolve.
 //!
-//! Shape: [`Java_io_unom_slipstream_kit_NativeBridge_nativeDiscoveryStart`] spins up a
+//! Shape: [`Java_io_slipstream_kit_NativeBridge_nativeDiscoveryStart`] spins up a
 //! [`ServiceDaemon`] browsing `_slipstream._udp.local.` on a background thread that folds
 //! resolve/remove events into a shared map; Kotlin polls `nativeDiscoveryPoll` ~1 Hz for a
 //! newline-joined snapshot and calls `nativeDiscoveryStop` to tear it down. Polling (not a JVM
@@ -199,9 +199,9 @@ fn resolve(info: &ResolvedService) -> Option<Host> {
 /// handle, or `0` on failure (logged). Pair with exactly one [`nativeDiscoveryStop`]. Kotlin must
 /// hold the Wi-Fi `MulticastLock` for the browse lifetime.
 ///
-/// [`nativeDiscoveryStop`]: Java_io_unom_slipstream_kit_NativeBridge_nativeDiscoveryStop
+/// [`nativeDiscoveryStop`]: Java_io_slipstream_kit_NativeBridge_nativeDiscoveryStop
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeDiscoveryStart(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeDiscoveryStart(
     _env: JNIEnv,
     _this: JObject,
 ) -> jlong {
@@ -215,7 +215,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeDiscoveryS
 /// newline-joined records of `key␟name␟addr␟port␟fp␟pair␟mac␟os` (`␟` = U+001F). Empty string = no hosts /
 /// `0` handle. Poll ~1 Hz from the UI thread (cheap: a mutex lock + string build).
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeDiscoveryPoll<'local>(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeDiscoveryPoll<'local>(
     env: JNIEnv<'local>,
     _this: JObject<'local>,
     handle: jlong,
@@ -243,10 +243,10 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeDiscoveryP
 /// `handle` must be `0` or a live handle from [`nativeDiscoveryStart`], stopped exactly once and not
 /// concurrently with [`nativeDiscoveryPoll`] (Kotlin owns this; all calls are on the main thread).
 ///
-/// [`nativeDiscoveryStart`]: Java_io_unom_slipstream_kit_NativeBridge_nativeDiscoveryStart
-/// [`nativeDiscoveryPoll`]: Java_io_unom_slipstream_kit_NativeBridge_nativeDiscoveryPoll
+/// [`nativeDiscoveryStart`]: Java_io_slipstream_kit_NativeBridge_nativeDiscoveryStart
+/// [`nativeDiscoveryPoll`]: Java_io_slipstream_kit_NativeBridge_nativeDiscoveryPoll
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeDiscoveryStop(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeDiscoveryStop(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,

@@ -82,7 +82,7 @@ mod cursor_fwd;
 /// The capture→encode→send data plane (plan §W1); `serve_session` dispatches the synthetic or
 /// virtual source here (`synthetic_stream` / `virtual_stream`) and hands the latter a
 /// `SessionContext`. `reconfig_allowed` gates mid-stream live reconfigure.
-mod stream;
+pub(crate) mod stream;
 use stream::{reconfig_allowed, synthetic_stream, virtual_stream, SessionContext};
 
 /// One client session (plan §W1); `serve` spawns [`serve::serve_session`] per accepted connection.

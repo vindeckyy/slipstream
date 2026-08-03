@@ -96,6 +96,86 @@ int main(void) {
         failures++;
     }
 
+    /* --- SlipstreamStatsV2: append-only surface (Phase 1b latency telemetry) --- */
+    if (slipstream_stats_v2_size() != sizeof(SlipstreamStatsV2)) {
+        fprintf(stderr, "FAIL: stats v2 size %zu != C sizeof %zu\n",
+                (size_t)slipstream_stats_v2_size(), sizeof(SlipstreamStatsV2));
+        failures++;
+    }
+    if (slipstream_stats_v2_version() != 1) {
+        fprintf(stderr, "FAIL: stats v2 version %u != 1\n", slipstream_stats_v2_version());
+        failures++;
+    }
+
+    /* Small-buffer contract: an embedder with a 16-byte view (header only) still gets
+     * struct_size/version filled and NOTHING beyond its out_len. */
+    SlipstreamStatsV2 prefix;
+    memset(&prefix, 0xAB, sizeof(prefix));
+    rc = slipstream_get_stats_v2(client, &prefix, 16);
+    if (rc != SLIPSTREAM_STATUS_OK) {
+        fprintf(stderr, "FAIL: stats v2 prefix get rc=%d\n", (int)rc);
+        failures++;
+    }
+    if (prefix.struct_size != (uint64_t)slipstream_stats_v2_size()) {
+        fprintf(stderr, "FAIL: stats v2 prefix struct_size=%llu want %llu\n",
+                (unsigned long long)prefix.struct_size,
+                (unsigned long long)slipstream_stats_v2_size());
+        failures++;
+    }
+    if (prefix.version != 1) {
+        fprintf(stderr, "FAIL: stats v2 prefix version=%u want 1\n", prefix.version);
+        failures++;
+    }
+    if (prefix.frames_submitted != 0xABABABABABABABABULL) {
+        fprintf(stderr, "FAIL: stats v2 wrote past the 16-byte prefix\n");
+        failures++;
+    }
+
+    /* Full-size read: shared fields must agree with the SlipstreamStats snapshot, and the
+     * Phase-1 counters must be readable (default 0 until later phases populate them). */
+    SlipstreamStatsV2 st2;
+    memset(&st2, 0, sizeof(st2));
+    rc = slipstream_get_stats_v2(client, &st2, sizeof(st2));
+    if (rc != SLIPSTREAM_STATUS_OK) {
+        fprintf(stderr, "FAIL: stats v2 get rc=%d\n", (int)rc);
+        failures++;
+    }
+    if (st2.struct_size != (uint64_t)slipstream_stats_v2_size() || st2.version != 1) {
+        fprintf(stderr, "FAIL: stats v2 header struct_size=%llu version=%u\n",
+                (unsigned long long)st2.struct_size, st2.version);
+        failures++;
+    }
+    if (st2.frames_completed != st.frames_completed ||
+        st2.packets_received != st.packets_received ||
+        st2.packets_dropped != st.packets_dropped ||
+        st2.fec_recovered_shards != st.fec_recovered_shards ||
+        st2.bytes_received != st.bytes_received) {
+        fprintf(stderr, "FAIL: stats v2 shared fields diverge from SlipstreamStats\n");
+        failures++;
+    }
+    printf("stats v2: struct_size=%llu version=%u stale=%llu backpressure=%llu rejections=%llu\n",
+           (unsigned long long)st2.struct_size, st2.version,
+           (unsigned long long)st2.frames_stale_dropped,
+           (unsigned long long)st2.frames_backpressure_dropped,
+           (unsigned long long)st2.send_rejections);
+
+    /* Guard rails: null out / undersized out_len / null session. */
+    rc = slipstream_get_stats_v2(client, NULL, sizeof(st2));
+    if (rc != SLIPSTREAM_STATUS_INVALID_ARG) {
+        fprintf(stderr, "FAIL: stats v2 null out rc=%d want INVALID_ARG\n", (int)rc);
+        failures++;
+    }
+    rc = slipstream_get_stats_v2(client, &st2, 15);
+    if (rc != SLIPSTREAM_STATUS_INVALID_ARG) {
+        fprintf(stderr, "FAIL: stats v2 out_len=15 rc=%d want INVALID_ARG\n", (int)rc);
+        failures++;
+    }
+    rc = slipstream_get_stats_v2(NULL, &st2, sizeof(st2));
+    if (rc != SLIPSTREAM_STATUS_NULL_POINTER) {
+        fprintf(stderr, "FAIL: stats v2 null session rc=%d want NULL_POINTER\n", (int)rc);
+        failures++;
+    }
+
     free(buf);
     slipstream_session_free(host);
     slipstream_session_free(client);

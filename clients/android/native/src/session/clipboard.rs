@@ -41,7 +41,7 @@ fn client(handle: jlong) -> Option<&'static SessionHandle> {
 
 /// `NativeBridge.nativeClipSupported(handle)` — the host advertised `HOST_CAP_CLIPBOARD`.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeClipSupported(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeClipSupported(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -54,7 +54,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeClipSuppor
 /// `NativeBridge.nativeClipControl(handle, enabled)` — session-level opt-in/out. Nothing
 /// clipboard-related happens on either side until an `enabled: true` crosses.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeClipControl(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeClipControl(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -69,7 +69,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeClipContro
 /// text" (format list only; bytes cross when the host fetches). `seq` is Kotlin's monotonic
 /// counter, newest wins.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeClipOfferText(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeClipOfferText(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -89,7 +89,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeClipOfferT
 /// `NativeBridge.nativeClipFetchText(handle, seq)` — pull the text of the host's offer `seq`.
 /// Returns the transfer id echoed on the matching `data:`/`error:` event, or −1.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeClipFetchText(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeClipFetchText(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -107,7 +107,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeClipFetchT
 /// `NativeBridge.nativeClipServeText(handle, reqId, text)` — answer a `fetch:` event with the
 /// clipboard's current text (the host is pasting our offer).
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeClipServeText(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeClipServeText(
     mut env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -126,7 +126,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeClipServeT
 
 /// `NativeBridge.nativeClipCancel(handle, id)` — abort a transfer (either direction).
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeClipCancel(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeClipCancel(
     _env: JNIEnv,
     _this: JObject,
     handle: jlong,
@@ -145,7 +145,7 @@ pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeClipCancel
 /// clipboard task delivers a whole payload in ONE event (`last = true`), so a chunk boundary
 /// can never split a UTF-8 sequence.
 #[no_mangle]
-pub extern "system" fn Java_io_unom_slipstream_kit_NativeBridge_nativeNextClip(
+pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeNextClip(
     env: JNIEnv,
     _this: JObject,
     handle: jlong,

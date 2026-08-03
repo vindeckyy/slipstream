@@ -297,6 +297,12 @@ pub struct EncoderCaps {
     /// `USER_FLAG_RECOVERY_POINT` on every Nth emitted AU, re-phased at each IDR). 0 when intra-refresh
     /// is off. Only consulted when [`intra_refresh_recovery`](Self::intra_refresh_recovery) is set.
     pub intra_refresh_period: u32,
+    /// The encoder emits **ordered sub-frame output** (slice readback while the frame is still
+    /// encoding — direct-NVENC `reportSliceOffsets` + sub-frame write). The slice-streaming
+    /// path may engage only when this is advertised; `LatencyProfile::LowLatency` gates on it
+    /// explicitly (Phase 4), never assuming a backend's slice behavior. `false` = complete-AU
+    /// delivery only.
+    pub subframe_output: bool,
     /// The encoder composites [`CapturedFrame::cursor`] into the picture it encodes.
     ///
     /// `open_video`'s `cursor_blend` argument is a REQUEST, and for most of this crate's life it was
@@ -548,9 +554,8 @@ pub(crate) fn vbv_frames_env() -> f64 {
 /// crate-wide `allow(dead_code)` gone (WP0.3) an item unused in ANY feature combination is a hard
 /// error — this is dead on every Windows leg.
 #[cfg(all(target_os = "linux", feature = "vulkan-encode"))]
-pub(crate) fn vbv_window_ms(fps: u32) -> (u32, u32) {
-    let frames = vbv_frames_env();
-    let ms = (frames * 1000.0 / fps.max(1) as f64).round();
+pub(crate) fn vbv_window_ms(fps: u32, vbv_frames: f64) -> (u32, u32) {
+    let ms = (vbv_frames * 1000.0 / fps.max(1) as f64).round();
     // `f64 as u32` saturates at the bounds in Rust, so an absurd `SLIPSTREAM_VBV_FRAMES` cannot wrap.
     let window = (ms as u32).max(1);
     (window, window / 2)

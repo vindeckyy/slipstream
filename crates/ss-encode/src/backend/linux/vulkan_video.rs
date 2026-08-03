@@ -1134,7 +1134,10 @@ impl VulkanVideoEncoder {
         let (rc_mode, vbv_ms) = if vbr {
             (
                 vk::VideoEncodeRateControlModeFlagsKHR::VBR,
-                crate::vbv_window_ms(fps),
+                crate::vbv_window_ms(
+                    fps,
+                    crate::LatencyProfile::current().config().vbv_frames,
+                ),
             )
         } else {
             (

@@ -21,6 +21,10 @@ use ss_frame::{CapturedFrame, PixelFormat};
 mod codec;
 pub use codec::*;
 
+/// The unified latency policy applied by every encoder backend (Phase 4).
+pub mod profile;
+pub use profile::{LatencyProfile, ProfileConfig};
+
 impl Codec {
     /// The `quic` codec bitfield the host can currently **emit** on the slipstream/1 native path,
     /// given the resolved encode backend — the same GPU-aware advertisement GameStream builds for
@@ -290,7 +294,11 @@ impl Encoder for TrackedEncoder {
     // Forwarded for the same reason as `set_wire_chunking` above — an unforwarded default here
     // would silently leave the in-place backends pipelining past the capturer's ring.
     fn set_input_ring_depth(&mut self, depth: usize) {
-        self.inner.set_input_ring_depth(depth)
+        // Phase 4: `LowLatency` caps the encoder's input ring at one — no hidden frame queue
+        // behind the encoder to absorb a slow backend (a slow backend must instead be handled
+        // by ABR, never by deepening the pipeline).
+        self.inner
+            .set_input_ring_depth(depth.min(LatencyProfile::current().config().max_input_depth))
     }
     fn poll(&mut self) -> Result<Option<EncodedFrame>> {
         self.inner.poll()

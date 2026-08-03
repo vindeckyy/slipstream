@@ -56,16 +56,27 @@ impl NativeAudioEnc {
 /// path) → `AUDIO_MAGIC` datagrams, at the negotiated `channels` (2 stereo / 6 = 5.1 / 8 = 7.1,
 /// canonical wire order FL FR FC LFE RL RR SL SR). QUIC already encrypts; no extra layer. The
 /// capturer comes from (and returns to) the persistent slot — see [`AudioCapSlot`].
+///
+/// Latency plan Phase 8: the sink ring is capped by the measured transport state — 2 buffered
+/// Opus frames on LAN, 3 on WAN — and stale audio is dropped during recovery instead of replayed
+/// (an old frame is latency, not audio). Each Opus frame is one datagram (one frame per packet).
+/// A periodic telemetry line records the negotiated quantum, ring occupancy, underruns, and
+/// playout age — audio health is never inferred from the video latency statistic.
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 pub(super) fn audio_thread(
     conn: quinn::Connection,
     stop: Arc<AtomicBool>,
     audio_cap: AudioCapSlot,
     channels: u8,
+    transport_policy: Arc<crate::transport_state::TransportPolicyShared>,
 ) {
     use crate::audio::SAMPLE_RATE;
     const FRAME_MS: usize = 5;
     const SAMPLES_PER_FRAME: usize = SAMPLE_RATE as usize * FRAME_MS / 1000; // 240
+    // Phase 8 ring cap (in Opus frames): 2 on LAN, 3 on WAN — the standing-audio budget. The
+    // cap is read per drain so a transport-state change applies immediately.
+    const RING_CAP_LAN: usize = 2;
+    const RING_CAP_WAN: usize = 3;
     let want = slipstream_core::audio::normalize_channels(channels);
 
     // Reuse the cached capturer ONLY when its channel count matches this session's; a stereo
@@ -109,6 +120,10 @@ pub(super) fn audio_thread(
     // Sized for the largest surround frame (7.1 HQ ≈ 1.3 KB at 5 ms); ample for normal quality.
     let mut opus_buf = vec![0u8; 4096];
     let mut seq: u32 = 0;
+    // Phase 8: bounded ring of full Opus frames awaiting send (the state-dependent cap). When
+    // the capturer delivers a burst, older frames are dropped (drop-oldest) so the standing
+    // audio age stays inside the transport state's budget.
+    let mut ring: std::collections::VecDeque<Vec<f32>> = std::collections::VecDeque::with_capacity(RING_CAP_WAN + 1);
     // Reopen-with-backoff: hold the capturer in an Option so a mid-session capture-thread death
     // (device unplug, daemon restart) — or a first open lost to session-start churn above —
     // reopens instead of muting the rest of a multi-hour session. A quiet sink is NOT a death —
@@ -120,6 +135,10 @@ pub(super) fn audio_thread(
     // A stuck Opus encoder would fail on every 5 ms frame (~200/s); power-of-two throttle the
     // warn so it can't flood stderr + the log ring while still surfacing that it's failing.
     let mut opus_encode_errs: u64 = 0;
+    // Phase 8 telemetry accumulators + cadence.
+    let underruns: u64 = 0;
+    let mut overflow_dropped: u64 = 0;
+    let mut last_telemetry = std::time::Instant::now();
     if capturer.is_some() {
         tracing::info!(
             channels = want,
@@ -138,6 +157,7 @@ pub(super) fn audio_thread(
                     capturer = Some(c);
                     last_failed = None;
                     acc.clear(); // drop the partial frame straddling the gap
+                    ring.clear(); // and any stale audio queued before the gap
                 }
                 Err(e) => {
                     tracing::debug!(error = %format!("{e:#}"), "audio reopen failed — will retry");
@@ -153,12 +173,28 @@ pub(super) fn audio_thread(
                 tracing::warn!(error = %format!("{e:#}"), "audio capture lost — reopening");
                 capturer = None;
                 last_failed = Some(std::time::Instant::now());
+                ring.clear(); // stale audio dies with the capture — never replay it
                 continue;
             }
         };
         acc.extend_from_slice(&chunk);
         while acc.len() >= frame_len {
             let frame: Vec<f32> = acc.drain(..frame_len).collect();
+            ring.push_back(frame);
+            // The transport-state-dependent ring cap: WAN keeps 3 frames, LAN 2, and the
+            // budget shrinks as the measured state tightens (drop-oldest = the stale tail).
+            let cap = if transport_policy.fec_floor() >= 10 {
+                RING_CAP_WAN
+            } else {
+                RING_CAP_LAN
+            };
+            while ring.len() > cap {
+                ring.pop_front();
+                overflow_dropped += 1;
+            }
+        }
+        // Drain the ring into Opus datagrams — one Opus frame per packet, in order.
+        while let Some(frame) = ring.pop_front() {
             let pts_ns = now_ns();
             match enc.encode_float(&frame, &mut opus_buf) {
                 Ok(n) => {
@@ -181,6 +217,26 @@ pub(super) fn audio_thread(
                 }
             }
         }
+        // Phase 8: periodic audio-health line — quantum, ring occupancy, underruns, playout
+        // age. The ring is normally empty here (drained above), so `ring_len` is the standing
+        // burst left after a congested drain; playout age is approximated from the overflow
+        // drops and the current frame age. Recorded separately from video latency.
+        if last_telemetry.elapsed() >= std::time::Duration::from_secs(5) {
+            let tel = capturer
+                .as_ref()
+                .map(|c| c.telemetry())
+                .unwrap_or_default();
+            tracing::info!(
+                quantum_ms = format_args!("{:.1}", tel.quantum_ms),
+                ring_len = ring.len(),
+                ring_samples = tel.ring_samples,
+                underruns = underruns.saturating_add(tel.underruns),
+                overflow_dropped = overflow_dropped.saturating_add(tel.overflow_dropped),
+                playout_age_ms = format_args!("{:.1}", tel.playout_age_ms),
+                "audio health (Phase 8)"
+            );
+            last_telemetry = std::time::Instant::now();
+        }
     }
     // Park the live capturer for the next session (None if it died and never reopened),
     // releasing its session-scoped routing claim (Linux: the default sink moves back;
@@ -199,6 +255,7 @@ pub(super) fn audio_thread(
     _stop: Arc<AtomicBool>,
     _audio_cap: AudioCapSlot,
     _channels: u8,
+    _transport_policy: Arc<crate::transport_state::TransportPolicyShared>,
 ) {
     tracing::warn!("slipstream/1 audio requires Linux or Windows — session continues without it");
 }

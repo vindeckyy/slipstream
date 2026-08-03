@@ -3,15 +3,16 @@ import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages";
 
-// The slipstream lens, alive. The two overlapping circles of the brand mark are
-// recreated from divs and animated as if orbiting on a path whose long axis points
-// INTO the screen, so depth is the dominant motion: each circle surges toward and
-// away from the viewer in antiphase, passing in front of and behind the other.
+// A stylized spin on the slipstream S-swoosh, alive. The two lobes of the brand
+// mark are recreated from divs (in the brand-blue palette) and animated as if
+// orbiting on a path whose long axis points INTO the screen, so depth is the
+// dominant motion: each lobe surges toward and away from the viewer in antiphase,
+// passing in front of and behind the other.
 //
 // The 3D is faked in JS (a perspective `scale()` + a `z-index` derived from depth)
-// rather than CSS `preserve-3d` — because `mix-blend-mode` (which gives the lens
-// its glowing overlap) flattens a preserve-3d context in some browsers, killing
-// both the scaling and the front/back swap. Honours prefers-reduced-motion.
+// rather than CSS `preserve-3d` — because `mix-blend-mode` (which gives the glow
+// overlap) flattens a preserve-3d context in some browsers, killing both the
+// scaling and the front/back swap. Honours prefers-reduced-motion.
 // Size via className (e.g. `size-8`); geometry derives from the box.
 
 const DURATION_MS = 1600;

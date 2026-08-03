@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Generate the slipstream-tray status icons (committed, like the other branding assets).
 
-Renders the brand mark — the two overlapping circles ("lens") from web's brand-mark.tsx, the
-same geometry gen-branding.ps1 uses — with a status dot in the lower-right corner:
+Renders the brand mark — the blue 3-swoosh S from assets/slipstream-mark.png (SS.png-derived)
+— with a status dot in the lower-right corner:
 
   running    colored mark + green dot
   stopped    grayscale mark + gray dot
@@ -16,30 +16,17 @@ Outputs (all checked in; re-run only when the brand or the palette changes):
   packaging/linux/icons/hicolor/{22x22,48x48}/apps/slipstream-tray[-<state>].png
                                                           (running is the unsuffixed base name)
 
-Pure stdlib (zlib PNG writer, analytic 4x-supersampled rasterizer) so it runs on any dev box —
-no PIL/ImageMagick/librsvg needed.
+Pure stdlib (zlib PNG writer + mark sampling from the committed mark PNG) so it runs on any
+dev box — no PIL/ImageMagick/librsvg needed. The mark PNG is read once and supersampled with
+the same analytic 4x rasterizer the circle mark used.
 """
 
-import math
 import struct
 import zlib
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-
-# Brand-mark geometry in its 1000-unit viewbox (brand-mark.tsx; mirrors gen-branding.ps1).
-R = 194.41
-C1 = (403.037, 597.262)  # light circle, behind
-C2 = (597.8075, 402.8525)  # deep circle, in front
-BB_MIN = (C1[0] - R, C2[1] - R)
-BB_MAX = (C2[0] + R, C1[1] + R)
-MARK_CENTER = ((BB_MIN[0] + BB_MAX[0]) / 2, (BB_MIN[1] + BB_MAX[1]) / 2)
-MARK_SPAN = BB_MAX[0] - BB_MIN[0]  # the bbox is square
-
-COL_LIGHT = (0xA7, 0x9F, 0xF8)
-COL_DEEP = (0x6C, 0x5B, 0xF3)
-COL_HI = (0xD2, 0xC9, 0xFB)
-RING = (0x1C, 0x15, 0x30)  # dot outline, the brand tile background
+MARK = REPO / "assets/slipstream-mark.png"
 
 STATES = {
     "running": {"dot": (0x2E, 0xCC, 0x71), "gray": False},
@@ -55,58 +42,102 @@ def luma(c):
     return (y, y, y)
 
 
-def render(size, dot_rgb, gray, ss=4):
-    """RGBA rows, 4x supersampled: mark centered upper-left-ish, dot lower-right."""
+def load_mark_rgba():
+    """Parse the committed mark PNG into a (w, h, [r,g,b,a ...]) tuple (stdlib zlib)."""
+    data = MARK.read_bytes()
+    assert data[:8] == b"\x89PNG\r\n\x1a\n", "not a PNG"
+    pos, w, h, idat = 8, 0, 0, b""
+    while pos < len(data):
+        (length,) = struct.unpack(">I", data[pos : pos + 4])
+        tag = data[pos + 4 : pos + 8]
+        payload = data[pos + 8 : pos + 8 + length]
+        if tag == b"IHDR":
+            w, h, depth, color = struct.unpack(">IIBB", payload[:10])
+            assert depth == 8 and color in (6, 2), f"unsupported PNG ({depth}bit/{color})"
+        elif tag == b"IDAT":
+            idat += payload
+        elif tag == b"IEND":
+            break
+        pos += 12 + length
+    raw = zlib.decompress(idat)
+    stride = w * 4
+    # RGBA (color 6) or RGB (color 2) → flat RGBA list.
+    px = []
+    for y in range(h):
+        row = raw[y * (stride + 1) + 1 : (y + 1) * (stride + 1)]
+        for x in range(w):
+            i = x * 4
+            if color == 6:
+                px.extend(row[i : i + 4])
+            else:
+                px.extend((row[i], row[i + 1], row[i + 2], 255))
+    return w, h, px
+
+
+def sample_mark(mark, mx, my):
+    """Nearest-sample the mark RGBA at normalized (0..1) coords; None when transparent."""
+    w, h, px = mark
+    xi = min(int(mx * w), w - 1)
+    yi = min(int(my * h), h - 1)
+    i = (yi * w + xi) * 4
+    a = px[i + 3]
+    if a < 40:
+        return None
+    return (px[i], px[i + 1], px[i + 2])
+
+
+def render(size, dot_rgb, gray, ss=2):
+    """RGBA rows: the S-swoosh mark as a crisp solid glyph + a plain status dot.
+
+    A 2x supersample with a hard alpha threshold keeps the shape clean at 22/48 px (the
+    4x + soft edges of the mark PNG read as noise at tray size). The dot is a plain circle
+    with no dark ring — the ring only muddied it at small sizes.
+    """
     n = size * ss
+    mark = load_mark_rgba()
+    w, h, px = mark
+    def alpha_at(x, y):
+        return px[(y * w + x) * 4 + 3]
+    minx = next((x for x in range(w) if any(alpha_at(x, y) > 60 for y in range(h))), 0)
+    maxx = next((x for x in range(w - 1, -1, -1) if any(alpha_at(x, y) > 60 for y in range(h))), w - 1)
+    miny = next((y for y in range(h) if any(alpha_at(x, y) > 60 for x in range(w))), 0)
+    maxy = next((y for y in range(h - 1, -1, -1) if any(alpha_at(x, y) > 60 for x in range(w))), h - 1)
+    span = max(maxx - minx, maxy - miny)
+    cx = (minx + maxx) / 2 / w
+    cy = (miny + maxy) / 2 / h
+    cw = span / w
+    ch = span / h
     mark_c = (0.44 * n, 0.44 * n)
-    scale = (0.82 * n) / MARK_SPAN
     dot_c = (0.76 * n, 0.76 * n)
-    dot_r = 0.21 * n
-    ring_r = dot_r + max(0.055 * n, 1.0 * ss)
-    c_light = luma(COL_LIGHT) if gray else COL_LIGHT
-    c_deep = luma(COL_DEEP) if gray else COL_DEEP
-    c_hi = luma(COL_HI) if gray else COL_HI
-    c1 = (mark_c[0] + (C1[0] - MARK_CENTER[0]) * scale, mark_c[1] + (C1[1] - MARK_CENTER[1]) * scale)
-    c2 = (mark_c[0] + (C2[0] - MARK_CENTER[0]) * scale, mark_c[1] + (C2[1] - MARK_CENTER[1]) * scale)
-    r = R * scale
+    dot_r = 0.20 * n
+    fill = luma((0x09, 0xA0, 0xE8)) if gray else (0x09, 0xA0, 0xE8)
 
     rows = []
     for y in range(size):
         row = bytearray()
         for x in range(size):
-            # Premultiplied accumulation over the ss×ss sample grid (no fringe on the rim).
-            ar = ag = ab = aa = 0.0
+            hit = False
             for sy in range(ss):
                 for sx in range(ss):
-                    px = x * ss + sx + 0.5
-                    py = y * ss + sy + 0.5
-                    d1 = math.hypot(px - c1[0], py - c1[1])
-                    d2 = math.hypot(px - c2[0], py - c2[1])
-                    dd = math.hypot(px - dot_c[0], py - dot_c[1])
-                    col = None
+                    px_ = x * ss + sx + 0.5
+                    py_ = y * ss + sy + 0.5
+                    dd = ((px_ - dot_c[0]) ** 2 + (py_ - dot_c[1]) ** 2) ** 0.5
                     if dd < dot_r:
+                        hit = True
                         col = dot_rgb
-                    elif dd < ring_r:
-                        col = RING
-                    elif d1 < r and d2 < r:
-                        col = c_hi
-                    elif d2 < r:
-                        col = c_deep
-                    elif d1 < r:
-                        col = c_light
-                    if col is not None:
-                        ar += col[0]
-                        ag += col[1]
-                        ab += col[2]
-                        aa += 255.0
-            samples = ss * ss
-            a = aa / samples
-            if a < 1.0:
+                        break
+                    mx = (px_ - mark_c[0]) / (0.80 * n) * cw + cx
+                    my = (py_ - mark_c[1]) / (0.80 * n) * ch + cy
+                    if 0.0 <= mx <= 1.0 and 0.0 <= my <= 1.0 and sample_mark(mark, mx, my) is not None:
+                        hit = True
+                        col = fill
+                        break
+                if hit:
+                    break
+            if not hit:
                 row += b"\x00\x00\x00\x00"
             else:
-                row += bytes(
-                    (round(ar / aa * 255), round(ag / aa * 255), round(ab / aa * 255), round(a))
-                )
+                row += bytes((*col, 255))
         rows.append(bytes(row))
     return rows
 

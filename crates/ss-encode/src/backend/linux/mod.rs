@@ -344,7 +344,12 @@ impl NvencEncoder {
         video.set_height(height);
         video.set_format(nvenc_pixel); // NVENC converts RGB→YUV internally
                                        // Fixed rate, CBR, no B-frames, ~1-frame VBV — the shared low-latency RC contract.
-        apply_low_latency_rc(&mut video, fps, bitrate_bps);
+        apply_low_latency_rc(
+            &mut video,
+            fps,
+            bitrate_bps,
+            crate::LatencyProfile::current().config().vbv_frames,
+        );
         // Infinite GOP — NO periodic IDR. A keyframe at 5120x1440 is ~20-40x a P-frame, so a
         // periodic IDR is a recurring multi-millisecond encode+packetize+send spike — the ~2s
         // "freeze". NVENC emits one IDR at stream start, then P-frames only; `forced-idr` (below)
@@ -1151,6 +1156,7 @@ mod hdr_tests {
             format: PixelFormat::X2Rgb10,
             payload: FramePayload::Cpu(bytes),
             cursor: None,
+            stage_ns: ss_frame::CaptureStageTimes::default(),
         };
         let mut au = None;
         for _ in 0..30 {
