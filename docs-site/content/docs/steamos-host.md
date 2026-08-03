@@ -1,32 +1,32 @@
 ---
 title: "SteamOS (Host)"
-description: "Run a Slipstream host on SteamOS — stream its Game Mode (or desktop) to your other devices. One script, built on-device and ABI-matched to SteamOS."
+description: "Run a Slipstream host on SteamOS, stream its Game Mode (or desktop) to your other devices. One script, built on-device and ABI-matched to SteamOS."
 ---
 
-This is for using a **SteamOS device as the host** — streaming *from* it to a laptop, TV, phone, or
-another device. (For the usual case — streaming *to* a Steam Deck — see [Install a Client](/docs/install-client),
+This is for using a **SteamOS device as the host**, streaming *from* it to a laptop, TV, phone, or
+another device. (For the usual case, streaming *to* a Steam Deck, see [Install a Client](/docs/install-client),
 which uses the Flatpak + Decky plugin.)
 
-We support SteamOS as a host mainly with an eye to the **upcoming Steam Machine** — a living-room,
+We support SteamOS as a host mainly with an eye to the **upcoming Steam Machine**, a living-room,
 desktop-class SteamOS box is a natural always-on streaming host. The **Steam Deck** is the SteamOS
 device we can test on today, so it's what these instructions are validated against; the same
 on-device build works on any SteamOS 3 system.
 
-> New here? Read [Security & Safe Use](/docs/security) first — a streaming host is remote control of
+> New here? Read [Security & Safe Use](/docs/security) first, a streaming host is remote control of
 > the machine, so keep it on a trusted LAN or VPN and require pairing.
 
 SteamOS is an immutable, read-only Arch base, so the host isn't a system package. Instead a single
 script builds the host **natively inside a Debian-trixie distrobox** (ABI-matched to SteamOS's
-FFmpeg/glibc — the binary then runs natively on SteamOS) and wires it up as systemd user services.
+FFmpeg/glibc, the binary then runs natively on SteamOS) and wires it up as systemd user services.
 Building on-device means a rebuild always matches the running OS, so a SteamOS update can't leave you
 with a binary linked against the wrong libraries. Encode is auto-detected: **Vulkan Video** on the
 Deck's AMD GPU (with libav **VAAPI** as the fallback), **NVENC** on NVIDIA. The installer writes
-`RADV_PERFTEST=video_encode` into `~/.config/slipstream/host.env` — Van Gogh's RADV driver hides
+`RADV_PERFTEST=video_encode` into `~/.config/slipstream/host.env`, Van Gogh's RADV driver hides
 Vulkan encode behind that flag, and without it sessions quietly fall back to VAAPI. Set
 `SLIPSTREAM_VULKAN_ENCODE=0` in `host.env` to force the libav VAAPI path.
 
 > **Heads up:** in our testing the Steam Deck's WiFi *tx* topped out around ~250 Mbps of goodput
-> regardless of band — enough for 1080p/1440p60, not 4K. This looked like a hardware/driver
+> regardless of band, enough for 1080p/1440p60, not 4K. This looked like a hardware/driver
 > packet-rate limit rather than a bandwidth ceiling, but it's one device measured on one network:
 > other SteamOS hardware, newer drivers, or a less congested band may do better. A wired dock
 > sidesteps it entirely. See [Configuration](/docs/configuration) for bitrate guidance.
@@ -41,15 +41,15 @@ Vulkan encode behind that flag, and without it sessions quietly fall back to VAA
   ```
   Without it the installer runs, but skips every root step: gamepad passthrough, `vhci-hcd`, the
   UDP buffer tuning, the atomic-update keep list and linger.
-- **Run the installer on a real terminal** — Konsole in Desktop Mode, or `ssh -t`. A
+- **Run the installer on a real terminal**, Konsole in Desktop Mode, or `ssh -t`. A
   non-interactive ssh session has no TTY for the `sudo` prompt, and the same steps get skipped.
 - **distrobox** installed (no root needed). If `distrobox` isn't found:
   ```sh
   curl -sfL https://raw.githubusercontent.com/89luca89/distrobox/main/install | sh -s -- --prefix ~/.local
   ```
   Make sure `~/.local/bin` is on your `PATH` (re-open the terminal).
-- The first build downloads a container image + toolchain (~1 GB) and takes ~10–15 minutes, then
-  another ~5–10 minutes for the HDR gamescope build (a second set of dependencies plus a fresh
+- The first build downloads a container image + toolchain (~1 GB) and takes ~10-15 minutes, then
+  another ~5-10 minutes for the HDR gamescope build (a second set of dependencies plus a fresh
   gamescope clone). Budget around 25 minutes for a first install. Later rebuilds are incremental,
   and the gamescope step is a no-op unless its sources changed.
 
@@ -67,16 +67,16 @@ git clone https://github.com/vindeckyy/slipstream ~/slipstream
 bash ~/slipstream/scripts/steamdeck/install.sh
 ```
 
-It is idempotent — safe to re-run. In one pass it:
+It is idempotent, safe to re-run. In one pass it:
 
 1. creates the `pf2` Debian-trixie distrobox and installs the build toolchain,
 2. builds `slipstream-host`, the web console, and the **plugin/script runner** (so the console's
-   [plugin store](/docs/plugins) works out of the box — the runner service itself stays opt-in),
+   [plugin store](/docs/plugins) works out of the box, the runner service itself stays opt-in),
 3. writes config to `~/.config/slipstream/` (a generated web-console login password),
 4. raises the UDP socket buffers to 32 MB, installs the gamepad udev rule + the `vhci-hcd` autoload
    and adds you to the `input` group (virtual gamepads / **native Steam Deck controller passthrough**),
    seeds the KDE RemoteDesktop grant for Desktop-mode input, and **registers all of it on SteamOS's
-   atomic-update keep list** so OS updates carry it over — the installer asks for your `sudo`
+   atomic-update keep list** so OS updates carry it over, the installer asks for your `sudo`
    password **first, before the long build**, so you can authorise once and walk away,
 5. installs + starts the `slipstream-host` and `slipstream-web` **systemd user services** (with linger,
    so they run without a login session) plus a boot-time **rebuild check** that repairs the host
@@ -86,24 +86,24 @@ Useful flags:
 
 | Flag | Effect |
 |------|--------|
-| `--open` | Accept **unpaired** clients (trust-on-first-use) — convenient on a fully trusted LAN. Default is PIN pairing required. |
-| `--no-gamestream` | Run a **secure native-only** host — skip the GameStream/Moonlight-compat planes (see below). Default keeps them on so stock Moonlight works. |
+| `--open` | Accept **unpaired** clients (trust-on-first-use), convenient on a fully trusted LAN. Default is PIN pairing required. |
+| `--no-gamestream` | Run a **secure native-only** host, skip the GameStream/Moonlight-compat planes (see below). Default keeps them on so stock Moonlight works. |
 | `--no-web` | Skip the management web console. |
-| `--src=DIR` | Build from source at `DIR` instead of `~/slipstream`. **Only if you must** — the post-OS-update rebuild check and the web console's one-click update both look for `~/slipstream/scripts/steamdeck/update.sh`, so with a relocated source you have to update by hand: `SLIPSTREAM_SRC=DIR bash DIR/scripts/steamdeck/update.sh --pull` (without `SLIPSTREAM_SRC` the script still looks for `~/slipstream`). A symlink (`ln -s DIR ~/slipstream`) restores both. |
+| `--src=DIR` | Build from source at `DIR` instead of `~/slipstream`. **Only if you must**, the post-OS-update rebuild check and the web console's one-click update both look for `~/slipstream/scripts/steamdeck/update.sh`, so with a relocated source you have to update by hand: `SLIPSTREAM_SRC=DIR bash DIR/scripts/steamdeck/update.sh --pull` (without `SLIPSTREAM_SRC` the script still looks for `~/slipstream`). A symlink (`ln -s DIR ~/slipstream`) restores both. |
 
 When it finishes it prints the web-console URL and how to pair.
 
 > **GameStream/Moonlight compat is on by default.** The native `slipstream/1` plane (used by
-> Slipstream's own clients — SPAKE2 PIN pairing, per-direction AEAD) is **always on** and is the secure
+> Slipstream's own clients, SPAKE2 PIN pairing, per-direction AEAD) is **always on** and is the secure
 > path. The installer also enables the **GameStream/Moonlight-compat planes** so stock
-> [Moonlight](/docs/moonlight) works — but those carry inherent on-path weaknesses (pairing over plain
+> [Moonlight](/docs/moonlight) works, but those carry inherent on-path weaknesses (pairing over plain
 > HTTP; legacy control encryption that can reuse GCM nonces), so enable them only on a **trusted LAN**.
 > If you only ever use native clients, install with `--no-gamestream` for a host with no GameStream
 > surface at all.
 
-> **First install — reboot once before streaming.** KWin only authorizes Desktop-mode screen capture
+> **First install, reboot once before streaming.** KWin only authorizes Desktop-mode screen capture
 > on a fresh session, and the new `input` group (native Steam Deck controller passthrough) only takes
-> effect on a new login — so after the **first** install, **reboot the Deck** (a re-run that changes
+> effect on a new login, so after the **first** install, **reboot the Deck** (a re-run that changes
 > nothing doesn't need it). Streaming **Game Mode** with a generic Xbox pad works right away; **Desktop
 > capture and the native Steam Deck controller need the reboot.** If a client connects and every
 > session ends with `KWin does not expose zkde_screencast_unstable_v1` or the pad shows up as an Xbox
@@ -114,7 +114,7 @@ When it finishes it prints the web-console URL and how to pair.
 By default the host **requires PIN pairing** (secure). Two ways to pair:
 
 - **Web console** (printed at the end of step 2): open `https://<device-ip>:47992` (self-signed host
-  cert — your browser warns once; trust it and continue),
+  cert, your browser warns once; trust it and continue),
   [arm pairing](/docs/web-console#arm-pairing), and enter the PIN on your client.
 - **From the client directly**: pick this host (it advertises over mDNS as `_slipstream._udp`) and
   enter the PIN the host shows.
@@ -142,8 +142,8 @@ attach-vs-managed detail and known limits.
 
 ## HDR (10-bit BT.2020 PQ)
 
-The installer also builds `slipstream-gamescope` — gamescope plus the small patch that adds the
-10-bit PQ formats to its capture node (see [HDR on gamescope](/docs/gamescope#hdr-on-gamescope)) —
+The installer also builds `slipstream-gamescope`, gamescope plus the small patch that adds the
+10-bit PQ formats to its capture node (see [HDR on gamescope](/docs/gamescope#hdr-on-gamescope)), 
 and points the host at it. Nothing to configure: with it in place, a 10-bit-capable client with
 HDR enabled streams true HDR10 from Game Mode; anything missing and the session streams 8-bit SDR
 instead (never a mislabelled picture). Check what the host resolved with:
@@ -153,31 +153,31 @@ instead (never a mislabelled picture). Check what the host resolved with:
   ~/slipstream/target-steamos/release/slipstream-host hdr-probe )
 ```
 
-Run it exactly like this — the probe reads its answers from the environment, and `host.env` is what
+Run it exactly like this, the probe reads its answers from the environment, and `host.env` is what
 the service runs with (including which gamescope the host uses). A bare shell doesn't have it, so
 the probe would describe an environment your host never runs in.
 
 The build is best-effort: if it fails, the installer says so loudly and everything else keeps
-working in SDR — re-run `update.sh` to retry. `SLIPSTREAM_GAMESCOPE_HDR=0` in
+working in SDR, re-run `update.sh` to retry. `SLIPSTREAM_GAMESCOPE_HDR=0` in
 `~/.config/slipstream/host.env` forces SDR deliberately.
 
 ## Updating
 
 Two ways, and both keep your config and pairings.
 
-**From the web console (easiest).** The Updates card shows an **Update now** button — no opt-in and
+**From the web console (easiest).** The Updates card shows an **Update now** button, no opt-in and
 no root, because this install is owned by your own user. It asks for the console password, then
 rebuilds on the device, so expect several minutes; the card shows progress and the full log lands in
 `~/.config/slipstream/logs/update-steamos.log`. See [Updating](/docs/updating).
 
-**From a terminal.** One command — `--pull` fetches the new source first:
+**From a terminal.** One command, `--pull` fetches the new source first:
 
 ```sh
 bash ~/slipstream/scripts/steamdeck/update.sh --pull
 ```
 
 Drop `--pull` if you rsync source in yourself. `update.sh` also retrofits anything a newer installer
-adds — the plugin runner, the HDR gamescope, the atomic-update keep list, the rebuild check — onto an
+adds, the plugin runner, the HDR gamescope, the atomic-update keep list, the rebuild check, onto an
 older install.
 
 > **This install follows the canary channel.** An on-device source build tracks `main`, not stable
@@ -193,14 +193,14 @@ git -C ~/slipstream checkout v0.22.3      # any release tag
 bash ~/slipstream/scripts/steamdeck/update.sh
 ```
 
-That leaves the checkout on a detached tag, where `git pull` has no branch to fast-forward — so a
+That leaves the checkout on a detached tag, where `git pull` has no branch to fast-forward, so a
 later `update.sh --pull`, **and the console's Update now button** (which runs exactly that), stops
 with *"You are not currently on a branch."* Run `git -C ~/slipstream checkout main` first when you
 want to follow `main` again.
 
 ## Uninstalling
 
-There is no uninstall script — the install is spread across your user session and a few root-owned
+There is no uninstall script, the install is spread across your user session and a few root-owned
 files, so remove it in that order. Stop and forget the services first:
 
 ```sh
@@ -238,7 +238,7 @@ sudo udevadm control --reload-rules
 ```
 
 Two things are deliberately left alone. `~/.config/slipstream/` holds your identity certificate,
-paired devices and the console password — delete it only if you're not coming back:
+paired devices and the console password, delete it only if you're not coming back:
 
 ```sh
 rm -rf ~/.config/slipstream
@@ -246,29 +246,29 @@ rm -rf ~/.config/slipstream
 
 And the installer may have seeded a KDE RemoteDesktop portal grant at
 `~/.local/share/flatpak/db/kde-authorized` (only if you had none); remove that file if nothing
-else on the device relies on it. Your `input` group membership is harmless to keep — drop it with
+else on the device relies on it. Your `input` group membership is harmless to keep, drop it with
 `sudo gpasswd -d "$USER" input` if you'd rather not.
 
 See [Uninstalling](/docs/uninstall) for the other install methods and what each one leaves behind.
 
 ## Notes & limits
 
-- **Single session at a time** at custom resolutions — two clients requesting different modes will
+- **Single session at a time** at custom resolutions, two clients requesting different modes will
   thrash the managed session. Pick one mode per session.
 - **Keep the device awake.** On handhelds, Game Mode auto-suspends on idle, which drops the host off
-  the network mid stream — disable auto-suspend (Settings → Power) for a headless host.
+  the network mid stream, disable auto-suspend (Settings -> Power) for a headless host.
 - **Native Steam Deck controller passthrough** presents the client's pad as a real Steam Deck
-  controller (paddles, trackpads, gyro) via a virtual USB device — that needs the `input` group and the
+  controller (paddles, trackpads, gyro) via a virtual USB device, that needs the `input` group and the
   `vhci-hcd` module live, so it only works **after the first-install reboot** above; until then the pad
   degrades to a generic Xbox 360 controller (still fully playable). If you're streaming *to* another
-  Steam Deck, also set Steam Input to **Off** for Slipstream on that Deck — see
+  Steam Deck, also set Steam Input to **Off** for Slipstream on that Deck, see
   [Stream to a Steam Deck](/docs/steam-deck).
-- **It survives OS updates — automatically.** SteamOS A/B updates rebuild `/etc` and can move
+- **It survives OS updates, automatically.** SteamOS A/B updates rebuild `/etc` and can move
   library versions; the installer defends both sides. The system tuning (gamepad udev rule,
   `vhci-hcd`, UDP buffers) is registered on SteamOS's own atomic-update keep list
   (`/etc/atomic-update.conf.d/`), so updates carry it over; and a boot-time check
   (`slipstream-rebuild-check`) probes the host binary and re-runs the build only if the new OS
-  actually broke its library links — you should never need to intervene. (Re-running `update.sh`
+  actually broke its library links, you should never need to intervene. (Re-running `update.sh`
   by hand still works and is harmless.)
 - Deeper reference (services, container, manual steps): [`scripts/steamdeck/README.md`](https://github.com/vindeckyy/slipstream/blob/main/scripts/steamdeck/README.md).
 

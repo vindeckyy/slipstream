@@ -36,7 +36,7 @@ reports.
   scrape of a physical screen.
 - **GPU-first encode.** Zero-copy where the platform allows (dmabuf / CUDA / Vulkan / NVENC, plus
   AMF/QSV and software fallbacks).
-- **Self-filling library.** Steam and plugins (ROM Manager, Playnite, VirtualHere, …) from the
+- **Self-filling library.** Steam and plugins (ROM Manager, Playnite, VirtualHere, ...) from the
   console Plugin store or `slipstream-host plugins add`.
 - **PIN pairing, no accounts.** SPAKE2 once, then pinned identities. mDNS discovery on the LAN.
 
@@ -45,7 +45,7 @@ reports.
 | Piece | State |
 |-------|-------|
 | `slipstream-core` + C ABI | Complete |
-| GameStream → Moonlight | Live (opt-in `--gamestream` on trusted LAN) |
+| GameStream -> Moonlight | Live (opt-in `--gamestream` on trusted LAN) |
 | `slipstream/1` native path | Live |
 | Windows host | Beta (signed installer) |
 | Apple / Linux / Android / Windows clients | Streaming |
@@ -110,12 +110,12 @@ clients have their own toolchains (see each client's README).
 crates/
   slipstream-core/   protocol · FEC · crypto · QUIC · C ABI
   slipstream-host/   host: displays · capture · encode · GameStream · slipstream/1 · mgmt
-  ss-*               capture, encode, inject, vdisplay, client-core, presenter, …
+  ss-*               capture, encode, inject, vdisplay, client-core, presenter, ...
 clients/             apple · linux · session · windows · android · cli · probe · decky
 web/                 TanStack management console
 api/openapi.json     mgmt OpenAPI (from `slipstream-host openapi`)
 docs-site/           Fumadocs documentation
-packaging/           distro + Windows installer + winget + Flatpak + …
+packaging/           distro + Windows installer + winget + Flatpak + ...
 include/             slipstream_core.h
 ```
 

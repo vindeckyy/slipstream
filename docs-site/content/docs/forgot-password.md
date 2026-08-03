@@ -1,6 +1,6 @@
 ---
 title: Forgot your Password?
-description: Where the Slipstream web console login password lives — and how to read or reset it — on each host platform.
+description: Where the Slipstream web console login password lives, and how to read or reset it, on each host platform.
 ---
 
 The Slipstream **web console** (status, paired devices, PIN pairing) is protected by a login
@@ -10,7 +10,7 @@ it on the host machine itself.
 
 New to the console? See [The Web Console](/docs/web-console) to enable it and arm pairing.
 
-> This is **only** the web console login. It is **not** your client/device pairing — if a client
+> This is **only** the web console login. It is **not** your client/device pairing, if a client
 > won't connect, that's [Pairing](/docs/pairing), not this password.
 
 ## Find your host
@@ -25,7 +25,7 @@ Find your host platform for exactly where the password lives, then read it back 
 
 ## Read it back, or set your own
 
-The password is stored on the host as a `SLIPSTREAM_UI_PASSWORD=…` line, so you can read it straight
+The password is stored on the host as a `SLIPSTREAM_UI_PASSWORD=...` line, so you can read it straight
 out of the file. On the **Linux packages** and the **SteamOS host**:
 
 ```sh
@@ -50,7 +50,7 @@ The login screen says **"Wrong password."** for every failure, including two tha
 with the password you typed.
 
 - **Too many attempts.** Five wrong guesses from the same device are free; every one after that
-  arms a lockout that doubles — a second, two, four — up to **five minutes**. While it holds, even
+  arms a lockout that doubles, a second, two, four, up to **five minutes**. While it holds, even
   the correct password is refused. Wait it out, or clear it at once by restarting the console (the
   lockout is only kept in the console's memory):
 
@@ -62,7 +62,7 @@ with the password you typed.
   slipstream-host service restart
   ```
 
-  (The PowerShell one is Windows, from an **elevated** prompt — the console runs under the
+  (The PowerShell one is Windows, from an **elevated** prompt, the console runs under the
   Slipstream Host service there.)
 - **No password is configured at all.** If the file is missing or empty, the console shows the
   first-run setup screen. Choose a password there. On older Linux installs you can intentionally

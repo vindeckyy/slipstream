@@ -13,14 +13,14 @@ them are in [Client settings](/docs/client-settings#input).
 On the Linux and Windows clients the stream runs in its own session window. Input is **captured**
 when the stream starts and whenever you click the video: your local cursor disappears and keys go to
 the host instead of your desktop. In the default mouse mode the pointer is also locked to the
-window — see [Mouse modes](#mouse-modes) below.
+window, see [Mouse modes](#mouse-modes) below.
 
 | Shortcut | What it does |
 |---|---|
 | **Ctrl+Alt+Shift+Q** | Release captured input (press again, or click the stream, to take it back) |
 | **Ctrl+Alt+Shift+M** | Switch the mouse mode (capture ⇄ desktop) |
 | **Ctrl+Alt+Shift+D** | Disconnect |
-| **Ctrl+Alt+Shift+S** | Cycle the [stats overlay](/docs/stats) — off · compact · normal · detailed |
+| **Ctrl+Alt+Shift+S** | Cycle the [stats overlay](/docs/stats), off · compact · normal · detailed |
 | **Ctrl+Alt+Shift+V** | Mute or unmute your microphone |
 | **F11** or **Alt+Enter** | Toggle fullscreen |
 
@@ -32,7 +32,7 @@ Ctrl+Alt+Shift+D disconnects · Ctrl+Alt+Shift+S stats
 ```
 
 With a controller in use the same hint names the controller chord instead of the mouse-mode and
-stats entries. The full list is always available without a stream running — see below.
+stats entries. The full list is always available without a stream running, see below.
 
 ### Muting your microphone
 
@@ -44,7 +44,7 @@ While you are muted a **Microphone muted** badge sits in the top-right corner of
 is deliberately separate from the [stats overlay](/docs/stats): it shows even with stats off,
 because "am I still muted?" is a question you ask ten minutes later.
 
-The mute lasts for that stream only — the next session starts unmuted, and nothing is written to
+The mute lasts for that stream only, the next session starts unmuted, and nothing is written to
 your settings. If the stream isn't sending a microphone at all (**Stream microphone** off in
 [client settings](/docs/client-settings#audio)) the shortcut does nothing and no badge appears,
 rather than pretending to mute something.
@@ -64,7 +64,7 @@ to one readable line.
 ### On the other clients
 
 - **macOS** honours the release, mouse-mode, disconnect and stats combos, written
-  **⌃⌥⇧Q / M / D / S** — but not the microphone mute. **⌘⎋** also toggles capture,
+  **⌃⌥⇧Q / M / D / S**, but not the microphone mute. **⌘⎋** also toggles capture,
   **⌃⌘F** toggles fullscreen, and **⌃⌥⇧C** starts or stops [clipboard sharing](/docs/clipboard). The
   **Stream** menu lists them all except the mouse-mode combo, which works but has no menu item.
 - **iPhone and iPad** with a hardware keyboard: **⌃⌥⇧Q** releases input while it is captured, and
@@ -74,7 +74,7 @@ to one readable line.
 - **Android and Android TV** honour **Ctrl+Alt+Shift+Q** only; it toggles pointer capture. The
   system Back button leaves the stream.
 - **Apple TV** has no keyboard path, and a short press of the Siri Remote's Back button deliberately
-  does nothing — so a controller's B button can't end your session by accident. To leave, **hold
+  does nothing, so a controller's B button can't end your session by accident. To leave, **hold
   Back for about a second and let go**. During a session the remote's touch surface drives the host
   cursor, a press is a left click, and Play/Pause is a right click.
 
@@ -83,30 +83,30 @@ to one readable line.
 Every client reserves one controller chord: **L1 + R1 + Start + Select** (LB + RB + Start + Back on
 an Xbox pad), held on any connected pad.
 
-- **Linux, Windows** — a press releases captured input, and leaves fullscreen if you didn't start
+- **Linux, Windows**, a press releases captured input, and leaves fullscreen if you didn't start
   fullscreen. Keep it held about 1.5 seconds and it disconnects.
-- **Steam Deck** — a press releases captured input only. The Decky plugin always launches the client
+- **Steam Deck**, a press releases captured input only. The Decky plugin always launches the client
   fullscreen, and a stream that started fullscreen stays that way. Holding disconnects, as above.
-- **macOS, iPhone/iPad, Apple TV** — holding it about 1.5 seconds disconnects. There is no
+- **macOS, iPhone/iPad, Apple TV**, holding it about 1.5 seconds disconnects. There is no
   quick-press step.
-- **Android** — holding it about a second disconnects. A quick press does nothing; the moment the
-  chord completes a **Hold to quit…** cue appears so you know it registered.
+- **Android**, holding it about a second disconnects. A quick press does nothing; the moment the
+  chord completes a **Hold to quit...** cue appears so you know it registered.
 
 ## Mouse modes
 
 There are two, and they are a per-client setting called **Mouse input**:
 
-- **Capture (games)** — the pointer locks to the stream and only relative movement is sent. The only
+- **Capture (games)**, the pointer locks to the stream and only relative movement is sent. The only
   cursor you see is the host's. This is what mouse-look in a game needs. The session window also
   grabs the keyboard here, so Alt+Tab and the Windows key (Super on Linux) reach the host rather than
-  your own desktop — turn **Capture system shortcuts** off in
+  your own desktop, turn **Capture system shortcuts** off in
   [client settings](/docs/client-settings#input) to keep them local.
-- **Desktop (absolute)** — the pointer is not locked. It moves in and out of the stream freely and
-  its position is sent as an absolute point — what you want for remote desktop work. Your local
+- **Desktop (absolute)**, the pointer is not locked. It moves in and out of the stream freely and
+  its position is sent as an absolute point, what you want for remote desktop work. Your local
   cursor is hidden over the stream; the one you see there is the host's.
 
 **Capture is the default** on the Linux, Windows and macOS clients. **Android defaults to Desktop**
-— a phone or TV is more often driven by touch or a pad than by a locked mouse.
+, a phone or TV is more often driven by touch or a pad than by a locked mouse.
 
 Switch live with **Ctrl+Alt+Shift+M** (**⌃⌥⇧M** on macOS), whether input is captured or not. On
 Android, Ctrl+Alt+Shift+Q flips the capture instead. The picker is macOS-only among the Apple apps;
@@ -125,11 +125,11 @@ overrides that until the host's intent next changes. The macOS client ignores th
 On a touchscreen client the **Touch input** setting picks one of three models. All three exist on
 Android, iPhone/iPad, Linux and Windows.
 
-- **Trackpad** (the default) — your finger drives the host cursor like a laptop touchpad. The cursor
+- **Trackpad** (the default), your finger drives the host cursor like a laptop touchpad. The cursor
   stays put when you touch down and moves by your finger's travel, so you can lift and re-swipe to
   walk it across a screen far larger than your own.
-- **Direct pointer** — the cursor jumps to your finger and follows it.
-- **Touch passthrough** — every finger is forwarded as a real touch contact, with no gesture
+- **Direct pointer**, the cursor jumps to your finger and follows it.
+- **Touch passthrough**, every finger is forwarded as a real touch contact, with no gesture
   interpretation at all. Only useful for apps and games that genuinely understand touch.
 
 Trackpad and Direct pointer share one gesture vocabulary: tap = left click, two-finger tap = right
@@ -144,8 +144,8 @@ Touch passthrough depends on the host being able to inject touch, and that varie
 |---|---|
 | KDE Plasma (KWin), GNOME | Full multi-touch |
 | Windows 10 1809 and newer | Full multi-touch |
-| Sway, Hyprland and other wlroots compositors | Not injected — contacts are dropped |
-| gamescope Gaming Mode | Degraded to a single absolute pointer — see [gamescope](/docs/gamescope) |
+| Sway, Hyprland and other wlroots compositors | Not injected, contacts are dropped |
+| gamescope Gaming Mode | Degraded to a single absolute pointer, see [gamescope](/docs/gamescope) |
 
 On GNOME/Mutter, Slipstream uses a virtual Linux touchscreen when Mutter's direct EIS session
 does not expose a touchscreen device. This needs the same `/dev/uinput` access used by virtual
@@ -168,7 +168,7 @@ plane, so drawing and handwriting behave the way they do locally.
 - **iPhone and iPad** with an Apple Pencil, including hover. The Pencil has no hardware eraser or
   barrel buttons, so a **double-tap** is sent as barrel button 2, and on iOS 17.5 or newer a
   **squeeze** is sent as barrel button 1. Pencil Pro's barrel roll also needs iOS 17.5.
-- **Android** phones and tablets with an active stylus — pressure, tilt, hover, the eraser tool and
+- **Android** phones and tablets with an active stylus, pressure, tilt, hover, the eraser tool and
   both barrel buttons. Android exposes no barrel-roll axis, so roll is not sent from there.
 - **[Moonlight](/docs/moonlight) clients** that send pen events reach the same host-side pen.
 
@@ -179,18 +179,18 @@ The Linux, Windows, macOS and Apple TV clients do not send stylus input.
 - On **Linux**, a virtual tablet named **Slipstream Pen** appears the first time you use the stylus
   and is removed when the session ends. Applications see a real pen through the usual tablet path,
   so Krita, GIMP and Xournal++ treat it as a graphics tablet. It is a screen tablet, mapped by your
-  compositor's own default tablet mapping — correct on a single output; multi-monitor pinning is up
+  compositor's own default tablet mapping, correct on a single output; multi-monitor pinning is up
   to the compositor.
 - On **Windows**, a per-session synthetic pen pointer feeds Windows' normal pen system: pressure,
   tilt, rotation, the barrel button and the eraser. This needs **Windows 10 1809 or newer**.
 
 **Before touch passthrough and pen input can work on Linux**, the host needs access to
-`/dev/uinput` — the same `input` group step the virtual gamepads need, covered under
+`/dev/uinput`, the same `input` group step the virtual gamepads need, covered under
 [After installing](/docs/install#after-installing). Without it, GNOME falls back to a single
 pointer and the host never offers pen input.
 
 **If the host is too old, or pen is switched off**, nothing breaks: the client keeps folding the
-stylus into its ordinary touch or pointer path. You can still draw — just without pressure and tilt.
+stylus into its ordinary touch or pointer path. You can still draw, just without pressure and tilt.
 Whether pen splits out is decided by the host, not by your touch mode: you can be in Trackpad mode
 and still draw with full fidelity.
 

@@ -1,30 +1,30 @@
 ---
 title: Bazzite
-description: Set up a Slipstream host on Bazzite — it follows the box between Steam Gaming Mode (gamescope) and the KDE Plasma desktop automatically.
+description: Set up a Slipstream host on Bazzite, it follows the box between Steam Gaming Mode (gamescope) and the KDE Plasma desktop automatically.
 ---
 
-[Bazzite](https://bazzite.gg/) already ships everything a Slipstream host needs — the NVIDIA driver,
+[Bazzite](https://bazzite.gg/) already ships everything a Slipstream host needs, the NVIDIA driver,
 NVENC, PipeWire, **gamescope**, and the **KDE Plasma desktop**. So a Bazzite host is the most
 "appliance-like" setup, and it streams **both** of Bazzite's faces:
 
-- **Steam Gaming Mode** (gamescope) — the couch/handheld game UI.
-- **The KDE Plasma desktop** — the full desktop you get from "Switch to Desktop".
+- **Steam Gaming Mode** (gamescope), the couch/handheld game UI.
+- **The KDE Plasma desktop**, the full desktop you get from "Switch to Desktop".
 
-The host **auto-detects which one is live and follows the box across the switch** — including
+The host **auto-detects which one is live and follows the box across the switch**, including
 mid-stream. You flip between Gaming Mode and Desktop with Bazzite's normal Steam UI /
 "Switch to Desktop"; the host just re-targets whatever's running and keeps streaming. Nothing in
 `host.env` forces a mode.
 
 > Ideal for a dedicated game-streaming box that you also occasionally want as a remote desktop. For a
 > pure desktop machine, install on [Ubuntu](/docs/ubuntu) or [Fedora](/docs/fedora) and configure the
-> [KDE](/docs/kde) or [GNOME](/docs/gnome) desktop directly — simpler.
+> [KDE](/docs/kde) or [GNOME](/docs/gnome) desktop directly, simpler.
 
-> New here? Read [Security & Safe Use](/docs/security) first — a streaming host is remote control of
+> New here? Read [Security & Safe Use](/docs/security) first, a streaming host is remote control of
 > the machine, so keep it on a trusted LAN or VPN and require pairing.
 
 ## Install
 
-The host installs as a **systemd system extension (sysext)** — no `rpm-ostree` layering. The
+The host installs as a **systemd system extension (sysext)**, no `rpm-ostree` layering. The
 Bazzite docs treat layering as a last resort (layered packages slow every OS update and can block
 upgrades until removed); a sysext never enters an rpm-ostree transaction: it overlays `/usr`
 read-only from `/var/lib/extensions/`, survives OS updates, installs and updates **without a
@@ -40,10 +40,10 @@ sudo bash slipstream-sysext.sh install          # add `--channel canary` if you 
 
 That installs from a sysext feed when you have one configured, or you can build the image locally
 with `packaging/bazzite/build-sysext.sh` and install with
-`sudo bash slipstream-sysext.sh install --from-file …`. See
+`sudo bash slipstream-sysext.sh install --from-file ...`. See
 [`packaging/bazzite/README.md`](https://github.com/vindeckyy/slipstream/blob/main/packaging/bazzite/README.md).
 When a feed is used, the checksum manifest is OpenPGP-signed (public key baked into the script), and
-`slipstream-sysext` checks that signature before it trusts a single checksum — so it needs `gpg` on
+`slipstream-sysext` checks that signature before it trusts a single checksum, so it needs `gpg` on
 the box, and it refuses a feed it can't verify.
 
 The plugin runner rides along in the image but isn't started: run
@@ -66,7 +66,7 @@ systemctl --user restart slipstream-host
 ```
 
 To **switch channel** later, re-run the install: `sudo slipstream-sysext install --channel canary`
-(or `--channel stable`). `update` takes no channel flag — it follows whatever the last install wrote
+(or `--channel stable`). `update` takes no channel flag, it follows whatever the last install wrote
 to `/etc/slipstream-sysext.conf`. To be able to **go back** to a build that worked, keep a copy of the
 image before you update, and re-install that file afterwards:
 
@@ -75,12 +75,12 @@ sudo cp /var/lib/extensions/slipstream.raw ~/slipstream-known-good.raw   # befor
 sudo slipstream-sysext install --from-file ~/slipstream-known-good.raw   # to go back to it
 ```
 
-The web console can also run the update for you — see [Updating the Host](/docs/updating), which
+The web console can also run the update for you, see [Updating the Host](/docs/updating), which
 needs the one-time `sudo usermod -aG slipstream-update $USER`.
 
 `remove` deletes the image and the `/etc` files it seeded (the tray autostart entry, and the
 gamescope session drop-in unless you've edited it), but three things it created outside `/usr` stay
-behind. To clear those too — services first, because once the image unmerges their binaries are
+behind. To clear those too, services first, because once the image unmerges their binaries are
 gone and the units just keep failing:
 
 ```sh
@@ -95,8 +95,8 @@ clients.
 
 Three things to know:
 
-- **After a Bazzite major rebase** (Fedora 43 → 44) the old image **refuses to load** rather than
-  run against mismatched system libraries — run `sudo slipstream-sysext update` once and it fetches
+- **After a Bazzite major rebase** (Fedora 43 -> 44) the old image **refuses to load** rather than
+  run against mismatched system libraries, run `sudo slipstream-sysext update` once and it fetches
   the image built for the new base.
 - **Already layering Slipstream?** Install the sysext (it shadows the layered copy immediately),
   then drop the layer so it stops slowing your updates:
@@ -105,21 +105,21 @@ Three things to know:
   feed predates signing; it gets sealed on the next publish. To install from it anyway, accepting
   that the images are unauthenticated, run
   `sudo env SLIPSTREAM_SYSEXT_ALLOW_UNSIGNED=1 bash slipstream-sysext.sh install`. The other message,
-  `the feed's SHA256SUMS is NOT signed by the expected key`, is not the same thing — don't install;
+  `the feed's SHA256SUMS is NOT signed by the expected key`, is not the same thing, don't install;
   re-download the script and try again.
 
 For a fully baked appliance image there's also a **bootc** Containerfile that installs RPMs you
-point it at during image-build time — see `packaging/bootc/` in the repo. Plain `rpm-ostree`
+point it at during image-build time, see `packaging/bootc/` in the repo. Plain `rpm-ostree`
 layering with a local RPM (built via [`packaging/rpm`](https://github.com/vindeckyy/slipstream/blob/main/packaging/rpm/README.md)
 or taken from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases)) keeps working too:
 `sudo rpm-ostree install ./slipstream-*.rpm ./slipstream-web-*.rpm` and reboot. The sysext is still
-the supported default. Building from source also works (Bazzite is Fedora Atomic underneath — same
+the supported default. Building from source also works (Bazzite is Fedora Atomic underneath, same
 steps as [Fedora](/docs/fedora)).
 
 ## Allow controller input
 
 Gamepad and DualSense input needs your user in the `input` group. On Bazzite, don't use
-`usermod` — the base is immutable and the group is managed by a recipe. Use:
+`usermod`, the base is immutable and the group is managed by a recipe. Use:
 
 ```sh
 ujust add-user-to-input-group
@@ -137,31 +137,31 @@ mkdir -p ~/.config/slipstream
 cp /usr/share/slipstream/host.env.bazzite ~/.config/slipstream/host.env
 ```
 
-The template is deliberately minimal — it does **not** force a compositor, because the host
+The template is deliberately minimal, it does **not** force a compositor, because the host
 auto-detects Gaming Mode (gamescope) vs Desktop (KWin) on every connect and follows the switch
 mid-stream. No session anchors are needed either (a user service inherits the right runtime dir).
 The only settings that matter (GPU zero-copy is on by default):
 
 ```sh
 SLIPSTREAM_VIDEO_SOURCE=virtual
-# GPU zero-copy (dmabuf → CUDA → NVENC) is ON by default; auto-falls back to CPU. Set =0 to force CPU.
-SLIPSTREAM_GAMESCOPE_ATTACH=1    # Gaming Mode = attach to the box's own session — SDR, and no cursor (see below)
+# GPU zero-copy (dmabuf -> CUDA -> NVENC) is ON by default; auto-falls back to CPU. Set =0 to force CPU.
+SLIPSTREAM_GAMESCOPE_ATTACH=1    # Gaming Mode = attach to the box's own session, SDR, and no cursor (see below)
 ```
 
 ### Gaming Mode: attach vs managed
 
 For Gaming Mode there are two models (pick one; the shipped default is **attach**):
 
-- **Attach** (`SLIPSTREAM_GAMESCOPE_ATTACH=1`, the template's default) — the **box** owns its
+- **Attach** (`SLIPSTREAM_GAMESCOPE_ATTACH=1`, the template's default), the **box** owns its
   gamescope session on its own display, and the host attaches to whatever's live without ever
   tearing it down (on a headless box, a box-owned autologin session is restarted at the client's
   resolution on a mismatch; with a display connected it streams at the box's own mode). Switching
   Desktop ↔ Game is rock-solid.
-- **Managed** (`SLIPSTREAM_GAMESCOPE_MANAGED=1`, and remove the attach line) — the host takes the
+- **Managed** (`SLIPSTREAM_GAMESCOPE_MANAGED=1`, and remove the attach line), the host takes the
   box's gamescope over and relaunches it **headless** at the *client's* exact resolution and
-  refresh — Game Mode on the virtual screen — restoring the box on idle.
+  refresh, Game Mode on the virtual screen, restoring the box on idle.
 
-Full treatment: [Steam / gamescope → How the host gets a
+Full treatment: [Steam / gamescope -> How the host gets a
 gamescope](/docs/gamescope#how-the-host-gets-a-gamescope).
 
 Mid-stream Gaming ↔ Desktop following (`SLIPSTREAM_SESSION_WATCH`) is **on by default** on
@@ -169,7 +169,7 @@ Bazzite/SteamOS. See [Configuration](/docs/configuration) for the full list of k
 
 ### Streaming the KDE Plasma desktop
 
-The **virtual output** (video) for the Desktop session needs no config — the host package ships an
+The **virtual output** (video) for the Desktop session needs no config, the host package ships an
 `io.slipstream.Host.desktop` file whose `X-KDE-Wayland-Interfaces` grants the host KWin's
 restricted screencast protocol on a normal interactive Plasma session (background:
 [KDE Plasma](/docs/kde)). After a **fresh host install, log out and back into the Desktop session
@@ -183,11 +183,11 @@ un-answerable dialog:
 bash /usr/share/slipstream/bazzite/kde-desktop-setup.sh
 ```
 
-Gaming Mode needs none of this — it auto-attaches.
+Gaming Mode needs none of this, it auto-attaches.
 
 ## Run as an always-on host
 
-Bazzite hosts are typically headless. Enable the host service and linger so it starts at boot — see
+Bazzite hosts are typically headless. Enable the host service and linger so it starts at boot, see
 [Running as a Service](/docs/running-as-a-service). One host service covers both Gaming Mode and the
 Desktop; it follows whichever the box is in.
 
@@ -197,7 +197,7 @@ systemctl --user enable --now slipstream-web     # web console: pairing + status
 sudo loginctl enable-linger "$USER"             # start at boot with nobody logged in
 ```
 
-Without that last line the `--user` units don't start until someone logs in — which on a headless box
+Without that last line the `--user` units don't start until someone logs in, which on a headless box
 never happens.
 
 Then open [The Web Console](/docs/web-console) for the login password and to
@@ -212,16 +212,16 @@ These apply to the **Gaming Mode (gamescope)** path; the KDE Desktop path is una
   the Quick Access Menu) is never painted into the captured node. Bazzite's current gamescope is
   past both; this only bites if you've pinned an old one.
 - **The template pins attach, and that costs you both the cursor and HDR.** The sysext ships the
-  `slipstream-gamescope` build, but it only reaches a session the host starts itself — and the
+  `slipstream-gamescope` build, but it only reaches a session the host starts itself, and the
   `host.env` template above sets `SLIPSTREAM_GAMESCOPE_ATTACH=1`, where the live session is
   Bazzite's own stock gamescope. Comment that line out and let the managed default take over: you
   get the compositor-drawn pointer and real HDR. To stay on attach instead, set
   `SLIPSTREAM_GAMESCOPE_HDR=0` and `SLIPSTREAM_GAMESCOPE_BIN=/usr/bin/gamescope`. Why each half
-  breaks: [gamescope → Known limits](/docs/gamescope#known-limits) for the cursor,
-  [HDR → Linux + gamescope](/docs/hdr#linux--gamescope) for the failed connect.
+  breaks: [gamescope -> Known limits](/docs/gamescope#known-limits) for the cursor,
+  [HDR -> Linux + gamescope](/docs/hdr#linux--gamescope) for the failed connect.
 
-Those are the two that bite on Bazzite. The full set — touch, mouse modes, the clipboard — is on
-[gamescope → Known limits](/docs/gamescope#known-limits).
+Those are the two that bite on Bazzite. The full set, touch, mouse modes, the clipboard, is on
+[gamescope -> Known limits](/docs/gamescope#known-limits).
 
-Then [connect a client](/docs/clients) — Moonlight works great for couch gaming, and the Apple app for
+Then [connect a client](/docs/clients), Moonlight works great for couch gaming, and the Apple app for
 Apple TV / iPad. Trouble? See [Troubleshooting](/docs/troubleshooting).

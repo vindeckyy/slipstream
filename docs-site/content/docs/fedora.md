@@ -12,10 +12,10 @@ compositor captures, headless sessions, quirks) lives on the
 **AMD/Intel** HEVC and AV1 go through **Vulkan Video**, with **VAAPI** for H.264 and as the fallback
 (`SLIPSTREAM_ENCODER=auto` picks per GPU).
 
-> New here? Read [Security & Safe Use](/docs/security) first — a streaming host is remote control of
+> New here? Read [Security & Safe Use](/docs/security) first, a streaming host is remote control of
 > the machine, so keep it on a trusted LAN or VPN and require pairing.
 
-Install is two parts: **GPU driver** → **host RPM**. Then open the firewall and point the host at
+Install is two parts: **GPU driver** -> **host RPM**. Then open the firewall and point the host at
 your desktop from the [desktop configure pages](#5-configure-your-desktop).
 
 ## 1. NVIDIA driver (RPM Fusion akmod)
@@ -31,7 +31,7 @@ sudo dnf install \
 sudo dnf install akmod-nvidia xorg-x11-drv-nvidia-cuda
 ```
 
-**NVENC ffmpeg.** Fedora ships `ffmpeg-free`, which is built **without** NVENC — the host can't
+**NVENC ffmpeg.** Fedora ships `ffmpeg-free`, which is built **without** NVENC, the host can't
 encode with it. Swap to RPM Fusion's ffmpeg:
 
 ```sh
@@ -49,16 +49,16 @@ sudo reboot
 ```
 
 On the next boot a blue **MOK Manager** screen appears **on the machine's console** (not over
-SSH): *Enroll MOK → Continue → Yes → (the password) → Reboot*. Then verify:
+SSH): *Enroll MOK -> Continue -> Yes -> (the password) -> Reboot*. Then verify:
 
 ```sh
 nvidia-smi                              # driver loads
 ffmpeg -hide_banner -encoders | grep nvenc
 ```
 
-(Or disable Secure Boot in firmware to skip the MOK step — fine for a dedicated test box.)
+(Or disable Secure Boot in firmware to skip the MOK step, fine for a dedicated test box.)
 
-**AMD / Intel.** No akmod needed — the Mesa stack carries both encode paths. HEVC and AV1 go through
+**AMD / Intel.** No akmod needed, the Mesa stack carries both encode paths. HEVC and AV1 go through
 **Vulkan Video** by default (the Mesa Vulkan driver, present on any normal Fedora desktop), and
 **VAAPI** is the H.264 path and the fallback. Install the freeworld VAAPI drivers for full codec
 support (`mesa-va-drivers-freeworld` for AMD from RPM Fusion, `intel-media-driver` for Intel); on a
@@ -89,7 +89,7 @@ Channel notes for when you publish your own feeds are in [Release Channels](/doc
 Updating in general, including the opt-in one-click button in the web console, is covered in
 [Updating the Host](/docs/updating).
 
-> On Fedora 42 or older — or on a release newer than what the packaging tree documents — build with
+> On Fedora 42 or older, or on a release newer than what the packaging tree documents, build with
 > the same toolchain CI uses (`docker build --build-arg FEDORA_VERSION=NN -f ci/fedora-rpm.Dockerfile
 > -t ss-rpm ci` then `packaging/rpm/build-rpm.sh` inside it), or build from source (appendix below).
 
@@ -102,9 +102,9 @@ slipstream-host --version           # the binary is on PATH
 slipstream-host detect-conflicts    # exits 1 if Sunshine/Apollo is also installed
 ```
 
-If `detect-conflicts` reports another streaming host, remove it before going further — two hosts on
+If `detect-conflicts` reports another streaming host, remove it before going further, two hosts on
 one machine is the most common reason a clean install never streams. See
-[Troubleshooting → another streaming host is installed](/docs/troubleshooting#another-streaming-host-sunshine-apollo--is-installed).
+[Troubleshooting -> another streaming host is installed](/docs/troubleshooting#another-streaming-host-sunshine-apollo--is-installed).
 
 Once you've enabled the service on your desktop page below, these are how you watch it:
 
@@ -116,10 +116,10 @@ journalctl --user -u slipstream-host -f      # watch a client connect
 ## 4. Open the firewall
 
 Fedora runs **firewalld** by default and the package never edits your firewall, so the host stays
-unreachable until you allow it. The RPM installs the service definitions — enable them once.
+unreachable until you allow it. The RPM installs the service definitions, enable them once.
 
-The packaged unit runs `serve --gamestream` — the RPM installs it as it ships and only rewrites the
-binary path — so a host you enabled with `systemctl --user enable --now slipstream-host` serves
+The packaged unit runs `serve --gamestream`, the RPM installs it as it ships and only rewrites the
+binary path, so a host you enabled with `systemctl --user enable --now slipstream-host` serves
 **both** the native `slipstream/1` plane and stock [Moonlight](/docs/moonlight) clients, and needs
 **both** services:
 
@@ -131,12 +131,12 @@ sudo firewall-cmd --reload
 ```
 
 `slipstream-native` opens UDP 9777 (QUIC control), UDP 5353 (mDNS discovery) and TCP 47990 (the
-mgmt/library API — HTTPS + mTLS, read-only off loopback). `slipstream-gamestream` opens the fixed
-Moonlight ports — TCP 47984, 47989 and 48010, UDP 47998–48000 — plus the same mDNS. The media
+mgmt/library API, HTTPS + mTLS, read-only off loopback). `slipstream-gamestream` opens the fixed
+Moonlight ports, TCP 47984, 47989 and 48010, UDP 47998-48000, plus the same mDNS. The media
 **data plane** uses an ephemeral UDP port the client opens with a hole-punch, so there is nothing
 fixed to open for video.
 
-Switched the host to **native-only** — dropped `--gamestream` with a
+Switched the host to **native-only**, dropped `--gamestream` with a
 `systemctl --user edit slipstream-host` drop-in, or you run `slipstream-host serve` by hand? Then add
 `slipstream-native` alone and leave `slipstream-gamestream` out. `systemctl --user cat slipstream-host`
 shows which one yours is.
@@ -150,7 +150,7 @@ sudo firewall-cmd --permanent --add-service=slipstream-web && sudo firewall-cmd 
 ## 5. Configure your desktop
 
 How the host creates its virtual display and injects input depends on your desktop, not your distro.
-Continue on the page for the desktop you run — it covers your `host.env`, any compositor quirks, and
+Continue on the page for the desktop you run, it covers your `host.env`, any compositor quirks, and
 starting the host:
 
 - [KDE Plasma (KWin)](/docs/kde)
@@ -159,11 +159,11 @@ starting the host:
 - [Hyprland](/docs/hyprland)
 - [Sway / wlroots](/docs/sway)
 
-Enable the browser management console (status, paired devices, arm pairing) — see
+Enable the browser management console (status, paired devices, arm pairing), see
 [Web Console](/docs/web-console).
 
 For a headless KWin appliance that streams at boot with no graphical login, see
-[KDE → Headless session](/docs/kde#headless-session).
+[KDE -> Headless session](/docs/kde#headless-session).
 
 Full config reference: [Configuration](/docs/configuration). Service model:
 [Running as a Service](/docs/running-as-a-service).
@@ -171,20 +171,20 @@ Full config reference: [Configuration](/docs/configuration). Service model:
 ## 6. Connect a client
 
 From any [client](/docs/clients), `--discover` finds the host on the LAN. On first connect, complete
-the **PIN pairing** — arm it from the host's [web console](/docs/web-console#arm-pairing), which
+the **PIN pairing**, arm it from the host's [web console](/docs/web-console#arm-pairing), which
 displays a 4-digit PIN to type into the client. See [Clients](/docs/clients) and
 [Pairing](/docs/pairing).
 
 ## Next steps
 
-- **Keep it current** — [Updating the Host](/docs/updating).
-- **Remove it again** — [Uninstalling](/docs/uninstall).
-- **Something not working?** — [Troubleshooting](/docs/troubleshooting).
+- **Keep it current**, [Updating the Host](/docs/updating).
+- **Remove it again**, [Uninstalling](/docs/uninstall).
+- **Something not working?**, [Troubleshooting](/docs/troubleshooting).
 
-## Appendix — build from source
+## Appendix, build from source
 
 If there's no RPM for your Fedora release and you don't want to build one, compile the host directly
-(no clean updates / no packaged units — you wire those up by hand):
+(no clean updates / no packaged units, you wire those up by hand):
 
 ```sh
 sudo dnf install gcc gcc-c++ make cmake clang clang-devel nasm git pkgconf-pkg-config \
@@ -198,11 +198,11 @@ cargo build --release --locked \
   -p slipstream-host
 ```
 
-`mesa-libGL-devel` isn't optional — the zero-copy GPU path links `libGL`, and without it the build
+`mesa-libGL-devel` isn't optional, the zero-copy GPU path links `libGL`, and without it the build
 fails at the link step with `cannot find -lGL`. The two `--features` are what the packaged builds
 use: leave them off and the host has no direct NVENC (NVIDIA) and no Vulkan Video encode
 (AMD/Intel), and quietly falls back to the slower libav backends.
 
 Then write `~/.config/slipstream/host.env` (as in `/usr/share/slipstream/host.env.kde`, but the host
-binary is `target/release/slipstream-host`) and run it inside your desktop session — for a headless
-KWin appliance see [KDE → Headless session](/docs/kde#headless-session).
+binary is `target/release/slipstream-host`) and run it inside your desktop session, for a headless
+KWin appliance see [KDE -> Headless session](/docs/kde#headless-session).

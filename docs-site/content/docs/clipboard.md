@@ -1,6 +1,6 @@
 ---
 title: Shared clipboard
-description: Copy on one machine and paste on the other — the two switches that have to be on, what actually crosses, and why the toggle does nothing when only one of them is flipped.
+description: Copy on one machine and paste on the other, the two switches that have to be on, what actually crosses, and why the toggle does nothing when only one of them is flipped.
 ---
 
 Slipstream can share the clipboard between the machine you are sitting at and the host you are
@@ -12,13 +12,13 @@ the host, paste it into a chat app on your laptop.
 1. The **host** operator has to allow it, with a line in `host.env` and a host restart. This one is
    off by default.
 2. **You** have to turn it on for that one host, in that host's edit sheet on your client. This one
-   is off by default on the macOS, Windows and Linux clients — but **on by default on Android**.
+   is off by default on the macOS, Windows and Linux clients, but **on by default on Android**.
 
 Flipping one and not the other looks exactly like the feature not existing. So check both.
 
 ## 1. Allow it on the host
 
-Add a `SLIPSTREAM_CLIPBOARD` line to the host's `host.env` — `~/.config/slipstream/host.env` on
+Add a `SLIPSTREAM_CLIPBOARD` line to the host's `host.env`, `~/.config/slipstream/host.env` on
 Linux, `%ProgramData%\slipstream\host.env` on Windows.
 
 ```ini
@@ -34,7 +34,7 @@ The accepted values:
 | `on`, `1` | On, and file transfer is permitted by policy. |
 
 Values are trimmed and compared case-insensitively. **Anything the host doesn't recognise is
-treated as `on`** — a typo like `SLIPSTREAM_CLIPBOARD=yes` or `no-file` enables the permissive
+treated as `on`**, a typo like `SLIPSTREAM_CLIPBOARD=yes` or `no-file` enables the permissive
 policy rather than failing, so check the spelling if you meant `text-only`.
 
 The file is only read at startup, so restart the host. On Linux:
@@ -52,7 +52,7 @@ slipstream-host service restart
 See [Configuration](/docs/configuration) for the rest of `host.env`.
 
 > **About the file mode.** No client shipping today asks for file transfer, and no host clipboard
-> backend offers file formats yet. `on` and `text-only` therefore behave the same in practice —
+> backend offers file formats yet. `on` and `text-only` therefore behave the same in practice, 
 > `text-only` is how you make that explicit and keep it that way.
 
 ## 2. Turn it on for that host, in your client
@@ -63,13 +63,13 @@ about *that* machine. You set it in the host's edit sheet, and it is deliberatel
 
 | Client | Where the switch is | Label | Default |
 |---|---|---|---|
-| macOS | Host card menu → **Edit…** | **Share clipboard with this host** | Off |
-| Windows | Host tile menu → **Edit…** | **Share clipboard with this host** | Off |
-| Linux (GTK) | Host card menu → **Edit…** | **Share clipboard** | Off |
-| Android (touch) | Host card menu → **Edit…** | **Shared clipboard** | **On** |
+| macOS | Host card menu -> **Edit...** | **Share clipboard with this host** | Off |
+| Windows | Host tile menu -> **Edit...** | **Share clipboard with this host** | Off |
+| Linux (GTK) | Host card menu -> **Edit...** | **Share clipboard** | Off |
+| Android (touch) | Host card menu -> **Edit...** | **Shared clipboard** | **On** |
 
-On Android the switch is only in the touch edit dialog. The controller/TV interface — what you get
-on Android TV, and on a phone when a controller is attached — has its own **Edit Host** screen with
+On Android the switch is only in the touch edit dialog. The controller/TV interface, what you get
+on Android TV, and on a phone when a controller is attached, has its own **Edit Host** screen with
 no clipboard row, so there is nowhere to change it there. It stays on, which is the Android default.
 
 The setting is read when a session starts, so if you change it while streaming, reconnect.
@@ -77,13 +77,13 @@ The setting is read when a session starts, so if you change it while streaming, 
 macOS can also flip it mid-session: **Stream ▸ Share Clipboard** (⌃⌥⇧C), which becomes **Stop
 Sharing Clipboard** once the host has acknowledged it.
 
-iOS, iPadOS, tvOS and the Steam Deck Decky plugin have no clipboard switch — see
+iOS, iPadOS, tvOS and the Steam Deck Decky plugin have no clipboard switch, see
 [what each client does](#which-hosts-and-clients-support-it) below.
 
 ## Nothing crosses until something pastes
 
 A copy costs nothing. When you copy, your machine announces only the **list of formats** it now
-holds — no bytes. The bytes are pulled across on a separate transfer, and only when an application
+holds, no bytes. The bytes are pulled across on a separate transfer, and only when an application
 on the other end actually pastes. Copying a large image and never pasting it transfers nothing.
 
 That holds for everything you copy on your own machine, and for both directions on the host. It
@@ -98,7 +98,7 @@ cross to a Windows or Android client for a paste that never happens.
 
 What you copy on the **macOS or Windows client** is filtered for secrets: content marked
 `org.nspasteboard.ConcealedType` or `org.nspasteboard.TransientType` on macOS, or
-`ExcludeClipboardContentFromMonitorProcessing` on Windows — what password managers set — is never
+`ExcludeClipboardContentFromMonitorProcessing` on Windows, what password managers set, is never
 announced and never served. That check exists only in those two clients. The Android client has no
 equivalent, and neither does the host, so a password copied **on the host** is announced to your
 client like anything else.
@@ -108,12 +108,12 @@ from a Slipstream client. A Moonlight client has no clipboard.
 
 ## Which hosts and clients support it
 
-**Hosts.** The host runs on Linux and Windows, and both have a clipboard backend — but on Linux it
+**Hosts.** The host runs on Linux and Windows, and both have a clipboard backend, but on Linux it
 depends on the desktop session.
 
 On Linux the host needs one of two mechanisms in the session it is streaming:
 
-- `ext-data-control-v1` — KWin, wlroots/Sway and Hyprland. Tried first.
+- `ext-data-control-v1`, KWin, wlroots/Sway and Hyprland. Tried first.
 - GNOME's own `org.gnome.Mutter.RemoteDesktop.Session` clipboard, used directly. Tried second.
 
 The older `zwlr-data-control-unstable-v1` is **not** implemented, so a compositor that offers only
@@ -129,7 +129,7 @@ when a host application pastes.
 | macOS | Plain text, rich text (RTF), HTML, and PNG, JPEG and GIF images |
 | Windows | Plain text, and PNG images |
 | Android, Android TV | **Plain text only** |
-| Linux (GTK), Steam Deck | Nothing yet — see below |
+| Linux (GTK), Steam Deck | Nothing yet, see below |
 | iOS, iPadOS, tvOS | Not implemented |
 
 The **Linux client has the switch but no working clipboard bridge**: it enables the plane and then
@@ -148,7 +148,7 @@ GIF. What you get is therefore whatever your client supports.
 ## Why the toggle does nothing (or is greyed out)
 
 On macOS, **Stream ▸ Share Clipboard** is greyed out whenever you are not streaming, or the
-connected host did not advertise a clipboard. On the other clients there is nothing to grey out —
+connected host did not advertise a clipboard. On the other clients there is nothing to grey out, 
 the per-host switch always looks available, and a host that can't do it simply does nothing. Work
 through these in order:
 
@@ -156,20 +156,20 @@ through these in order:
   `0`, `false` or empty. Fix it with step 1 above.
 - **`host.env` was edited but the host wasn't restarted.** The file is read once, at startup.
 - **The switch is off for this host in your client.** It is per saved host, and off by default
-  everywhere except Android. Check the host's **Edit…** sheet — step 2 above.
+  everywhere except Android. Check the host's **Edit...** sheet, step 2 above.
 - **The host's session has no supported backend.** The host allows the clipboard, so it still
   advertises the capability, but it has nothing to read the desktop's clipboard with. This is a
   gamescope session, a compositor with only the old `zwlr-data-control-unstable-v1`, or a GNOME
   session whose Mutter doesn't expose the direct RemoteDesktop clipboard. Nothing on screen tells
-  you this apart — the host log does.
+  you this apart, the host log does.
 - **The host is older than the feature.** A host from before clipboard sync never advertises it.
-- **Your client doesn't implement it** — Linux, Steam Deck, iOS, iPadOS or tvOS. Nothing crosses
+- **Your client doesn't implement it**, Linux, Steam Deck, iOS, iPadOS or tvOS. Nothing crosses
   regardless of what the host allows.
 - **You changed the switch while connected.** Reconnect, or use ⌃⌥⇧C on macOS.
 - **The copy was a secret, or a format nobody handles.** Concealed content is skipped on purpose on
   the macOS and Windows clients, and an image copied on Windows as a bare bitmap isn't announced.
 
-Still stuck? The host log records what it decided on each session — a `clipboard control` line with
+Still stuck? The host log records what it decided on each session, a `clipboard control` line with
 the resolved state, and a `clipboard backend unavailable` line when the session had nothing to bind
-to. That is the fastest way to tell "off by policy" from "no backend" — see
+to. That is the fastest way to tell "off by policy" from "no backend", see
 [Troubleshooting](/docs/troubleshooting).

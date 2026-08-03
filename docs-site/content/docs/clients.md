@@ -1,34 +1,34 @@
 ---
 title: Clients
-description: The ways to connect to a Slipstream host — the Apple app, Moonlight, or the Linux client.
+description: The ways to connect to a Slipstream host, the Apple app, Moonlight, or the Linux client.
 ---
 
 A Slipstream host accepts clients over its own `slipstream/1` protocol (the macOS, Linux, Windows, and
 Android apps) and over GameStream (Moonlight). Pick whichever fits the device you're streaming *to*.
 Ready to install?
-**[Install a Client](/docs/install-client)** has the step-by-step for every device — plus how to
+**[Install a Client](/docs/install-client)** has the step-by-step for every device, plus how to
 [update](/docs/install-client#keeping-a-client-up-to-date) and
 [remove](/docs/install-client#removing-a-client) each one.
 
 Two things apply to every app, whichever you pick:
 [profiles and `slipstream://` links](#profiles-and-links-every-app), and the keys and chords that
-work [while you're streaming](#while-youre-streaming). What each one lets you change — resolution,
-bitrate, codec, HDR, audio, controllers — is catalogued in
+work [while you're streaming](#while-youre-streaming). What each one lets you change, resolution,
+bitrate, codec, HDR, audio, controllers, is catalogued in
 [Client settings](/docs/client-settings).
 
 ## Apple app (Mac, iPhone, iPad, Apple TV)
 
 The native app for Apple devices speaks Slipstream's own [`slipstream/1`](/docs/how-it-works#two-protocols)
-protocol — the lowest-latency, most resilient path, with the full feature set:
+protocol, the lowest-latency, most resilient path, with the full feature set:
 
-- **Automatic host discovery** — hosts on your network appear under *On this network*; no IP typing.
+- **Automatic host discovery**, hosts on your network appear under *On this network*; no IP typing.
 - **PIN pairing** built in, and pinned reconnects after that.
-- **Controllers**, including DualSense — rumble, adaptive triggers, lightbar, motion, and touchpad.
-- A **[game library](/docs/game-library)** — browse the host's installed games with cover art and
+- **Controllers**, including DualSense, rumble, adaptive triggers, lightbar, motion, and touchpad.
+- A **[game library](/docs/game-library)**, browse the host's installed games with cover art and
   launch one straight into the stream.
 - A live **stats overlay** (resolution, fps, bitrate, latency) and a built-in **network speed test**
   to pick a bitrate for your link.
-- **Widgets, Live Activities and Shortcuts** — a hosts widget for the home screen, a Live Activity
+- **Widgets, Live Activities and Shortcuts**, a hosts widget for the home screen, a Live Activity
   while a session runs, and App Intents so Siri and the Shortcuts app can start a stream.
 
 Open the app, pick your host, [pair](/docs/pairing) once, and stream. It builds from the
@@ -37,8 +37,8 @@ Open the app, pick your host, [pair](/docs/pairing) once, and stream. It builds 
 ## Moonlight (anything else)
 
 Slipstream also speaks the **GameStream** protocol, so any [Moonlight](https://moonlight-stream.org/)
-client — a browser, a smart TV, an old phone, a games console — connects with no slipstream-specific
-software. (Most platforms also have a native Slipstream app below — Moonlight is the catch-all.) See
+client, a browser, a smart TV, an old phone, a games console, connects with no slipstream-specific
+software. (Most platforms also have a native Slipstream app below, Moonlight is the catch-all.) See
 [Connect with Moonlight](/docs/moonlight).
 
 This is the broadest-compatibility option and great for couch gaming. It doesn't use the native
@@ -46,38 +46,38 @@ protocol's FEC/encryption extensions, but for a healthy LAN that rarely matters.
 
 ## Linux desktop client (GTK4)
 
-`slipstream-client` is the native graphical Linux client — a GTK4 / libadwaita app that speaks
+`slipstream-client` is the native graphical Linux client, a GTK4 / libadwaita app that speaks
 `slipstream/1` directly, with vendor-ordered hardware decode (**Vulkan Video first on NVIDIA and
 AMD**, **VAAPI dmabuf first on Intel**; whichever isn't first is the fallback, and software decode
 is last), PipeWire audio, and SDL3 controllers (rumble, lightbar, DualSense touchpad/motion). To
-force one, pick it in *Preferences → Display → Video decoder* or set
+force one, pick it in *Preferences -> Display -> Video decoder* or set
 `SLIPSTREAM_DECODER=vulkan|vaapi|software`. Like the Apple app it discovers hosts on your network
 automatically, does PIN pairing, pins reconnects, and browses the host's **game library** (with
 cover art) so you can launch a title straight into the stream.
 
-It ships as a real package, not just a source build — full steps in
+It ships as a real package, not just a source build, full steps in
 [Install a Client](/docs/install-client#linux-desktop-flatpak):
 
-- **Any Flatpak distro (recommended)** — build with `packaging/flatpak` or install a `.flatpak`
+- **Any Flatpak distro (recommended)**, build with `packaging/flatpak` or install a `.flatpak`
   from GitHub Releases when attached; the guide linked above has the exact commands. It's also the
   client the [Decky plugin](/docs/steam-deck) uses by default, though the plugin drives a native
   `slipstream-client` just as well.
-- **Ubuntu 26.04 or newer** — build/install a local `slipstream-client` `.deb`. The client package
-  needs SDL3 and GTK4 ≥ 4.20, which Ubuntu 24.04 LTS doesn't ship — on 24.04 use the Flatpak above.
-- **Fedora** — build/install a local `slipstream-client` RPM (see the [Fedora guide](/docs/fedora)).
-- **Fedora Atomic / Bazzite** — use the Flatpak above. Layering a local RPM works, but slows every
+- **Ubuntu 26.04 or newer**, build/install a local `slipstream-client` `.deb`. The client package
+  needs SDL3 and GTK4 ≥ 4.20, which Ubuntu 24.04 LTS doesn't ship, on 24.04 use the Flatpak above.
+- **Fedora**, build/install a local `slipstream-client` RPM (see the [Fedora guide](/docs/fedora)).
+- **Fedora Atomic / Bazzite**, use the Flatpak above. Layering a local RPM works, but slows every
   OS update, so it's a last resort (see [Bazzite](/docs/bazzite)).
-- **Arch** — `makepkg -si` from `packaging/arch` (see [Arch Linux](/docs/arch)).
+- **Arch**, `makepkg -si` from `packaging/arch` (see [Arch Linux](/docs/arch)).
 
 Launch it, pick your host from the list, and stream. For scripting, use the
 [`slipstream` CLI](#scripting-the-slipstream-cli) that ships in the same packages:
 
 ```sh
 slipstream launch <host-ref>              # start a session, waking the host first if it's asleep
-slipstream-client --connect <host>:9777   # the older flag — still supported for existing scripts
+slipstream-client --connect <host>:9777   # the older flag, still supported for existing scripts
 ```
 
-The client also updates itself (`slipstream-client --check-update` / `--apply-update`) — see
+The client also updates itself (`slipstream-client --check-update` / `--apply-update`), see
 [Keeping a client up to date](/docs/install-client#keeping-a-client-up-to-date).
 
 ## Android app (phone + Android TV)
@@ -85,12 +85,12 @@ The client also updates itself (`slipstream-client --check-update` / `--apply-up
 The native Android app speaks `slipstream/1` directly, on both phones and Android TV. It does hardware
 HEVC decode (including [HDR10](/docs/hdr#per-client)), Opus audio with a mic uplink, game
 controllers with rumble and DualSense feedback, automatic host discovery, PIN pairing with pinned
-reconnects, the host's **game library** with cover art, and a live stats overlay — with D-pad and
+reconnects, the host's **game library** with cover art, and a live stats overlay, with D-pad and
 game-controller focus navigation for the couch. It builds from the `clients/android` directory
 (Kotlin + a shared Rust core).
 
 **Controllers.** Plug a **DualSense**, **DualSense Edge** or **DualShock 4** into the phone or tablet
-by USB and grant the USB permission Android asks for when it attaches — Slipstream then drives the pad
+by USB and grant the USB permission Android asks for when it attaches, Slipstream then drives the pad
 itself instead of taking what Android's gamepad layer exposes, so the host gets rumble, adaptive
 triggers, the lightbar and gyro. The app's **Controllers** screen lists attached pads and their
 capture state, and the switch that turns this off is *DualSense / DualShock passthrough (USB)* in
@@ -98,14 +98,14 @@ Settings. Over **Bluetooth** the pad still works as an ordinary gamepad, but ada
 the lightbar need the USB connection.
 
 The app is on Google Play as a **test track** (closed testing for stable, internal testing for
-canary) — request a tester invite on our [**Discord**](https://discord.gg/kaPNvzMuGU) and we'll add
+canary), request a tester invite on our [**Discord**](https://discord.gg/kaPNvzMuGU) and we'll add
 you, or sideload the public APK instead (see
 [Install a Client](/docs/install-client#android)). Then open the app, pick your host,
 [pair](/docs/pairing) once, and stream.
 
 ## Windows desktop client
 
-`slipstream-client` for Windows (`clients/windows`) is the native graphical client for Windows — pure
+`slipstream-client` for Windows (`clients/windows`) is the native graphical client for Windows, pure
 Rust, the same `slipstream/1` core as the Apple, Linux, and Android apps, with a **WinUI 3** UI (host
 list, settings, PIN pairing); the stream itself runs in Slipstream's Vulkan presenter. Its decoder
 order is per-vendor: **Vulkan Video, then D3D11VA, then software** on NVIDIA and AMD, and
@@ -115,9 +115,9 @@ SDL3 controllers (rumble, lightbar, DualSense), network discovery, the host's **
 cover art, and the full PIN-pairing trust surface. It builds for both `x86_64` and `aarch64` and
 ships as a **signed MSIX**. Launch it and pick a host from the list, just like the other native apps.
 
-The package installs **two** Start-menu entries — **Slipstream**, the desktop window, and
+The package installs **two** Start-menu entries, **Slipstream**, the desktop window, and
 **Slipstream Console**, a controller-driven fullscreen interface for a TV or HTPC (host list, pairing,
-settings and game library, all navigable with a pad) — plus the headless
+settings and game library, all navigable with a pad), plus the headless
 [`slipstream` command](#scripting-the-slipstream-cli) on your PATH.
 
 > Hardware decode and HDR10 present are validated on glass on NVIDIA and Intel (including HDR
@@ -135,21 +135,21 @@ slipstream-client --headless --speed-test --connect <host>:9777  # no window: pr
 
 Prefer the broadest compatibility, or no install? **Moonlight** also streams to Windows (see below).
 
-## webOS (LG TV) — community
+## webOS (LG TV), community
 
 [`ss-webos`](https://github.com/dyptan-io/ss-webos) is a native client for LG webOS TVs, built and
 maintained by the community ([dyptan-io](https://github.com/dyptan-io)) on top of Slipstream's
 `slipstream/1` protocol and core. It's not an official Slipstream app, but it speaks the real protocol
-directly (not Moonlight/GameStream) — LAN discovery or add-by-IP, PIN pairing with pinned reconnects,
+directly (not Moonlight/GameStream), LAN discovery or add-by-IP, PIN pairing with pinned reconnects,
 hardware video decode via webOS's NDL DirectMedia API, and a browsable game library with cover art,
 navigable with the Magic Remote.
 
-It ships as a sideloadable `.ipk` (homebrew package) rather than through the LG Content Store — see
+It ships as a sideloadable `.ipk` (homebrew package) rather than through the LG Content Store, see
 [Install a Client](/docs/install-client#lg-webos-tv-community) for the sideload steps.
 
 ## Scripting: the `slipstream` CLI
 
-`slipstream` is the headless client — the same core the graphical apps use, with no window. It ships
+`slipstream` is the headless client, the same core the graphical apps use, with no window. It ships
 in **every Linux client package** (apt, dnf, pacman and the Flatpak) and in the **Windows MSIX**, so
 if you have a desktop client you already have it:
 
@@ -162,7 +162,7 @@ slipstream open 'slipstream://connect/<host-ref>'
 slipstream speed-test <host-ref>               # measure the link, print the recommended bitrate
 ```
 
-A `<host-ref>` is a saved host's id, its name, or an address — the same reference a `slipstream://`
+A `<host-ref>` is a saved host's id, its name, or an address, the same reference a `slipstream://`
 link takes. There is also `hosts add` / `hosts forget`,
 [`wake`](/docs/wake-on-lan#from-the-command-line), `reachable`, `profiles list` and `reset`; run
 `slipstream help <command>` for a verb's flags.
@@ -173,29 +173,29 @@ named, **6** it needs a person (pairing, or an unknown host).
 
 Under the Flatpak, run it as `flatpak run --command=slipstream io.slipstream <args>`.
 
-> The older headless flags stay supported for existing scripts — `slipstream-client --connect`,
+> The older headless flags stay supported for existing scripts, `slipstream-client --connect`,
 > `--discover` and `--headless --speed-test` on both Linux and Windows. `slipstream` is the surface
 > to build new things on: it wakes a sleeping host before connecting, which those never did.
 >
-> `slipstream-probe` is a different thing again — an in-repo protocol test and latency-measurement
+> `slipstream-probe` is a different thing again, an in-repo protocol test and latency-measurement
 > tool for development. It isn't shipped in any package; you build it from source.
 
 ## Profiles and links (every app)
 
 Two things work the same in the Apple, Linux, Windows and Android apps. **Settings profiles** are
-named sets of stream overrides — bitrate, resolution, codec, HDR and the rest — that you bind to a
+named sets of stream overrides, bitrate, resolution, codec, HDR and the rest, that you bind to a
 host or pick for a single connect, with every field you didn't touch still following your defaults.
 And a **`slipstream://` link** starts a stream from a browser, a desktop shortcut, a home-automation
-rule or `slipstream open`, carrying only *references* to things that already exist on your device —
+rule or `slipstream open`, carrying only *references* to things that already exist on your device, 
 never a setting, and never a trust decision.
 
 [Profiles and links](/docs/profiles-and-links) has both in full: the link grammar, where each app
-puts **Copy link** and **Create shortcut…**, and what a link is refused for. From a script,
+puts **Copy link** and **Create shortcut...**, and what a link is refused for. From a script,
 `slipstream profiles list` and `slipstream launch --profile <ref>` reach the same profiles.
 
 ## While you're streaming
 
-Click the stream and the desktop clients **capture** your keyboard and mouse — everything goes to
+Click the stream and the desktop clients **capture** your keyboard and mouse, everything goes to
 the host until you let go. **Ctrl+Alt+Shift+Q** (⌃⌥⇧Q or ⌘⎋ on a Mac) gives it back.
 
 That chord, the three others a stream reserves, the controller chord that works with no keyboard in
@@ -204,12 +204,12 @@ are all on [Mouse, touch and pen](/docs/input#getting-your-input-back).
 
 Copying between the two machines is a separate opt-in: the host operator allows it in `host.env`
 and you turn it on for that one host in your client. Content crosses today from the macOS, Windows
-and Android apps — the Linux client has the switch but no bridge behind it yet, and iOS, iPadOS and
+and Android apps, the Linux client has the switch but no bridge behind it yet, and iOS, iPadOS and
 tvOS have neither. See [Shared clipboard](/docs/clipboard).
 
 ## Which should I use?
 
-| You're streaming to… | Use |
+| You're streaming to... | Use |
 |---|---|
 | A Mac, iPhone, iPad, or Apple TV | The **[Apple app](#apple-app-mac-iphone-ipad-apple-tv)** |
 | A Linux desktop or laptop | **[`slipstream-client`](#linux-desktop-client-gtk4)** (GTK4) |

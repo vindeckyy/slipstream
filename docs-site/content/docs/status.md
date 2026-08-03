@@ -1,10 +1,10 @@
 ---
 title: "Status & Progress"
-description: This page has moved — what works where now lives in the Support matrix.
+description: This page has moved, what works where now lives in the Support matrix.
 ---
 
-This page has moved. What works on which host, GPU and client — and how settled each part of
-Slipstream is — is now in the **[Support matrix](/docs/support-matrix)**.
+This page has moved. What works on which host, GPU and client, and how settled each part of
+Slipstream is, is now in the **[Support matrix](/docs/support-matrix)**.
 
 - What works where: [Support matrix](/docs/support-matrix)
 - How finished each part is:

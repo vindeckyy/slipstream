@@ -1,13 +1,13 @@
 ---
 title: GNOME (Mutter)
-description: Configure a Slipstream host for GNOME — host.env, the EGL/lock traps, and a headless session.
+description: Configure a Slipstream host for GNOME, host.env, the EGL/lock traps, and a headless session.
 ---
 
 Configure a host running **GNOME**. The host drives GNOME's Mutter compositor to create a per-client
 virtual display over D-Bus (`RecordVirtual`), zero-copy. This page assumes the host is already
-installed — see [Ubuntu](/docs/ubuntu), [Fedora](/docs/fedora), or [Arch](/docs/arch).
+installed, see [Ubuntu](/docs/ubuntu), [Fedora](/docs/fedora), or [Arch](/docs/arch).
 
-> New here? Read [Security & Safe Use](/docs/security) first — a streaming host is remote control of
+> New here? Read [Security & Safe Use](/docs/security) first, a streaming host is remote control of
 > the machine, so keep it on a trusted LAN or VPN and require pairing.
 
 ## host.env
@@ -18,11 +18,11 @@ The host auto-detects the compositor from your live session on every connect, so
 ```ini
 # ~/.config/slipstream/host.env  (keys are case-sensitive)
 SLIPSTREAM_VIDEO_SOURCE=virtual
-# GPU zero-copy (dmabuf → CUDA → NVENC) is ON by default; auto-falls back to CPU. Set =0 to force CPU.
+# GPU zero-copy (dmabuf -> CUDA -> NVENC) is ON by default; auto-falls back to CPU. Set =0 to force CPU.
 ```
 
 > **Don't set `SLIPSTREAM_COMPOSITOR`, `WAYLAND_DISPLAY`, or `XDG_CURRENT_DESKTOP` here.** Pinning
-> the compositor turns auto-detection **off** — per connect *and* mid-stream — so the host stops
+> the compositor turns auto-detection **off**, per connect *and* mid-stream, so the host stops
 > following session switches, and stale session values point it at dead sockets. Forcing a backend
 > is a CI / dedicated-appliance posture, not desktop configuration.
 
@@ -31,10 +31,10 @@ You must be on a **Wayland** session (not X11), and Mutter must be **≥ 48**. S
 
 ## The GL/EGL userspace
 
-On NVIDIA, gnome-shell fails to start — or the host logs **"GPU … not supported by EGL"** — when the
+On NVIDIA, gnome-shell fails to start, or the host logs **"GPU ... not supported by EGL"**, when the
 NVIDIA GL/EGL userspace is missing. The base driver package doesn't always pull it in. Install your
-distro's NVIDIA GL/EGL userspace package — on **Ubuntu** it's `libnvidia-gl-<version>` matching
-your driver; on **Fedora/Arch** it ships with the RPM Fusion / repo driver — then confirm the glvnd
+distro's NVIDIA GL/EGL userspace package, on **Ubuntu** it's `libnvidia-gl-<version>` matching
+your driver; on **Fedora/Arch** it ships with the RPM Fusion / repo driver, then confirm the glvnd
 vendor file exists:
 
 ```sh
@@ -46,7 +46,7 @@ Installing the driver itself is covered on your distro's install page
 
 ## Do not lock the session
 
-A **locked** GNOME session blocks screen capture — the host fails with
+A **locked** GNOME session blocks screen capture, the host fails with
 **"Session creation inhibited"**. On an always-on or headless host there's no one to unlock it, so
 disable the lock:
 
@@ -69,7 +69,7 @@ as the native ones. For a native-only host, see
 [What the unit starts](/docs/running-as-a-service#what-the-unit-starts).
 
 A desktop-login host should also follow your session's lifetime, or restarting GNOME Shell leaves the
-host wired to a compositor that is gone — it keeps answering, and every session after that fails at
+host wired to a compositor that is gone, it keeps answering, and every session after that fails at
 capture. Add the drop-in from
 [Restart the host with your desktop](/docs/running-as-a-service#restart-the-host-with-your-desktop).
 Skip it on the headless route below.
@@ -78,17 +78,17 @@ Then bring up [The Web Console](/docs/web-console) to arm pairing and connect a
 [client](/docs/clients). For an always-on box, see the [headless session](#headless-session) below.
 
 Display scaling you set while streaming **sticks per client**: the host remembers each device's
-scale and reapplies it on reconnect — see
+scale and reapplies it on reconnect, see
 [Persistent scaling](/docs/virtual-displays#persistent-scaling).
 
 ## HDR (GNOME 50+)
 
-The per-client virtual display this page is about always streams **SDR** — Mutter's `RecordVirtual`
+The per-client virtual display this page is about always streams **SDR**, Mutter's `RecordVirtual`
 screencasts are 8-bit upstream, so there is nothing to turn on.
 
-GNOME 50 added HDR screencast for **real monitors**, and the host can use that route — on the
+GNOME 50 added HDR screencast for **real monitors**, and the host can use that route, on the
 GameStream/Moonlight plane only, by mirroring a monitor instead of creating one.
-[HDR → Linux + GNOME](/docs/hdr#linux--gnome) has the two settings it needs, which monitor it
+[HDR -> Linux + GNOME](/docs/hdr#linux--gnome) has the two settings it needs, which monitor it
 checks, and how it degrades when none is in HDR mode; [Check it](/docs/hdr#check-it) has the
 `hdr-probe` subcommand that names the link that said no.
 
@@ -117,6 +117,6 @@ Reboot and the host comes up on the auto-login session. Full walkthrough:
 
 ## Troubleshooting
 
-More fixes — black screen, discovery, pairing — in [Troubleshooting](/docs/troubleshooting).
+More fixes, black screen, discovery, pairing, in [Troubleshooting](/docs/troubleshooting).
 
-Once the host is up, bring the console up and pair — see [The Web Console](/docs/web-console).
+Once the host is up, bring the console up and pair, see [The Web Console](/docs/web-console).

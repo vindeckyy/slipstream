@@ -1,18 +1,18 @@
 ---
 title: Steam / gamescope
-description: Configure a gamescope/Steam host — how the host gets a gamescope, session following, and limits.
+description: Configure a gamescope/Steam host, how the host gets a gamescope, session following, and limits.
 ---
 
-gamescope is the compositor behind Steam **Gaming Mode** — the couch/handheld game UI on Bazzite,
+gamescope is the compositor behind Steam **Gaming Mode**, the couch/handheld game UI on Bazzite,
 SteamOS, or any distro running a gamescope session. The host **auto-detects** gamescope from your
 live session, so you rarely need to set anything here. It also **follows a Gaming ↔ Desktop switch
-mid-stream** — flip between Gaming Mode and the desktop with Steam's normal UI and the host
+mid-stream**, flip between Gaming Mode and the desktop with Steam's normal UI and the host
 re-targets whatever's running without a reconnect.
 
 This page covers the gamescope-specific choices. To get a host running on an appliance box, start
 from the install guide for your OS: [Bazzite](/docs/bazzite) or [SteamOS (Host)](/docs/steamos-host).
 
-> New here? Read [Security & Safe Use](/docs/security) first — a streaming host is remote control of
+> New here? Read [Security & Safe Use](/docs/security) first, a streaming host is remote control of
 > the machine, so keep it on a trusted LAN or VPN and require pairing.
 
 ## How the host gets a gamescope
@@ -21,20 +21,20 @@ There are three models; the host picks one per session, and you rarely have to. 
 set**, a box that has gamescope session infrastructure (Bazzite, SteamOS, Nobara) gets **managed**;
 the [Bazzite template](/docs/bazzite) ships with **attach** chosen instead.
 
-- **Attach** (`SLIPSTREAM_GAMESCOPE_ATTACH=1`) — the **box** owns its gamescope session and decides
+- **Attach** (`SLIPSTREAM_GAMESCOPE_ATTACH=1`), the **box** owns its gamescope session and decides
   Gaming vs Desktop via the normal Steam UI. Game Mode stays on the box's own (physical) display;
   the host attaches to whatever's live and never tears it down, so switching Desktop ↔ Game is
   rock-solid and disconnecting leaves the box where it was. When the box is **headless** (no
   display connected) and the session is its own autologin unit, the host restarts it at the
-  **client's** resolution on a mismatch; a box driving a physical display — and any foreign or
-  bare gamescope — is streamed at its own mode.
-- **Managed** (the infra-detected default; force with `SLIPSTREAM_GAMESCOPE_MANAGED=1`) — the host
+  **client's** resolution on a mismatch; a box driving a physical display, and any foreign or
+  bare gamescope, is streamed at its own mode.
+- **Managed** (the infra-detected default; force with `SLIPSTREAM_GAMESCOPE_MANAGED=1`), the host
   takes the box's gamescope session over and relaunches it **headless** at the *client's* exact
-  resolution and refresh — Game Mode runs on the virtual screen, physical displays drop out of it —
+  resolution and refresh, Game Mode runs on the virtual screen, physical displays drop out of it, 
   restoring the box on idle after disconnect.
 - **Bare spawn** (the default on a plain distro with no gamescope session infrastructure and no
   gamescope already running, and the route a dedicated game launch takes unless you've forced
-  managed or attach) — the host starts its own headless gamescope per session at the client's mode
+  managed or attach), the host starts its own headless gamescope per session at the client's mode
   and runs the session's launch command (or `SLIPSTREAM_GAMESCOPE_APP`) inside it. Nothing on the
   box is taken over, because there is nothing to take over.
 
@@ -43,19 +43,19 @@ the [Bazzite template](/docs/bazzite) ships with **attach** chosen instead.
 The managed takeover has to stop the box's Gaming Mode session to free Steam. How it does that
 depends on the display manager driving the autologin:
 
-- **SDDM** (Bazzite, SteamOS): handled automatically — no setup.
+- **SDDM** (Bazzite, SteamOS): handled automatically, no setup.
 - **plasmalogin** (Nobara) and other display managers: the host must stop the display manager
   itself for the length of the stream and restart it afterwards, which needs privilege. The
   packages ship that privilege: a root helper (`/usr/libexec/slipstream/ss-dm-helper`, or
   `/usr/lib/slipstream/ss-dm-helper` from the Arch package) behind its own polkit action
   (`io.slipstream.dm-helper`), invoked automatically when the plain
-  `systemctl` verbs are denied — no setup. The helper only stops/restores the unit the
+  `systemctl` verbs are denied, no setup. The helper only stops/restores the unit the
   `display-manager.service` symlink points at, the same class of local-seat operation these
   distros already authorize for their own session switcher (Nobara's `os-session-select`).
 
   Installed from a tarball, or prefer not to ship the `allow_any` action? Remove the `.policy`
   file and use a polkit rule scoped to your user instead (adjust the unit and user names to your
-  box) — the host tries the plain verbs first, so the rule takes precedence:
+  box), the host tries the plain verbs first, so the rule takes precedence:
 
   ```js
   // /etc/polkit-1/rules.d/49-slipstream-dm.rules
@@ -70,14 +70,14 @@ depends on the display manager driving the autologin:
 
   With no privilege path at all the host degrades safely: it **attaches** to the live Gaming Mode
   session instead (Game Mode stays on the box's display at the box's own resolution, mirrored to
-  the client — if your monitor stays on and the stream runs at the desktop's resolution, this is
+  the client, if your monitor stays on and the stream runs at the desktop's resolution, this is
   what happened; check the host log for "managed takeover unavailable"). If the display-manager
   restart ever loses its privilege mid-restore, `SLIPSTREAM_RECOVER_SESSION_CMD` (see
   [Configuration](/docs/configuration)) is fired as the fallback.
 
   **Lingering is required here**, and the host turns it on for you the first time it takes the box
   over. Stopping the display manager ends your last login session, and without
-  `loginctl enable-linger` logind stops your `systemd --user` manager about ten seconds later —
+  `loginctl enable-linger` logind stops your `systemd --user` manager about ten seconds later, 
   taking the host with it, mid-stream, with the display manager down and nothing left to bring it
   back. If lingering can't be enabled the host refuses the takeover and degrades to attach instead
   (above) rather than risk that. Run `sudo loginctl enable-linger "$USER"` once, as the setup guides
@@ -92,7 +92,7 @@ depends on the display manager driving the autologin:
 There is a fourth thing you can ask for, and it isn't a gamescope model at all: **mirror the head
 Gaming Mode is lighting**. A Gaming Mode gamescope is the DRM master of a real connector, so that
 head is listed by `slipstream-host list-monitors` and appears in the web console under **Virtual
-displays → Streamed screen**. Pick it there, or pin it from
+displays -> Streamed screen**. Pick it there, or pin it from
 [`host.env`](/docs/configuration):
 
 ```sh
@@ -103,14 +103,14 @@ The host then attaches to the session's own composited output: nothing is stoppe
 relaunched, no mode is imposed, and what you see is exactly what is on the TV. That is the
 difference from **managed**, which deliberately takes the session over and blanks the panel.
 
-Only the one head the session drives is listed — a nested or headless gamescope (including the
+Only the one head the session drives is listed, a nested or headless gamescope (including the
 per-session ones the host spawns itself) has none of its own, so the picker is empty there. Full
 details, including what the setting turns off, are in
 [Stream a real monitor instead](/docs/virtual-displays#stream-a-real-monitor-instead).
 
 ## Session following
 
-`SLIPSTREAM_SESSION_WATCH` follows a Gaming ↔ Desktop switch **mid-stream** — the host rebuilds the
+`SLIPSTREAM_SESSION_WATCH` follows a Gaming ↔ Desktop switch **mid-stream**, the host rebuilds the
 backend in place, with no reconnect. It is **on by default** on Bazzite/SteamOS; set `0` to disable.
 One host service covers both faces of the box: it streams Gaming Mode over gamescope and the desktop
 over its own compositor, and re-targets whichever is live on each switch.
@@ -118,7 +118,7 @@ over its own compositor, and re-targets whichever is live on each switch.
 ## Start the host
 
 On an appliance box (Bazzite, SteamOS) the install guide already enables the host service for you. On
-any other distro running a gamescope session, just start it — the host auto-detects the live
+any other distro running a gamescope session, just start it, the host auto-detects the live
 gamescope session and picks the model for it:
 
 ```sh
@@ -135,59 +135,59 @@ Then bring up [The Web Console](/docs/web-console) to arm pairing.
 
 ## gamescope knobs
 
-Every gamescope setting — the three models above, `SLIPSTREAM_GAMESCOPE_NODE`, the bare-spawn flags
+Every gamescope setting, the three models above, `SLIPSTREAM_GAMESCOPE_NODE`, the bare-spawn flags
 (`APP`, `SPLASH`, `STEAM`, `GRAB_CURSOR`), the binary override, the two HDR knobs, and
-`SLIPSTREAM_SESSION_WATCH` — lives in the `host.env` reference, under *gamescope / session
+`SLIPSTREAM_SESSION_WATCH`, lives in the `host.env` reference, under *gamescope / session
 following*: [Configuration](/docs/configuration). Leave them unset to auto-detect; set one only to
 force a model.
 
 Two are worth naming here, because the sections below turn on them:
 
-- `SLIPSTREAM_GAMESCOPE_HDR` — on by default; see [HDR on gamescope](#hdr-on-gamescope).
-- `SLIPSTREAM_GAMESCOPE_BIN` — forces one gamescope binary. Unset, the host prefers
+- `SLIPSTREAM_GAMESCOPE_HDR`, on by default; see [HDR on gamescope](#hdr-on-gamescope).
+- `SLIPSTREAM_GAMESCOPE_BIN`, forces one gamescope binary. Unset, the host prefers
   `slipstream-gamescope` on `PATH` and falls back to `gamescope`.
 
 ## HDR on gamescope
 
 Games can render HDR on a headless gamescope today, but a stock gamescope's **capture** output is
 8-bit SDR: its PipeWire node offers only 8-bit formats, and it tone-maps the composite down before
-handing it over. So a stock setup streams SDR — correctly, including a correct SDR rendition of an
-HDR game — and there is nothing to configure. This section is the gamescope half; the rest of the
+handing it over. So a stock setup streams SDR, correctly, including a correct SDR rendition of an
+HDR game, and there is nothing to configure. This section is the gamescope half; the rest of the
 chain, and what to check when a stream comes out SDR, is on [HDR](/docs/hdr#linux--gamescope).
 
 To stream real HDR you need `slipstream-gamescope`: gamescope plus a small patch that adds the
 10-bit BT.2020 PQ formats to that node (offered upstream as
 [gamescope#2126](https://github.com/ValveSoftware/gamescope/issues/2126)). It installs under its
-own name and does **not** replace your system gamescope — your Gaming Mode keeps using that one.
+own name and does **not** replace your system gamescope, your Gaming Mode keeps using that one.
 
-- **Bazzite / Fedora Atomic** — included in the Slipstream sysext; `slipstream-sysext update` gets it.
-- **Arch** — the `slipstream-gamescope` package.
-- **SteamOS (Steam Deck installer)** — built and wired automatically by
+- **Bazzite / Fedora Atomic**, included in the Slipstream sysext; `slipstream-sysext update` gets it.
+- **Arch**, the `slipstream-gamescope` package.
+- **SteamOS (Steam Deck installer)**, built and wired automatically by
   `scripts/steamdeck/install.sh` / `update.sh`.
-- **NixOS** — `services.slipstream.host.gamescopeHdr` (default `true`).
-- **Anything else** — `bash packaging/gamescope/build-slipstream-gamescope.sh` from the source tree.
+- **NixOS**, `services.slipstream.host.gamescopeHdr` (default `true`).
+- **Anything else**, `bash packaging/gamescope/build-slipstream-gamescope.sh` from the source tree.
 
 HDR is attempted by default once the build is present (`SLIPSTREAM_GAMESCOPE_HDR=0` forces SDR).
 
-**The build only reaches sessions the host starts itself** — managed, `SLIPSTREAM_GAMESCOPE_SESSION`,
+**The build only reaches sessions the host starts itself**, managed, `SLIPSTREAM_GAMESCOPE_SESSION`,
 or a bare spawn. In **attach** mode the running session is the box's own, started by the display
 manager with the distro's `gamescope`, so it offers neither the 10-bit formats nor the in-node
-cursor — but the host answers both questions by asking the *installed* binary, so an installed
+cursor, but the host answers both questions by asking the *installed* binary, so an installed
 `slipstream-gamescope` makes it believe the attached session has them. Attach *plus* that build is
-the combination to avoid: [HDR → Linux + gamescope](/docs/hdr#linux--gamescope) has what it costs
+the combination to avoid: [HDR -> Linux + gamescope](/docs/hdr#linux--gamescope) has what it costs
 you and the two ways out.
 
 The cursor is the half this page owns. The host leaves the pointer to the compositor whenever the
-installed build can paint it (below) — so on an attached session, which can't, nothing draws it and
+installed build can paint it (below), so on an attached session, which can't, nothing draws it and
 the stream has no cursor at all. Commenting
 `SLIPSTREAM_GAMESCOPE_ATTACH=1` out of the [Bazzite template](/docs/bazzite) and letting the managed
 default take over fixes that along with HDR. To stay on attach, point `SLIPSTREAM_GAMESCOPE_BIN` at
 your distro's own `gamescope` (`/usr/bin/gamescope`) instead: the host goes back to compositing the
-cursor itself, and — since the HDR answer comes from the same binary — stops attempting HDR too.
+cursor itself, and, since the HDR answer comes from the same binary, stops attempting HDR too.
 
 One thing to know beyond HDR itself: **the pointer rides on the same build.** When the compositor
 paints the cursor into the capture node the host stops blending one in, which is also what frees the
-session to take the encoder's fastest source — a front end with no blend stage. That is why
+session to take the encoder's fastest source, a front end with no blend stage. That is why
 `slipstream-gamescope` is worth installing even on a box where you never turn HDR on.
 
 ## Known limits
@@ -202,15 +202,15 @@ These apply to the **Gaming Mode (gamescope)** path only; the desktop path is un
   only bites if you've pinned an old one.
 - **The cursor comes from the compositor when it can, and from the host otherwise.** A stock
   gamescope leaves the pointer out of its captured image, so the host reads it separately and draws
-  it into every frame — a full pass over the picture, and the fastest encode source cannot blend at
+  it into every frame, a full pass over the picture, and the fastest encode source cannot blend at
   all. `slipstream-gamescope` paints the pointer into the capture instead, so the host stops
-  redrawing it and the frame reaches the encoder untouched — but only in a session the host starts
+  redrawing it and the frame reaches the encoder untouched, but only in a session the host starts
   itself, not in **attach** mode (see [HDR on gamescope](#hdr-on-gamescope) above).
 - **Touch arrives as a single-finger pointer.** gamescope's virtual input device has no
   touchscreen, so the host maps a client's touchscreen to an absolute pointer: taps click exactly
   where you touch and drags work, but multi-touch gestures (pinch) aren't available in Gaming
   Mode. The desktop path has full multi-touch, and the client's other two
-  [touch modes](/docs/input#touch-modes) — trackpad and direct pointer — are unaffected either way,
+  [touch modes](/docs/input#touch-modes), trackpad and direct pointer, are unaffected either way,
   because they send ordinary mouse events.
 - **Desktop (absolute) mouse mode is unavailable.** A client asking for it quietly stays captured
   against a Gaming Mode session, and the [mouse-mode](/docs/input#mouse-modes) shortcut has nothing
@@ -218,7 +218,7 @@ These apply to the **Gaming Mode (gamescope)** path only; the desktop path is un
 - **There is no clipboard.** A gamescope session offers neither mechanism the host can read and
   write a clipboard through, so [clipboard sharing](/docs/clipboard) does nothing in Gaming Mode,
   even with both of its switches on.
-- **HDR needs the Slipstream gamescope build** — see [HDR on gamescope](#hdr-on-gamescope) above.
+- **HDR needs the Slipstream gamescope build**, see [HDR on gamescope](#hdr-on-gamescope) above.
 
 To stream the KDE Plasma desktop of a Steam box instead, see [KDE Plasma](/docs/kde). To bring up the
 web console and pair a client, see [The Web Console](/docs/web-console).

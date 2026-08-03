@@ -1,21 +1,21 @@
 ---
 title: Updating the Host
-description: How to see when a newer Slipstream host is available — the web console's update card — and the update command for every install method.
+description: How to see when a newer Slipstream host is available, the web console's update card, and the update command for every install method.
 ---
 
 The web console tells you when a newer host is out. The **Host** page has an **Updates** card
 showing the version you run, the channel you follow (stable or canary), how this host was
-installed, and — once a newer release exists — the exact command that updates it. The
+installed, and, once a newer release exists, the exact command that updates it. The
 "update available" state also fires an `update.available` event on the host
 [event stream](/docs/automation), and a successful update fires `update.applied` (with `from`
-and `to`) once the host is back up — so hooks and scripts can react to both.
+and `to`) once the host is back up, so hooks and scripts can react to both.
 
-Your channel comes from the repository this host installs from — see
+Your channel comes from the repository this host installs from, see
 [Release Channels](/docs/channels) for what each track means and how to move a host between
 them. The Updates card never switches channels for you.
 
 The check is a small signed manifest the host fetches from the Slipstream release feed and
-verifies against keys built into the host itself — a tampered or replayed feed is rejected, and
+verifies against keys built into the host itself, a tampered or replayed feed is rejected, and
 the console will tell you when a check failed rather than silently showing stale facts.
 
 ## Updating, per install method
@@ -24,24 +24,24 @@ The console shows the right one of these automatically; for reference:
 
 | How you installed | How to update |
 |---|---|
-| Windows installer | download the newer `slipstream-host-setup-<version>.exe` from the [releases page](https://github.com/vindeckyy/slipstream/releases) and run it — it upgrades in place, keeping your settings, console password and paired devices |
+| Windows installer | download the newer `slipstream-host-setup-<version>.exe` from the [releases page](https://github.com/vindeckyy/slipstream/releases) and run it, it upgrades in place, keeping your settings, console password and paired devices |
 | Windows via winget | `winget upgrade vindeckyy.SlipstreamHost` after registering **your** private winget source (see `packaging/winget/`) |
 | Ubuntu (apt) | rebuild/install a newer `.deb`, or `sudo apt install --only-upgrade slipstream-host` if you mirror packages locally |
 | Fedora (dnf) | rebuild/install a newer RPM, or `sudo dnf upgrade slipstream` if you mirror packages locally |
 | Bazzite sysext (recommended) | `sudo slipstream-sysext update` |
-| Bazzite / Fedora Atomic rpm-ostree layer | see below — `rpm-ostree upgrade` alone is not enough (staged — reboot to finish) |
+| Bazzite / Fedora Atomic rpm-ostree layer | see below, `rpm-ostree upgrade` alone is not enough (staged, reboot to finish) |
 | Arch / CachyOS (pacman) | `sudo pacman -Syu` (a normal full system upgrade) |
 | Steam Deck (on-device build) | `bash ~/slipstream/scripts/steamdeck/update.sh --pull` |
 | NixOS (flake) | `nix flake update slipstream` in your flake directory, then rebuild your system |
 
 winget carries **stable** releases only. A Windows host on the canary channel updates by running the
-canary installer again from your canary feed or a canary release asset — see
+canary installer again from your canary feed or a canary release asset, see
 [Release Channels](/docs/channels).
 
 ### rpm-ostree layer: `rpm-ostree upgrade` is not enough
 
 `rpm-ostree upgrade` upgrades the **base image** and only re-resolves layered packages when the
-base actually changes — so on a base that sits still (a pinned tag, a paused rebase) it keeps
+base actually changes, so on a base that sits still (a pinned tag, a paused rebase) it keeps
 reporting "No updates available" while newer Slipstream RPMs are sitting in the repo. Force
 rpm-ostree to re-resolve just the Slipstream layer, removing and re-adding the same names in one
 transaction:
@@ -54,12 +54,12 @@ sudo rpm-ostree update \
 systemctl reboot
 ```
 
-Name only the packages you actually layered — `rpm-ostree status` lists them. The new version is
+Name only the packages you actually layered, `rpm-ostree status` lists them. The new version is
 staged; it activates on the next boot.
 
 Two things to know. The re-resolve picks the highest version across **every enabled**
 `/etc/yum.repos.d/slipstream*.repo`, so if the canary repo is enabled alongside the stable one,
-canary wins and the box quietly tracks canary — enable exactly the channel you want (see
+canary wins and the box quietly tracks canary, enable exactly the channel you want (see
 [Release Channels](/docs/channels)). And if this box runs the Bazzite **sysext**, the sysext
 shadows any layered copy: update with `sudo slipstream-sysext update` instead.
 
@@ -71,7 +71,7 @@ Restart the host to pick up the new binary:
 systemctl --user restart slipstream-host
 ```
 
-If the update also brought a new `slipstream-web` (the console itself — it ships as a separate
+If the update also brought a new `slipstream-web` (the console itself, it ships as a separate
 package and a separate user service), restart that too, and do it first; the page blinks and
 reconnects:
 
@@ -81,7 +81,7 @@ systemctl --user restart slipstream-host
 ```
 
 A `pacman -Syu` upgrades every installed Slipstream package, so it always needs both. The apt and
-dnf commands above name one package, so they usually don't — to move the console and the host
+dnf commands above name one package, so they usually don't, to move the console and the host
 together, name both: `sudo apt install --only-upgrade slipstream-host slipstream-web` (apt) or
 `sudo dnf upgrade slipstream slipstream-web` (dnf). If you enabled the plugin/script runner, it is
 a third unit: `systemctl --user restart slipstream-scripting`.
@@ -94,55 +94,55 @@ restart hint when it's needed.)
 On a Windows host the card shows an **Update now** button instead of a command. It asks for the
 console password again (a saved login alone can't restart your host), then the host downloads
 the installer, verifies it against the signed release manifest **and** its code signature, and
-runs it silently — the service restarts at the end and the page reconnects by itself. If a
+runs it silently, the service restarts at the end and the page reconnects by itself. If a
 stream is live you'll be warned first: updating drops it.
 
 Every attempt leaves a result in the card (and an installer log under
-`C:\ProgramData\slipstream\logs\update-<version>.log`) — including across the restart, so a
+`C:\ProgramData\slipstream\logs\update-<version>.log`), including across the restart, so a
 failed update is never silent.
 
 If the newly installed host crash-loops, the service puts the previous installer back on its own
-(the last two are kept) and says so in the card — you end up on the version you started from,
+(the last two are kept) and says so in the card, you end up on the version you started from,
 not on a dead host. That rollback writes
 `C:\ProgramData\slipstream\logs\update-rollback-from-<version>.log`.
 
-## One-click updating (Linux — opt-in)
+## One-click updating (Linux, opt-in)
 
 The apt, dnf, Bazzite-sysext, and rpm-ostree installs can one-click update too, via a small
 root helper the packages ship (`ss-update` + a `slipstream-update.service` oneshot). It's **off
 until you opt in**, because a web button that ends in root deserves an explicit decision:
 
 ```bash
-sudo usermod -aG slipstream-update $USER    # takes effect within a minute — no re-login needed
+sudo usermod -aG slipstream-update $USER    # takes effect within a minute, no re-login needed
 ```
 
 The console re-checks group membership every minute, so the **Update now** button replaces the
-opt-in hint on its own — there's no need to log out and back in.
+opt-in hint on its own, there's no need to log out and back in.
 
-That group membership is the entire grant — a polkit rule lets its members start exactly that
+That group membership is the entire grant, a polkit rule lets its members start exactly that
 one service, whose only job is "run this system's normal package update for the Slipstream
 packages, then prove the new binary runs". The button never chooses versions or URLs; your
 package manager's own signed repositories stay the source of truth. The card shows the opt-in
 command until you've done this, and the manual command always keeps working.
 
-Notes per method: on **rpm-ostree** the update is staged and the card will say so — reboot to
+Notes per method: on **rpm-ostree** the update is staged and the card will say so, reboot to
 finish (the console never reboots your machine). On **Arch/pacman** the button additionally
 requires `PACMAN_FULL_SYSUPGRADE=1` in `/etc/slipstream/update.conf`, because the only safe
-pacman update is a full `pacman -Syu` — partial upgrades are how Arch boxes break, and we
+pacman update is a full `pacman -Syu`, partial upgrades are how Arch boxes break, and we
 won't run one. After a successful update the host restarts itself and the page reconnects.
 
 The **Steam Deck on-device build** gets the button too, with no opt-in (it's your own user's
 install, no root involved): it runs the same `update.sh` rebuild the docs describe, which
-compiles on the Deck — expect it to take a while; the card keeps showing progress and the log
+compiles on the Deck, expect it to take a while; the card keeps showing progress and the log
 lands in `~/.config/slipstream/logs/update-steamos.log`.
 
 ## Updating a client
 
-This page is about the host. Clients update on their own tracks — `flatpak update` on Linux, your
+This page is about the host. Clients update on their own tracks, `flatpak update` on Linux, your
 normal `apt upgrade` / `dnf upgrade` for the packaged Linux client, a newer `.dmg` dragged over the
 old app on macOS, TestFlight on iPhone/iPad/Apple TV, Google Play on Android, and the Decky panel's
 own **Update** button on a Steam Deck. The per-platform table is in
-[Install a Client → Keeping a client up to date](/docs/install-client#keeping-a-client-up-to-date).
+[Install a Client -> Keeping a client up to date](/docs/install-client#keeping-a-client-up-to-date).
 A host and a client don't have to be on the same version, but keeping them close is the least
 surprising.
 
@@ -157,7 +157,7 @@ SLIPSTREAM_UPDATE_CHECK=0
 ```
 
 `host.env` lives at `~/.config/slipstream/host.env` on Linux and
-`%ProgramData%\slipstream\host.env` on Windows — see [Configuration](/docs/configuration). Then
+`%ProgramData%\slipstream\host.env` on Windows, see [Configuration](/docs/configuration). Then
 restart the host: `systemctl --user restart slipstream-host` on Linux, or restart the Slipstream
 host service on Windows. The card then shows checks as disabled; everything else keeps working.
 
@@ -169,7 +169,7 @@ Windows or Linux; the card shows the manual command instead.
 "Feed hasn't changed in over 45 days" means checks *succeed* but nothing new arrives. Usually
 that just means no release happened for a while; if the [releases page](https://github.com/vindeckyy/slipstream/releases)
 shows something newer than the card does, something between this host and the feed is pinning old
-data — worth a look at proxies or DNS on the way to the release feed. That comparison only works on a
+data, worth a look at proxies or DNS on the way to the release feed. That comparison only works on a
 **stable** host: the releases page is stable-only, so a canary host being "behind" it means
 nothing.
 

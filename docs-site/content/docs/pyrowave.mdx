@@ -1,10 +1,10 @@
 ---
 title: PyroWave (wired-LAN codec)
-description: The opt-in ultra-low-latency wavelet codec for wired links — what it is, the bandwidth it needs, and how to turn it on.
+description: The opt-in ultra-low-latency wavelet codec for wired links, what it is, the bandwidth it needs, and how to turn it on.
 ---
 
 PyroWave is an **opt-in** video codec mode for links that can afford real bandwidth: wired
-Ethernet, a docked Steam Deck, a 2.5GbE LAN. It trades bitrate for latency — instead of
+Ethernet, a docked Steam Deck, a 2.5GbE LAN. It trades bitrate for latency, instead of
 H.264/HEVC/AV1 on the GPU's video engine, frames are compressed with
 [PyroWave](https://github.com/Themaister/pyrowave), an intra-only wavelet codec running as plain
 Vulkan compute. Slipstream vendors a pinned copy and runs it on both ends.
@@ -19,11 +19,11 @@ either side can't, the session silently falls back to the normal codec ladder.
   millisecond of GPU compute (measured ~0.15 ms encode / ~0.07 ms decode at 1080p on an
   RTX 5070 Ti), versus one-to-several milliseconds per side for the hardware H.26x pipelines.
 - **Every frame is a keyframe.** There is no GOP, no reference chain, no keyframe round-trip
-  after packet loss — a lost frame costs exactly that frame, and the next one is already a
+  after packet loss, a lost frame costs exactly that frame, and the next one is already a
   complete picture. The whole IDR/recovery apparatus that produces loss-time stutter simply
   doesn't exist in this mode.
 - **Uniform frame sizes.** The rate control hits its per-frame byte budget exactly, so the
-  pacer sees a flat load instead of 20–40× keyframe spikes.
+  pacer sees a flat load instead of 20-40x keyframe spikes.
 
 ## What it costs
 
@@ -31,13 +31,13 @@ Bandwidth. At the codec's ~1.6 bits-per-pixel operating point (4:2:0, SDR):
 
 | Mode | Bitrate |
 |---|---|
-| 1280×800 @ 60 (Deck) | ≈ 100 Mbps |
-| 1920×1080 @ 60 | ≈ 200 Mbps |
-| 1920×1080 @ 120 | ≈ 400 Mbps |
-| 2560×1440 @ 60 | ≈ 355 Mbps |
-| 2560×1440 @ 120 | ≈ 710 Mbps |
-| 3840×2160 @ 60 | ≈ 800 Mbps |
-| 3840×2160 @ 120 | ≈ 1.6 Gbps |
+| 1280x800 @ 60 (Deck) |  approx  100 Mbps |
+| 1920x1080 @ 60 |  approx  200 Mbps |
+| 1920x1080 @ 120 |  approx  400 Mbps |
+| 2560x1440 @ 60 |  approx  355 Mbps |
+| 2560x1440 @ 120 |  approx  710 Mbps |
+| 3840x2160 @ 60 |  approx  800 Mbps |
+| 3840x2160 @ 120 |  approx  1.6 Gbps |
 
 Frame rate scales the rate linearly, [4:4:4](#444-and-hdr) multiplies it by ~1.6, and an
 [HDR](#444-and-hdr) (10-bit) session adds ~15 %. Estimate any combination:
@@ -45,56 +45,56 @@ Frame rate scales the rate linearly, [4:4:4](#444-and-hdr) multiplies it by ~1.6
 <BitrateCalculator />
 
 Gigabit Ethernet tops out around 940 Mbps of payload, so 4K60 wants 2.5GbE and the big
-4:4:4 / HDR / high-refresh modes want 5GbE or 10GbE. **Do not run this over Wi-Fi** — that's
+4:4:4 / HDR / high-refresh modes want 5GbE or 10GbE. **Do not run this over Wi-Fi**, that's
 what HEVC/AV1 are for.
 
 ## 4:4:4 and HDR
 
-PyroWave carries **full-chroma 4:4:4** and **HDR** the same way it carries everything else —
-intra-only, every frame a keyframe — so the low-latency and clean-loss properties above hold
+PyroWave carries **full-chroma 4:4:4** and **HDR** the same way it carries everything else, 
+intra-only, every frame a keyframe, so the low-latency and clean-loss properties above hold
 in these modes too. Both are negotiated per session from your client's settings, exactly like
 HEVC/AV1; nothing PyroWave-specific to turn on beyond picking the codec.
 
 - **4:4:4 (full chroma).** With your client's **4:4:4** setting on, the session encodes chroma
-  at full resolution instead of subsampled 4:2:0 — sharp coloured text, thin UI lines, and
-  red/blue edges that 4:2:0 softens. It costs ~1.6× the bitrate (chroma compresses better than
-  luma, so it is less than the 2× the extra samples imply). Available on Linux and Windows
+  at full resolution instead of subsampled 4:2:0, sharp coloured text, thin UI lines, and
+  red/blue edges that 4:2:0 softens. It costs ~1.6x the bitrate (chroma compresses better than
+  luma, so it is less than the 2x the extra samples imply). Available on Linux and Windows
   hosts.
 - **HDR (10-bit, BT.2020 PQ).** With HDR on, the session carries the 10-bit BT.2020 PQ signal in
-  16-bit planes and adds ~15 % to the bitrate. **PyroWave HDR needs a Windows host today** — the
+  16-bit planes and adds ~15 % to the bitrate. **PyroWave HDR needs a Windows host today**, the
   Linux PyroWave path has no HDR colour conversion, so a Linux-hosted PyroWave session is SDR; stay
   on HEVC or AV1 for HDR from Linux, where PyroWave is the odd one out among the
   [codec rules](/docs/hdr#codec-rules). 4:4:4 works with PyroWave on both.
-- The two combine: a 4:4:4 **and** HDR session applies both factors (~1.6 × 1.15 ≈ 1.9× the
-  4:2:0 SDR rate). The Apple and Rust clients decode whatever the session negotiated — 4:2:0
-  or 4:4:4, SDR or HDR — with no extra setup.
+- The two combine: a 4:4:4 **and** HDR session applies both factors (~1.6 x 1.15  approx  1.9x the
+  4:2:0 SDR rate). The Apple and Rust clients decode whatever the session negotiated, 4:2:0
+  or 4:4:4, SDR or HDR, with no extra setup.
 
-At the top end this gets demanding: 4:4:4 + HDR at a super-ultrawide 5120×1440@240 pins around
+At the top end this gets demanding: 4:4:4 + HDR at a super-ultrawide 5120x1440@240 pins around
 5.3 Gbps, which is more than a 5GbE link carries. On a link that can't keep up, either set an
 explicit lower bitrate on the client or cap the host's Automatic pin with
-[`SLIPSTREAM_PYROWAVE_MAX_MBPS`](/docs/configuration) — otherwise the overshoot just becomes
+[`SLIPSTREAM_PYROWAVE_MAX_MBPS`](/docs/configuration), otherwise the overshoot just becomes
 dropped packets.
 
 ## Turning it on
 
-1. **Host** (Linux): nothing to do — default builds ship the codec and every Linux GPU host
+1. **Host** (Linux): nothing to do, default builds ship the codec and every Linux GPU host
    advertises it. AMD, Intel and NVIDIA hosts all encode straight from the capture dmabuf: the
    wavelet encoder owns its own Vulkan device and imports the buffer on any vendor, so there is
    no CPU copy on the host. (A compositor that refuses every offered dmabuf format still falls
    back to the CPU path, as it does for the other codecs.)
 2. **Client**:
-   - Linux client: set **Settings → Video codec → PyroWave (wired LAN)** — the same setting in
+   - Linux client: set **Settings -> Video codec -> PyroWave (wired LAN)**, the same setting in
      the GTK desktop app and in the full-screen controller UI. Or launch with
      `SLIPSTREAM_PREFER_PYROWAVE=1`.
-   - Windows client: set **Settings → Video codec → PyroWave (wired LAN)** (Intel, AMD and
-     NVIDIA alike; x64 only — the ARM64 build does not include the decoder).
-   - Apple (Mac, Apple TV 4K, iPad — wired networking strongly recommended): set
-     **Settings → Codec → PyroWave (wired LAN)**. The option appears only on devices whose
+   - Windows client: set **Settings -> Video codec -> PyroWave (wired LAN)** (Intel, AMD and
+     NVIDIA alike; x64 only, the ARM64 build does not include the decoder).
+   - Apple (Mac, Apple TV 4K, iPad, wired networking strongly recommended): set
+     **Settings -> Codec -> PyroWave (wired LAN)**. The option appears only on devices whose
      GPU passes the decode probe (Apple Silicon and A13-class or newer). The decoder follows
      the stream: 4:2:0 or 4:4:4, SDR or HDR, per what the session negotiated.
 3. Leave the bitrate on Automatic: a PyroWave session pins itself to the ~1.6 bpp rate for
-   your mode (≈200 Mbps at 1080p60; ~2.6 bpp for 4:4:4, +15 % for HDR). An explicit bitrate is honored if you set one, but the
-   adaptive-bitrate controller stays off either way — this codec has no useful low-rate
+   your mode ( approx 200 Mbps at 1080p60; ~2.6 bpp for 4:4:4, +15 % for HDR). An explicit bitrate is honored if you set one, but the
+   adaptive-bitrate controller stays off either way, this codec has no useful low-rate
    regime, so under sustained loss the right move is switching back to HEVC, not degrading.
    The pin follows the resolution: a mid-stream resize (e.g. Match window) re-pins the rate
    for the new mode, so resizing a window down also cuts the bandwidth.
@@ -106,5 +106,5 @@ The stats overlay shows `pyrowave` as the decode path when the mode is active.
 - Linux and Windows hosts; Linux clients (the GTK desktop app and the session client, including
   a docked Deck), the Windows client on x64, and Apple clients (native Metal decode on Mac, and on
   A13-or-newer iPhone, iPad and Apple TV hardware) today. Android has no PyroWave decoder.
-- **PyroWave HDR needs a Windows host today** — a Linux-hosted PyroWave session is SDR, however the
+- **PyroWave HDR needs a Windows host today**, a Linux-hosted PyroWave session is SDR, however the
   rest of the box is set up (see [4:4:4 and HDR](#444-and-hdr) above). 4:4:4 works on both.
