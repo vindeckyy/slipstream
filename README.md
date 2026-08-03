@@ -1,11 +1,11 @@
-<p align="center">
-<pre>
+<div align="center">
+<pre style="display: inline-block; text-align: left;">
 ▞▀▖▌  ▜▘▛▀▖▞▀▖▀▛▘▛▀▖▛▀▘▞▀▖▙▗▌
 ▚▄ ▌  ▐ ▙▄▘▚▄  ▌ ▙▄▘▙▄ ▙▄▌▌▘▌
 ▖ ▌▌  ▐ ▌  ▖ ▌ ▌ ▌▚ ▌  ▌ ▌▌ ▌
 ▝▀ ▀▀▘▀▘▘  ▝▀  ▘ ▘ ▘▀▀▘▘ ▘▘ ▘
 </pre>
-</p>
+</div>
 
 <p align="center"><b>Low-latency desktop and game streaming for Linux and Windows hosts.</b></p>
 
