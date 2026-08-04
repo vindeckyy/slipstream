@@ -19,7 +19,7 @@ game-library browsing to paired clients.
 
 Do this once after install so the rest of the console has somewhere useful to point.
 
-1. **Enable the console** (Linux) or confirm the Windows / SteamOS install already started it —
+1. **Enable the console** (Linux) or confirm the Windows / SteamOS install already started it -
    commands in [Enable the console](#enable-the-console) below.
 2. From a device on the same trusted network, open `https://<host-ip>:47992`. Accept the
    self-signed certificate warning for this host.
@@ -30,15 +30,15 @@ Do this once after install so the rest of the console has somewhere useful to po
    competing host) before you chase client issues.
 5. Open **Pairing** → **Pair a device**, then complete PIN entry (or approval) on your
    [client](/docs/clients). Full trust model: [Pairing & Trust](/docs/pairing).
-6. Open **Virtual displays** and pick a preset that matches how you use the machine —
+6. Open **Virtual displays** and pick a preset that matches how you use the machine -
    **Workstation** / **Hot-desk** for [Desktop at work](/docs/desktop-at-work), **Headless box** /
    **Shared desktop** for [Play](/docs/play).
 7. Optional: **Library** to confirm launchers are visible; **Plugins** only if you intend to run
-   them ([Plugins](/docs/plugins) — they run code on the host).
+   them ([Plugins](/docs/plugins) - they run code on the host).
 8. Start a stream from the client. Return to **Dashboard** to see the live session; use **Logs**
    or **Performance** if something looks wrong.
 
-After first run, day-to-day office reconnects usually never need the console — only pairing a new
+After first run, day-to-day office reconnects usually never need the console - only pairing a new
 device, changing display policy, reading logs, or updating the host.
 
 ## Enable the console
@@ -152,7 +152,7 @@ Settings, and Plugins.
 Live status for the host you are administering:
 
 - Whether **video** and **audio** are streaming right now.
-- **Active sessions** with codec, resolution, frame rate, and bitrate — useful when diagnosing soft
+- **Active sessions** with codec, resolution, frame rate, and bitrate - useful when diagnosing soft
   text or stutter alongside the client's [stats overlay](/docs/stats) and
   [Picture quality](/docs/picture-quality).
 - Which **games** are running and how many clients are **paired**.
@@ -167,12 +167,12 @@ panel ([Desktop at work](/docs/desktop-at-work)).
 
 Trust management for this host:
 
-- **Pair a device** — arms a 4-digit PIN for about **two minutes** (countdown + Cancel in the UI).
-- **Waiting for approval** — devices that already knocked; **Approve** (optional label) or
+- **Pair a device** - arms a 4-digit PIN for about **two minutes** (countdown + Cancel in the UI).
+- **Waiting for approval** - devices that already knocked; **Approve** (optional label) or
   **Deny** (dismisses; not a permanent blocklist). Requests expire after **10 minutes**.
-- **Paired devices** — revoke access for a lost or retired client; re-pair is the same ceremony
+- **Paired devices** - revoke access for a lost or retired client; re-pair is the same ceremony
   again.
-- **Moonlight (GameStream) pairing** — PIN entry box appears **only** when this host runs the
+- **Moonlight (GameStream) pairing** - PIN entry box appears **only** when this host runs the
   GameStream plane. Direction is reversed vs native: Moonlight shows the PIN, you type it here.
   See [Moonlight](/docs/moonlight) and [Pairing](/docs/pairing).
 
@@ -199,7 +199,7 @@ you need Forever + Release for a dedicated box. Full reference:
 
 What every client sees as launchable titles:
 
-- Turn a **launcher source** on or off (Steam, Epic, GOG, Xbox, … as the host found them).
+- Turn a **launcher source** on or off (Steam, Epic, GOG, Xbox, ... as the host found them).
 - Add or edit a **custom** title with its own art and launch command.
 
 This is the same catalog native clients and Moonlight show as the game list. Details:
@@ -209,13 +209,13 @@ use the host for [Play](/docs/play).
 ### Plugins
 
 Plugin store tabs **Browse**, **Installed**, and **Sources**, plus the plugin **runner** switch.
-An installed plugin with a UI gets its own sidebar entry below. Plugins run code on your host —
+An installed plugin with a UI gets its own sidebar entry below. Plugins run code on your host -
 read [Plugins](/docs/plugins) and the security notes in [Security](/docs/security#plugins-run-code-on-your-host)
 before enabling the runner on a machine that holds sensitive work data.
 
 ### Logs and Performance
 
-**Logs** — follow the host's recent log stream live, filter by level, search, download or share for
+**Logs** - follow the host's recent log stream live, filter by level, search, download or share for
 a bug report, and create an owner-private **redacted support bundle**. The bundle contains host
 state, recent logs, and performance summaries, downloads as JSON, and is also stored under the
 host's private config directory. It is **never uploaded** by the console.
@@ -223,7 +223,7 @@ host's private config directory. It is **never uploaded** by the console.
 Search Logs for strings like `Wake-on-LAN`, `METRONOMIC`, or encoder errors when
 [Troubleshooting](/docs/troubleshooting) points you there.
 
-**Performance** — arm a capture, run a session, stop it, and read the recording back as per-stage
+**Performance** - arm a capture, run a session, stop it, and read the recording back as per-stage
 latency, throughput, and health graphs. Use it when you need host-side evidence that a VPN or
 encode path is the bottleneck, alongside client [stats](/docs/stats).
 
@@ -233,13 +233,13 @@ Identity and readiness for this machine:
 
 - Hostname, OS, local IP, version, unique id.
 - Codecs the host **advertises**, ports it listens on.
-- **Preflight** — same checks as `slipstream-host doctor` (configuration, storage, encoder,
+- **Preflight** - same checks as `slipstream-host doctor` (configuration, storage, encoder,
   compositor, capture, competing hosts). Blocked checks include an action that can resolve them;
   **Refresh** after you change setup.
-- **Updates** — [Updating the Host](/docs/updating).
-- **GPUs** — Automatic or a preferred GPU for capture and encode (applies to the **next**
+- **Updates** - [Updating the Host](/docs/updating).
+- **GPUs** - Automatic or a preferred GPU for capture and encode (applies to the **next**
   session), plus compositor backends found.
-- **Host power** — **Restart** restarts the Slipstream host process and waits for the console to
+- **Host power** - **Restart** restarts the Slipstream host process and waits for the console to
   reconnect; **Shutdown** stops the process **without** powering off the computer. Both end
   active sessions and require confirmation. Start the host service again on the machine after a
   shutdown.
@@ -247,7 +247,7 @@ Identity and readiness for this machine:
 ### Settings
 
 Console language, and **Sign out**. This page is about the browser UI session, not the host's
-stream encoder knobs — those live in [Configuration](/docs/configuration) / `host.env` and in
+stream encoder knobs - those live in [Configuration](/docs/configuration) / `host.env` and in
 client [profiles](/docs/profiles-and-links).
 
 ## Preflight and host power (detail)

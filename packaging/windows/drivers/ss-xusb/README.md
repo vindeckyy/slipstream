@@ -1,16 +1,16 @@
-# ss-xusb — virtual Xbox 360 XUSB companion (UMDF2, classic XInput)
+# ss-xusb - virtual Xbox 360 XUSB companion (UMDF2, classic XInput)
 
 A **pure-user-mode** UMDF2 driver that makes a virtual Xbox 360 controller visible to classic
-**`XInputGetState`** with **no kernel bus driver** (no ViGEmBus) — the HIDMaestro approach. It is the
+**`XInputGetState`** with **no kernel bus driver** (no ViGEmBus) - the HIDMaestro approach. It is the
 Windows counterpart to ViGEm's X360 target, owned in-tree.
 
 ## Why this is not the HID driver
 
 XInput does **not** use HID. `xinput1_4.dll` enumerates the **XUSB device-interface GUID**
 `{EC87F1E3-C13B-4100-B5F7-8B84D54260CB}` (`SetupDiEnumDeviceInterfaces`), opens the Nth present
-instance (= player slot 0–3) with `CreateFile`, and polls it with buffered IOCTLs. So this driver:
+instance (= player slot 0-3) with `CreateFile`, and polls it with buffered IOCTLs. So this driver:
 
-- is **not** a HID minidriver (no `MsHidUmdf`) — it's a plain UMDF2 function driver under `WUDFRd`,
+- is **not** a HID minidriver (no `MsHidUmdf`) - it's a plain UMDF2 function driver under `WUDFRd`,
   **System** setup class;
 - registers the XUSB interface with `WdfDeviceCreateDeviceInterface(device, &XUSB_GUID, NULL)`;
 - answers the XUSB IOCTLs (all `METHOD_BUFFERED`, delivered to user mode by the reflector) from
@@ -21,15 +21,15 @@ instance (= player slot 0–3) with `CreateFile`, and polls it with buffered IOC
   back for the host to forward to the client.
 
 The WAIT_* IOCTLs return `STATUS_INVALID_DEVICE_REQUEST`, which makes `xinput1_4` fall back to
-synchronous `GET_STATE` polling — so no manual queue / timer is needed for classic XInput. (WGI/
+synchronous `GET_STATE` polling - so no manual queue / timer is needed for classic XInput. (WGI/
 GameInput admission additionally needs a `xinputhid` `UpperFilters` registry tripwire + the async
-`WAIT_FOR_INPUT` pump — not implemented; classic XInput does not need it.)
+`WAIT_FOR_INPUT` pump - not implemented; classic XInput does not need it.)
 
 ## Verified wire formats (source: HIDMaestro `driver/companion.c`, nefarius/XInputHooker `XUSB.h`, ViGEm)
 
 | IOCTL | Code | Reply |
 | --- | --- | --- |
-| `GET_INFORMATION` | `0x80006000` | 12 B: `[0]`=ver `0x0103`, `[2]`=count `0x01`, `[8]`=VID `045E`, `[10]`=PID `028E` — marks the slot **connected** |
+| `GET_INFORMATION` | `0x80006000` | 12 B: `[0]`=ver `0x0103`, `[2]`=count `0x01`, `[8]`=VID `045E`, `[10]`=PID `028E` - marks the slot **connected** |
 | `GET_CAPABILITIES` | `0x8000E004` | 24 B (or 36 B V2 if `outLen>=36`): Type `0x03`/SubType `0x01`, motor max `0xFFFF` (advertise rumble) |
 | `GET_STATE` | `0x8000E00C` | **29 B**: `[0]`ver `[2]`count `[5]`u32 packet# `[0x0B]`u16 wButtons `[0x0D]`LT `[0x0E]`RT `[0x0F..0x16]`4×i16 sticks |
 | `SET_STATE` | `0x8000A010` | input 5 B `{00, led, large, small, subcmd}`: `subcmd 0x02`=rumble (large `[2]`, small `[3]`), `0x01`=player-LED |
@@ -37,10 +37,10 @@ GameInput admission additionally needs a `xinputhid` `UpperFilters` registry tri
 | `GET_BATTERY_INFORMATION` | `0x8000E018` | `{0,0x01,0x03,0}` |
 | `WAIT_GUIDE_BUTTON` / `WAIT_FOR_INPUT` | `0x8000E014` / `0x8000E3AC` | `STATUS_INVALID_DEVICE_REQUEST` → GET_STATE fallback |
 
-`wButtons` is the `XINPUT_GAMEPAD_*` bitmap (DPAD_UP `0x0001` … A `0x1000` B `0x2000` X `0x4000`
+`wButtons` is the `XINPUT_GAMEPAD_*` bitmap (DPAD_UP `0x0001` ... A `0x1000` B `0x2000` X `0x4000`
 Y `0x8000`). `dwPacketNumber` (GET_STATE `[5]`) must increment whenever the payload changes.
 
-## Shared-memory layout (unnamed DATA section, 64 B) — host writes state, driver writes rumble
+## Shared-memory layout (unnamed DATA section, 64 B) - host writes state, driver writes rumble
 
 `ss_driver_proto::gamepad::XusbShm` (the crate owns the offsets; both sides compile against it):
 `magic u32 @0` (`"PFXU"` `0x55584650`) · `packet u32 @4` (host bumps → dwPacketNumber) · `wButtons u16
@@ -57,7 +57,7 @@ devnode + cycling state via shm) and `xinputtest.exe` (`XInputGetState`/`SetStat
 
 ## Build / sign / install (same recipe as the DualSense driver)
 
-Built as a member of the in-tree [`packaging/windows/drivers/`](../) workspace — one
+Built as a member of the in-tree [`packaging/windows/drivers/`](../) workspace - one
 `cargo build --release` builds all three drivers; `build-gamepad-drivers.ps1` (one level up) wraps
 the whole build/sign/stage flow in CI. The manual steps:
 
@@ -85,4 +85,4 @@ via `WdfDeviceAllocAndQueryProperty(DevicePropertyLocationInformation)` in EvtDe
 `pfxusb-boot-<index>` bootstrap mailbox (the delivered DATA section's `pad_index` is validated against it). `UmdfHostProcessSharing=ProcessSharingDisabled` (the INF) gives each pad its own
 WUDFHost, so the per-pad `SHM_INDEX` static doesn't collide. Validated live: two pads → two distinct
 XInput slots. (XInput assigns the player slot 0-3 by interface-enumeration order, independent of this
-index — which only routes shared memory.)
+index - which only routes shared memory.)

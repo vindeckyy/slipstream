@@ -231,12 +231,12 @@ is capture working as designed: **Ctrl+Alt+Shift+Q** or **L1+R1+Start+Select** r
 
 ## Related pages
 
-- [Mouse, touch and pen](/docs/input) — chords, mouse modes, touch, pen
-- [Client settings](/docs/client-settings) — Gamepad type, Forwarded controller, Audio
-- [Play](/docs/play) — couch / game streaming path
-- [Desktop at work](/docs/desktop-at-work) — office remote desktop path
-- [Plugins → VirtualHere](/docs/plugins#virtualhere-usb-passthrough) — real USB devices
-- [gamescope](/docs/gamescope) — Gaming Mode limits
-- [Configuration → Gamepads](/docs/configuration#gamepads) — `SLIPSTREAM_GAMEPAD`
-- [Support matrix](/docs/support-matrix) — per-client rumble / gyro / DualSense truth
+- [Mouse, touch and pen](/docs/input) - chords, mouse modes, touch, pen
+- [Client settings](/docs/client-settings) - Gamepad type, Forwarded controller, Audio
+- [Play](/docs/play) - couch / game streaming path
+- [Desktop at work](/docs/desktop-at-work) - office remote desktop path
+- [Plugins → VirtualHere](/docs/plugins#virtualhere-usb-passthrough) - real USB devices
+- [gamescope](/docs/gamescope) - Gaming Mode limits
+- [Configuration → Gamepads](/docs/configuration#gamepads) - `SLIPSTREAM_GAMEPAD`
+- [Support matrix](/docs/support-matrix) - per-client rumble / gyro / DualSense truth
 - [Troubleshooting](/docs/troubleshooting#a-controller-is-detected-but-games-dont-see-it)

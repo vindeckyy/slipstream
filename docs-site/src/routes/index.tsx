@@ -69,7 +69,7 @@ const guides = [
   },
   {
     title: 'Support matrix',
-    description: 'Host desktops, GPUs, encoders, and client features — read from the code.',
+    description: 'Host desktops, GPUs, encoders, and client features - read from the code.',
     slug: 'support-matrix',
   },
   {
@@ -118,7 +118,7 @@ function Home() {
             </h1>
             <p className="mt-7 max-w-2xl text-lg leading-8 text-fd-muted-foreground motion-safe:animate-[ss-rise_900ms_ease-out] md:text-xl md:leading-9">
               Slipstream is a private host for low-latency desktop and game streaming. These guides
-              take you from install to a sharp work session or a couch stream — on a LAN or a VPN you
+              take you from install to a work session or a couch stream on a LAN or a VPN you
               trust.
             </p>
 
@@ -301,7 +301,7 @@ function Home() {
                   Keep the host on a trusted network.
                 </h2>
                 <p className="mt-3 text-base leading-7 text-fd-muted-foreground">
-                  Slipstream is built for a LAN or a private VPN — including office laptop to home
+                  Slipstream is built for a LAN or a private VPN - including office laptop to home
                   desktop. Pairing is the security boundary. Do not port-forward to the public internet.
                 </p>
               </div>

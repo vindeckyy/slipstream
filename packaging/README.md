@@ -26,7 +26,7 @@ The other packaging targets have their own READMEs: [`debian/`](debian/README.md
 [`arch/`](arch/README.md) (pacman binary repo + PKGBUILD + SteamOS sysext),
 [`flatpak/`](flatpak/README.md) (the client), [`windows/`](windows/README.md) (host installer +
 drivers), plus `kde/` and `linux/` helpers. **NixOS / Nix** users get a flake (`flake.nix` at the
-repo root) with reproducible host + client packages and a `services.slipstream` NixOS module —
+repo root) with reproducible host + client packages and a `services.slipstream` NixOS module -
 see [`nix/README.md`](nix/README.md).
 
 ## What's needed beyond base Fedora
@@ -39,12 +39,12 @@ see [`nix/README.md`](nix/README.md).
 | `opus`, `libei` | Fedora base / updates |
 
 On **Bazzite** the only genuinely new runtime bits are `ffmpeg-libs` (RPM Fusion) + `opus` +
-`libei` — the rest of the stack is already there. The default backend is **gamescope**
-(`packaging/bazzite/host.env`), which the host spawns headless per session — no desktop login.
+`libei` - the rest of the stack is already there. The default backend is **gamescope**
+(`packaging/bazzite/host.env`), which the host spawns headless per session - no desktop login.
 
-## Option A — systemd-sysext (recommended; no layering, no reboot)
+## Option A - systemd-sysext (recommended; no layering, no reboot)
 
-On Bazzite / Fedora Atomic the recommended install is the **systemd-sysext** image — rpm-ostree
+On Bazzite / Fedora Atomic the recommended install is the **systemd-sysext** image - rpm-ostree
 layering is a last resort per the Bazzite docs (it slows every OS update and can block upgrades),
 while a sysext overlays `/usr` at runtime, survives OS updates, and updates in one command with
 no reboot. CI wraps the same RPMs below into the image, so content and channels are identical.
@@ -57,7 +57,7 @@ sudo bash slipstream-sysext.sh install     # then: sudo slipstream-sysext update
 Full walkthrough (incl. the F43→F44 rebase behavior and migration off layering):
 [`bazzite/README.md`](bazzite/README.md).
 
-## Option B — local RPM / rpm-ostree layering
+## Option B - local RPM / rpm-ostree layering
 
 Build the host RPM with [`rpm/README.md`](rpm/README.md) (or take one from GitHub Releases when
 attached), then layer it. There is no public RPM registry.
@@ -68,14 +68,14 @@ rpm-ostree install ./dist/slipstream-*.rpm && systemctl reboot
 # updates: install a newer local RPM the same way, then reboot
 ```
 
-## Option C — COPR (per-host, `rpm-ostree install`)
+## Option C - COPR (per-host, `rpm-ostree install`)
 
 1. Create a COPR project, enable **build-from-SCM** pointing at this repo, spec path
    `packaging/rpm/slipstream.spec` (see `copr/README.md`). Under *External Repositories* add
    RPM Fusion nonfree so `ffmpeg-devel` resolves at build time.
 2. On the Bazzite host:
    ```sh
-   # RPM Fusion (for the NVENC ffmpeg) — usually already enabled on Bazzite
+   # RPM Fusion (for the NVENC ffmpeg) - usually already enabled on Bazzite
    rpm-ostree install \
      https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
      https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
@@ -86,9 +86,9 @@ rpm-ostree install ./dist/slipstream-*.rpm && systemctl reboot
    systemctl reboot
    ```
 
-## Option D — bootc (image-based, atomic)
+## Option D - bootc (image-based, atomic)
 
-Layer slipstream into a Bazzite image once, then rebase any number of hosts onto it — no
+Layer slipstream into a Bazzite image once, then rebase any number of hosts onto it - no
 per-host drift. See `bootc/Containerfile`:
 ```sh
 podman build -t ghcr.io/<you>/bazzite-slipstream -f packaging/bootc/Containerfile .
@@ -101,35 +101,35 @@ sudo bootc switch ghcr.io/<you>/bazzite-slipstream && systemctl reboot
 
 ```sh
 ujust add-user-to-input-group           # virtual gamepads need /dev/uinput (then re-login).
-                                        # On Bazzite use ujust, NOT `usermod -aG input` (atomic OS — it won't stick).
+                                        # On Bazzite use ujust, NOT `usermod -aG input` (atomic OS - it won't stick).
 mkdir -p ~/.config/slipstream
 cp /usr/share/slipstream/host.env.bazzite ~/.config/slipstream/host.env   # edit (gamescope app, etc.)
 systemctl --user enable --now slipstream-host
 
-# Management web console (pairing + status) — pulled in by default (the host RPM Recommends it;
+# Management web console (pairing + status) - pulled in by default (the host RPM Recommends it;
 # `--no-install-recommends` / headless-only boxes can skip it). Enable it, then choose a password:
 systemctl --user enable --now slipstream-web
 # open https://<host-ip>:47992
 ```
 
-Pair a stock Moonlight client (mDNS-discovered), or connect the native slipstream/1 client — via the
+Pair a stock Moonlight client (mDNS-discovered), or connect the native slipstream/1 client - via the
 web console at `https://<host-ip>:47992` or directly.
 
 > ⚠️ **COPR caveat:** COPR's mock chroot has no `bun`, so a COPR build produces only
-> `slipstream` + `slipstream-client` — **not** `slipstream-web`. For the console on a COPR/bootc host,
+> `slipstream` + `slipstream-client` - **not** `slipstream-web`. For the console on a COPR/bootc host,
 > build the RPM with `--with web` (or take a release asset that includes it); the sysext image
 > includes the console too.
 
 ## Why not Flatpak (for the HOST)?
 
 The host needs unsandboxed access the zero-copy NVENC path, `/dev/uinput`, the PipeWire
-graph and the compositor's privileged protocols — a Flatpak sandbox fights all of these.
+graph and the compositor's privileged protocols - a Flatpak sandbox fights all of these.
 An RPM (or the bootc layer) installs into the host system where those just work.
 
-> 👉 The **client** is a different story — it IS shipped as a Flatpak (the only viable
+> 👉 The **client** is a different story - it IS shipped as a Flatpak (the only viable
 > Steam Deck install path: SteamOS `/usr` is read-only and lacks `libadwaita`/`libSDL3`). See
 > [`flatpak/README.md`](flatpak/README.md). The client sandbox only needs the GPU render node,
-> Wayland, PipeWire audio, the network and hidraw — all expressible as finish-args.
+> Wayland, PipeWire audio, the network and hidraw - all expressible as finish-args.
 
 ## Building the SRPM/RPM locally (Fedora only)
 
@@ -138,4 +138,4 @@ git archive --format=tar.gz --prefix=slipstream-0.3.0/ -o ~/rpmbuild/SOURCES/sli
 rpmbuild -ba packaging/rpm/slipstream.spec     # needs the BuildRequires from the spec
 # (0.3.0 = the spec's default %{ss_version}; the prefix and tarball name must match it)
 ```
-(Not buildable on Debian/Ubuntu — use a Fedora toolbox/container or COPR.)
+(Not buildable on Debian/Ubuntu - use a Fedora toolbox/container or COPR.)

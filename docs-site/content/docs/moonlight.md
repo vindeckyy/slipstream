@@ -14,7 +14,7 @@ a browser, a smart TV, or any device without a native client.
 ## Feature delta vs native
 
 Use Moonlight when you need a client Slipstream does not ship. Prefer a **native** app when one
-exists for your device — especially for [Play](/docs/play) on a lossy link and for
+exists for your device - especially for [Play](/docs/play) on a lossy link and for
 [Desktop at work](/docs/desktop-at-work) over a VPN.
 
 | Topic | **Native Slipstream client** | **Moonlight (GameStream)** |
@@ -27,11 +27,11 @@ exists for your device — especially for [Play](/docs/play) on a lossy link and
 | Session crypto / FEC | Native plane extensions | GameStream legacy control encryption; no Slipstream-native FEC/encryption extensions |
 | Library | Host game library + Desktop | Same library catalog the host exposes (Desktop + detected launchers) |
 | Mouse / pen | Desktop vs Capture modes; pen with pressure/tilt where the client sends it | Mouse/keyboard/controllers; pen when Moonlight sends pen events (e.g. Apple Pencil on iPad) |
-| Clipboard | Shared clipboard when host + client enable it | Not the native clipboard product path — use native for [Clipboard](/docs/clipboard) office setups |
+| Clipboard | Shared clipboard when host + client enable it | Not the native clipboard product path - use native for [Clipboard](/docs/clipboard) office setups |
 | Work / VPN fit | **Preferred** | Keep off on Work hosts unless you need Moonlight |
 | LAN play on a TV without a native app | Use native if available | **Good fit** |
 | Lossy Wi‑Fi / high bitrate | Native FEC path holds up better | Fine on a solid LAN; prefer native when the link is messy |
-| Stats overlay | Slipstream [stats](/docs/stats) HUD | Moonlight's own overlay — numbers measure different pipeline slices; do not compare line-for-line without the stats matrix |
+| Stats overlay | Slipstream [stats](/docs/stats) HUD | Moonlight's own overlay - numbers measure different pipeline slices; do not compare line-for-line without the stats matrix |
 
 Security detail for the GameStream plane:
 [Security → GameStream](/docs/security#gamestream--moonlight-compatibility-is-the-weak-crypto-path).
@@ -54,7 +54,7 @@ Leave GameStream **on** when:
 - You stay on a **trusted home LAN** and accept the GameStream crypto trade-off for compatibility.
 
 Windows ships GameStream **off** unless you ticked the installer box. Most Linux packages ship it
-**on** — override the unit if this is a Work-only box
+**on** - override the unit if this is a Work-only box
 ([Running as a Service → What the unit starts](/docs/running-as-a-service#what-the-unit-starts)).
 
 ## 1. Make sure the host is running with GameStream enabled
@@ -145,7 +145,7 @@ That **Desktop** entry is the operator base list. An `apps.json` in the host's c
 For couch play settings (Capture mouse on native, HDR, bitrate), see [Play](/docs/play) and
 [Picture quality](/docs/picture-quality). Controllers:
 [Controllers](/docs/controllers). Audio behaviour in Moonlight can differ from native mic/clipboard
-paths — [Audio](/docs/audio).
+paths - [Audio](/docs/audio).
 
 ## Security summary
 
@@ -164,11 +164,11 @@ paths — [Audio](/docs/audio).
 **Play (trusted LAN).** Moonlight on a TV or living-room box is a common fit: enable GameStream,
 open `slipstream-gamestream` on the firewall, pair once on the home Wi‑Fi, set resolution/refresh
 in Moonlight before connect. Controllers plugged into the Moonlight device reach the host like
-any GameStream pad path — see [Controllers](/docs/controllers) and [Play](/docs/play).
+any GameStream pad path - see [Controllers](/docs/controllers) and [Play](/docs/play).
 
 **Work (office / VPN).** Use a **native** Slipstream client. Absolute mouse, shared clipboard, and
 Work picture profiles are native product paths. If GameStream is still on for a couch TV at home,
-that is fine — just do not rely on Moonlight as your office remote, and do not expose those ports
+that is fine - just do not rely on Moonlight as your office remote, and do not expose those ports
 beyond the private network ([Desktop at work](/docs/desktop-at-work),
 [Network & VPN](/docs/network-and-vpn)).
 

@@ -216,12 +216,12 @@ the other.
 
 ## Related pages
 
-- [Why do I hear myself](/docs/echo) — full echo FAQ
-- [Client settings → Audio](/docs/client-settings#audio) — channels, mic, AEC, device pickers
-- [Mouse, touch and pen → Muting](/docs/input#muting-your-microphone) — Ctrl+Alt+Shift+V
-- [Configuration → Audio / microphone](/docs/configuration#audio--microphone) — `host.env` knobs
-- [Play](/docs/play) — couch streaming path
-- [Desktop at work](/docs/desktop-at-work) — office mic default off
-- [Windows Host](/docs/windows-host) — VB-CABLE install
-- [Support matrix](/docs/support-matrix) — which clients offer microphone and surround
-- [Controllers & gamepads](/docs/controllers) — pads that often sit next to a headset on the couch
+- [Why do I hear myself](/docs/echo) - full echo FAQ
+- [Client settings → Audio](/docs/client-settings#audio) - channels, mic, AEC, device pickers
+- [Mouse, touch and pen → Muting](/docs/input#muting-your-microphone) - Ctrl+Alt+Shift+V
+- [Configuration → Audio / microphone](/docs/configuration#audio--microphone) - `host.env` knobs
+- [Play](/docs/play) - couch streaming path
+- [Desktop at work](/docs/desktop-at-work) - office mic default off
+- [Windows Host](/docs/windows-host) - VB-CABLE install
+- [Support matrix](/docs/support-matrix) - which clients offer microphone and surround
+- [Controllers & gamepads](/docs/controllers) - pads that often sit next to a headset on the couch

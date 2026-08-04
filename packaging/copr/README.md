@@ -16,7 +16,7 @@ once in the COPR web UI (or with `copr-cli`):
 - External repositories (so `ffmpeg-devel` resolves at build time):
   `https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$releasever.noarch.rpm`
   and the matching `-free-` repo.
-- Enable network during build (cargo fetches crates from crates.io) — COPR allows this by
+- Enable network during build (cargo fetches crates from crates.io) - COPR allows this by
   default.
 
 `copr-cli` equivalent:
@@ -37,9 +37,9 @@ parallelism with `CARGO_BUILD_JOBS` in the spec's `%build`.
 ## The web console subpackage (`slipstream-web`)
 
 The spec can also build the management web console as a `slipstream-web` subpackage, but it's
-gated behind `%bcond_with web` and **OFF by default** — building (and now *running*) the Nitro
+gated behind `%bcond_with web` and **OFF by default** - building (and now *running*) the Nitro
 console needs `bun`, which COPR's mock chroot does not provide. The package vendors the build env's
-bun binary (the console serves HTTPS — HTTP/1.1 over TLS — via `Bun.serve`), so it is arch-specific, not noarch.
+bun binary (the console serves HTTPS - HTTP/1.1 over TLS - via `Bun.serve`), so it is arch-specific, not noarch.
 A stock COPR build produces only `slipstream` + `slipstream-client`.
 
 Two ways to get the console:

@@ -1,12 +1,12 @@
 ---
 title: Picture quality
-description: Bitrate, codecs, chroma, soft text, HDR trade-offs, and when PyroWave belongs — recipes for sharp desk work and for high-refresh play, without inventing settings the product does not have.
+description: Bitrate, codecs, chroma, soft text, HDR trade-offs, and when PyroWave belongs - recipes for sharp desk work and for high-refresh play, without inventing settings the product does not have.
 ---
 
 Picture quality in Slipstream is mostly a **client request**. You ask for a mode, a codec, a
 bitrate, HDR, and (where the client can) full chroma; the host answers in the handshake with what
 it can actually send. A setting the host cannot honor is usually a quiet downgrade rather than an
-error. Nothing on this page takes effect mid-stream for codec, HDR, or chroma — reconnect after
+error. Nothing on this page takes effect mid-stream for codec, HDR, or chroma - reconnect after
 you change them. Bitrate and **Match window** behave differently; see
 [Client settings](/docs/client-settings).
 
@@ -30,32 +30,32 @@ Four levers matter for how sharp and how smooth a stream looks. They interact; t
 | **Full chroma (4:4:4)** | Client toggle; host must allow | Off | Crisp coloured text and thin UI lines, at more bandwidth |
 
 **Render scale** sits beside resolution: the host renders and encodes at your mode multiplied by
-0.5x–4x, and the client resamples to the window. Above 1x supersamples for sharpness at more
+0.5x-4x, and the client resamples to the window. Above 1x supersamples for sharpness at more
 bandwidth and decode work; below 1x is lighter on both. Caps are per-axis 4096 px for H.264 and
 8192 px otherwise. Details: [Client settings → Video](/docs/client-settings#video).
 
 There is **no host-side bitrate knob**. The client requests a rate; the host clamps it to
-**500 kbps – 8 Gbps** (or uses its Automatic defaults below). Use the client's **Test network
-speed...** entry on a host card to measure the link and suggest a value —
+**500 kbps - 8 Gbps** (or uses its Automatic defaults below). Use the client's **Test network
+speed...** entry on a host card to measure the link and suggest a value -
 [Configuration → Bitrate](/docs/configuration#bitrate).
 
 ## Codecs in one paragraph
 
 **Automatic** is a soft preference: the host emits your choice when it can also produce it,
 otherwise the best codec you both speak, in the order **HEVC → AV1 → H.264**.
-**[PyroWave](/docs/pyrowave) is never auto-picked** — you must choose it explicitly on a client that
+**[PyroWave](/docs/pyrowave) is never auto-picked** - you must choose it explicitly on a client that
 offers it. Android and Apple hide AV1 unless the device has a hardware AV1 decoder; Android never
 offers PyroWave.
 
 Practical rule of thumb:
 
-- **HEVC** — the usual pick for both desk work and games. Best quality-per-bit for UI among the
+- **HEVC** - the usual pick for both desk work and games. Best quality-per-bit for UI among the
   hardware codecs Slipstream uses day to day, and the usual path for HDR (Main10).
-- **AV1** — where both ends encode/decode it in hardware. Often efficient; not a requirement for
+- **AV1** - where both ends encode/decode it in hardware. Often efficient; not a requirement for
   sharp text.
-- **H.264** — widest compatibility and the GPU-less software path. **Never HDR** on the hardware
+- **H.264** - widest compatibility and the GPU-less software path. **Never HDR** on the hardware
   Slipstream targets; pinning H.264 pins the session to SDR.
-- **PyroWave** — wired-LAN only, opt-in, hundreds of Mbps. Ultra-low codec latency and every frame
+- **PyroWave** - wired-LAN only, opt-in, hundreds of Mbps. Ultra-low codec latency and every frame
   a keyframe. See [When you are wired](#when-you-are-wired-pyrowave).
 
 ## Bitrate: Automatic vs an explicit rate
@@ -63,12 +63,12 @@ Practical rule of thumb:
 For **H.264, HEVC and AV1**, **Automatic** means the host's own default, **20 Mbps**, and it turns
 on two things an explicit rate switches off:
 
-1. **Adaptive bitrate** — the target can move with network conditions during the session.
-2. **A short link-capacity probe** about two seconds in — it measures what your link really
+1. **Adaptive bitrate** - the target can move with network conditions during the session.
+2. **A short link-capacity probe** about two seconds in - it measures what your link really
    carries and lets the rate climb **past** 20 Mbps when the path allows.
 
 An **explicit** rate is fixed for the session (still clamped by the host). The stats overlay shows
-`(auto)` on the target when Automatic owns it —
+`(auto)` on the target when Automatic owns it -
 [Understanding the stats overlay](/docs/stats).
 
 ### When Automatic helps
@@ -76,7 +76,7 @@ An **explicit** rate is fixed for the session (still clamped by the host). The s
 Leave Automatic on when:
 
 - You move between networks (home Wi-Fi one day, VPN the next) and do not want to retune by hand.
-- You are not sure what the link carries — the capacity probe is specifically for "start sane,
+- You are not sure what the link carries - the capacity probe is specifically for "start sane,
   climb if the wire allows."
 - The session is mostly quiet desktop with occasional motion: adaptive bitrate can sit under the
   grant when the picture is static and spend it when something moves.
@@ -94,11 +94,11 @@ the negotiated mode (hundreds of Mbps at typical desktop sizes), and both adapti
 capacity probe stay **off** for the whole session. An explicit bitrate is honored if you set one,
 but under sustained loss the right move is switching back to HEVC, not waiting for Automatic to
 "settle." Cap an over-ambitious Automatic pin on the host with
-`SLIPSTREAM_PYROWAVE_MAX_MBPS` — [Configuration](/docs/configuration#video-quality).
+`SLIPSTREAM_PYROWAVE_MAX_MBPS` - [Configuration](/docs/configuration#video-quality).
 
 ## Chroma: why text goes soft
 
-Hardware codecs usually send **4:2:0** — chroma (colour) at half the resolution of luma
+Hardware codecs usually send **4:2:0** - chroma (colour) at half the resolution of luma
 (brightness). Fine for photographs and most game frames. Bad for **small coloured text**, thin
 UI chrome, and red/blue edges: the colour channel is literally subsampled, so glyphs look soft or
 fringed even when the bitrate is high.
@@ -112,14 +112,14 @@ Honest gates today (do not skip these when diagnosing):
 
 - **Only HEVC and PyroWave** can carry 4:4:4. AV1 and H.264 sessions stay 4:2:0.
 - **Only NVENC and PyroWave** produce it on the host. AMD (VCN / AMF) and Intel (QSV / VAAPI /
-  Vulkan Video) decline HEVC 4:4:4 — that is a hardware or backend limit, not a missing toggle.
+  Vulkan Video) decline HEVC 4:4:4 - that is a hardware or backend limit, not a missing toggle.
   See the [encoder matrix](/docs/support-matrix#encoders).
 - **Today only the Apple app actually advertises 4:4:4**, and only when its hardware decode probe
   passes. The Linux and Windows apps store the toggle but their session does not advertise the
   capability yet, so **it has no effect there**. Android, Decky, and the console home do not offer
   it. Moonlight / GameStream sessions are always 4:2:0.
 - On Detailed stats, asking for full chroma prints `4:4:4` when granted or `4:4:4→4:2:0` when the
-  host could not — [Stats](/docs/stats).
+  host could not - [Stats](/docs/stats).
 
 ## HDR and picture quality
 
@@ -139,14 +139,14 @@ HDR is not free picture quality for desk work:
   - **Linux:** a host encodes 4:4:4 at **8 bits**, so a session that negotiates both resolves back
     down to **SDR** before the stream starts. On Linux **4:4:4 wins**; on Windows **HDR does**.
 - H.264 never does HDR. PyroWave HDR needs a **Windows** host today; Linux-hosted PyroWave is SDR
-  — stay on HEVC or AV1 for HDR from Linux.
+  - stay on HEVC or AV1 for HDR from Linux.
 
 Use two [profiles](/docs/profiles-and-links): Work with HDR off (and 4:4:4 when you can get it),
 Play with HDR as you like it for games and films.
 
 ## Recipe: Work (sharp UI and text)
 
-Goal: IDEs, browsers, terminals, and documents that look like a local panel — not a soft video of
+Goal: IDEs, browsers, terminals, and documents that look like a local panel - not a soft video of
 one. Pair this with [Desktop at work](/docs/desktop-at-work) (Desktop mouse, clipboard, VPN,
 Workstation / Hot-desk presets). Picture alone does not fix absolute mouse.
 
@@ -158,17 +158,17 @@ Create a **Work** settings profile and bind it to the office host:
 | **Full chroma / 4:4:4** | **On** when the client advertises it, the host GPU can encode it, and the link can carry it | Sharper coloured text and thin lines |
 | **10-bit HDR** | **Off** | Avoids washed / clipped office UI on typical SDR laptop panels; frees HEVC/AV1 sessions to keep 4:4:4 on Windows |
 | **Bitrate** | Higher than couch defaults if the VPN or LAN can carry it; or Automatic with a speed-test check | Soft text is usually bitrate or chroma, not a "broken" host |
-| **Resolution / refresh** | Match the laptop panel (Native) | Host builds a virtual display at your client mode — no local upscale of a smaller stream |
+| **Resolution / refresh** | Match the laptop panel (Native) | Host builds a virtual display at your client mode - no local upscale of a smaller stream |
 | **Render scale** | Native (1x) first; try >1x only if you have spare bitrate and decode headroom | Supersampling helps sharpness but spends bandwidth |
 
 On an Apple client talking to an **NVIDIA** host (NVENC) over a capable path, HEVC + 4:4:4 + HDR
 off is the sharpest shipping desk-work picture Slipstream offers today. On Linux or Windows
 *clients*, turn the 4:4:4 toggle on if you want it ready when advertising lands, but expect
-**4:2:0** until the session advertises the capability — raise bitrate and keep HEVC meanwhile.
+**4:2:0** until the session advertises the capability - raise bitrate and keep HEVC meanwhile.
 
 Over a **VPN**, raise bitrate until text stops looking muddy, then stop. If the VPN cannot carry
 more, drop refresh or resolution before chasing settings the product does not have. Over a **wired
-LAN** to the same workstation, you can spend much more — including PyroWave with 4:4:4 when you
+LAN** to the same workstation, you can spend much more - including PyroWave with 4:4:4 when you
 want maximum chroma sharpness and minimum codec latency (still not a WAN codec).
 
 ## Recipe: Play (motion and high refresh)
@@ -192,7 +192,7 @@ stage tells you which knob to turn. For shooters and racing on a **docked Deck o
 see PyroWave below.
 
 Save a **Play** (or Couch) profile next to Work on the same host so you are not retuning HDR and
-mouse mode every time you switch jobs —
+mouse mode every time you switch jobs -
 [Profiles and links](/docs/profiles-and-links).
 
 ## Soft text: diagnosis
@@ -208,22 +208,22 @@ corrupt host.
    climb. Run **Test network speed...**. Soft glyphs on a 1080p IDE at 10 Mbps on HEVC are
    expected; soft glyphs at 50 Mbps on a quiet LAN usually point elsewhere.
 3. **Chroma (4:2:0).** Coloured text and red/blue edges look fringed while grayscale looks
-   acceptable — classic 4:2:0. Enable full chroma **when your client advertises it and the host
+   acceptable - classic 4:2:0. Enable full chroma **when your client advertises it and the host
    GPU can encode it**; otherwise raise bitrate and stay on HEVC. Remember Linux/Windows clients
    do not advertise yet.
 4. **HDR fighting the panel or chroma.** Office UI on an SDR laptop with HDR left on → turn HDR
    off. Wanted 4:4:4 on Windows HEVC but left HDR on → session dropped to 4:2:0; turn HDR off for
    that Work profile.
 5. **Wrong resolution / upscale.** You asked for a smaller mode than the panel, or the host is
-   pinned to a real monitor and the client scales. Prefer Native / Match window for desk work —
+   pinned to a real monitor and the client scales. Prefer Native / Match window for desk work -
    [Virtual displays](/docs/virtual-displays).
 6. **Render scale below 1x.** Deliberately softer and cheaper; set Native if you did not mean to.
 7. **H.264 instead of HEVC.** Same bitrate, worse UI. Pin HEVC when the host can encode it.
 8. **Decoder / presentation path.** Software decode of an HDR stream on Linux/Windows can look
-   washed (no HDR10 swapchain path). Turn client HDR off there —
+   washed (no HDR10 swapchain path). Turn client HDR off there -
    [HDR → Per client](/docs/hdr#per-client).
 
-If text is sharp but the pointer fights you, that is **mouse mode**, not picture quality —
+If text is sharp but the pointer fights you, that is **mouse mode**, not picture quality -
 [Input → Mouse modes](/docs/input#mouse-modes).
 
 ## When you are wired: PyroWave
@@ -231,7 +231,7 @@ If text is sharp but the pointer fights you, that is **mouse mode**, not picture
 [PyroWave](/docs/pyrowave) is an **opt-in** wavelet codec for links that can afford real bandwidth:
 wired Ethernet, a docked Steam Deck, a 2.5GbE LAN. It runs as Vulkan compute on both ends, every
 frame a keyframe, encode/decode latency far below the hardware H.26x pipelines. **Do not run it
-over Wi-Fi** — that is what HEVC/AV1 are for. It is never selected automatically.
+over Wi-Fi** - that is what HEVC/AV1 are for. It is never selected automatically.
 
 Rough Automatic bitrate ballpark (~1.6 bits per pixel, 4:2:0 SDR):
 
@@ -277,25 +277,25 @@ Call these out so expectations stay accurate:
   trade-offs against 4:4:4. Desk work usually wants it off.
 - **PyroWave is not a WAN / Wi-Fi codec.** Hundreds of Mbps, no adaptive low-rate mode. Under loss,
   switch to HEVC.
-- **Web console cannot set bitrate or run a speed test** yet — client apps can. The console can
-  show what a live session is using —
+- **Web console cannot set bitrate or run a speed test** yet - client apps can. The console can
+  show what a live session is using -
   [Support matrix / roadmap notes](/docs/support-matrix).
 - **Multi-monitor as separate client windows** for one session is still on the
   [roadmap](/docs/roadmap). Picture quality settings do not unlock that.
 
 ## Cross-links
 
-- [Client settings → Video](/docs/client-settings#video) — every default and which clients offer
+- [Client settings → Video](/docs/client-settings#video) - every default and which clients offer
   which row
-- [Configuration → Video quality](/docs/configuration#video-quality) — `SLIPSTREAM_444`,
+- [Configuration → Video quality](/docs/configuration#video-quality) - `SLIPSTREAM_444`,
   `SLIPSTREAM_10BIT`, `SLIPSTREAM_PYROWAVE_MAX_MBPS`
-- [Configuration → Bitrate](/docs/configuration#bitrate) — speed test; no host bitrate knob
-- [HDR](/docs/hdr) — four-link chain, Windows vs Linux, codec rules, HDR vs 4:4:4
-- [PyroWave](/docs/pyrowave) — wired codec, bitrate table, 4:4:4 and HDR
-- [Support matrix → Encoders](/docs/support-matrix#encoders) — which GPUs encode 10-bit / 4:4:4
-- [Desktop at work](/docs/desktop-at-work) — Work path (mouse, clipboard, VPN, presets)
-- [Profiles and links](/docs/profiles-and-links) — Work vs Play profiles on one host
-- [Understanding the stats overlay](/docs/stats) — `(auto)`, chroma tags, HDR→SDR
-- [How it works](/docs/how-it-works) — soft text vs motion-to-photon
-- [Network & VPN](/docs/network-and-vpn) — what LAN vs VPN can realistically carry
-- [Troubleshooting](/docs/troubleshooting) — stutter, loss, and when bitrate is the wrong lever
+- [Configuration → Bitrate](/docs/configuration#bitrate) - speed test; no host bitrate knob
+- [HDR](/docs/hdr) - four-link chain, Windows vs Linux, codec rules, HDR vs 4:4:4
+- [PyroWave](/docs/pyrowave) - wired codec, bitrate table, 4:4:4 and HDR
+- [Support matrix → Encoders](/docs/support-matrix#encoders) - which GPUs encode 10-bit / 4:4:4
+- [Desktop at work](/docs/desktop-at-work) - Work path (mouse, clipboard, VPN, presets)
+- [Profiles and links](/docs/profiles-and-links) - Work vs Play profiles on one host
+- [Understanding the stats overlay](/docs/stats) - `(auto)`, chroma tags, HDR→SDR
+- [How it works](/docs/how-it-works) - soft text vs motion-to-photon
+- [Network & VPN](/docs/network-and-vpn) - what LAN vs VPN can realistically carry
+- [Troubleshooting](/docs/troubleshooting) - stutter, loss, and when bitrate is the wrong lever

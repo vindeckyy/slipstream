@@ -1,8 +1,8 @@
-# `slipstream-gamescope` — gamescope with 10-bit HDR PipeWire capture
+# `slipstream-gamescope` - gamescope with 10-bit HDR PipeWire capture
 
 Upstream gamescope's built-in PipeWire node is SDR-only: `build_format_params()` offers `BGRx`
 and `NV12`, and `paint_pipewire()` hardcodes a Gamma-2.2 composite with the SDR screenshot LUT
-set. An HDR game therefore reaches every capture consumer already tone-mapped down — which is
+set. An HDR game therefore reaches every capture consumer already tone-mapped down - which is
 why the slipstream gamescope backend has always streamed 8-bit, even though games *can* render
 HDR on a headless gamescope today (`--hdr-enabled --hdr-debug-force-support`).
 
@@ -11,27 +11,27 @@ The patches here add the missing half, and nothing else. See
 
 | Patch | What | Upstream? |
 |---|---|---|
-| `0001-pipewire-offer-10-bit-BT.2020-PQ-capture-formats-HDR.patch` | Offer SPA `xRGB_210LE`/`xBGR_210LE` with MANDATORY SMPTE ST.2084 + BT.2020 props, map them to `DRM_FORMAT_XRGB2101010`/`XBGR2101010`, and composite them with `g_ScreenshotColorMgmtLutsHDR` + `EOTF_PQ` | **Yes** — offered against [gamescope#2126](https://github.com/ValveSoftware/gamescope/issues/2126) |
-| `0002-pipewire-optionally-composite-the-cursor-into-the-ca.patch` | `--pipewire-composite-cursor` (off by default): paint the pointer into the capture stream, using the same `MouseCursor::paint` call the scanout composite uses | **Yes** — independently useful to any consumer with no cursor of its own |
-| `0003-slipstream-stamp-the-version-banner-with-pfhdrN.patch` | Append `+pfhdr<N>` to the `--version` banner | **No** — ours only, retired when the two above land upstream |
+| `0001-pipewire-offer-10-bit-BT.2020-PQ-capture-formats-HDR.patch` | Offer SPA `xRGB_210LE`/`xBGR_210LE` with MANDATORY SMPTE ST.2084 + BT.2020 props, map them to `DRM_FORMAT_XRGB2101010`/`XBGR2101010`, and composite them with `g_ScreenshotColorMgmtLutsHDR` + `EOTF_PQ` | **Yes** - offered against [gamescope#2126](https://github.com/ValveSoftware/gamescope/issues/2126) |
+| `0002-pipewire-optionally-composite-the-cursor-into-the-ca.patch` | `--pipewire-composite-cursor` (off by default): paint the pointer into the capture stream, using the same `MouseCursor::paint` call the scanout composite uses | **Yes** - independently useful to any consumer with no cursor of its own |
+| `0003-slipstream-stamp-the-version-banner-with-pfhdrN.patch` | Append `+pfhdr<N>` to the `--version` banner | **No** - ours only, retired when the two above land upstream |
 
 ### Why the cursor patch matters more than it looks
 
-gamescope keeps the pointer out of its PipeWire node — it lives on a hardware plane for scanout —
+gamescope keeps the pointer out of its PipeWire node - it lives on a hardware plane for scanout -
 so slipstream has always reconstructed it from XFixes and blended it into every frame host-side.
 That blend is what forces the encode path onto its compute colour-conversion arm: the zero-copy
 RGB-direct encode source (`VK_VALVE_video_encode_rgb_conversion`) hands the captured buffer to a
 fixed-function front end with no blend stage. Painting the cursor into the node removes the reason
-for the blend, and with it a full-frame pass per frame — a gamescope session becomes the first one
+for the blend, and with it a full-frame pass per frame - a gamescope session becomes the first one
 that can be genuinely zero-copy end to end.
 
 ## Why the marker exists
 
 slipstream decides a session's shape **before** the virtual display exists: the bit depth at
-handshake time (irrevocable — a PQ stream handed to an 8-bit encoder is a deliberate hard error),
+handshake time (irrevocable - a PQ stream handed to an 8-bit encoder is a deliberate hard error),
 and whether the host must composite the cursor before the encoder is even opened. Both answers
 must therefore be static properties of the resolved binary, not optimistic negotiations. The host
-runs `<gamescope> --version` once per boot and reads the revision — see `gamescope_patch_level()`
+runs `<gamescope> --version` once per boot and reads the revision - see `gamescope_patch_level()`
 in `crates/ss-vdisplay/src/display/linux/gamescope/discovery.rs`.
 
 The number is a **monotonic patch-set revision**, so one probe answers every capability:
@@ -39,7 +39,7 @@ The number is a **monotonic patch-set revision**, so one probe answers every cap
 | Level | Adds |
 |---|---|
 | `+pfhdr1` | 10-bit BT.2020/PQ capture formats |
-| `+pfhdr2` | …and `--pipewire-composite-cursor` |
+| `+pfhdr2` | ...and `--pipewire-composite-cursor` |
 
 Bump it whenever a patch adds or changes something the host must know about before it spawns.
 
@@ -47,13 +47,13 @@ Bump it whenever a patch adds or changes something the host must know about befo
 SteamOS PATH shim) pass these flags through `PF_HDR_ARGS`, so they share one dependency: if the
 session ignores `GAMESCOPE_BIN`/`PATH` and execs the distro's gamescope, it gets neither the HDR
 formats nor the cursor flag. HDR fails loudly there (the capture negotiation times out and latches
-an SDR downgrade) — but a missing cursor would be silent, because the host was told the compositor
+an SDR downgrade) - but a missing cursor would be silent, because the host was told the compositor
 would paint the pointer and so painted none itself.
 
 Both managed paths therefore **verify after spawn**: once the session's node appears,
 `verify_managed_spawn_flags` reads the running compositor's `/proc/<pid>/cmdline` and refuses the
 session if a flag we passed isn't there. The plan is fixed by then (`cursor_blend` feeds the encoder
-open, which precedes the display), so the session cannot be corrected in place — instead the
+open, which precedes the display), so the session cannot be corrected in place - instead the
 capability is latched off for the process and the spawn fails, and the retry resolves a correct SDR
 host-composited session. One rejected attempt per boot, then it converges.
 
@@ -65,7 +65,7 @@ The check fails **open** at every ambiguity: no flags expected, or no readable g
 Resolution order, applied identically by the bare spawn, the `GAMESCOPE_BIN` wrapper
 (gamescope-session-plus) and the SteamOS PATH shim:
 
-1. `SLIPSTREAM_GAMESCOPE_BIN` — absolute path override
+1. `SLIPSTREAM_GAMESCOPE_BIN` - absolute path override
 2. `slipstream-gamescope` on `PATH`
 3. `gamescope`
 
@@ -74,7 +74,7 @@ distro's `gamescope`.
 
 ## Building
 
-Pinned upstream: `8c676c39` (master, 2026-07-27 — tags through 3.16.25). The patches apply
+Pinned upstream: `8c676c39` (master, 2026-07-27 - tags through 3.16.25). The patches apply
 cleanly to that commit; they touch `src/pipewire.cpp`, `src/steamcompmgr.cpp` and
 `src/meson.build` only.
 
@@ -96,19 +96,19 @@ install -Dm755 build/src/gamescope /usr/bin/slipstream-gamescope
 They are gamescope's, not ours, and they vary by distro. Two shortcuts that work:
 
 ```sh
-# Fedora / Bazzite (inside a toolbox/distrobox — the host is immutable)
+# Fedora / Bazzite (inside a toolbox/distrobox - the host is immutable)
 sudo dnf install -y dnf-plugins-core meson ninja-build glslc
 sudo dnf builddep -y gamescope
 sudo dnf install -y xorg-x11-server-Xwayland-devel      # NOT pulled by builddep; wlroots needs it
 
-# Arch / SteamOS — see the makedepends in ./PKGBUILD
+# Arch / SteamOS - see the makedepends in ./PKGBUILD
 ```
 
 ⚠️ `dnf builddep gamescope` resolves Fedora's *packaged* gamescope, which is older than the master
 we pin, so it can come up short. `xorg-x11-server-Xwayland-devel` is the one that actually bit
 (2026-07-28, Fedora 43): without it wlroots' configure fails with `Neither a subproject directory
 nor a xserver.wrap file was found`, several minutes into an otherwise clean run. If a different
-one surfaces, meson names it — install and re-run with `--srcdir` so the clone is not repeated.
+one surfaces, meson names it - install and re-run with `--srcdir` so the clone is not repeated.
 
 `gamescope` needs `CAP_SYS_NICE` for its realtime priority; the distro packages set it on their
 own binary. Mirror it if you install ours system-wide:
@@ -119,15 +119,15 @@ setcap 'CAP_SYS_NICE=eip' /usr/bin/slipstream-gamescope
 
 ## How each channel ships it
 
-Four packaging paths, one build recipe — `build-slipstream-gamescope.sh` — because the two things
+Four packaging paths, one build recipe - `build-slipstream-gamescope.sh` - because the two things
 that are easy to get wrong (which patches get applied, and whether wlroots is linked statically)
 must not be decided twice.
 
 | Channel | Built by | Notes |
 |---|---|---|
-| Bazzite / Fedora Atomic | `.github/workflows/rpm.yml` → `build-sysext.sh --gamescope` | Inside the matching Fedora container, per major — the binary is soname-coupled to its base exactly like the RPM |
+| Bazzite / Fedora Atomic | `.github/workflows/rpm.yml` → `build-sysext.sh --gamescope` | Inside the matching Fedora container, per major - the binary is soname-coupled to its base exactly like the RPM |
 | Arch / SteamOS | `.github/workflows/arch.yml` → `makepkg` on `./PKGBUILD` | Its own pkgbase in the same pacman repo; `pacman -S slipstream-gamescope` |
-| NixOS | `packaging/nix/gamescope.nix` (an `overrideAttrs` on nixpkgs' gamescope) | The one path that does NOT call the script — nixpkgs already solves the submodules, and a nix closure names every library it links |
+| NixOS | `packaging/nix/gamescope.nix` (an `overrideAttrs` on nixpkgs' gamescope) | The one path that does NOT call the script - nixpkgs already solves the submodules, and a nix closure names every library it links |
 | Anything else | the script, by hand | See *Building* above |
 
 Both CI builds are **cached on `packaging/gamescope/**`** and **best-effort**. Cached because this

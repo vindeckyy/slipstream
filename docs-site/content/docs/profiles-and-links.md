@@ -99,7 +99,7 @@ If one host is both your office desktop and your game PC, make two profiles and 
 | **Work** | Desktop (absolute) mouse, HEVC, full chroma / 4:4:4 when the link allows, HDR off, bitrate high enough for sharp text |
 | **Play** | Capture (games) mouse, HDR as you like, bitrate / refresh for the title |
 
-Clipboard stays a per-host trust toggle, not a profile row — see [Clipboard](/docs/clipboard). The
+Clipboard stays a per-host trust toggle, not a profile row - see [Clipboard](/docs/clipboard). The
 full office checklist is on [Desktop at work](/docs/desktop-at-work).
 
 ## Deleting a profile

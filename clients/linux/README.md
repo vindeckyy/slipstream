@@ -1,35 +1,35 @@
-# slipstream — Linux client
+# slipstream - Linux client
 
 The native **Linux** app for streaming a slipstream host to your desktop, laptop, or Steam Deck.
 It's a clean relm4/GTK4/libadwaita **shell** that finds hosts on your network, pairs with a PIN,
-and manages your settings and library — the stream itself runs in the sibling
+and manages your settings and library - the stream itself runs in the sibling
 **`slipstream-session`** Vulkan binary ([`clients/session`](../session/README.md)), which the shell
 spawns, putting the picture on glass at your display's own resolution and refresh rate.
 
 Built in Rust end to end (no C ABI): the shell shares its plumbing with the session binary through
 **`crates/ss-client-core`**, which links the **`slipstream-core`** protocol crate and speaks the fast
-**`slipstream/1`** protocol — QUIC control plane, GF(2¹⁶) FEC + AES-GCM data plane.
+**`slipstream/1`** protocol - QUIC control plane, GF(2¹⁶) FEC + AES-GCM data plane.
 
 ## Features
 
-- **Zero-copy hardware decode** — the session presenter decodes via **Vulkan Video** on every GPU
+- **Zero-copy hardware decode** - the session presenter decodes via **Vulkan Video** on every GPU
   vendor (including NVIDIA), falling back to FFmpeg VAAPI → DRM-PRIME dmabuf and then software when
   Vulkan Video is unavailable.
-- **Your display's native mode** — the host builds a virtual output at exactly your WxH@Hz; no
+- **Your display's native mode** - the host builds a virtual output at exactly your WxH@Hz; no
   scaling, no letterboxing. Steady 60 fps at 1080p60, ~6 ms capture→decoded on the LAN.
-- **Audio both ways** — PipeWire playback with a jitter ring, plus mic uplink to the host.
-- **Full controller support** — SDL3 gamepads with rumble and DualSense fidelity (lightbar, player
+- **Audio both ways** - PipeWire playback with a jitter ring, plus mic uplink to the host.
+- **Full controller support** - SDL3 gamepads with rumble and DualSense fidelity (lightbar, player
   LEDs, touchpad, motion, adaptive-trigger replay). Click-to-capture keyboard and mouse, with a
   release chord (Ctrl+Alt+Shift+Q) and focus-loss release.
-- **Find hosts automatically** — mDNS discovery lists hosts on your LAN; saved hosts persist.
+- **Find hosts automatically** - mDNS discovery lists hosts on your LAN; saved hosts persist.
   First connect does a one-time **SPAKE2 PIN pairing** (or TOFU on trusted LANs), then reconnects on
   a pinned identity.
 - **Per-host speed test** to pick a bitrate, plus compositor and mode preferences in Settings.
-- **Game library browser** *(experimental, off by default)* — "Browse library…" on a saved host
+- **Game library browser** *(experimental, off by default)* - "Browse library..." on a saved host
   shows its games (Steam + custom) as a poster grid; click one to launch it in the session.
-  Fetched from the host's management API over mTLS — paired devices are authorized by their
+  Fetched from the host's management API over mTLS - paired devices are authorized by their
   certificate, no extra host setup.
-- **Gamepad library launcher** (`--browse host`) — a console-style, controller-driven library view
+- **Gamepad library launcher** (`--browse host`) - a console-style, controller-driven library view
   of a paired host's games, rendered by the session binary's Skia console UI: A plays the focused
   title, B quits, L1/R1 jump. Built for the Steam Deck plugin's "Open library" launch; session end
   returns to the launcher. Arrow keys/Enter/Esc drive it too (no pad needed).
@@ -40,7 +40,7 @@ Most people should install a package rather than build from source:
 
 | Distro | Install |
 |--------|---------|
-| **Flatpak** (any distro, Steam Deck) | `io.slipstream` — see [`packaging/flatpak`](../../packaging/flatpak/README.md) |
+| **Flatpak** (any distro, Steam Deck) | `io.slipstream` - see [`packaging/flatpak`](../../packaging/flatpak/README.md) |
 | **Ubuntu / Debian** (apt) | `sudo apt install slipstream-client` *(after adding the repo)* |
 | **Fedora / Bazzite** (rpm) | `rpm-ostree install slipstream-client` |
 | **Arch** (PKGBUILD) | see [`packaging/arch`](../../packaging/arch/README.md) |
@@ -60,7 +60,7 @@ cargo run -p slipstream-client-linux -- --connect HOST[:PORT]   # skip the host 
 cargo run -p slipstream-client-linux -- --browse HOST           # the gamepad library launcher
 ```
 
-The binary is named **`slipstream-client`** — the relm4/libadwaita desktop shell (hosts,
+The binary is named **`slipstream-client`** - the relm4/libadwaita desktop shell (hosts,
 pairing/trust, settings, the desktop library page). Every stream and the console game
 library run in the sibling **`slipstream-session`** Vulkan binary; the shell spawns it
 for connects, and `--connect`/`--browse` on the shell exec it directly (so the Decky
@@ -85,12 +85,12 @@ src/
 tools/screenshots.sh      store screenshot capture (app self-capture; Xvfb fallback)
 ```
 
-The UI-agnostic plumbing — session pump, FFmpeg decode, PipeWire audio, SDL3 gamepads +
-keymap, trust store, mDNS discovery, library client, Wake-on-LAN — lives in
+The UI-agnostic plumbing - session pump, FFmpeg decode, PipeWire audio, SDL3 gamepads +
+keymap, trust store, mDNS discovery, library client, Wake-on-LAN - lives in
 `crates/ss-client-core`, shared with the Vulkan session binary.
 
 ## Related
 
-- **[Documentation](../../docs-site/content/docs/)** — quick start, pairing, troubleshooting
-- **[Steam Deck plugin](../decky/README.md)** — launches this client fullscreen in Gaming Mode
-- **[Project README](../../README.md)** — the host, the other clients, and how it all fits together
+- **[Documentation](../../docs-site/content/docs/)** - quick start, pairing, troubleshooting
+- **[Steam Deck plugin](../decky/README.md)** - launches this client fullscreen in Gaming Mode
+- **[Project README](../../README.md)** - the host, the other clients, and how it all fits together

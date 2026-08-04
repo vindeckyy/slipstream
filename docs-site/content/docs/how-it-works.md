@@ -266,11 +266,11 @@ and the same pairing model.
 
 ## Where to go next
 
-- **[Quick Start](/docs/quickstart)** — from nothing to a first stream
-- **[Virtual displays](/docs/virtual-displays)** — presets, keep-alive, topology, multi-client layout
-- **[Desktop at work](/docs/desktop-at-work)** — office laptop → home desktop checklist
-- **[Network & VPN](/docs/network-and-vpn)** — Tailscale / WireGuard, discovery, ports, firewalls
-- **[Pairing & Trust](/docs/pairing)** — PIN, console approve, pinned reconnects
-- **[Clients](/docs/clients)** / **[Moonlight](/docs/moonlight)** — how to connect
-- **[Security & Safe Use](/docs/security)** — what a streaming host really exposes
-- **[Support matrix](/docs/support-matrix)** — what works where, read out of the code that decides it
+- **[Quick Start](/docs/quickstart)** - from nothing to a first stream
+- **[Virtual displays](/docs/virtual-displays)** - presets, keep-alive, topology, multi-client layout
+- **[Desktop at work](/docs/desktop-at-work)** - office laptop → home desktop checklist
+- **[Network & VPN](/docs/network-and-vpn)** - Tailscale / WireGuard, discovery, ports, firewalls
+- **[Pairing & Trust](/docs/pairing)** - PIN, console approve, pinned reconnects
+- **[Clients](/docs/clients)** / **[Moonlight](/docs/moonlight)** - how to connect
+- **[Security & Safe Use](/docs/security)** - what a streaming host really exposes
+- **[Support matrix](/docs/support-matrix)** - what works where, read out of the code that decides it

@@ -1,6 +1,6 @@
 ---
 title: Network & VPN
-description: Reach a Slipstream host from another network safely — trusted LAN model, Tailscale and WireGuard patterns, discovery, ports, firewalls, and what does not work over a VPN.
+description: Reach a Slipstream host from another network safely - trusted LAN model, Tailscale and WireGuard patterns, discovery, ports, firewalls, and what does not work over a VPN.
 ---
 
 Slipstream is built for a **trusted private network**: your home LAN, or a VPN that makes the
@@ -9,7 +9,7 @@ the networking companion to [Security & Safe Use](/docs/security).
 
 If you are connecting from an office laptop to a home desktop, read this together with
 [Desktop at work](/docs/desktop-at-work). For couch / LAN play on the same network, you usually
-need only the firewall section — see [Play](/docs/play).
+need only the firewall section - see [Play](/docs/play).
 
 ## The model in one paragraph
 
@@ -28,8 +28,8 @@ that routes to your LAN) and you **never** open Slipstream's ports on the WAN si
 ## Do not
 
 - Port-forward TCP/UDP Slipstream ports to `0.0.0.0` on the public internet.
-- Rely on “security through obscurity” with a random high port on the WAN.
-- Leave GameStream/Moonlight enabled on a host you only use over a wide VPN if you do not need it —
+- Rely on "security through obscurity" with a random high port on the WAN.
+- Leave GameStream/Moonlight enabled on a host you only use over a wide VPN if you do not need it -
   that plane pairs over legacy plain HTTP ([Security](/docs/security#gamestream--moonlight-compatibility-is-the-weak-crypto-path),
   [Moonlight](/docs/moonlight)).
 
@@ -48,15 +48,15 @@ Step-by-step that matches how people actually get a first office stream:
 4. On the host firewall, treat the Tailscale interface like a private LAN: the packaged
    `slipstream-native` rules (below) must allow traffic that arrives on that interface. Some
    people temporarily disable the host firewall only to prove the path, then re-enable with the
-   correct service rules — do not leave the firewall permanently off on a dual-homed box.
+   correct service rules - do not leave the firewall permanently off on a dual-homed box.
 5. Open the Slipstream client. The host list is often **empty** over Tailscale (mDNS does not
    cross). Use **Add host** and enter the **Tailscale IP** (or a MagicDNS name if your client
    accepts a hostname).
-6. [Pair once](/docs/pairing) over the VPN the same way you would on LAN — arm a PIN in the
+6. [Pair once](/docs/pairing) over the VPN the same way you would on LAN - arm a PIN in the
    [web console](/docs/web-console) (reachable at `https://<tailscale-ip>:47992` if you opened the
    console port), or approve a waiting device.
 7. Connect. If control connects but video stalls, your ACLs are probably allowing TCP-ish paths
-   but not **UDP** to **9777** and the negotiated media port — see
+   but not **UDP** to **9777** and the negotiated media port - see
    [Office / VPN](/docs/troubleshooting#office--vpn).
 
 **Notes**
@@ -84,8 +84,8 @@ Step-by-step that matches how people actually get a first office stream:
 
 **Notes**
 
-- “Full tunnel” vs “split tunnel” both work; split tunnel is usually enough if it includes the host
-  subnet or WG peer IPs — and it avoids sending all office browsing through your home uplink.
+- "Full tunnel" vs "split tunnel" both work; split tunnel is usually enough if it includes the host
+  subnet or WG peer IPs - and it avoids sending all office browsing through your home uplink.
 - Some router VPNs put you on a **different subnet** than the host. That is fine for Slipstream as
   long as routed unicast works; discovery may still need add-by-IP.
 - Keep MTU sensible. Pathologically low or fragmented UDP paths show up as high latency or stalled
@@ -100,15 +100,15 @@ substitute for PIN pairing.
 Extra caveats that bite people on corp tunnels:
 
 - **UDP is often restricted.** Native Slipstream needs UDP for control (**9777**) and media. A
-  “VPN that only forwards HTTPS” will not carry a stream. Test with a native client after ping
+  "VPN that only forwards HTTPS" will not carry a stream. Test with a native client after ping
   works; TCP-only tools lying green does not prove the path.
 - **Split DNS / captive portal helpers** can make the host hostname resolve to a wrong address.
   Prefer the literal VPN or LAN IP when adding the host.
-- **Mandatory proxies** on the client OS usually do not apply to Slipstream's UDP path — but they
+- **Mandatory proxies** on the client OS usually do not apply to Slipstream's UDP path - but they
   can break fetching the web console in a browser. Use the host's VPN IP with HTTPS on **47992**,
   or administer from a machine that is actually on the host LAN.
 - **Do not** enable GameStream/Moonlight on a Work host that sits on a shared corporate segment
-  unless you fully trust that LAN — see [Moonlight](/docs/moonlight) and
+  unless you fully trust that LAN - see [Moonlight](/docs/moonlight) and
   [Desktop at work](/docs/desktop-at-work).
 - IT policy may forbid always-on remote-control hosts. That is an org decision Slipstream cannot
   override; keep the blast radius small ([Security → which machine](/docs/security#choosing-which-machine-to-host-on)).
@@ -128,9 +128,9 @@ After pairing, the client remembers the host. You can also confirm reachability 
 Disable mDNS on the host only if you must (`--no-mdns` / `SLIPSTREAM_MDNS=0`); then every client
 must add the host manually.
 
-## Host not found — decision tree
+## Host not found - decision tree
 
-Work top to bottom. Most “VPN is broken” reports stop at step 3 or 5.
+Work top to bottom. Most "VPN is broken" reports stop at step 3 or 5.
 
 1. **Is the host process running?**  
    Linux: `systemctl --user status slipstream-host`. Windows: `slipstream-host service status` /
@@ -147,7 +147,7 @@ Work top to bottom. Most “VPN is broken” reports stop at step 3 or 5.
    work even when discovery is empty.
 
 4. **Android client?**  
-   Local-network / Nearby devices permission denied looks exactly like “no hosts.” Allow it —
+   Local-network / Nearby devices permission denied looks exactly like "no hosts." Allow it -
    [Troubleshooting](/docs/troubleshooting#the-host-isnt-found-on-the-network).
 
 5. **Host firewall open for native ports?**  
@@ -160,7 +160,7 @@ Work top to bottom. Most “VPN is broken” reports stop at step 3 or 5.
    truly is trusted.
 
 7. **Competing GameStream host running?**  
-   Sunshine / Apollo / forks binding the same ports —
+   Sunshine / Apollo / forks binding the same ports -
    `slipstream-host detect-conflicts`, then stop the other host.
 
 8. **Still stuck?**  
@@ -171,7 +171,7 @@ Work top to bottom. Most “VPN is broken” reports stop at step 3 or 5.
 
 Exact numbers matter for firewalls and VPN ACLs.
 
-### Native Slipstream (`slipstream/1`) — always needed for native clients
+### Native Slipstream (`slipstream/1`) - always needed for native clients
 
 | Port | Proto | Role |
 |---|---|---|
@@ -196,7 +196,7 @@ loopback-only if you only ever use the console on the host itself.
 | Ports | Proto | Role |
 |---|---|---|
 | **47984**, **47989**, **48010** | TCP | nvhttp / RTSP control |
-| **47998–48000** | UDP | Video / control / audio |
+| **47998-48000** | UDP | Video / control / audio |
 | **5353** | UDP | `_nvstream` mDNS |
 
 Linux packages: `slipstream-gamestream`. Prefer leaving this **off** for office-only hosts.
@@ -213,7 +213,7 @@ What you will see in practice:
 - **Host firewall denies inbound to the random port:** session still works after ~**2.5 s**
   (punch timeout, then fallback). Slow start is the symptom of a missing data-plane allow.
 - **Across a VPN / subnet:** same punch-then-fallback, as long as host → client UDP can flow.
-  Strict ACLs that allow only TCP break the picture even when “connect” seemed to start.
+  Strict ACLs that allow only TCP break the picture even when "connect" seemed to start.
 
 To remove the punch wait on a controlled path, pin a port in `host.env` and open **exactly** that
 UDP port:
@@ -232,10 +232,10 @@ session falls back to random + punch); leave the pin **off** when you rely on NA
 hole-punch. Full write-up:
 [Troubleshooting → Video is slow to start](/docs/troubleshooting#video-is-slow-to-start-or-fails-across-subnets).
 
-**Never** port-forward that data port (or 9777) to the public WAN — use a VPN
+**Never** port-forward that data port (or 9777) to the public WAN - use a VPN
 ([Security](/docs/security)).
 
-## Firewalls — copy-paste
+## Firewalls - copy-paste
 
 Open only what you use. A Work host that never serves Moonlight can skip `slipstream-gamestream`.
 
@@ -243,7 +243,7 @@ Open only what you use. A Work host that never serves Moonlight can skip `slipst
 
 ```sh
 sudo ufw allow slipstream-native
-# optional — browser console from another device on the private network:
+# optional - browser console from another device on the private network:
 sudo ufw allow slipstream-web
 # only if the host runs with --gamestream / Moonlight clients:
 sudo ufw allow slipstream-gamestream
@@ -288,13 +288,13 @@ VPN interfaces must be treated as private/trusted by the OS firewall the same wa
 
 Office VPNs vary widely.
 
-- **LAN:** you can push high bitrate, high refresh, 4:4:4, HDR —
+- **LAN:** you can push high bitrate, high refresh, 4:4:4, HDR -
   [Picture quality](/docs/picture-quality), [Play](/docs/play).
-- **Good home uplink + light VPN:** 1080p–1440p desktop work is realistic; raise bitrate until text
-  looks crisp, then stop — [Desktop at work](/docs/desktop-at-work),
+- **Good home uplink + light VPN:** 1080p-1440p desktop work is realistic; raise bitrate until text
+  looks crisp, then stop - [Desktop at work](/docs/desktop-at-work),
   [Picture quality → Soft text](/docs/picture-quality#soft-text-diagnosis).
 - **Congested VPN:** drop refresh, resolution, or chroma before you assume the host is broken.
-- **Wired LAN only:** [PyroWave](/docs/pyrowave) for ultra-low-latency / 4:4:4 — not a WAN codec.
+- **Wired LAN only:** [PyroWave](/docs/pyrowave) for ultra-low-latency / 4:4:4 - not a WAN codec.
 
 Use the [stats overlay](/docs/stats) (`Ctrl+Alt+Shift+S`) to see whether you are network-bound or
 decode-bound.
@@ -313,7 +313,7 @@ Practical options:
 ## Competing hosts on the same ports
 
 Do not run Sunshine, Apollo, or other GameStream hosts **at the same time** as Slipstream on one
-machine — shared ports and often shared virtual-display drivers. Slipstream warns when another host
+machine - shared ports and often shared virtual-display drivers. Slipstream warns when another host
 is **actively running**. Details:
 [Troubleshooting](/docs/troubleshooting#another-streaming-host-sunshine-apollo--is-installed).
 

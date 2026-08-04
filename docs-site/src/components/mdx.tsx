@@ -8,7 +8,7 @@ export function getMDXComponents(components?: MDXComponents) {
     ...defaultMdxComponents,
     // Custom components usable in any .md/.mdx without a per-file import.
     BitrateCalculator,
-    // Per-platform instructions: <Tabs items={['Linux', 'Windows']}><Tab value="Linux">…
+    // Per-platform instructions: <Tabs items={['Linux', 'Windows']}><Tab value="Linux">...
     Tabs,
     Tab,
     ...components,

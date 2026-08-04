@@ -8,7 +8,7 @@ use super::*;
 /// Who owns a [`VirtualOutput`]'s lifecycle — the honest declaration that lets the registry
 /// (`design/gamemode-and-dedicated-sessions.md` Part A1) pool **only what it owns** instead of
 /// keeping outputs whose real lifecycle lives elsewhere (the gamescope managed/attach paths, which
-/// are governed by the gamescope module's own session machinery). Extends the CLAUDE.md invariant
+/// are governed by the gamescope module's own session machinery). Extends the project invariant
 /// "the registry owns display lifecycle" with its converse: what the registry does not own, it must
 /// not pretend to keep.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

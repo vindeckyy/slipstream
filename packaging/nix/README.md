@@ -15,7 +15,7 @@ and the native Linux **client**, a **NixOS module** that wires up everything the
 | Output | Contents |
 | --- | --- |
 | `packages.x86_64-linux.slipstream-host` | `slipstream-host` + `slipstream-tray` (built with `nvenc` + `vulkan-encode`, like CI) |
-| `packages.x86_64-linux.slipstream-client` | `slipstream-client` (GTK4 shell) + `slipstream-session` (Vulkan streamer, without the Skia OSD — see caveats) |
+| `packages.x86_64-linux.slipstream-client` | `slipstream-client` (GTK4 shell) + `slipstream-session` (Vulkan streamer, without the Skia OSD - see caveats) |
 | `packages.x86_64-linux.slipstream-web` | the management web console (bun-built Nitro SSR bundle; SPAKE2 pairing + host status) |
 | `packages.x86_64-linux.slipstream-scripting` | the plugin/script runner (bun-bundled Effect SDK; supervises host automation) |
 | `packages.x86_64-linux.default` | = `slipstream-host` |
@@ -41,7 +41,7 @@ nix run github:vindeckyy/slipstream#slipstream-client
 ```
 
 GPU drivers are resolved at runtime from `/run/opengl-driver/lib`. On non-NixOS distros use
-[nixGL](https://github.com/nix-community/nixGL) so that path is populated (`nixGL nix run …`); on
+[nixGL](https://github.com/nix-community/nixGL) so that path is populated (`nixGL nix run ...`); on
 NixOS the module (below) sets `hardware.graphics.enable = true` for you.
 
 ---
@@ -72,7 +72,7 @@ Add the flake and enable the host and/or client:
             };
           };
 
-          # …and/or the client on the same or another box:
+          # ...and/or the client on the same or another box:
           services.slipstream.client = {
             enable = true;
             openFirewall = true;        # UDP 5353 for mDNS discovery
@@ -98,7 +98,7 @@ systemctl --user enable --now slipstream-host
 | --- | --- | --- |
 | `enable` | `false` | Install the host + wire udev/sysctl/kernel-modules/firewall and the user service. |
 | `gamestream` | `true` | `serve --gamestream` (Moonlight-compatible). `false` = native-only, more secure. |
-| `autoStart` | `false` | Add the user service to `default.target` (appliance mode — pair with lingering). |
+| `autoStart` | `false` | Add the user service to `default.target` (appliance mode - pair with lingering). |
 | `users` | `[ ]` | Users added to the `input` group (virtual gamepads). |
 | `settings` | `{ }` | `host.env` key/values (see `${package}/share/slipstream-host/host.env.example`). |
 | `environmentFile` | `null` | Extra `EnvironmentFile` for secrets (e.g. `SLIPSTREAM_MGMT_TOKEN`); loaded optionally. |
@@ -107,7 +107,7 @@ systemctl --user enable --now slipstream-host
 
 `services.slipstream.client`: `enable`, `openFirewall` (UDP 5353), `package`.
 
-`services.slipstream.web` (the management console — **on by default whenever the host is enabled**,
+`services.slipstream.web` (the management console - **on by default whenever the host is enabled**,
 mirroring the RPM's `Recommends: slipstream-web`):
 
 | Option | Default | Meaning |
@@ -124,13 +124,13 @@ server-side (never sent to the browser). Choose a login password in the browser 
 `https://<host-ip>:47992` and trust the self-signed host cert once. Enable it (with the host) via
 `systemctl --user enable --now slipstream-web`.
 
-`services.slipstream.scripting` (the plugin/script runner — installed with the host, but **opt-in to
+`services.slipstream.scripting` (the plugin/script runner - installed with the host, but **opt-in to
 run**):
 
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `enable` | `host.enable` | Install the runner + define its `systemd --user` unit `slipstream-scripting`. |
-| `autoStart` | `false` | Add the unit to `default.target`. Off even on an auto-start host — running operator scripts/plugins is a deliberate opt-in. |
+| `autoStart` | `false` | Add the unit to `default.target`. Off even on an auto-start host - running operator scripts/plugins is a deliberate opt-in. |
 | `package` | flake's | Override the package. |
 
 The runner discovers loose scripts under `~/.config/slipstream/scripts` and installed
@@ -155,19 +155,19 @@ Everything the RPM's `%install` + `%post` do, declaratively:
   libs the binaries `dlopen`.
 - **firewall** (when `openFirewall`): native UDP 9777/5353 + TCP 47990; with `gamestream` also TCP
   47984/47989/48010 + UDP 47998/47999/48000. The media data plane is an ephemeral, hole-punched
-  UDP port — nothing fixed to open.
+  UDP port - nothing fixed to open.
 - **tray autostart** entry (`--autostart`; self-gates to users who actually run a host).
 
-### GPU drivers (out of scope of the module — set these yourself)
+### GPU drivers (out of scope of the module - set these yourself)
 
 - **NVIDIA:** `hardware.nvidia` + `hardware.graphics.enable = true`. NVENC/CUDA come from the
   driver at runtime (nothing pinned in the closure).
-- **AMD/Intel:** `hardware.graphics.enable = true` with `extraPackages = [ vaapiVdpau … ]` /
+- **AMD/Intel:** `hardware.graphics.enable = true` with `extraPackages = [ vaapiVdpau ... ]` /
   `intel-media-driver` for VAAPI encode; the host's raw Vulkan-Video HEVC path needs only Mesa.
 
 ### Headless / appliance
 
-Set `autoStart = true`, enable lingering, and — for a **dedicated single-session appliance** —
+Set `autoStart = true`, enable lingering, and - for a **dedicated single-session appliance** -
 pin a backend in `settings` (pinning `SLIPSTREAM_COMPOSITOR` disables live-session auto-detection,
 so leave it out on any box that switches between a desktop and Game Mode):
 
@@ -193,7 +193,7 @@ The `${package}/share/slipstream-host/headless/` helpers (KDE/Sway session scrip
 ```sh
 nix develop        # pinned toolchain (rust-toolchain.toml) + all system libs
 cargo build --release -p slipstream-host -p slipstream-client-linux -p slipstream-client-session
-# The tray gets its OWN invocation — co-building it with the host unifies the host's
+# The tray gets its OWN invocation - co-building it with the host unifies the host's
 # ashpd -> zbus/tokio onto the tray's zbus (which runs ksni's async-io executor, no tokio runtime),
 # and the resulting binary panics at launch: "there is no reactor running, must be called from the
 # context of a Tokio 1.x runtime". Same split the .deb / RPM / Arch packaging does.
@@ -212,12 +212,12 @@ The shell exports `PF_FFVK_VULKAN_INCLUDE` (Vulkan headers for ss-ffvk bindgen) 
   `windows 0.62.2` from both crates.io *and* a pinned `microsoft/windows-rs` git rev (the Windows
   client), which `rustPlatform.importCargoLock` can't vendor (colliding `name-version`); crane
   vendors per-source and fetches the git rev via `builtins.fetchGit` (no output hash to maintain).
-  Those crates are `cfg(windows)`-gated — vendored, never compiled on Linux.
-- **First build compiles from scratch** (no split dep cache — pyrowave-sys builds a CMake tree in
+  Those crates are `cfg(windows)`-gated - vendored, never compiled on Linux.
+- **First build compiles from scratch** (no split dep cache - pyrowave-sys builds a CMake tree in
   its build.rs that a crane "dummy" source would drop) and has no public binary cache, so expect a
   long initial build. `nix develop` gives incremental rebuilds.
 - **The status tray is built in its own derivation, on purpose.** `slipstream-tray` uses `ksni`'s
-  `async-io` zbus executor with no tokio runtime (by design — see `crates/slipstream-tray/Cargo.toml`).
+  `async-io` zbus executor with no tokio runtime (by design - see `crates/slipstream-tray/Cargo.toml`).
   Cargo unifies features across everything in one `cargo build`, so co-building the tray with the
   host would pull the host's `ashpd → zbus/tokio` onto the tray's shared `zbus`, and the tray then
   panics at startup (`there is no reactor running, must be called from the context of a Tokio 1.x
@@ -225,13 +225,13 @@ The shell exports `PF_FFVK_VULKAN_INCLUDE` (Vulkan headers for ss-ffvk bindgen) 
   the host package copies the resulting binary into its `$out`. (The rpm/arch builds split it the same
   way. The **.deb did not**, despite its sibling comments claiming otherwise: `deb.yml` co-built
   `-p slipstream-host -p slipstream-tray`, and `build-deb.sh`'s own standalone build was skipped because
-  the poisoned artifact already existed — so this shipped as a real crash-at-launch on Debian/Ubuntu,
+  the poisoned artifact already existed - so this shipped as a real crash-at-launch on Debian/Ubuntu,
   not a latent one. Fixed 2026-07-27: the workflow no longer co-builds it and `build-deb.sh` now
   rebuilds it unconditionally.)
 - **The bun packages (`slipstream-web`, `slipstream-scripting`) use [bun2nix](https://github.com/nix-community/bun2nix).**
   Their `node_modules` is fetched **one `fetchurl` per package**, straight from the integrity hashes
   already in the lockfile, via a generated-and-committed `bun.nix` (`web/bun.nix`, `sdk/bun.nix`).
-  There is **no aggregate deps hash to bump** — the previous design put `bun install` in a
+  There is **no aggregate deps hash to bump** - the previous design put `bun install` in a
   fixed-output derivation whose single `outputHash` silently went stale on every lockfile change and
   broke the build. `bun.nix` regenerates itself: `bun2nix` is a devDependency of both packages and
   runs on every `bun install` (web's `postinstall`; the SDK's `prepare`, since sdk/ is the
@@ -247,20 +247,20 @@ The shell exports `PF_FFVK_VULKAN_INCLUDE` (Vulkan headers for ss-ffvk bindgen) 
   > `bun install` in `web/` and `sdk/` to regenerate.
 
   Everything past the deps fetch is offline (the console's codegen + vite build; the runner's
-  `bun build --target=bun` bundle). Both launchers exec `pkgs.bun` from the store — unlike the
+  `bun build --target=bun` bundle). Both launchers exec `pkgs.bun` from the store - unlike the
   deb/rpm, which vendor a bun binary because apt/dnf have none.
 - **Commit `flake.lock`:** it pins the input revisions (nixpkgs / crane / rust-overlay / bun2nix).
   It is generated on first eval and checked in.
 - **Session Skia OSD is off under Nix.** `slipstream-session`'s default `ui` feature draws its
   on-screen stats/console overlay with `skia-safe`, whose build *downloads* a prebuilt Skia from
-  the rust-skia releases — which Nix's network-less build sandbox forbids, and a from-source Skia
+  the rust-skia releases - which Nix's network-less build sandbox forbids, and a from-source Skia
   build pulls the whole gn/ninja/python toolchain plus network-fetched third-party. The feature is
   explicitly droppable ("same streaming, stats on stdout only"), so the Nix build compiles the
   session with `--no-default-features --features pyrowave`. **Everything streams**; only the
   session binary's *optional* on-glass stats overlay is absent, and the **GTK shell
   (`slipstream-client`) is skia-free and fully featured.** Re-adding it means teaching skia-bindings
   to consume a prebuilt Skia offline (a fixed-output derivation of the rust-skia tarball) or a
-  vendored from-source Skia build — a tracked follow-up.
+  vendored from-source Skia build - a tracked follow-up.
 
 ## Verified
 

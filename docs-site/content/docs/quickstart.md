@@ -21,8 +21,8 @@ first checklist. You can always add the other path later with a second
 
 **Do first**
 
-1. Install and start the host on the gaming PC (steps 1–2 below).
-2. Open the [web console](/docs/web-console), set the password, arm pairing (steps 3–4).
+1. Install and start the host on the gaming PC (steps 1-2 below).
+2. Open the [web console](/docs/web-console), set the password, arm pairing (steps 3-4).
 3. Install a [native client](/docs/clients) when one exists; use [Moonlight](/docs/moonlight) only if
    you need a device without a native app.
 4. Pair on the home LAN, start a stream, leave mouse in **Capture** for mouse-look titles.
@@ -39,13 +39,13 @@ first checklist. You can always add the other path later with a second
 
 ### Office tomorrow
 
-**Goal:** your real home/workstation desktop from an office laptop over a **private VPN** — not a
+**Goal:** your real home/workstation desktop from an office laptop over a **private VPN** - not a
 public port-forward.
 
 **Do first**
 
 1. Complete **Playing tonight** style setup **once on the home LAN** so you know the host, console,
-   and native client work before the VPN is in the picture (steps 1–5 below).
+   and native client work before the VPN is in the picture (steps 1-5 below).
 2. Prefer a **native** client; turn **GameStream off** on a Work-oriented host if you do not need
    Moonlight ([Moonlight](/docs/moonlight), [Security](/docs/security#gamestream--moonlight-compatibility-is-the-weak-crypto-path)).
 3. Put host and laptop on the same VPN ([Network & VPN](/docs/network-and-vpn)); add the host **by
@@ -57,7 +57,7 @@ public port-forward.
 
 - From the office network, the native client connects using the VPN address (empty mDNS list is OK).
 - Desktop mouse lets you click window chrome and select text without capture-lock fighting you.
-- Text in an IDE or browser is readable after bitrate / HEVC / chroma tuning —
+- Text in an IDE or browser is readable after bitrate / HEVC / chroma tuning -
   [Picture quality](/docs/picture-quality).
 - Clipboard text crosses when both host and client switches are on ([Clipboard](/docs/clipboard)),
   or you have an agreed file-share alternative for large files.
@@ -66,7 +66,7 @@ public port-forward.
 [Virtual displays](/docs/virtual-displays), [Input](/docs/input).
 
 If you need both, finish the LAN stream first, then layer the VPN and a **Work** profile on the
-same host — do not debug soft text and Tailscale ACLs at the same time.
+same host - do not debug soft text and Tailscale ACLs at the same time.
 
 | | Playing tonight | Office tomorrow |
 |---|---|---|
@@ -79,8 +79,8 @@ same host — do not debug soft text and Tailscale ACLs at the same time.
 
 ## 1. Set up the host
 
-On the machine you want to stream from — a gaming PC, a workstation, or any supported host with an
-NVIDIA, AMD, or Intel GPU — follow the install guide for your system:
+On the machine you want to stream from - a gaming PC, a workstation, or any supported host with an
+NVIDIA, AMD, or Intel GPU - follow the install guide for your system:
 
 - [Ubuntu](/docs/ubuntu)
 - [Fedora](/docs/fedora)
@@ -94,7 +94,7 @@ installing, configure for your desktop ([KDE](/docs/kde) / [GNOME](/docs/gnome) 
 [gamescope](/docs/gamescope) / [Hyprland](/docs/hyprland) / [Sway](/docs/sway)). Check the
 [Requirements](/docs/requirements) first if you're not sure your machine is a fit.
 
-**Office note:** for remote desktop, prefer a full desktop session over gamescope / Gaming Mode —
+**Office note:** for remote desktop, prefer a full desktop session over gamescope / Gaming Mode -
 absolute mouse needs a real desktop ([Desktop at work](/docs/desktop-at-work)).
 
 ## 2. Start the host
@@ -183,7 +183,7 @@ console you opened in step 3, the host displays a 4-digit PIN, you type it into 
 trust each other from then on. Pairing is required by default. Full details:
 [Pairing & Trust](/docs/pairing).
 
-**Office / VPN:** discovery often fails across the tunnel — **Add host** by VPN IP, then pair the
+**Office / VPN:** discovery often fails across the tunnel - **Add host** by VPN IP, then pair the
 same way ([Network & VPN](/docs/network-and-vpn#discovery-across-a-vpn)).
 
 ## 5. Stream
@@ -195,7 +195,7 @@ host.
 Worth knowing before you need it: on the desktop clients the stream *takes* your mouse and keyboard
 when it starts, and again whenever you click into it. **Ctrl+Alt+Shift+Q** (**⌃⌥⇧Q** on macOS) hands
 them back. For remote desktop / office work, switch to **Desktop (absolute)** mouse
-(**Ctrl+Alt+Shift+M**) so the pointer is not locked — Capture mode is the default and is meant for
+(**Ctrl+Alt+Shift+M**) so the pointer is not locked - Capture mode is the default and is meant for
 games. The other in-stream shortcuts, and the mouse, touch and pen modes, are on
 [Mouse, touch and pen](/docs/input).
 

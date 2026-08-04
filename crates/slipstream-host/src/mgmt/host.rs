@@ -383,9 +383,9 @@ pub(crate) struct AvailableCaptureMethod {
 
 /// Available desktop capture methods
 ///
-/// Lists every SolarFlare-shaped desktop-mirror backend the host knows (no hermes-kms), with a
-/// best-effort availability probe. Pass an `id` as `SLIPSTREAM_CAPTURE_METHOD` / the host-config
-/// `capture_method` field. `auto` walks the preference order at session open.
+/// Lists desktop capture backends this host supports, with a best-effort availability probe.
+/// Pass an `id` as `SLIPSTREAM_CAPTURE_METHOD` / the host-config `capture_method` field.
+/// `auto` walks the preference order at session open.
 #[utoipa::path(
     get,
     path = "/capture/methods",

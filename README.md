@@ -7,10 +7,11 @@
 </pre>
 </div>
 
-<p align="center"><b>Low-latency desktop and game streaming for Linux and Windows hosts — play from the couch, or use your real desktop while you&apos;re at work.</b></p>
+<p align="center"><b>Low-latency desktop and game streaming for Linux and Windows hosts. Play from the couch, or use your real desktop while you&apos;re at work.</b></p>
 
 <p align="center">
   <a href="#what-it-is">What it is</a> ·
+  <a href="#web-console">Web console</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#status">Status</a> ·
   <a href="#install">Install</a> ·
@@ -19,13 +20,17 @@
   <a href="#design-invariants">Design</a>
 </p>
 
+<p align="center">
+  <img src="assets/screenshots/dashboard.png" alt="Slipstream live status dashboard while streaming 1080p120 HEVC" width="900" />
+</p>
+
 ---
 
 ## What it is
 
 Slipstream turns a Linux or Windows machine into a private **desktop and game streaming** host.
 You install the host, pair a client once, and stream to any screen on your LAN or VPN at that
-screen's own resolution and refresh rate — for games on the couch, or for focused work on your
+screen's own resolution and refresh rate, for games on the couch, or for focused work on your
 real desktop from an office laptop. No accounts, no cloud relay, no subscription.
 
 The stack has three pieces that work together:
@@ -42,8 +47,7 @@ the project's own protocol: QUIC control, UDP data, forward error correction, an
 sealing, built for lower latency and larger frame protection than GameStream allows.
 
 The console's workflows take cues from [Sunshine](https://github.com/LizardByte/Sunshine), without
-copying its assets. Linux capture and compositor work draws on ideas from local SolarFlare
-experiments in this workspace.
+copying its assets. Linux capture and compositor work draws on ideas from SolarFlare.
 
 ## How it works
 
@@ -81,6 +85,27 @@ split, plus decode and display stages where the client can see them. The docs ex
 - **Self-filling library.** Steam and plugins (ROM Manager, Playnite, VirtualHere, ...) from the
   console Plugin store or `slipstream-host plugins add`.
 - **PIN pairing, no accounts.** SPAKE2 once, then pinned identities. mDNS discovery on the LAN.
+
+## Web console
+
+Manage the host from a browser: pairing, virtual-display presets, live sessions, performance,
+configuration, and the plugin store. Same Sunshine-style workflows, Slipstream branding.
+
+<p align="center">
+  <img src="assets/screenshots/virtual-displays.png" alt="Virtual display presets (shared desktop, hot-desk, workstation, headless)" width="440" />
+  &nbsp;
+  <img src="assets/screenshots/pairing.png" alt="PIN pairing with slipstream/1 and Moonlight clients" width="440" />
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/performance.png" alt="Per-session latency by stage and throughput charts" width="440" />
+  &nbsp;
+  <img src="assets/screenshots/host.png" alt="Host identity and preflight checks" width="440" />
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/configuration.png" alt="Recommended host configuration with clickable toggles" width="700" />
+</p>
 
 ## Status
 

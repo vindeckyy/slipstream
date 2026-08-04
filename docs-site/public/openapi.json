@@ -19,7 +19,7 @@
           "host"
         ],
         "summary": "Available desktop capture methods",
-        "description": "Lists every SolarFlare-shaped desktop-mirror backend the host knows (no hermes-kms), with a\nbest-effort availability probe. Pass an `id` as `SLIPSTREAM_CAPTURE_METHOD` / the host-config\n`capture_method` field. `auto` walks the preference order at session open.",
+        "description": "Lists desktop capture backends this host supports, with a\nbest-effort availability probe. Pass an `id` as `SLIPSTREAM_CAPTURE_METHOD` / the host-config\n`capture_method` field. `auto` walks the preference order at session open.",
         "operationId": "listCaptureMethods",
         "responses": {
           "200": {
@@ -88,7 +88,7 @@
           "clients"
         ],
         "summary": "Unpair a client",
-        "description": "Removes the client's certificate from the pairing store. Caveat: the nvhttp TLS layer\ndoes not yet reject unlisted certificates (`gamestream/tls.rs` accepts any well-formed\nclient cert — a planned hardening step), so until that lands this removes the client\nfrom the listing without severing its ability to reconnect.",
+        "description": "Removes the client's certificate from the pairing store. Caveat: the nvhttp TLS layer\ndoes not yet reject unlisted certificates (`gamestream/tls.rs` accepts any well-formed\nclient cert - a planned hardening step), so until that lands this removes the client\nfrom the listing without severing its ability to reconnect.",
         "operationId": "unpairClient",
         "parameters": [
           {
@@ -245,7 +245,7 @@
           "display"
         ],
         "summary": "Arrange virtual displays",
-        "description": "Set the **manual** desktop arrangement — per-identity-slot `(x, y)` offsets so a multi-monitor\ngroup (§6A/§6B) comes back where the operator placed it. Persisted into the policy's layout block\nand switched to manual mode; applied from the next connect (a live group re-applies on its next\nacquire). Locks in the current effective behavior as explicit fields, so arranging displays never\nsilently changes keep-alive/topology/conflict/identity. See `design/display-management.md` §6.2.",
+        "description": "Set the **manual** desktop arrangement - per-identity-slot `(x, y)` offsets so a multi-monitor\ngroup (§6A/§6B) comes back where the operator placed it. Persisted into the policy's layout block\nand switched to manual mode; applied from the next connect (a live group re-applies on its next\nacquire). Locks in the current effective behavior as explicit fields, so arranging displays never\nsilently changes keep-alive/topology/conflict/identity. See `design/display-management.md` §6.2.",
         "operationId": "setDisplayLayout",
         "requestBody": {
           "content": {
@@ -297,7 +297,7 @@
           "display"
         ],
         "summary": "Physical monitors",
-        "description": "The heads this host actually has — for pinning capture at one (`SLIPSTREAM_CAPTURE_MONITOR`) and\nfor rendering a picker. Read-only: this never creates, moves or disables anything. Note these\nare *not* the managed virtual displays — those are `/display/state`. See\n`design/per-monitor-portal-capture.md` §5.1.",
+        "description": "The heads this host actually has - for pinning capture at one (`SLIPSTREAM_CAPTURE_MONITOR`) and\nfor rendering a picker. Read-only: this never creates, moves or disables anything. Note these\nare *not* the managed virtual displays - those are `/display/state`. See\n`design/per-monitor-portal-capture.md` §5.1.",
         "operationId": "getDisplayMonitors",
         "responses": {
           "200": {
@@ -362,7 +362,7 @@
           "display"
         ],
         "summary": "Save a custom preset",
-        "description": "Stores a named bundle of the display-behavior axes (+ the game-session axis) the operator can\napply later. The host assigns a stable id, returned in the body. Applying a preset is a\n`PUT /display/settings` with a `Custom` policy carrying its `fields` — no separate apply route.",
+        "description": "Stores a named bundle of the display-behavior axes (+ the game-session axis) the operator can\napply later. The host assigns a stable id, returned in the body. Applying a preset is a\n`PUT /display/settings` with a `Custom` policy carrying its `fields` - no separate apply route.",
         "operationId": "createCustomPreset",
         "requestBody": {
           "content": {
@@ -504,7 +504,7 @@
           "display"
         ],
         "summary": "Delete a custom preset",
-        "description": "Removes it from the catalog. The active policy is untouched — if this preset was the one applied,\nthe running behavior stays exactly as it was (the catalog and `display-settings.json` are decoupled).",
+        "description": "Removes it from the catalog. The active policy is untouched - if this preset was the one applied,\nthe running behavior stays exactly as it was (the catalog and `display-settings.json` are decoupled).",
         "operationId": "deleteCustomPreset",
         "parameters": [
           {
@@ -560,7 +560,7 @@
           "display"
         ],
         "summary": "Release kept virtual displays",
-        "description": "Tear down lingering/pinned displays now — so a physical-screen user gets their screen back\nwithout waiting out the linger. `slot` releases one; omit it to release all kept displays.\nActive (streaming) displays are never torn down here (that is session control).",
+        "description": "Tear down lingering/pinned displays now - so a physical-screen user gets their screen back\nwithout waiting out the linger. `slot` releases one; omit it to release all kept displays.\nActive (streaming) displays are never torn down here (that is session control).",
         "operationId": "releaseDisplay",
         "requestBody": {
           "content": {
@@ -632,7 +632,7 @@
           "display"
         ],
         "summary": "Set the display-management policy",
-        "description": "Persists a new policy (validated + clamped) and applies it from the next connect/teardown — a\nrunning session keeps the display it opened on. `keep_alive: forever` (the gaming-rig preset) is\nhonored (the display is Pinned; free it via `POST /display/release`).",
+        "description": "Persists a new policy (validated + clamped) and applies it from the next connect/teardown - a\nrunning session keeps the display it opened on. `keep_alive: forever` (the gaming-rig preset) is\nhonored (the display is Pinned; free it via `POST /display/release`).",
         "operationId": "setDisplaySettings",
         "requestBody": {
           "content": {
@@ -694,7 +694,7 @@
           "display"
         ],
         "summary": "Live virtual displays",
-        "description": "The host's managed virtual displays right now — active (streaming), lingering (kept after\ndisconnect, counting down to teardown), or pinned (kept indefinitely). See\n`design/display-management.md`.",
+        "description": "The host's managed virtual displays right now - active (streaming), lingering (kept after\ndisconnect, counting down to teardown), or pinned (kept indefinitely). See\n`design/display-management.md`.",
         "operationId": "getDisplayState",
         "responses": {
           "200": {
@@ -726,7 +726,7 @@
           "events"
         ],
         "summary": "Stream host lifecycle events (SSE)",
-        "description": "Server-Sent Events stream of the host's lifecycle events: client connect/disconnect, session\nand stream start/end, pairing decisions, display create/release, library changes, host\nstart/stop — both protocol planes. Frames carry `id:` = the event's monotonic `seq`,\n`event:` = its kind, and `data:` = the event JSON (schema-versioned, additive-only).\n\nResume: standard `Last-Event-ID` (or `?since=`) replays from the in-memory ring; a consumer\nthat fell off the ring receives an `event: dropped` frame first and should resync via the\nREST snapshots. Keep-alive comments are sent every 15 s.",
+        "description": "Server-Sent Events stream of the host's lifecycle events: client connect/disconnect, session\nand stream start/end, pairing decisions, display create/release, library changes, host\nstart/stop - both protocol planes. Frames carry `id:` = the event's monotonic `seq`,\n`event:` = its kind, and `data:` = the event JSON (schema-versioned, additive-only).\n\nResume: standard `Last-Event-ID` (or `?since=`) replays from the in-memory ring; a consumer\nthat fell off the ring receives an `event: dropped` frame first and should resync via the\nREST snapshots. Keep-alive comments are sent every 15 s.",
         "operationId": "streamEvents",
         "parameters": [
           {
@@ -752,7 +752,7 @@
           {
             "name": "Last-Event-ID",
             "in": "header",
-            "description": "SSE auto-reconnect cursor — the decimal `id:` of the last received frame.",
+            "description": "SSE auto-reconnect cursor - the decimal `id:` of the last received frame.",
             "required": false,
             "schema": {
               "type": [
@@ -784,7 +784,7 @@
             }
           },
           "503": {
-            "description": "Concurrent event-stream cap reached — retry shortly",
+            "description": "Concurrent event-stream cap reached - retry shortly",
             "content": {
               "application/json": {
                 "schema": {
@@ -802,7 +802,7 @@
           "session"
         ],
         "summary": "End a launched game",
-        "description": "Ends a game whose session has already gone and which is waiting out its reconnect window — the\nconsole's \"End now\" for a game the host is about to close anyway. `app_id` picks one title; omit it\nto end every waiting game.\n\nThis does **not** touch a game whose session is still live: ending that is session management\n(`DELETE /session`), and how the game is treated then follows the operator's policy.",
+        "description": "Ends a game whose session has already gone and which is waiting out its reconnect window - the\nconsole's \"End now\" for a game the host is about to close anyway. `app_id` picks one title; omit it\nto end every waiting game.\n\nThis does **not** touch a game whose session is still live: ending that is session management\n(`DELETE /session`), and how the game is treated then follows the operator's policy.",
         "operationId": "endGame",
         "requestBody": {
           "content": {
@@ -1003,7 +1003,7 @@
           "hooks"
         ],
         "summary": "Replace the hook configuration",
-        "description": "Validates and persists a full `hooks.json` document (this is a whole-document PUT, not a\npatch). Applies from the next event — no restart. Hook commands run as the host user\n(interactive user session on Windows): treat this configuration as operator-privileged.",
+        "description": "Validates and persists a full `hooks.json` document (this is a whole-document PUT, not a\npatch). Applies from the next event - no restart. Hook commands run as the host user\n(interactive user session on Windows): treat this configuration as operator-privileged.",
         "operationId": "setHooks",
         "requestBody": {
           "content": {
@@ -1300,7 +1300,7 @@
           "library"
         ],
         "summary": "List the game library",
-        "description": "Every installed-store title (Steam, read from the host's local files — no Steam API key)\nmerged with the user's custom entries, sorted by title. Artwork fields are URLs the client\nfetches directly (the public Steam CDN for Steam titles). `?provider=` narrows to the\nentries a given external provider owns; `?platform=` to one platform (case-insensitive —\ninstalled-store titles are `PC`, custom/provider entries carry whatever was authored).",
+        "description": "Every installed-store title (Steam, read from the host's local files - no Steam API key)\nmerged with the user's custom entries, sorted by title. Artwork fields are URLs the client\nfetches directly (the public Steam CDN for Steam titles). `?provider=` narrows to the\nentries a given external provider owns; `?platform=` to one platform (case-insensitive -\ninstalled-store titles are `PC`, custom/provider entries carry whatever was authored).",
         "operationId": "getLibrary",
         "parameters": [
           {
@@ -1355,7 +1355,7 @@
           "library"
         ],
         "summary": "Fetch one cover-art image for a library entry",
-        "description": "Resolves `kind` (`portrait` | `hero` | `logo` | `header`) for the given library id and streams\nthe image bytes. For a Steam title, the host's own local Steam cache is tried first (exact —\nit's what the user's Steam client already shows for it), the public Steam CDN's flat URL\nconvention as a fallback (newer titles' CDN assets can live at a per-asset-hash path the host\ncan't predict, in which case this 404s and the client falls through to its next art candidate).\nOnly Steam ids are backed today; any other store 404s.",
+        "description": "Resolves `kind` (`portrait` | `hero` | `logo` | `header`) for the given library id and streams\nthe image bytes. For a Steam title, the host's own local Steam cache is tried first (exact -\nit's what the user's Steam client already shows for it), the public Steam CDN's flat URL\nconvention as a fallback (newer titles' CDN assets can live at a per-asset-hash path the host\ncan't predict, in which case this 404s and the client falls through to its next art candidate).\nOnly Steam ids are backed today; any other store 404s.",
         "operationId": "getLibraryArt",
         "parameters": [
           {
@@ -1610,7 +1610,7 @@
           "library"
         ],
         "summary": "Replace a provider's library entries (declarative reconcile)",
-        "description": "Atomically replaces the full entry set owned by `{provider}` (RFC §8): the payload is the\nprovider's desired list, keyed by its own stable `external_id` — the host diffs, keeps each\nsurviving title's host id stable across reconciles, drops orphans, and never touches manual\nentries or other providers'. An empty array removes everything the provider owns. Emits\n`library.changed` with the provider as `source`.",
+        "description": "Atomically replaces the full entry set owned by `{provider}` (RFC §8): the payload is the\nprovider's desired list, keyed by its own stable `external_id` - the host diffs, keeps each\nsurviving title's host id stable across reconciles, drops orphans, and never touches manual\nentries or other providers'. An empty array removes everything the provider owns. Emits\n`library.changed` with the provider as `source`.",
         "operationId": "reconcileProviderEntries",
         "parameters": [
           {
@@ -1687,7 +1687,7 @@
           "library"
         ],
         "summary": "Remove a provider's library entries",
-        "description": "Deletes every entry owned by `{provider}` — the clean-uninstall path for a provider plugin\n(RFC §8). Emits `library.changed` when anything was removed.",
+        "description": "Deletes every entry owned by `{provider}` - the clean-uninstall path for a provider plugin\n(RFC §8). Emits `library.changed` when anything was removed.",
         "operationId": "deleteProviderEntries",
         "parameters": [
           {
@@ -1750,7 +1750,7 @@
           "library"
         ],
         "summary": "List the library scanners",
-        "description": "The installed-store scanners this host supports — the list is platform-dependent (Steam\neverywhere; Lutris + Heroic on Linux; Epic, GOG, and Xbox/Game Pass on Windows), so the console\nrenders a toggle only for scanners that can do anything here. Scanners default to enabled;\ndisabling one hides its titles from every library surface from the next read. The user-curated\ncustom store is not a scanner and is always on.",
+        "description": "The installed-store scanners this host supports - the list is platform-dependent (Steam\neverywhere; Lutris + Heroic on Linux; Epic, GOG, and Xbox/Game Pass on Windows), so the console\nrenders a toggle only for scanners that can do anything here. Scanners default to enabled;\ndisabling one hides its titles from every library surface from the next read. The user-curated\ncustom store is not a scanner and is always on.",
         "operationId": "listLibraryScanners",
         "responses": {
           "200": {
@@ -1785,7 +1785,7 @@
           "library"
         ],
         "summary": "Enable or disable a library scanner",
-        "description": "Persists the toggle and applies it from the next library read (no restart). Disabling a scanner\nhides its titles everywhere — the console grid, native clients, and the GameStream app list —\nand re-enabling brings them straight back (nothing is deleted; the scan just runs again). Emits\n`library.changed` with the scanner id as `source` when the state changed.",
+        "description": "Persists the toggle and applies it from the next library read (no restart). Disabling a scanner\nhides its titles everywhere - the console grid, native clients, and the GameStream app list -\nand re-enabling brings them straight back (nothing is deleted; the scan just runs again). Emits\n`library.changed` with the scanner id as `source` when the state changed.",
         "operationId": "setLibraryScanner",
         "parameters": [
           {
@@ -1861,7 +1861,7 @@
           "host"
         ],
         "summary": "Local status summary for the tray icon",
-        "description": "Non-sensitive status (counts, booleans, and the streaming client's display name — no PIN\nvalues, no fingerprints). Unauthenticated, but served to loopback peers only.",
+        "description": "Non-sensitive status (counts, booleans, and the streaming client's display name - no PIN\nvalues, no fingerprints). Unauthenticated, but served to loopback peers only.",
         "operationId": "getLocalSummary",
         "responses": {
           "200": {
@@ -1896,7 +1896,7 @@
           "logs"
         ],
         "summary": "Host logs",
-        "description": "The host's recent log entries — an in-memory ring of the newest few thousand, captured at\nDEBUG and above regardless of `RUST_LOG`. Follow live by polling with `after` set to the last\nresponse's `next` cursor; a `dropped: true` means entries were evicted between polls (the ring\nwrapped). Bearer-only: logs can reference client identities and host paths, so this is part of\nthe loopback-only admin surface, never the LAN-readable mTLS one.",
+        "description": "The host's recent log entries - an in-memory ring of the newest few thousand, captured at\nDEBUG and above regardless of `RUST_LOG`. Follow live by polling with `after` set to the last\nresponse's `next` cursor; a `dropped: true` means entries were evicted between polls (the ring\nwrapped). Bearer-only: logs can reference client identities and host paths, so this is part of\nthe loopback-only admin surface, never the LAN-readable mTLS one.",
         "operationId": "logsGet",
         "parameters": [
           {
@@ -2194,7 +2194,7 @@
           "native"
         ],
         "summary": "Approve a pending device",
-        "description": "Pairs the device's certificate fingerprint — it can connect immediately (no PIN). Optionally\nrelabel it via the body; send `{}` to keep the name it knocked with.",
+        "description": "Pairs the device's certificate fingerprint - it can connect immediately (no PIN). Optionally\nrelabel it via the body; send `{}` to keep the name it knocked with.",
         "operationId": "approvePendingDevice",
         "parameters": [
           {
@@ -2279,7 +2279,7 @@
           "native"
         ],
         "summary": "Deny a pending device",
-        "description": "Drops the request. Not a blocklist — the device's next attempt knocks again.",
+        "description": "Drops the request. Not a blocklist - the device's next attempt knocks again.",
         "operationId": "denyPendingDevice",
         "parameters": [
           {
@@ -2444,7 +2444,7 @@
           "plugins"
         ],
         "summary": "List registered plugins",
-        "description": "The live plugin directory (lease not expired), sorted by title. **Secret-free**: each entry\nreports its id, title, optional version, and — for plugins that serve one — a UI descriptor\n(loopback port + icon). The console renders these as nav entries and proxies to the port; it\nfetches the secret separately, server-side.",
+        "description": "The live plugin directory (lease not expired), sorted by title. **Secret-free**: each entry\nreports its id, title, optional version, and - for plugins that serve one - a UI descriptor\n(loopback port + icon). The console renders these as nav entries and proxies to the port; it\nfetches the secret separately, server-side.",
         "operationId": "listPlugins",
         "responses": {
           "200": {
@@ -2479,7 +2479,7 @@
           "plugins"
         ],
         "summary": "Register or renew a plugin",
-        "description": "Upserts the plugin's directory entry and renews its lease (TTL 90 s). Idempotent: a plugin PUTs\nthis every ~30 s while it runs. The optional `ui` block declares a loopback UI surface the console\nwill proxy and add to its nav. Emits `plugins.changed` when an operator-visible field changed\n(first registration, restart, or re-scan) — a pure renewal is silent.",
+        "description": "Upserts the plugin's directory entry and renews its lease (TTL 90 s). Idempotent: a plugin PUTs\nthis every ~30 s while it runs. The optional `ui` block declares a loopback UI surface the console\nwill proxy and add to its nav. Emits `plugins.changed` when an operator-visible field changed\n(first registration, restart, or re-scan) - a pure renewal is silent.",
         "operationId": "registerPlugin",
         "parameters": [
           {
@@ -2533,7 +2533,7 @@
           "plugins"
         ],
         "summary": "Deregister a plugin",
-        "description": "The clean-shutdown path: removes the plugin's directory entry immediately (the SDK helper calls\nthis from its scope finalizer on `SIGTERM`). Emits `plugins.changed` when a live entry was\nremoved. Idempotent — deleting an unknown/expired id is a no-op `204`.",
+        "description": "The clean-shutdown path: removes the plugin's directory entry immediately (the SDK helper calls\nthis from its scope finalizer on `SIGTERM`). Emits `plugins.changed` when a live entry was\nremoved. Idempotent - deleting an unknown/expired id is a no-op `204`.",
         "operationId": "deregisterPlugin",
         "parameters": [
           {
@@ -2569,7 +2569,7 @@
           "plugins"
         ],
         "summary": "Fetch a plugin UI's proxy credential",
-        "description": "Returns `{port, secret}` for a live plugin's loopback UI — the console proxy's server-side lookup.\nBearer + loopback only (like every mutation), and additionally excluded from the console's browser\npassthrough: the secret never reaches a browser.",
+        "description": "Returns `{port, secret}` for a live plugin's loopback UI - the console proxy's server-side lookup.\nBearer + loopback only (like every mutation), and additionally excluded from the console's browser\npassthrough: the secret never reaches a browser.",
         "operationId": "getPluginUiCredential",
         "parameters": [
           {
@@ -2622,7 +2622,7 @@
           "session"
         ],
         "summary": "Stop the active session",
-        "description": "Kicks the connected client: stops the video/audio stream threads and clears the launch\nstate. Idempotent — succeeds even when nothing is streaming.\n\nCounts as a **deliberate** stop, exactly like a client pressing Stop: the display skips its\nkeep-alive linger, and the end-game-on-session-end policy (if the operator enabled one) applies.",
+        "description": "Kicks the connected client: stops the video/audio stream threads and clears the launch\nstate. Idempotent - succeeds even when nothing is streaming.\n\nCounts as a **deliberate** stop, exactly like a client pressing Stop: the display skips its\nkeep-alive linger, and the end-game-on-session-end policy (if the operator enabled one) applies.",
         "operationId": "stopSession",
         "responses": {
           "204": {
@@ -2647,7 +2647,7 @@
           "session"
         ],
         "summary": "Force a keyframe",
-        "description": "Asks the encoder for an IDR frame on the active video stream (what a client requests\nafter unrecoverable loss — exposed for debugging).",
+        "description": "Asks the encoder for an IDR frame on the active video stream (what a client requests\nafter unrecoverable loss - exposed for debugging).",
         "operationId": "requestIdr",
         "responses": {
           "202": {
@@ -2712,7 +2712,7 @@
           "session"
         ],
         "summary": "Set the session⇄game lifetime settings",
-        "description": "Persists the settings (clamped) and applies them from the next decision — including to a session\nthat is already streaming, since the policy is read when a session ends rather than when it starts.",
+        "description": "Persists the settings (clamped) and applies them from the next decision - including to a session\nthat is already streaming, since the policy is read when a session ends rather than when it starts.",
         "operationId": "setSessionSettings",
         "requestBody": {
           "content": {
@@ -2816,7 +2816,7 @@
           "stats"
         ],
         "summary": "Start a stats capture",
-        "description": "Arms a new performance-stats capture. Idempotent: if a capture is already running this returns\nthe current status unchanged. While armed, the streaming loops emit aggregated samples (~ every\n1–2 s) into the in-progress capture, readable live via `GET /stats/capture/live`.",
+        "description": "Arms a new performance-stats capture. Idempotent: if a capture is already running this returns\nthe current status unchanged. While armed, the streaming loops emit aggregated samples (~ every\n1-2 s) into the in-progress capture, readable live via `GET /stats/capture/live`.",
         "operationId": "statsCaptureStart",
         "responses": {
           "200": {
@@ -2925,7 +2925,7 @@
           "stats"
         ],
         "summary": "List saved recordings",
-        "description": "Every saved capture's summary (the `meta` head only — not the sample body), newest first.",
+        "description": "Every saved capture's summary (the `meta` head only - not the sample body), newest first.",
         "operationId": "statsRecordingsList",
         "responses": {
           "200": {
@@ -3108,7 +3108,7 @@
           "store"
         ],
         "summary": "Browse the plugin catalog",
-        "description": "The merged shelf across every configured source, annotated with what this host already has and\nwhat it can run. Sources past their freshness window are refreshed first; a source that can't be\nreached keeps serving its last good copy, marked `stale` (a LAN-only host still has a working\nstore — an entry's pin travelled with the entry).",
+        "description": "The merged shelf across every configured source, annotated with what this host already has and\nwhat it can run. Sources past their freshness window are refreshed first; a source that can't be\nreached keeps serving its last good copy, marked `stale` (a LAN-only host still has a working\nstore - an entry's pin travelled with the entry).",
         "operationId": "getPluginCatalog",
         "responses": {
           "200": {
@@ -3150,7 +3150,7 @@
           "store"
         ],
         "summary": "Install a plugin",
-        "description": "Either `{source, id}` — a catalogued entry, installed at its pinned version after its integrity\nis re-checked against the registry — or `{spec, accept_unverified: true}`, which installs an\nunreviewed package the operator takes responsibility for. Returns `202` with a job id; watch it\nat `GET /store/jobs/{id}`.\n\nOne package operation runs at a time (`409` otherwise): `bun` operations share a lockfile and a\n`node_modules` tree.",
+        "description": "Either `{source, id}` - a catalogued entry, installed at its pinned version after its integrity\nis re-checked against the registry - or `{spec, accept_unverified: true}`, which installs an\nunreviewed package the operator takes responsibility for. Returns `202` with a job id; watch it\nat `GET /store/jobs/{id}`.\n\nOne package operation runs at a time (`409` otherwise): `bun` operations share a lockfile and a\n`node_modules` tree.",
         "operationId": "installPlugin",
         "requestBody": {
           "content": {
@@ -3222,7 +3222,7 @@
           "store"
         ],
         "summary": "List installed plugins",
-        "description": "What's actually in the plugins directory, joined with how it got there (the provenance manifest)\nand whether it is registered right now. A package with no provenance record was installed with\nthe CLI and reports `tier: \"cli\"` — absence is the answer, not a gap.",
+        "description": "What's actually in the plugins directory, joined with how it got there (the provenance manifest)\nand whether it is registered right now. A package with no provenance record was installed with\nthe CLI and reports `tier: \"cli\"` - absence is the answer, not a gap.",
         "operationId": "listInstalledPlugins",
         "responses": {
           "200": {
@@ -3416,7 +3416,7 @@
           "store"
         ],
         "summary": "Plugin runner state",
-        "description": "Installed plugins only run while the runner is on, and the runner discovers units at startup —\nso this is both the \"is anything running\" answer and the explanation for a freshly installed\nplugin that hasn't appeared yet.",
+        "description": "Installed plugins only run while the runner is on, and the runner discovers units at startup -\nso this is both the \"is anything running\" answer and the explanation for a freshly installed\nplugin that hasn't appeared yet.",
         "operationId": "getPluginRuntime",
         "responses": {
           "200": {
@@ -3589,7 +3589,7 @@
             "description": "Source saved"
           },
           "400": {
-            "description": "Invalid name, url or key — or the reserved built-in name",
+            "description": "Invalid name, url or key - or the reserved built-in name",
             "content": {
               "application/json": {
                 "schema": {
@@ -3888,7 +3888,7 @@
           "update"
         ],
         "summary": "Apply the available update",
-        "description": "Starts the one-click apply for install kinds that support it (Windows installer). The\nrequest carries no version or URL — the host installs exactly what its verified manifest\nannounced. Progress is polled via `GET /update/status` (`job`); the host restarts as part\nof the apply, and the outcome lands in `last_result` after it comes back.",
+        "description": "Starts the one-click apply for install kinds that support it (Windows installer). The\nrequest carries no version or URL - the host installs exactly what its verified manifest\nannounced. Progress is polled via `GET /update/status` (`job`); the host restarts as part\nof the apply, and the outcome lands in `last_result` after it comes back.",
         "operationId": "applyUpdate",
         "requestBody": {
           "content": {
@@ -3902,7 +3902,7 @@
         },
         "responses": {
           "202": {
-            "description": "Apply started — poll `GET /update/status`",
+            "description": "Apply started - poll `GET /update/status`",
             "content": {
               "application/json": {
                 "schema": {
@@ -4036,7 +4036,7 @@
               "string",
               "null"
             ],
-            "description": "Store-qualified library id (`steam:570`) — the key the console matches against `GET /library`\nto show box art. Absent for an operator-typed GameStream command."
+            "description": "Store-qualified library id (`steam:570`) - the key the console matches against `GET /library`\nto show box art. Absent for an operator-typed GameStream command."
           },
           "client": {
             "type": "string",
@@ -4048,7 +4048,7 @@
               "null"
             ],
             "format": "int64",
-            "description": "Seconds until this game is ended — only present on a `grace` row.",
+            "description": "Seconds until this game is ended - only present on a `grace` row.",
             "minimum": 0
           },
           "plane": {
@@ -4074,7 +4074,7 @@
               "string",
               "null"
             ],
-            "description": "Which store surfaced it (`steam`, `heroic`, `custom`, …), when known."
+            "description": "Which store surfaced it (`steam`, `heroic`, `custom`, ...), when known."
           },
           "title": {
             "type": "string",
@@ -4118,7 +4118,7 @@
       },
       "ApiCodec": {
         "type": "string",
-        "description": "Video codec identifier. The wire token matches the codec's canonical name used across the\nstack (SDP/GameStream advertisement, the stats-capture `CaptureMeta.codec`, and the encoder's\n[`Codec::label`]) — notably `H.265` serializes as `\"hevc\"`, not `\"h265\"`, so the same codec\nreads identically on every console page.",
+        "description": "Video codec identifier. The wire token matches the codec's canonical name used across the\nstack (SDP/GameStream advertisement, the stats-capture `CaptureMeta.codec`, and the encoder's\n[`Codec::label`]) - notably `H.265` serializes as `\"hevc\"`, not `\"h265\"`, so the same codec\nreads identically on every console page.",
         "enum": [
           "h264",
           "hevc",
@@ -4144,7 +4144,7 @@
         "properties": {
           "backend": {
             "type": "string",
-            "description": "Backend name (`ss-vdisplay`, `kwin`, …)."
+            "description": "Backend name (`ss-vdisplay`, `kwin`, ...)."
           },
           "client": {
             "type": [
@@ -4171,7 +4171,7 @@
           "group": {
             "type": "integer",
             "format": "int32",
-            "description": "Display group (shared desktop) id — several displays with the same group form one desktop (§6A).",
+            "description": "Display group (shared desktop) id - several displays with the same group form one desktop (§6A).",
             "minimum": 0
           },
           "identity_slot": {
@@ -4243,7 +4243,7 @@
         "properties": {
           "id": {
             "type": "string",
-            "description": "Stable identifier (`vendorid-deviceid-occurrence`, hex PCI ids) — pass to `setGpuPreference`.\nStable across reboots and driver updates, unlike an adapter index or LUID.",
+            "description": "Stable identifier (`vendorid-deviceid-occurrence`, hex PCI ids) - pass to `setGpuPreference`.\nStable across reboots and driver updates, unlike an adapter index or LUID.",
             "example": "10de-2c05-0"
           },
           "name": {
@@ -4281,7 +4281,7 @@
         "properties": {
           "connector": {
             "type": "string",
-            "description": "Connector name (`DP-1`, `HDMI-A-2`) — the value `SLIPSTREAM_CAPTURE_MONITOR` takes."
+            "description": "Connector name (`DP-1`, `HDMI-A-2`) - the value `SLIPSTREAM_CAPTURE_MONITOR` takes."
           },
           "description": {
             "type": "string",
@@ -4315,7 +4315,7 @@
           "x": {
             "type": "integer",
             "format": "int32",
-            "description": "Desktop-space top-left — what makes a head identifiable when two share a size."
+            "description": "Desktop-space top-left - what makes a head identifiable when two share a size."
           },
           "y": {
             "type": "integer",
@@ -4341,7 +4341,7 @@
           },
           "source": {
             "type": "string",
-            "description": "Why this GPU was selected: `preference` (the manual choice), `env`\n(`SLIPSTREAM_RENDER_ADAPTER`), `auto` (max dedicated VRAM / platform default), or\n`preference_missing` (a manual choice is set but that GPU is absent — auto-selected\ninstead so the host keeps streaming)."
+            "description": "Why this GPU was selected: `preference` (the manual choice), `env`\n(`SLIPSTREAM_RENDER_ADAPTER`), `auto` (max dedicated VRAM / platform default), or\n`preference_missing` (a manual choice is set but that GPU is absent - auto-selected\ninstead so the host keeps streaming)."
           },
           "vendor": {
             "type": "string",
@@ -4354,7 +4354,7 @@
         "properties": {
           "force": {
             "type": "boolean",
-            "description": "Proceed even while a streaming session is live (the stream will drop when the host\nrestarts — the console warns before sending this)."
+            "description": "Proceed even while a streaming session is live (the stream will drop when the host\nrestarts - the console warns before sending this)."
           }
         }
       },
@@ -4381,7 +4381,7 @@
               "string",
               "null"
             ],
-            "description": "Optional: bind the window to ONE device fingerprint (hex SHA-256, e.g. from a pending knock).\nWhen set, only a pairing attempt from that fingerprint consumes the window — so an unpaired\nLAN peer can neither pair nor burn a window armed for a specific device (security-review #9).\nOmit for an unbound window (any device may use the PIN — trusted-LAN only).",
+            "description": "Optional: bind the window to ONE device fingerprint (hex SHA-256, e.g. from a pending knock).\nWhen set, only a pairing attempt from that fingerprint consumes the window - so an unpaired\nLAN peer can neither pair nor burn a window armed for a specific device (security-review #9).\nOmit for an unbound window (any device may use the PIN - trusted-LAN only).",
             "example": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
           },
           "ttl_secs": {
@@ -4390,7 +4390,7 @@
               "null"
             ],
             "format": "int32",
-            "description": "Window length in seconds (default 120; clamped to 15–600).",
+            "description": "Window length in seconds (default 120; clamped to 15-600).",
             "example": 120,
             "minimum": 0
           }
@@ -4405,7 +4405,7 @@
               "string",
               "null"
             ],
-            "description": "Horizontal header (Steam `header.jpg`) — the universal fallback."
+            "description": "Horizontal header (Steam `header.jpg`) - the universal fallback."
           },
           "hero": {
             "type": [
@@ -4469,7 +4469,7 @@
               "string",
               "null"
             ],
-            "description": "Desktop capture backend (`SLIPSTREAM_CAPTURE_METHOD`):\n`auto` | `portal` | `kwin` | `wlr` | `kms` | `x11` | `nvfbc` (no hermes-kms)."
+            "description": "Desktop capture backend (`SLIPSTREAM_CAPTURE_METHOD`):\n`auto` | `portal` | `kwin` | `wlr` | `kms` | `x11` | `nvfbc`."
           },
           "compositor": {
             "type": [
@@ -4588,7 +4588,7 @@
           },
           "id": {
             "type": "string",
-            "description": "Stable identifier (`\"kwin\"` | `\"wlroots\"` | `\"mutter\"` | `\"gamescope\"`) — pass this to a\nclient's `--compositor` flag."
+            "description": "Stable identifier (`\"kwin\"` | `\"wlroots\"` | `\"mutter\"` | `\"gamescope\"`) - pass this to a\nclient's `--compositor` flag."
           },
           "label": {
             "type": "string",
@@ -4640,7 +4640,7 @@
       },
       "CaptureMeta": {
         "type": "object",
-        "description": "Capture summary — the filename stem plus the negotiated mode/codec/client. Stored at the head\nof each on-disk recording and listed standalone (without the sample body) by\n[`StatsRecorder::list`].",
+        "description": "Capture summary - the filename stem plus the negotiated mode/codec/client. Stored at the head\nof each on-disk recording and listed standalone (without the sample body) by\n[`StatsRecorder::list`].",
         "required": [
           "id",
           "started_unix_ms",
@@ -4669,7 +4669,7 @@
           },
           "encoder_backend": {
             "type": "string",
-            "description": "The encode backend that ACTUALLY opened for this session — `\"nvenc\"`, `\"vaapi\"`,\n`\"vulkan\"`, `\"amf\"`, `\"qsv\"`, `\"software\"`, … — and the GPU it runs on.\n\nRecorded because the stage split alone can't be read without them. A p50 `submit` of 10 ms\nmeans \"the GPU's CSC+encode throughput is the ceiling\" on one backend and something else\nentirely on another, and every fps-shortfall report so far has cost a round-trip asking\nwhich one it was. Both come from `ss_gpu::active()`, the record the encoder open itself\nwrites, so they name the branch that really opened rather than a re-derived guess.\n\n`\"\"` when nothing was streaming at registration (or on a build without the record)."
+            "description": "The encode backend that ACTUALLY opened for this session - `\"nvenc\"`, `\"vaapi\"`,\n`\"vulkan\"`, `\"amf\"`, `\"qsv\"`, `\"software\"`, ... - and the GPU it runs on.\n\nRecorded because the stage split alone can't be read without them. A p50 `submit` of 10 ms\nmeans \"the GPU's CSC+encode throughput is the ceiling\" on one backend and something else\nentirely on another, and every fps-shortfall report so far has cost a round-trip asking\nwhich one it was. Both come from `ss_gpu::active()`, the record the encoder open itself\nwrites, so they name the branch that really opened rather than a re-derived guess.\n\n`\"\"` when nothing was streaming at registration (or on a build without the record)."
           },
           "fps": {
             "type": "integer",
@@ -4687,7 +4687,7 @@
           },
           "id": {
             "type": "string",
-            "description": "e.g. `\"2026-06-26T20-14-03Z_5120x1440\"` — also the filename stem."
+            "description": "e.g. `\"2026-06-26T20-14-03Z_5120x1440\"` - also the filename stem."
           },
           "kind": {
             "type": "string",
@@ -4735,7 +4735,7 @@
               "string",
               "null"
             ],
-            "description": "A revocation covering the catalogued version — do not offer this without shouting."
+            "description": "A revocation covering the catalogued version - do not offer this without shouting."
           },
           "compatible": {
             "type": "boolean",
@@ -4832,7 +4832,7 @@
         "properties": {
           "busy": {
             "type": "boolean",
-            "description": "True while a package operation is in flight — the console disables install buttons."
+            "description": "True while a package operation is in flight - the console disables install buttons."
           },
           "host": {
             "$ref": "#/components/schemas/HostFacts"
@@ -4896,7 +4896,7 @@
         "allOf": [
           {
             "$ref": "#/components/schemas/GameMeta",
-            "description": "Descriptive metadata (platform, description, …), flattened — see [`GameMeta`]."
+            "description": "Descriptive metadata (platform, description, ...), flattened - see [`GameMeta`]."
           },
           {
             "type": "object",
@@ -4910,14 +4910,14 @@
               },
               "detect": {
                 "$ref": "#/components/schemas/DetectHint",
-                "description": "How to recognize this title's process once it is running (design §9) — the one thing a\nprovider knows that the host cannot work out for itself.\n\nOptional: without it the entry is still tracked by the child the host spawns for it, which\ncovers every command that stays in the foreground. It earns its keep for a command that hands\noff and exits — a launcher script, a `flatpak run`, a front-end that starts an emulator — where\nthe host would otherwise lose the game the moment the shim returns."
+                "description": "How to recognize this title's process once it is running (design §9) - the one thing a\nprovider knows that the host cannot work out for itself.\n\nOptional: without it the entry is still tracked by the child the host spawns for it, which\ncovers every command that stays in the foreground. It earns its keep for a command that hands\noff and exits - a launcher script, a `flatpak run`, a front-end that starts an emulator - where\nthe host would otherwise lose the game the moment the shim returns."
               },
               "external_id": {
                 "type": [
                   "string",
                   "null"
                 ],
-                "description": "The provider's own stable key for this title — the reconcile diff key, so the\nhost-assigned `id` stays stable across reconciles. Present iff `provider` is."
+                "description": "The provider's own stable key for this title - the reconcile diff key, so the\nhost-assigned `id` stays stable across reconciles. Present iff `provider` is."
               },
               "id": {
                 "type": "string",
@@ -4945,7 +4945,7 @@
                   "string",
                   "null"
                 ],
-                "description": "The external provider owning this entry (RFC §8), set ONLY by the provider reconcile\nAPI — `None` = a manual entry, which no provider operation ever touches, and which the\nmanual CRUD alone may edit (the converse holds too: manual CRUD refuses provider-owned\nentries, so ownership is never ambiguous)."
+                "description": "The external provider owning this entry (RFC §8), set ONLY by the provider reconcile\nAPI - `None` = a manual entry, which no provider operation ever touches, and which the\nmanual CRUD alone may edit (the converse holds too: manual CRUD refuses provider-owned\nentries, so ownership is never ambiguous)."
               },
               "title": {
                 "type": "string"
@@ -4959,7 +4959,7 @@
         "allOf": [
           {
             "$ref": "#/components/schemas/GameMeta",
-            "description": "Descriptive metadata (platform, description, …), flattened — see [`GameMeta`]. Replaced\nwholesale on update, like `art`: an edit must round-trip every field it wants kept."
+            "description": "Descriptive metadata (platform, description, ...), flattened - see [`GameMeta`]. Replaced\nwholesale on update, like `art`: an edit must round-trip every field it wants kept."
           },
           {
             "type": "object",
@@ -4972,7 +4972,7 @@
               },
               "detect": {
                 "$ref": "#/components/schemas/DetectHint",
-                "description": "How to recognize this title's process — see [`CustomEntry::detect`]."
+                "description": "How to recognize this title's process - see [`CustomEntry::detect`]."
               },
               "launch": {
                 "oneOf": [
@@ -4989,7 +4989,7 @@
                 "items": {
                   "$ref": "#/components/schemas/PrepCmd"
                 },
-                "description": "Per-title prep/undo steps — commands run as the host user; operator-privileged config."
+                "description": "Per-title prep/undo steps - commands run as the host user; operator-privileged config."
               },
               "title": {
                 "type": "string"
@@ -4997,11 +4997,11 @@
             }
           }
         ],
-        "description": "Request body to create or replace a custom entry (no `id` — the host owns it)."
+        "description": "Request body to create or replace a custom entry (no `id` - the host owns it)."
       },
       "CustomPreset": {
         "type": "object",
-        "description": "A user-defined named preset: a saved bundle of the six display-behavior axes (exactly what a\nbuilt-in [`Preset`] expands to) plus the orthogonal game-session axis, that the operator names\nand applies from the console.\n\nUnlike the built-in [`Preset`]s (a closed enum), custom presets are **data** — a catalog stored in\n`<config>/display-presets.json`. Applying one writes a `Custom` [`DisplayPolicy`] carrying these\nfields (the console reuses `PUT /display/settings`), so [`DisplayPolicy::effective`] stays pure and\nthe built-in set is never touched. The catalog is decoupled from the active `display-settings.json`:\nediting or deleting a preset never mutates the running policy (re-apply to adopt a change).",
+        "description": "A user-defined named preset: a saved bundle of the six display-behavior axes (exactly what a\nbuilt-in [`Preset`] expands to) plus the orthogonal game-session axis, that the operator names\nand applies from the console.\n\nUnlike the built-in [`Preset`]s (a closed enum), custom presets are **data** - a catalog stored in\n`<config>/display-presets.json`. Applying one writes a `Custom` [`DisplayPolicy`] carrying these\nfields (the console reuses `PUT /display/settings`), so [`DisplayPolicy::effective`] stays pure and\nthe built-in set is never touched. The catalog is decoupled from the active `display-settings.json`:\nediting or deleting a preset never mutates the running policy (re-apply to adopt a change).",
         "required": [
           "id",
           "name",
@@ -5014,7 +5014,7 @@
           },
           "game_session": {
             "$ref": "#/components/schemas/GameSession",
-            "description": "The game-session routing this preset applies (orthogonal to the six axes; see [`GameSession`]).\nA custom preset captures the operator's *full* setup, so — unlike a built-in preset — applying\none does set this axis."
+            "description": "The game-session routing this preset applies (orthogonal to the six axes; see [`GameSession`]).\nA custom preset captures the operator's *full* setup, so - unlike a built-in preset - applying\none does set this axis."
           },
           "id": {
             "type": "string",
@@ -5028,7 +5028,7 @@
       },
       "CustomPresetInput": {
         "type": "object",
-        "description": "Request body to create or replace a custom preset (no `id` — the host owns it).",
+        "description": "Request body to create or replace a custom preset (no `id` - the host owns it).",
         "required": [
           "name",
           "fields"
@@ -5047,7 +5047,7 @@
       },
       "DetectHint": {
         "type": "object",
-        "description": "What an operator (or a provider plugin) can tell the host about recognizing a title — the wire\nhalf of [`DetectSpec`], and the only part of it that is ever accepted from outside.\n\nDeliberately a **subset**: the store-derived signals (a Steam appid, a launcher's environment\nmarker) are things the host discovers for itself and would be meaningless — or dangerous — to take\non someone's word. What is left is what a provider genuinely knows and the host cannot guess: where\nthe title is installed, which executable is the game, what the process is called. All three are\noptional; supplying none is the same as supplying no hint at all.\n\nNever returned by the catalog API — see the module docs on why detect data does not cross the wire\noutbound.",
+        "description": "What an operator (or a provider plugin) can tell the host about recognizing a title - the wire\nhalf of [`DetectSpec`], and the only part of it that is ever accepted from outside.\n\nDeliberately a **subset**: the store-derived signals (a Steam appid, a launcher's environment\nmarker) are things the host discovers for itself and would be meaningless - or dangerous - to take\non someone's word. What is left is what a provider genuinely knows and the host cannot guess: where\nthe title is installed, which executable is the game, what the process is called. All three are\noptional; supplying none is the same as supplying no hint at all.\n\nNever returned by the catalog API - see the module docs on why detect data does not cross the wire\noutbound.",
         "properties": {
           "exe": {
             "type": [
@@ -5061,14 +5061,14 @@
               "string",
               "null"
             ],
-            "description": "Where the title is installed. Any process running from under this directory is part of the\ngame — the universal recipe, and the one worth supplying if you supply only one."
+            "description": "Where the title is installed. Any process running from under this directory is part of the\ngame - the universal recipe, and the one worth supplying if you supply only one."
           },
           "process_name": {
             "type": [
               "string",
               "null"
             ],
-            "description": "The executable's file name (`Hades.exe`), when its location isn't fixed. Weakest of the three\n— see [`DetectSpec::process_name`]."
+            "description": "The executable's file name (`Hades.exe`), when its location isn't fixed. Weakest of the three\n- see [`DetectSpec::process_name`]."
           }
         }
       },
@@ -5109,7 +5109,7 @@
         "properties": {
           "positions": {
             "type": "object",
-            "description": "`{\"<identity_slot>\": {\"x\": …, \"y\": …}}` — where each arranged display's top-left sits.",
+            "description": "`{\"<identity_slot>\": {\"x\": ..., \"y\": ...}}` - where each arranged display's top-left sits.",
             "additionalProperties": {
               "$ref": "#/components/schemas/Position"
             },
@@ -5121,22 +5121,22 @@
       },
       "DisplayPolicy": {
         "type": "object",
-        "description": "The user-facing display-management policy — what `display-settings.json` holds and what the mgmt\nAPI GETs/PUTs. When [`preset`](Self::preset) is not [`Preset::Custom`] the explicit fields are\nignored (the console writes one or the other); [`effective`](Self::effective) resolves both to a\nsingle [`EffectivePolicy`].",
+        "description": "The user-facing display-management policy - what `display-settings.json` holds and what the mgmt\nAPI GETs/PUTs. When [`preset`](Self::preset) is not [`Preset::Custom`] the explicit fields are\nignored (the console writes one or the other); [`effective`](Self::effective) resolves both to a\nsingle [`EffectivePolicy`].",
         "properties": {
           "capture_monitor": {
             "type": [
               "string",
               "null"
             ],
-            "description": "**Mirror a physical monitor instead of creating a virtual display**: the connector name\n(`DP-1`, `HDMI-A-2`) sessions should stream, or `None` for the normal virtual-display path.\n\nOrthogonal to `preset`/lifecycle (like `game_session`): a preset change never clears it, and\n`#[serde(default)]` leaves existing `display-settings.json` files untouched. It is a\n**host-wide** setting, not per-client — the host-pinned decision of record in\n`design/per-monitor-portal-capture.md` §5.3. `SLIPSTREAM_CAPTURE_MONITOR` overrides it (see\n[`capture_monitor`]), so an appliance can pin in `host.env` without the console fighting it."
+            "description": "**Mirror a physical monitor instead of creating a virtual display**: the connector name\n(`DP-1`, `HDMI-A-2`) sessions should stream, or `None` for the normal virtual-display path.\n\nOrthogonal to `preset`/lifecycle (like `game_session`): a preset change never clears it, and\n`#[serde(default)]` leaves existing `display-settings.json` files untouched. It is a\n**host-wide** setting, not per-client - the host-pinned decision of record in\n`design/per-monitor-portal-capture.md` §5.3. `SLIPSTREAM_CAPTURE_MONITOR` overrides it (see\n[`capture_monitor`]), so an appliance can pin in `host.env` without the console fighting it."
           },
           "ddc_power_off": {
             "type": "boolean",
-            "description": "EXPERIMENTAL (Windows): command physical monitors' panels off over DDC/CI (VCP 0xD6 →\nDPMS off) right before an `Exclusive` isolate deactivates them, and back on at restore.\nTargets the \"connected-but-dark head\" periodic-stutter class (monitor standby\nauto-input-scan / DP link churn while the virtual display is the sole active display) at\nthe monitor-firmware level. Best-effort — monitors without DDC/CI (or with it disabled in\nthe OSD) are skipped. Orthogonal to `preset` (like `game_session`): preserved across\npreset changes; `#[serde(default)]` = off so existing `display-settings.json` files are\nuntouched."
+            "description": "EXPERIMENTAL (Windows): command physical monitors' panels off over DDC/CI (VCP 0xD6 →\nDPMS off) right before an `Exclusive` isolate deactivates them, and back on at restore.\nTargets the \"connected-but-dark head\" periodic-stutter class (monitor standby\nauto-input-scan / DP link churn while the virtual display is the sole active display) at\nthe monitor-firmware level. Best-effort - monitors without DDC/CI (or with it disabled in\nthe OSD) are skipped. Orthogonal to `preset` (like `game_session`): preserved across\npreset changes; `#[serde(default)]` = off so existing `display-settings.json` files are\nuntouched."
           },
           "game_session": {
             "$ref": "#/components/schemas/GameSession",
-            "description": "How a game-launching session is served (`design/gamemode-and-dedicated-sessions.md` §5.2).\nOrthogonal to `preset`/lifecycle — preserved across preset changes; `#[serde(default)]` = `Auto`\nso existing `display-settings.json` files are untouched."
+            "description": "How a game-launching session is served (`design/gamemode-and-dedicated-sessions.md` §5.2).\nOrthogonal to `preset`/lifecycle - preserved across preset changes; `#[serde(default)]` = `Auto`\nso existing `display-settings.json` files are untouched."
           },
           "identity": {
             "$ref": "#/components/schemas/Identity"
@@ -5158,7 +5158,7 @@
           },
           "pnp_disable_monitors": {
             "type": "boolean",
-            "description": "EXPERIMENTAL (Windows): DISABLE physical monitors' PnP device nodes for the stream's\nduration (persistently, so a standby monitor/TV whose hot-plug events re-arrive stays\ndisabled) and re-enable them at teardown. Two selectors: the monitors an `Exclusive`\nisolate deactivated, plus — in ANY topology — external monitors that are connected but not\npart of the desktop (the standby TV that was never active, whose input auto-scan /\ninstant-on HPD cycling re-probes the link every few seconds). Targets the same\n\"connected-but-dark head\" periodic-stutter class as [`Self::ddc_power_off`], but at the\nWindows-reaction level: a disabled devnode's wake events trigger no PnP arrival, no CCD\nre-evaluation, no DWM invalidation. A crash-recovery journal re-enables leftovers on host\nstartup. Orthogonal to `preset` (like `game_session`); `#[serde(default)]` = off."
+            "description": "EXPERIMENTAL (Windows): DISABLE physical monitors' PnP device nodes for the stream's\nduration (persistently, so a standby monitor/TV whose hot-plug events re-arrive stays\ndisabled) and re-enable them at teardown. Two selectors: the monitors an `Exclusive`\nisolate deactivated, plus - in ANY topology - external monitors that are connected but not\npart of the desktop (the standby TV that was never active, whose input auto-scan /\ninstant-on HPD cycling re-probes the link every few seconds). Targets the same\n\"connected-but-dark head\" periodic-stutter class as [`Self::ddc_power_off`], but at the\nWindows-reaction level: a disabled devnode's wake events trigger no PnP arrival, no CCD\nre-evaluation, no DWM invalidation. A crash-recovery journal re-enables leftovers on host\nstartup. Orthogonal to `preset` (like `game_session`); `#[serde(default)]` = off."
           },
           "preset": {
             "$ref": "#/components/schemas/Preset"
@@ -5169,7 +5169,7 @@
           "version": {
             "type": "integer",
             "format": "int32",
-            "description": "Schema version (currently 1) — lets a future field addition migrate rather than reject.",
+            "description": "Schema version (currently 1) - lets a future field addition migrate rather than reject.",
             "minimum": 0
           }
         }
@@ -5195,7 +5195,7 @@
             "items": {
               "$ref": "#/components/schemas/CustomPreset"
             },
-            "description": "The operator's saved custom presets (`display-presets.json`) — named field-bundles rendered\nalongside the built-ins. Managed via `POST/PUT/DELETE /display/presets`; applied by writing a\n`Custom` policy carrying the preset's fields."
+            "description": "The operator's saved custom presets (`display-presets.json`) - named field-bundles rendered\nalongside the built-ins. Managed via `POST/PUT/DELETE /display/presets`; applied by writing a\n`Custom` policy carrying the preset's fields."
           },
           "effective": {
             "$ref": "#/components/schemas/EffectivePolicy",
@@ -5206,7 +5206,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Option names this build enforces right now. All five axes are now acted on (keep_alive +\ntopology since Stage 0-2, identity Stage 3, mode_conflict Stage 4, layout Stage 5) — the console\nreads this to know which controls are live vs. \"coming soon\" (per-backend nuance, e.g. layout\nposition apply being KWin-only, is reported per display in `/display/state`)."
+            "description": "Option names this build enforces right now. All five axes are now acted on (keep_alive +\ntopology since Stage 0-2, identity Stage 3, mode_conflict Stage 4, layout Stage 5) - the console\nreads this to know which controls are live vs. \"coming soon\" (per-backend nuance, e.g. layout\nposition apply being KWin-only, is reported per display in `/display/state`)."
           },
           "presets": {
             "type": "array",
@@ -5238,7 +5238,7 @@
       },
       "EffectivePolicy": {
         "type": "object",
-        "description": "The six resolved fields after preset expansion — what the lifecycle/registry and the Stage-0 call\nsites read, and what the mgmt API echoes as the \"currently in force\" policy. Pure output of\n[`DisplayPolicy::effective`].",
+        "description": "The six resolved fields after preset expansion - what the lifecycle/registry and the Stage-0 call\nsites read, and what the mgmt API echoes as the \"currently in force\" policy. Pure output of\n[`DisplayPolicy::effective`].",
         "required": [
           "keep_alive",
           "topology",
@@ -5436,7 +5436,7 @@
           },
           {
             "type": "object",
-            "description": "A launched game was confirmed running — fires once per launch, after the host has actually\nseen the game's process (not merely spawned its launcher).",
+            "description": "A launched game was confirmed running - fires once per launch, after the host has actually\nseen the game's process (not merely spawned its launcher).",
             "required": [
               "game",
               "kind"
@@ -5610,7 +5610,7 @@
               },
               "install_kind": {
                 "type": "string",
-                "description": "This host's install kind (`apt`, `windows-installer`, …) — lets a hook or the\ntray render the right \"how to update\" hint without a second call."
+                "description": "This host's install kind (`apt`, `windows-installer`, ...) - lets a hook or the\ntray render the right \"how to update\" hint without a second call."
               },
               "kind": {
                 "type": "string",
@@ -5668,7 +5668,7 @@
           },
           {
             "type": "object",
-            "description": "The set of installed plugins, or what the store knows about them, changed — an install or\nuninstall finished, or a catalog refresh brought in new rows. A consumer re-reads\n`GET /api/v1/store/catalog` / `…/installed`. Deliberately payload-free: the store's answer\nis a join over several sources of truth, so \"go look again\" is the only honest signal.",
+            "description": "The set of installed plugins, or what the store knows about them, changed - an install or\nuninstall finished, or a catalog refresh brought in new rows. A consumer re-reads\n`GET /api/v1/store/catalog` / `.../installed`. Deliberately payload-free: the store's answer\nis a join over several sources of truth, so \"go look again\" is the only honest signal.",
             "required": [
               "kind"
             ],
@@ -5733,7 +5733,7 @@
         "allOf": [
           {
             "$ref": "#/components/schemas/GameMeta",
-            "description": "Descriptive metadata, flattened — see [`GameMeta`]."
+            "description": "Descriptive metadata, flattened - see [`GameMeta`]."
           },
           {
             "type": "object",
@@ -5768,7 +5768,7 @@
                   "string",
                   "null"
                 ],
-                "description": "The external provider owning this entry (custom-store entries synced by a provider\nplugin, RFC §8) — `None` for installed-store titles and manual custom entries. The\nconsole uses it for attribution; `GET /library?provider=` filters on it."
+                "description": "The external provider owning this entry (custom-store entries synced by a provider\nplugin, RFC §8) - `None` for installed-store titles and manual custom entries. The\nconsole uses it for attribution; `GET /library?provider=` filters on it."
               },
               "store": {
                 "type": "string",
@@ -5785,7 +5785,7 @@
       },
       "GameMeta": {
         "type": "object",
-        "description": "Descriptive metadata for a title — everything a richer library UI (details pane, platform\nfilter, couch-pick badges) renders beyond the poster. Every field is optional and defaults to\nabsent, so pre-metadata catalogs, providers, and clients keep working unchanged. The struct is\n`#[serde(flatten)]`-ed into [`GameEntry`] / the custom-store shapes: one definition, a flat\nwire shape everywhere.\n\nValues are free-form display strings, not enums — emulation sources (RomM, EmuDeck, Playnite)\neach have their own vocabulary and the host has no business normalizing it.",
+        "description": "Descriptive metadata for a title - everything a richer library UI (details pane, platform\nfilter, couch-pick badges) renders beyond the poster. Every field is optional and defaults to\nabsent, so pre-metadata catalogs, providers, and clients keep working unchanged. The struct is\n`#[serde(flatten)]`-ed into [`GameEntry`] / the custom-store shapes: one definition, a flat\nwire shape everywhere.\n\nValues are free-form display strings, not enums - emulation sources (RomM, EmuDeck, Playnite)\neach have their own vocabulary and the host has no business normalizing it.",
         "properties": {
           "description": {
             "type": [
@@ -5805,14 +5805,14 @@
             "items": {
               "type": "string"
             },
-            "description": "Genre taxonomy from the metadata source (`\"RPG\"`, `\"Platformer\"`, …)."
+            "description": "Genre taxonomy from the metadata source (`\"RPG\"`, `\"Platformer\"`, ...)."
           },
           "platform": {
             "type": [
               "string",
               "null"
             ],
-            "description": "The system the title runs on — `\"PS2\"`, `\"Xbox 360\"`, `\"SNES\"`, … Installed-store\nscanners stamp `\"PC\"`; `GET /library?platform=` filters on it (case-insensitive).",
+            "description": "The system the title runs on - `\"PS2\"`, `\"Xbox 360\"`, `\"SNES\"`, ... Installed-store\nscanners stamp `\"PC\"`; `GET /library?platform=` filters on it (case-insensitive).",
             "example": "PS2"
           },
           "players": {
@@ -5835,7 +5835,7 @@
               "string",
               "null"
             ],
-            "description": "Release region — emulation-relevant (`\"NTSC-U\"`, `\"PAL\"`, `\"NTSC-J\"`)."
+            "description": "Release region - emulation-relevant (`\"NTSC-U\"`, `\"PAL\"`, `\"NTSC-J\"`)."
           },
           "release_year": {
             "type": [
@@ -5843,7 +5843,7 @@
               "null"
             ],
             "format": "int32",
-            "description": "Year of first release — the granularity metadata sources reliably agree on.",
+            "description": "Year of first release - the granularity metadata sources reliably agree on.",
             "example": 2001,
             "minimum": 0
           },
@@ -5852,7 +5852,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Free-form organizational labels (`\"co-op\"`, `\"kids\"`, `\"finished\"`, …)."
+            "description": "Free-form organizational labels (`\"co-op\"`, `\"kids\"`, `\"finished\"`, ...)."
           }
         }
       },
@@ -5893,7 +5893,7 @@
               "string",
               "null"
             ],
-            "description": "Which store surfaced it (`steam`, `heroic`, `custom`, …), when known."
+            "description": "Which store surfaced it (`steam`, `heroic`, `custom`, ...), when known."
           },
           "title": {
             "type": "string",
@@ -5903,7 +5903,7 @@
       },
       "GameSession": {
         "type": "string",
-        "description": "How a session that **launches a game** (a library id on the Hello / apps.json / Decky pin) is\nserved (`design/gamemode-and-dedicated-sessions.md` §5.2). Orthogonal to the preset/lifecycle axes\n— a top-level [`DisplayPolicy`] field, NOT part of [`EffectivePolicy`], so a preset never clobbers\nit. Linux-only in effect (a launching Windows session opens into the one desktop).",
+        "description": "How a session that **launches a game** (a library id on the Hello / apps.json / Decky pin) is\nserved (`design/gamemode-and-dedicated-sessions.md` §5.2). Orthogonal to the preset/lifecycle axes\n- a top-level [`DisplayPolicy`] field, NOT part of [`EffectivePolicy`], so a preset never clobbers\nit. Linux-only in effect (a launching Windows session opens into the one desktop).",
         "enum": [
           "auto",
           "dedicated"
@@ -5950,14 +5950,14 @@
               "string",
               "null"
             ],
-            "description": "`SLIPSTREAM_ENCODER` (the host.env encoder pin), when set to something other than `auto`\n(e.g. `qsv`, `nvenc`, `amf`, `software`). A pin whose vendor contradicts the selected\nGPU is overridden at session open — the adapter wins — so the console can warn that the\npin is stale rather than letting the selection look broken."
+            "description": "`SLIPSTREAM_ENCODER` (the host.env encoder pin), when set to something other than `auto`\n(e.g. `qsv`, `nvenc`, `amf`, `software`). A pin whose vendor contradicts the selected\nGPU is overridden at session open - the adapter wins - so the console can warn that the\npin is stale rather than letting the selection look broken."
           },
           "env_override": {
             "type": [
               "string",
               "null"
             ],
-            "description": "`SLIPSTREAM_RENDER_ADAPTER` (the host.env pin), when set — it applies while `mode` is\n`auto`; a manual preference overrides it."
+            "description": "`SLIPSTREAM_RENDER_ADAPTER` (the host.env pin), when set - it applies while `mode` is\n`auto`; a manual preference overrides it."
           },
           "gpus": {
             "type": "array",
@@ -6060,7 +6060,7 @@
           },
           "on": {
             "type": "string",
-            "description": "Which events fire this hook: an exact kind (`stream.started`) or a `domain.*` prefix\n(`pairing.*`) — the same vocabulary as the SSE `?kinds=` filter."
+            "description": "Which events fire this hook: an exact kind (`stream.started`) or a `domain.*` prefix\n(`pairing.*`) - the same vocabulary as the SSE `?kinds=` filter."
           },
           "run": {
             "type": [
@@ -6072,7 +6072,7 @@
           "timeout_s": {
             "type": "integer",
             "format": "int32",
-            "description": "Exec timeout in seconds (1–600, default 30); the process group is killed on expiry.",
+            "description": "Exec timeout in seconds (1-600, default 30); the process group is killed on expiry.",
             "minimum": 0
           },
           "webhook": {
@@ -6086,7 +6086,7 @@
       },
       "HookFilter": {
         "type": "object",
-        "description": "Exact-match filters against an event's identity fields (RFC open-question 3: exact match\nonly — anything richer is what the SDK is for). Absent fields don't constrain; a filter\nfield set on an event kind that doesn't carry it (e.g. `client` on `host.started`) never\nmatches.",
+        "description": "Exact-match filters against an event's identity fields (RFC open-question 3: exact match\nonly - anything richer is what the SDK is for). Absent fields don't constrain; a filter\nfield set on an event kind that doesn't carry it (e.g. `client` on `host.started`) never\nmatches.",
         "properties": {
           "app": {
             "type": [
@@ -6124,7 +6124,7 @@
       },
       "HooksConfig": {
         "type": "object",
-        "description": "The operator's hook configuration — the `hooks.json` document and the `/api/v1/hooks` body.",
+        "description": "The operator's hook configuration - the `hooks.json` document and the `/api/v1/hooks` body.",
         "properties": {
           "hooks": {
             "type": "array",
@@ -6207,7 +6207,7 @@
         "allOf": [
           {
             "$ref": "#/components/schemas/EventKind",
-            "description": "The event kind + payload, flattened: `\"kind\": \"stream.started\", …payload…`."
+            "description": "The event kind + payload, flattened: `\"kind\": \"stream.started\", ...payload...`."
           },
           {
             "type": "object",
@@ -6226,7 +6226,7 @@
               "seq": {
                 "type": "integer",
                 "format": "int64",
-                "description": "Monotonic sequence number (1-based) — a consumer resumes with `since = last seen`.",
+                "description": "Monotonic sequence number (1-based) - a consumer resumes with `since = last seen`.",
                 "minimum": 0
               },
               "ts_ms": {
@@ -6294,7 +6294,7 @@
           },
           "gamestream": {
             "type": "boolean",
-            "description": "Whether the GameStream/Moonlight-compat planes are running (`--gamestream`). `false` on the\nsecure default (native slipstream/1 only) — a console can hide Moonlight-only UI (e.g. the\nMoonlight PIN pairing card, which could never receive a PIN when this is `false`)."
+            "description": "Whether the GameStream/Moonlight-compat planes are running (`--gamestream`). `false` on the\nsecure default (native slipstream/1 only) - a console can hide Moonlight-only UI (e.g. the\nMoonlight PIN pairing card, which could never receive a PIN when this is `false`)."
           },
           "gfe_version": {
             "type": "string",
@@ -6361,7 +6361,7 @@
       },
       "InstallRequest": {
         "type": "object",
-        "description": "`POST /store/install` — either a catalogued entry, or a raw spec the operator owns.",
+        "description": "`POST /store/install` - either a catalogued entry, or a raw spec the operator owns.",
         "properties": {
           "accept_unverified": {
             "type": "boolean",
@@ -6427,7 +6427,7 @@
               "string",
               "null"
             ],
-            "description": "The plugin id it registers under — the key into `GET /plugins`."
+            "description": "The plugin id it registers under - the key into `GET /plugins`."
           },
           "running": {
             "type": "boolean",
@@ -6441,7 +6441,7 @@
           },
           "tier": {
             "type": "string",
-            "description": "`verified` / `external` / `unverified` / `cli` — remembered from install time, so an\nunverified plugin stays visibly unverified long after the dialog is forgotten."
+            "description": "`verified` / `external` / `unverified` / `cli` - remembered from install time, so an\nunverified plugin stays visibly unverified long after the dialog is forgotten."
           },
           "title": {
             "type": [
@@ -6466,7 +6466,7 @@
       },
       "Job": {
         "type": "object",
-        "description": "A job as the console sees it. Field names are snake_case like the rest of the management API\n(the *file* formats — index, sources, manifest — follow npm's camelCase instead).",
+        "description": "A job as the console sees it. Field names are snake_case like the rest of the management API\n(the *file* formats - index, sources, manifest - follow npm's camelCase instead).",
         "required": [
           "id",
           "kind",
@@ -6519,7 +6519,7 @@
           },
           "target": {
             "type": "string",
-            "description": "What the operator asked for — a package name, or the raw spec they typed."
+            "description": "What the operator asked for - a package name, or the raw spec they typed."
           }
         }
       },
@@ -6576,7 +6576,7 @@
           },
           {
             "type": "object",
-            "description": "Keep the display until host shutdown or an explicit release (the `Pinned` lifecycle state).\n**Not honored until the display-lifecycle stage** — rejected by the mgmt PUT at Stage 0.",
+            "description": "Keep the display until host shutdown or an explicit release (the `Pinned` lifecycle state).\n**Not honored until the display-lifecycle stage** - rejected by the mgmt PUT at Stage 0.",
             "required": [
               "mode"
             ],
@@ -6646,7 +6646,7 @@
       },
       "LocalSummary": {
         "type": "object",
-        "description": "Non-sensitive host status for the local tray icon: counts and booleans — no PIN values, no\nfingerprints. The ONE name exposed is `client_name`, the streaming client's display label\n(deliberate loosening for the tray's \"client connected\" toast: it tells the local user who is\non their machine, which is disclosure in the user's favor — and any local process could\nalready infer a session exists from the booleans here). Served unauthenticated to LOOPBACK\npeers only (see `require_auth`): the bearer-token file is SYSTEM/Administrators-DACL'd on\nWindows, so the per-user tray process cannot authenticate — this narrow read-only route is\nits status source.",
+        "description": "Non-sensitive host status for the local tray icon: counts and booleans - no PIN values, no\nfingerprints. The ONE name exposed is `client_name`, the streaming client's display label\n(deliberate loosening for the tray's \"client connected\" toast: it tells the local user who is\non their machine, which is disclosure in the user's favor - and any local process could\nalready infer a session exists from the booleans here). Served unauthenticated to LOOPBACK\npeers only (see `require_auth`): the bearer-token file is SYSTEM/Administrators-DACL'd on\nWindows, so the per-user tray process cannot authenticate - this narrow read-only route is\nits status source.",
         "required": [
           "version",
           "video_streaming",
@@ -6667,7 +6667,7 @@
               "string",
               "null"
             ],
-            "description": "Display name of the (first) streaming native client — the trust store's name for it, else\nthe name the device sent at connect. `null` when idle, for a nameless client, or for a\nGameStream session (that plane carries no device name)."
+            "description": "Display name of the (first) streaming native client - the trust store's name for it, else\nthe name the device sent at connect. `null` when idle, for a nameless client, or for a\nGameStream session (that plane carries no device name)."
           },
           "conflicts": {
             "type": "array",
@@ -6681,12 +6681,12 @@
             "items": {
               "type": "string"
             },
-            "description": "Launched games the host is tracking, as compact labels (`Hades`, `Hades (closing in 4:12)`).\n\nThe countdown form is the one that matters: it means the game's client is gone and the host\nwill end the game when the window closes — something a user at the machine should be able to\nsee (and stop) without opening the console. Empty when nothing was launched."
+            "description": "Launched games the host is tracking, as compact labels (`Hades`, `Hades (closing in 4:12)`).\n\nThe countdown form is the one that matters: it means the game's client is gone and the host\nwill end the game when the window closes - something a user at the machine should be able to\nsee (and stop) without opening the console. Empty when nothing was launched."
           },
           "kept_displays": {
             "type": "integer",
             "format": "int32",
-            "description": "Virtual displays being KEPT with no live session — lingering (keep-alive window) or pinned\n(`keep_alive: forever`). Non-zero means a display (and, exclusive, your physical monitors) is\nheld; the tray surfaces it + a one-click release. Active (in-use) displays are not counted.",
+            "description": "Virtual displays being KEPT with no live session - lingering (keep-alive window) or pinned\n(`keep_alive: forever`). Non-zero means a display (and, exclusive, your physical monitors) is\nheld; the tray surfaces it + a one-click release. Active (in-use) displays are not counted.",
             "minimum": 0
           },
           "native_paired_clients": {
@@ -6728,7 +6728,7 @@
           },
           "video_streaming": {
             "type": "boolean",
-            "description": "True while video is streaming on EITHER plane: the GameStream media pipeline, or a live\nnative (slipstream/1) session — the default plane, invisible in the GameStream flag alone."
+            "description": "True while video is streaming on EITHER plane: the GameStream media pipeline, or a live\nnative (slipstream/1) session - the default plane, invisible in the GameStream flag alone."
           }
         }
       },
@@ -6754,7 +6754,7 @@
           "seq": {
             "type": "integer",
             "format": "int64",
-            "description": "Monotonic sequence number (1-based) — pass the last one back as the `after` cursor.",
+            "description": "Monotonic sequence number (1-based) - pass the last one back as the `after` cursor.",
             "minimum": 0
           },
           "target": {
@@ -6819,7 +6819,7 @@
               "string",
               "null"
             ],
-            "description": "Compositor backend the enumeration came from (`kwin`, `mutter`, …), when one was resolved."
+            "description": "Compositor backend the enumeration came from (`kwin`, `mutter`, ...), when one was resolved."
           },
           "error": {
             "type": [
@@ -6837,14 +6837,14 @@
           },
           "pin_supported": {
             "type": "boolean",
-            "description": "Whether this build can actually STREAM one of these monitors.\n\nEnumeration and capture are separate capabilities, and on Windows only the first exists: the\nheads below are real and worth showing (they explain the topology, and `/display/state`\ncross-references them), but `ss-capture`'s sole Windows entry point is `open_idd_push` — a\nframe channel pushed by our OWN IddCx virtual display. There is no desktop-duplication\ncapturer to point at a chosen head (DXGI Desktop Duplication was deliberately removed), so\n`vdisplay::open` has no mirror arm outside Linux and a pin could not be honored.\n\nThe console renders the picker read-only on `false`. Reported as a capability rather than\nsniffed client-side from the OS so the answer comes from the build that would have to honor\nit — when a Windows mirror backend lands, this flips and the UI needs no change."
+            "description": "Whether this build can actually STREAM one of these monitors.\n\nEnumeration and capture are separate capabilities, and on Windows only the first exists: the\nheads below are real and worth showing (they explain the topology, and `/display/state`\ncross-references them), but `ss-capture`'s sole Windows entry point is `open_idd_push` - a\nframe channel pushed by our OWN IddCx virtual display. There is no desktop-duplication\ncapturer to point at a chosen head (DXGI Desktop Duplication was deliberately removed), so\n`vdisplay::open` has no mirror arm outside Linux and a pin could not be honored.\n\nThe console renders the picker read-only on `false`. Reported as a capability rather than\nsniffed client-side from the OS so the answer comes from the build that would have to honor\nit - when a Windows mirror backend lands, this flips and the UI needs no change."
           },
           "pinned": {
             "type": [
               "string",
               "null"
             ],
-            "description": "The configured `SLIPSTREAM_CAPTURE_MONITOR`, if any — reported even when it matches nothing,\nso the console can show \"pinned to DP-2, which this host doesn't have\"."
+            "description": "The configured `SLIPSTREAM_CAPTURE_MONITOR`, if any - reported even when it matches nothing,\nso the console can show \"pinned to DP-2, which this host doesn't have\"."
           }
         }
       },
@@ -6870,7 +6870,7 @@
         "properties": {
           "fingerprint": {
             "type": "string",
-            "description": "Hex SHA-256 of the client certificate — its stable id here."
+            "description": "Hex SHA-256 of the client certificate - its stable id here."
           },
           "name": {
             "type": "string",
@@ -6881,7 +6881,7 @@
       },
       "NativePairStatus": {
         "type": "object",
-        "description": "Native (slipstream/1) pairing status. Unlike GameStream, the **host** mints the PIN (the SPAKE2\nceremony needs it client-side first), so the console **displays** `pin` for the user to enter on\ntheir device — armed on demand for a short window.",
+        "description": "Native (slipstream/1) pairing status. Unlike GameStream, the **host** mints the PIN (the SPAKE2\nceremony needs it client-side first), so the console **displays** `pin` for the user to enter on\ntheir device - armed on demand for a short window.",
         "required": [
           "enabled",
           "armed",
@@ -6967,7 +6967,7 @@
         "properties": {
           "fingerprint": {
             "type": "string",
-            "description": "Lowercase hex SHA-256 of the client certificate DER — the client's stable id here.",
+            "description": "Lowercase hex SHA-256 of the client certificate DER - the client's stable id here.",
             "example": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
           },
           "not_after_unix": {
@@ -7010,7 +7010,7 @@
       },
       "PendingDevice": {
         "type": "object",
-        "description": "An unpaired device that tried to connect while the host requires pairing — awaiting\n**delegated approval** (approve it here instead of fetching the host PIN out of band).",
+        "description": "An unpaired device that tried to connect while the host requires pairing - awaiting\n**delegated approval** (approve it here instead of fetching the host PIN out of band).",
         "required": [
           "id",
           "name",
@@ -7026,7 +7026,7 @@
           },
           "fingerprint": {
             "type": "string",
-            "description": "Hex SHA-256 of the device's certificate — what approval pins."
+            "description": "Hex SHA-256 of the device's certificate - what approval pins."
           },
           "id": {
             "type": "integer",
@@ -7050,7 +7050,7 @@
       },
       "Plane": {
         "type": "string",
-        "description": "Which protocol plane an event originated from. Hooks and scripts filter on it — a hook\nthat fires for native clients but not Moonlight clients is a bug, not a v2 feature.",
+        "description": "Which protocol plane an event originated from. Hooks and scripts filter on it - a hook\nthat fires for native clients but not Moonlight clients is a bug, not a v2 feature.",
         "enum": [
           "native",
           "gamestream"
@@ -7065,7 +7065,7 @@
         "properties": {
           "title": {
             "type": "string",
-            "description": "Human-readable title for the console nav entry (1–64 chars; control chars stripped)."
+            "description": "Human-readable title for the console nav entry (1-64 chars; control chars stripped)."
           },
           "ui": {
             "oneOf": [
@@ -7089,7 +7089,7 @@
       },
       "PluginSummary": {
         "type": "object",
-        "description": "One entry in `GET /plugins`. **Never carries the secret** — the browser learns a plugin exists\nand has a UI, nothing that lets it reach the plugin directly (it goes through the console proxy).",
+        "description": "One entry in `GET /plugins`. **Never carries the secret** - the browser learns a plugin exists\nand has a UI, nothing that lets it reach the plugin directly (it goes through the console proxy).",
         "required": [
           "id",
           "title"
@@ -7121,7 +7121,7 @@
       },
       "PluginUi": {
         "type": "object",
-        "description": "A plugin's UI surface as it registers it. Carries the secret — this shape is only ever a request\nbody, never a response ([`PluginUiPublic`] is the secret-free view).",
+        "description": "A plugin's UI surface as it registers it. Carries the secret - this shape is only ever a request\nbody, never a response ([`PluginUiPublic`] is the secret-free view).",
         "required": [
           "port",
           "secret"
@@ -7148,7 +7148,7 @@
       },
       "PluginUiPublic": {
         "type": "object",
-        "description": "The secret-free view of a plugin's UI surface — what [`list_plugins`] returns to the browser.",
+        "description": "The secret-free view of a plugin's UI surface - what [`list_plugins`] returns to the browser.",
         "required": [
           "port"
         ],
@@ -7299,7 +7299,7 @@
       },
       "PrepCmd": {
         "type": "object",
-        "description": "One per-app preparation step (RFC §6 — deliberate Sunshine `prep-cmd` parity): `do` runs\n**synchronously before the app launches** (an HDR toggle or a MangoHud env change must land\nfirst), `undo` runs at session end — reverse order across steps, best-effort, on every exit\npath including a crash-unwind (RAII via [`PrepGuard`]).",
+        "description": "One per-app preparation step (RFC §6 - deliberate Sunshine `prep-cmd` parity): `do` runs\n**synchronously before the app launches** (an HDR toggle or a MangoHud env change must land\nfirst), `undo` runs at session end - reverse order across steps, best-effort, on every exit\npath including a crash-unwind (RAII via [`PrepGuard`]).",
         "required": [
           "do"
         ],
@@ -7356,7 +7356,7 @@
         "allOf": [
           {
             "$ref": "#/components/schemas/GameMeta",
-            "description": "Descriptive metadata (platform, description, …), flattened — see [`GameMeta`]."
+            "description": "Descriptive metadata (platform, description, ...), flattened - see [`GameMeta`]."
           },
           {
             "type": "object",
@@ -7370,7 +7370,7 @@
               },
               "detect": {
                 "$ref": "#/components/schemas/DetectHint",
-                "description": "How to recognize this title's process — see [`CustomEntry::detect`]. A provider that knows its\ntitles' install directories (Playnite does) should send them: it is what lets a game launched\nthrough the provider's own client still end its session when the player quits."
+                "description": "How to recognize this title's process - see [`CustomEntry::detect`]. A provider that knows its\ntitles' install directories (Playnite does) should send them: it is what lets a game launched\nthrough the provider's own client still end its session when the player quits."
               },
               "external_id": {
                 "type": "string",
@@ -7391,7 +7391,7 @@
                 "items": {
                   "$ref": "#/components/schemas/PrepCmd"
                 },
-                "description": "Per-title prep/undo steps — commands run as the host user; operator-privileged config."
+                "description": "Per-title prep/undo steps - commands run as the host user; operator-privileged config."
               },
               "title": {
                 "type": "string"
@@ -7483,18 +7483,18 @@
             "items": {
               "$ref": "#/components/schemas/ActiveGame"
             },
-            "description": "Every launched game the host is tracking: one row per live session that launched a title, plus\nany game whose session has ended and which is waiting out its reconnect window before being\nended (`state: \"grace\"`). Empty when nothing was launched — a plain desktop stream has no game."
+            "description": "Every launched game the host is tracking: one row per live session that launched a title, plus\nany game whose session has ended and which is waiting out its reconnect window before being\nended (`state: \"grace\"`). Empty when nothing was launched - a plain desktop stream has no game."
           },
           "native_paired_clients": {
             "type": "integer",
             "format": "int32",
-            "description": "Number of paired native (slipstream/1) devices — the default plane, so on a host that has\nnever been touched by Moonlight this is the only non-zero one of the pair.",
+            "description": "Number of paired native (slipstream/1) devices - the default plane, so on a host that has\nnever been touched by Moonlight this is the only non-zero one of the pair.",
             "minimum": 0
           },
           "paired_clients": {
             "type": "integer",
             "format": "int32",
-            "description": "Number of pinned (paired) GameStream client certificates. Native (slipstream/1) devices pair\nagainst a separate store and are counted in `native_paired_clients` — sum the two for\n\"how many clients are paired with this host\".",
+            "description": "Number of pinned (paired) GameStream client certificates. Native (slipstream/1) devices pair\nagainst a separate store and are counted in `native_paired_clients` - sum the two for\n\"how many clients are paired with this host\".",
             "minimum": 0
           },
           "pin_pending": {
@@ -7519,7 +7519,7 @@
               },
               {
                 "$ref": "#/components/schemas/StreamInfo",
-                "description": "The active stream's parameters — RTSP-negotiated for GameStream, or the live native session's\nmode/codec/bitrate. `null` when nothing is streaming."
+                "description": "The active stream's parameters - RTSP-negotiated for GameStream, or the live native session's\nmode/codec/bitrate. `null` when nothing is streaming."
               }
             ]
           },
@@ -7569,7 +7569,7 @@
       },
       "ScannerInfo": {
         "type": "object",
-        "description": "One installed-store scanner this host build supports, with its enable state — the unit the\nconsole renders a toggle for. The list is platform-gated at compile time (the scanners are),\nso the console never shows a toggle that cannot do anything on this host.",
+        "description": "One installed-store scanner this host build supports, with its enable state - the unit the\nconsole renders a toggle for. The list is platform-gated at compile time (the scanners are),\nso the console never shows a toggle that cannot do anything on this host.",
         "required": [
           "id",
           "label",
@@ -7582,7 +7582,7 @@
           },
           "id": {
             "type": "string",
-            "description": "Stable scanner id — the same string the scanner's entries carry in their `store` field.",
+            "description": "Stable scanner id - the same string the scanner's entries carry in their `store` field.",
             "example": "steam"
           },
           "label": {
@@ -7728,7 +7728,7 @@
           },
           "mode": {
             "type": "string",
-            "description": "`auto` (env pin, else max dedicated VRAM — the default) or `manual`.",
+            "description": "`auto` (env pin, else max dedicated VRAM - the default) or `manual`.",
             "example": "manual"
           }
         }
@@ -7803,7 +7803,7 @@
           },
           "stale": {
             "type": "boolean",
-            "description": "The catalog we're serving is older than the last refresh attempt (offline, or the last\nfetch failed) — entries still install, because the pin travelled with the entry."
+            "description": "The catalog we're serving is older than the last refresh attempt (offline, or the last\nfetch failed) - entries still install, because the pin travelled with the entry."
           },
           "url": {
             "type": "string"
@@ -7933,7 +7933,7 @@
           "mbps": {
             "type": "number",
             "format": "float",
-            "description": "Attempted sealed wire bytes/s (Mb/s): full UDP payloads at seal time — video AU bytes\nplus shard framing (header + AEAD) plus FEC parity, and for PyroWave's datagram-aligned\nmode the zero-padded window tails. NOT goodput, and NOT reduced by socket send drops."
+            "description": "Attempted sealed wire bytes/s (Mb/s): full UDP payloads at seal time - video AU bytes\nplus shard framing (header + AEAD) plus FEC parity, and for PyroWave's datagram-aligned\nmode the zero-padded window tails. NOT goodput, and NOT reduced by socket send drops."
           },
           "packets_dropped": {
             "type": "integer",
@@ -8122,7 +8122,7 @@
         "properties": {
           "pin": {
             "type": "string",
-            "description": "1–16 ASCII digits (Moonlight shows 4).",
+            "description": "1-16 ASCII digits (Moonlight shows 4).",
             "example": "1234"
           }
         }
@@ -8254,7 +8254,7 @@
       },
       "UiCredential": {
         "type": "object",
-        "description": "`GET /plugins/{id}/ui-credential` — the console proxy's server-side lookup (bearer + loopback).\nThis is the only endpoint that returns a secret; the console BFF denylists it from the browser.",
+        "description": "`GET /plugins/{id}/ui-credential` - the console proxy's server-side lookup (bearer + loopback).\nThis is the only endpoint that returns a secret; the console BFF denylists it from the browser.",
         "required": [
           "port",
           "secret"
@@ -8341,12 +8341,12 @@
           "serial": {
             "type": "integer",
             "format": "int64",
-            "description": "Publish serial (unix seconds) — monotonic per channel.",
+            "description": "Publish serial (unix seconds) - monotonic per channel.",
             "minimum": 0
           },
           "stale": {
             "type": "boolean",
-            "description": "The last verified manifest is suspiciously old (>45 days) — the freeze/stale hint."
+            "description": "The last verified manifest is suspiciously old (>45 days) - the freeze/stale hint."
           },
           "version": {
             "type": "string",
@@ -8420,11 +8420,11 @@
         "properties": {
           "apply": {
             "type": "string",
-            "description": "What the console may offer for this install: `notify` (show the command) — later\nphases add `full` (one-click apply) and `staged` (apply + reboot to finish)."
+            "description": "What the console may offer for this install: `notify` (show the command) - later\nphases add `full` (one-click apply) and `staged` (apply + reboot to finish)."
           },
           "available": {
             "type": "boolean",
-            "description": "A newer release than `current_version` exists for this channel (definitive\ncomparisons only — an unparseable version pair never flags)."
+            "description": "A newer release than `current_version` exists for this channel (definitive\ncomparisons only - an unparseable version pair never flags)."
           },
           "channel": {
             "type": "string",
@@ -8497,14 +8497,14 @@
           },
           "not_published": {
             "type": "boolean",
-            "description": "The check reached the feed and found this channel has **no release published yet** —\nan expected state (a channel nobody has announced to answers with a 404), not a\nfailure. Mutually exclusive with `last_error`, so a UI can say \"nothing published yet\"\ninstead of painting an empty feed as a broken host. Never set once a manifest has been\nseen for this channel: a feed that loses a document it used to serve stays an error."
+            "description": "The check reached the feed and found this channel has **no release published yet** -\nan expected state (a channel nobody has announced to answers with a 404), not a\nfailure. Mutually exclusive with `last_error`, so a UI can say \"nothing published yet\"\ninstead of painting an empty feed as a broken host. Never set once a manifest has been\nseen for this channel: a feed that loses a document it used to serve stays an error."
           },
           "opt_in_hint": {
             "type": [
               "string",
               "null"
             ],
-            "description": "This install could one-click apply, but the operator hasn't opted in yet — the\ncommand to run (Linux: join the `slipstream-update` group)."
+            "description": "This install could one-click apply, but the operator hasn't opted in yet - the\ncommand to run (Linux: join the `slipstream-update` group)."
           }
         }
       }
@@ -8576,7 +8576,7 @@
     },
     {
       "name": "hooks",
-      "description": "Operator hooks: commands and webhooks fired on lifecycle events (fire-and-forget — hooks observe, never veto)"
+      "description": "Operator hooks: commands and webhooks fired on lifecycle events (fire-and-forget - hooks observe, never veto)"
     },
     {
       "name": "plugins",

@@ -1,16 +1,16 @@
-# slipstream-host — RPM (Bazzite / Fedora Atomic)
+# slipstream-host - RPM (Bazzite / Fedora Atomic)
 
 Build RPMs locally with this tree (or attach them to a
 [GitHub Release](https://github.com/vindeckyy/slipstream/releases)). There is no public RPM
 registry. CI (`.github/workflows/rpm.yml`) can still produce canary/stable builds when you wire
-publishing to your own feed or to GitHub Releases — keep those channels separate (see
+publishing to your own feed or to GitHub Releases - keep those channels separate (see
 [Release Channels](../../docs-site/content/docs/channels.md)). The RPM is built in the Fedora image
-(`ci/fedora-rpm.Dockerfile`) so its auto-generated library Requires (`libavcodec.so.NN`, …) match
-the target sonames; the NVIDIA driver lib (`libcuda.so.1`) is excluded — NVENC/EGL come from
+(`ci/fedora-rpm.Dockerfile`) so its auto-generated library Requires (`libavcodec.so.NN`, ...) match
+the target sonames; the NVIDIA driver lib (`libcuda.so.1`) is excluded - NVENC/EGL come from
 whatever NVIDIA stack the host runs (a weak Recommends).
 
 This is the same package as the [COPR](../copr/README.md) / [bootc](../bootc/Containerfile)
-paths — same spec (`slipstream.spec`).
+paths - same spec (`slipstream.spec`).
 
 ## Install on a Bazzite host (one-time)
 
@@ -31,7 +31,7 @@ CI can GPG-sign every RPM: `packaging/rpm/sign-rpms.sh` (run from `rpm.yml` betw
 publish) signs with a dedicated EdDSA key (historical uid `packages@unom.io`, fingerprint
 `AF245C506F4E4763` when using the committed public key) and self-verifies with
 `rpmkeys --checksig` before publishing. The public key is committed at
-`packaging/rpm/RPM-GPG-KEY-slipstream`. (This is a GPG/OpenPGP key — a `step-ca`/X.509 cert can't
+`packaging/rpm/RPM-GPG-KEY-slipstream`. (This is a GPG/OpenPGP key - a `step-ca`/X.509 cert can't
 sign RPMs.)
 
 > Store `RPM_GPG_PRIVATE_KEY` as a CI secret on whatever forge you use. Verify end to end with
@@ -62,7 +62,7 @@ Commit the public half next to the packaging scripts, and serve it from your own
 publish one (so `gpgkey=` in a `.repo` file resolves).
 
 **This key also signs the Bazzite sysext feed**, and a third copy of its public half is baked into
-`packaging/bazzite/slipstream-sysext.sh` (`FEED_KEY=`) — that script is bootstrapped by `curl` on
+`packaging/bazzite/slipstream-sysext.sh` (`FEED_KEY=`) - that script is bootstrapped by `curl` on
 machines that have nothing installed yet, so it can't fetch the key from the thing it's
 authenticating. A rotation must update **all three**: the CI secret, this directory's
 `RPM-GPG-KEY-slipstream`, and `FEED_KEY`. `publish-sysext-feed.sh` compares its signing key's
@@ -72,16 +72,16 @@ After reboot, as the desktop user:
 
 ```sh
 ujust add-user-to-input-group           # virtual gamepads need /dev/uinput (re-login).
-                                        # Bazzite is atomic — use ujust, NOT `usermod -aG input`.
+                                        # Bazzite is atomic - use ujust, NOT `usermod -aG input`.
 mkdir -p ~/.config/slipstream
 cp /usr/share/slipstream/host.env.bazzite ~/.config/slipstream/host.env   # gamescope defaults
 systemctl --user enable --now slipstream-host
-# Web console — enable it, then choose a login password in the browser:
+# Web console - enable it, then choose a login password in the browser:
 systemctl --user enable --now slipstream-web
 # open https://<host-ip>:47992
 ```
 
-(See [`../bazzite/README.md`](../bazzite/README.md) for the full appliance walkthrough —
+(See [`../bazzite/README.md`](../bazzite/README.md) for the full appliance walkthrough -
 udev/group, `host.env`, the Steam session unit, firewall, verify.)
 
 ## Updates
@@ -115,14 +115,14 @@ docker run --rm -v "$PWD:/src" -w /src slipstream-fedora-rpm \
 A plain `rpmbuild`/COPR build with no `ss_version`/`ss_release` defines produces `0.3.0-1` (the
 spec defaults).
 
-### aarch64 — the client RPM
+### aarch64 - the client RPM
 
 The **client** builds for aarch64; the **host** does not (its encode stack is NVENC/QSV/AMF, all
 x86). `PF_WITHOUT_HOST=1` drops the host binary, the tray, the headless-session data, the
 firewalld services and the main package's `%files`, leaving exactly one RPM: `slipstream-client`.
 Omitting the main `%files` is what keeps rpm from emitting an empty `slipstream` next to it.
 
-This is **not** a cross-compile — `%build` runs cargo for the host architecture, so run it on an
+This is **not** a cross-compile - `%build` runs cargo for the host architecture, so run it on an
 arm64 machine (or an emulated arm64 container, which is very slow):
 
 ```sh

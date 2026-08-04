@@ -1,6 +1,6 @@
 ---
 title: Play
-description: Game streaming hub — host setup, Capture mouse, game library, display presets, HDR, controllers, Moonlight vs native, bitrate for 4K and high refresh, and honest limits.
+description: Game streaming hub - host setup, Capture mouse, game library, display presets, HDR, controllers, Moonlight vs native, bitrate for 4K and high refresh, and honest limits.
 ---
 
 Slipstream is built for games as much as for desk work. A lot of people run the host on a powerful
@@ -13,7 +13,7 @@ cannot, finish [Quick Start](/docs/quickstart) on a trusted LAN first, then come
 couch setup.
 
 If you also need that same host as a remote office desktop, use a separate **Work** settings
-profile and follow [Desktop at work](/docs/desktop-at-work) — same host process, different mouse,
+profile and follow [Desktop at work](/docs/desktop-at-work) - same host process, different mouse,
 display, and picture choices.
 
 > **Security first.** A streaming host is remote control of the machine. Prefer a **trusted LAN**
@@ -36,26 +36,26 @@ yet). Slipstream is a private low-latency stream with PIN pairing on a network y
 
 Do these once on the host and once on the couch client:
 
-1. **Install and start the host** on a machine with a working GPU encode path —
+1. **Install and start the host** on a machine with a working GPU encode path -
    [Install the Host](/docs/install), then [Quick Start](/docs/quickstart).
 2. **No competing GameStream host running.** Stop Sunshine, Apollo, or forks **before** starting
-   Slipstream if they are active on the same machine —
+   Slipstream if they are active on the same machine -
    [Troubleshooting](/docs/troubleshooting#another-streaming-host-sunshine-apollo--is-installed).
 3. **Pair a client.** Prefer a [native Slipstream client](/docs/clients) when one exists for your
    device; use [Moonlight](/docs/moonlight) when you need a smart TV or a device without a native
    app.
-4. **Capture (games) mouse** for mouse-look titles. Capture is the default on desktop clients —
+4. **Capture (games) mouse** for mouse-look titles. Capture is the default on desktop clients -
    [Mouse modes](/docs/input#mouse-modes).
-5. **Browse the game library** and launch a title into the stream —
+5. **Browse the game library** and launch a title into the stream -
    [Your game library](/docs/game-library).
 6. **Pick a display preset.** **Headless box** for a dedicated stream / couch box; **Shared
-   desktop** for a family PC you also sit at —
+   desktop** for a family PC you also sit at -
    [Virtual displays](/docs/virtual-displays#pick-a-preset).
-7. **HDR on** when the whole chain can deliver 10-bit BT.2020 PQ — [HDR](/docs/hdr).
+7. **HDR on** when the whole chain can deliver 10-bit BT.2020 PQ - [HDR](/docs/hdr).
 8. **Controllers** plugged into the client (or built into a Deck / phone clip). See
    [Controllers](/docs/controllers).
 9. **Bitrate for the mode you asked for.** Automatic starts at a modest floor; raise it (or run
-   the native speed test) for 4K and high refresh —
+   the native speed test) for 4K and high refresh -
    [Picture quality](/docs/picture-quality), [Client settings](/docs/client-settings).
 
 ## Recommended host setup for play
@@ -100,7 +100,7 @@ across disconnects with keep-alive **forever**, and the next client takes the bo
 display from the console when you are done for the day.
 
 **Shared desktop** never blanks the physical monitors and tears the streamed display down when the
-session ends — the right pick when someone might walk up to the host mid-stream.
+session ends - the right pick when someone might walk up to the host mid-stream.
 
 Where a launched game lands (live desktop, existing gamescope session, or a dedicated headless one)
 is covered under
@@ -123,7 +123,7 @@ Full detail: [Your game library](/docs/game-library).
 
 For a play-oriented host:
 
-- Prefer a **native** Slipstream client when one exists — lower latency path, built-in discovery,
+- Prefer a **native** Slipstream client when one exists - lower latency path, built-in discovery,
   speed test, and FEC on lossy links ([Clients](/docs/clients)).
 - Keep **GameStream** enabled when you want Moonlight on a smart TV, browser, or other device
   without a native app ([Moonlight](/docs/moonlight)).
@@ -141,14 +141,14 @@ game host:
 |---|---|---|
 | **Mouse input** | Capture (games) | Relative mouse-look; pointer locks to the stream |
 | **Video codec** | HEVC (or AV1 when both ends support it) | Best everyday quality/bitrate on Wi-Fi and LAN |
-| **Bitrate** | Explicit, or Automatic + speed test | Automatic's H.264/HEVC/AV1 floor is **20 Mbps** — fine for 1080p60, short for 4K / high refresh |
+| **Bitrate** | Explicit, or Automatic + speed test | Automatic's H.264/HEVC/AV1 floor is **20 Mbps** - fine for 1080p60, short for 4K / high refresh |
 | **Resolution / refresh** | Match the client panel (or the TV mode you want) | Host creates a virtual display at your client mode |
-| **HDR** | On when the chain allows | 10-bit BT.2020 PQ when source, encoder, codec, and client all agree — [HDR](/docs/hdr) |
+| **HDR** | On when the chain allows | 10-bit BT.2020 PQ when source, encoder, codec, and client all agree - [HDR](/docs/hdr) |
 | **Full chroma / 4:4:4** | Usually off for games | Costs bandwidth; more useful for sharp UI/text than for 3D titles |
-| **PyroWave** | Wired LAN only, explicit pick | Ultra-low codec latency at hundreds of Mbps — [PyroWave](/docs/pyrowave) |
+| **PyroWave** | Wired LAN only, explicit pick | Ultra-low codec latency at hundreds of Mbps - [PyroWave](/docs/pyrowave) |
 
 Save a second **Work** profile with Desktop mouse, clipboard, and text-oriented picture settings for
-the same host when you use it from the office — [Desktop at work](/docs/desktop-at-work).
+the same host when you use it from the office - [Desktop at work](/docs/desktop-at-work).
 
 ### Bitrate for 4K and high refresh
 
@@ -184,11 +184,11 @@ Full guide: [Controllers](/docs/controllers).
 1. Leave the host logged in (or configure headless / linger / Game Mode so a session exists). Confirm
    the host service is running.
 2. On the couch client, open a [native app](/docs/clients) or [Moonlight](/docs/moonlight). If the
-   host is asleep on the same LAN, wake it — [Wake-on-LAN](/docs/wake-on-lan).
-3. Pair once if this device is new — [Pairing & Trust](/docs/pairing).
+   host is asleep on the same LAN, wake it - [Wake-on-LAN](/docs/wake-on-lan).
+3. Pair once if this device is new - [Pairing & Trust](/docs/pairing).
 4. Connect to the desktop, **or** open the [game library](/docs/game-library) and launch a title.
 5. Confirm **Capture** mouse for shooters (`Ctrl+Alt+Shift+M` toggles). Plug in a pad if you use one.
-6. Play. Release input with `Ctrl+Alt+Shift+Q`, or **L1+R1+Start+Select** on a controller —
+6. Play. Release input with `Ctrl+Alt+Shift+Q`, or **L1+R1+Start+Select** on a controller -
    [Getting your input back](/docs/input#getting-your-input-back).
 7. Disconnect. Your display preset decides whether the game session stays ready for a fast reconnect
    (Headless box) or tears down cleanly (Shared desktop).
@@ -201,28 +201,28 @@ Call these out so Play expectations stay accurate:
   one device showing several host monitors as separate windows is still on the
   [roadmap](/docs/roadmap)).
 - **Webcam / camera uplink** for video calls on the host is not a finished product story yet.
-- **gamescope / Gaming Mode** hosts are excellent for games and cannot take absolute Desktop mouse —
+- **gamescope / Gaming Mode** hosts are excellent for games and cannot take absolute Desktop mouse -
   fine for Play, a poor fit for office UI ([gamescope](/docs/gamescope), [input](/docs/input)).
 - **Moonlight** is broad compatibility, not the lowest-latency path; rich DualSense extras travel
   on the native plane ([Clients](/docs/clients), [Moonlight](/docs/moonlight)).
-- **Wake-on-LAN** usually does **not** work across a VPN — wake on the LAN, leave the box on, or
+- **Wake-on-LAN** usually does **not** work across a VPN - wake on the LAN, leave the box on, or
   use another wake path ([Wake-on-LAN](/docs/wake-on-lan)).
 - **Running Slipstream beside Sunshine** (or another GameStream host) on the same machine is
   unsupported while the other host is active.
 
 ## Related pages
 
-- [Quick Start](/docs/quickstart) — first host and first stream
-- [Your game library](/docs/game-library) — scan, custom titles, launch from clients
-- [Mouse, touch and pen](/docs/input) — Capture vs Desktop mouse
-- [Controllers](/docs/controllers) — pads, rumble, host prerequisites
-- [HDR](/docs/hdr) — the four gates for a 10-bit stream
-- [Picture quality](/docs/picture-quality) — bitrate, codec, chroma, refresh
-- [PyroWave](/docs/pyrowave) — wired-LAN ultra-low-latency codec
-- [Virtual displays](/docs/virtual-displays) — Headless box, Shared desktop, keep-alive
-- [Clients](/docs/clients) / [Moonlight](/docs/moonlight) — how to connect
-- [Steam Deck (Decky)](/docs/steam-deck) — stream to the Deck from Gaming Mode
+- [Quick Start](/docs/quickstart) - first host and first stream
+- [Your game library](/docs/game-library) - scan, custom titles, launch from clients
+- [Mouse, touch and pen](/docs/input) - Capture vs Desktop mouse
+- [Controllers](/docs/controllers) - pads, rumble, host prerequisites
+- [HDR](/docs/hdr) - the four gates for a 10-bit stream
+- [Picture quality](/docs/picture-quality) - bitrate, codec, chroma, refresh
+- [PyroWave](/docs/pyrowave) - wired-LAN ultra-low-latency codec
+- [Virtual displays](/docs/virtual-displays) - Headless box, Shared desktop, keep-alive
+- [Clients](/docs/clients) / [Moonlight](/docs/moonlight) - how to connect
+- [Steam Deck (Decky)](/docs/steam-deck) - stream to the Deck from Gaming Mode
 - [Wake-on-LAN](/docs/wake-on-lan)
-- [Desktop at work](/docs/desktop-at-work) — office path on the same host
+- [Desktop at work](/docs/desktop-at-work) - office path on the same host
 - [Security & Safe Use](/docs/security)
-- [Profiles and links](/docs/profiles-and-links) — Play vs Work profiles
+- [Profiles and links](/docs/profiles-and-links) - Play vs Work profiles

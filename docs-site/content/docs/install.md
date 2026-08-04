@@ -10,7 +10,7 @@ per-distro walkthrough. On **Windows**, the host ships as a signed installer ins
 [Windows](#windows).
 
 > **First, read [Security & Safe Use](/docs/security).** A streaming host is remote control of the
-> machine. It's built for trusted local networks, don't expose it to the internet, and be thoughtful
+> machine. Designed for trusted local networks, don't expose it to the internet, and be thoughtful
 > about which machine you host on (especially on Windows).
 
 ## Pick your distro
@@ -83,8 +83,8 @@ You can also build the installer locally from `packaging/windows/`.
 
 The repo's `flake.nix` is a supported install path (**`x86_64-linux`**, NixOS **24.11+**): `nix run`
 for a quick try, or the NixOS module for a declarative host (systemd user units, udev, firewall,
-`input` group, web console). Full walkthrough — module options, GameStream toggle, GPU/nixGL notes,
-updates, and headless appliance setup — is on [NixOS](/docs/nixos). Packaging reference:
+`input` group, web console). Full walkthrough - module options, GameStream toggle, GPU/nixGL notes,
+updates, and headless appliance setup - is on [NixOS](/docs/nixos). Packaging reference:
 [packaging/nix](https://github.com/vindeckyy/slipstream/blob/main/packaging/nix/README.md).
 
 ## What the packages are

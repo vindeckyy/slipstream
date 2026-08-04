@@ -279,7 +279,7 @@ few networking twists. The full guides are [Desktop at work](/docs/desktop-at-wo
   subnets](#video-is-slow-to-start-or-fails-across-subnets).
 - **Mouse feels wrong for desk work.** Desktop clients default to **Capture (game)** mouse. Switch
   to **Desktop (absolute)** with **Ctrl+Alt+Shift+M**, or set it in client Input settings. gamescope
-  / Gaming Mode hosts cannot take absolute mouse — use a full desktop session for office work
+  / Gaming Mode hosts cannot take absolute mouse - use a full desktop session for office work
   ([Input](/docs/input#mouse-modes)).
 - **Clipboard does nothing.** Both host `SLIPSTREAM_CLIPBOARD` and the per-host client switch must
   be on ([Clipboard](/docs/clipboard)).

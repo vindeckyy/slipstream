@@ -1,6 +1,6 @@
 ---
 title: Virtual displays
-description: Control how Slipstream creates, keeps alive, and arranges the virtual displays it streams — office and gaming presets, keep-alive, exclusive vs. extend, and persistent per-client scaling.
+description: Control how Slipstream creates, keeps alive, and arranges the virtual displays it streams - office and gaming presets, keep-alive, exclusive vs. extend, and persistent per-client scaling.
 ---
 
 When a client connects, Slipstream creates a **virtual display** sized to exactly that client's
@@ -139,7 +139,7 @@ laptop that roams between devices, a multi-monitor daily driver you use from wor
 couch or stream box, and "leave the defaults alone." Pick from the table below once you know which
 story matches; the rest of this section is the why.
 
-### Shared desktop — family PC you also sit at
+### Shared desktop - family PC you also sit at
 
 Use this when the host is a real desk machine people walk up to, and streaming must not fight the
 person in the room. The preset **extends** the virtual display alongside your physical monitors
@@ -154,7 +154,7 @@ Do **not** stack a long or forever keep-alive with Exclusive topology on a share
 combination is what leaves physical monitors dark after a disconnect (see
 [Keep alive](#keep-alive)).
 
-### Hot-desk — roam devices, one person, office laptop + tablet
+### Hot-desk - roam devices, one person, office laptop + tablet
 
 One person owns the box; they bounce between devices (laptop at the desk, tablet on the couch, phone
 on the train) and want a fast reconnect without reshuffling the desktop. Keep-alive lingers for
@@ -167,7 +167,7 @@ same host. For the full office path (VPN, clipboard, absolute mouse, Work vs Pla
 at [Desktop at work](/docs/desktop-at-work) and run the host as a
 [service](/docs/running-as-a-service) so it is there when you join the VPN.
 
-### Workstation — multi-monitor daily driver for remote work
+### Workstation - multi-monitor daily driver for remote work
 
 Your own desk machine, often several physical monitors, that you use as a remote desktop from the
 office or another room. Keep-alive is again a **five-minute** linger, topology **Exclusive**, extra
@@ -180,7 +180,7 @@ session at a time and roam resolutions; Workstation is better when several clien
 resolutions you treat as monitors of one desktop) should coexist in a layout you own. Office
 checklist and honest limits: [Desktop at work](/docs/desktop-at-work).
 
-### Headless box — dedicated stream box / couch box
+### Headless box - dedicated stream box / couch box
 
 A machine with no one sitting at it, or whose only job is to be streamed: a Steam Deck / Bazzite
 couch box, a living-room HTPC, a dedicated game host in a closet. Keep-alive is **forever** (the
@@ -192,7 +192,7 @@ This is the gaming / appliance preset, not the office one. If you also do remote
 same hardware, prefer a real desktop session (KDE / GNOME / Hyprland / Sway) for work and leave
 Headless box for the game-mode or dedicated-stream path.
 
-### Default — when to leave it alone
+### Default - when to leave it alone
 
 Default is today's behavior made explicit: a short **10-second** keep-alive, **Automatic** topology
 (Exclusive on a normal Windows or KDE/GNOME desktop), extra viewers get **separate** displays, and

@@ -19,8 +19,8 @@ winget upgrade vindeckyy.SlipstreamHost
 
 `microsoft/winget-pkgs` gates submissions on its `Binary-Validation-Error` /
 `Validation-Defender-Error` checks, and the host installer is currently signed with a self-signed
-cert (`CN=unom`). That is a pre-existing condition — winget does not sign anything, so SmartScreen
-behaves identically whether the installer arrives by browser or by `winget` — but it does block that
+cert (`CN=unom`). That is a pre-existing condition - winget does not sign anything, so SmartScreen
+behaves identically whether the installer arrives by browser or by `winget` - but it does block that
 route until a publicly trusted cert is in place. A self-hosted source has no such gate, can carry
 `Agreements` (verified-developers-only upstream), and can serve channels the community repo would
 never accept.
@@ -34,9 +34,9 @@ time has nothing to mutate, so they are not implemented.
 | Endpoint | Notes |
 | --- | --- |
 | `GET /information` | Source identity, `ServerSupportedVersions`, declared capabilities. |
-| `POST /manifestSearch` | `Query` / `Inclusions` (OR) / `Filters` (AND) / `FetchAllManifests`. **204** on no match — not an empty 200. |
+| `POST /manifestSearch` | `Query` / `Inclusions` (OR) / `Filters` (AND) / `FetchAllManifests`. **204** on no match - not an empty 200. |
 | `GET /packageManifests/{id}` | Full manifest; honours `?Version=`. Identifier match is case-insensitive. |
-| `GET /healthz` | Not part of the spec — liveness for compose. |
+| `GET /healthz` | Not part of the spec - liveness for compose. |
 
 `NormalizedPackageNameAndPublisher` is deliberately declared **unsupported**. winget derives it
 client-side from ARP entries with its own normalization (case folding plus stripping legal suffixes,
@@ -65,7 +65,7 @@ GitHub releases (manifest trio per stable tag)
    bun + server.mjs on your-host:3240  ←  edge Caddy TLS  ←  <your-winget-host>
 ```
 
-Stock `oven/bun` image with the two `.mjs` files bind-mounted — the same shape as the flatpak server
+Stock `oven/bun` image with the two `.mjs` files bind-mounted - the same shape as the flatpak server
 (stock `caddy:2-alpine` + a bind-mounted Caddyfile). There is no image to build, publish or pull, so
 a code change deploys by scp plus `docker compose up -d`.
 
@@ -87,19 +87,19 @@ A half-written file mid-rsync keeps the previous catalogue rather than taking th
 *list*, so a source that only knew the newest release could neither pin an older version nor show an
 upgrade path from one.
 
-It also means the source holds no state — re-running the build reproduces the same `data.json`, so a
+It also means the source holds no state - re-running the build reproduces the same `data.json`, so a
 lost deployment is one command away and nothing can drift.
 
 ## Local development
 
 ```bash
 npm install
-npm run build:local     # data/data.json from ../*.yaml (single version — fine for dev)
+npm run build:local     # data/data.json from ../*.yaml (single version - fine for dev)
 npm test                # 28 checks, no network, no server
 npm start               # http://localhost:3240
 ```
 
-`npm test` is the gate that matters. A malformed response does not fail loudly — winget reports "no
+`npm test` is the gate that matters. A malformed response does not fail loudly - winget reports "no
 package found", so a shape regression looks like a missing package rather than a broken source. CI
 runs it before anything reaches the box.
 
@@ -108,9 +108,9 @@ trusted certificate, which is what the edge vhost provides in production.
 
 ## First-time setup
 
-1. **DNS** — `<your-winget-host>` → your hosting box / load balancer
+1. **DNS** - `<your-winget-host>` → your hosting box / load balancer
    (DNS-only, same as `docs`). ✅ *done*
-2. **Caddy vhost** — in **`vindeckyy/slipstream`, `caddy/Caddyfile`**, next to the existing
+2. **Caddy vhost** - in **`vindeckyy/slipstream`, `caddy/Caddyfile`**, next to the existing
    `docs-site (local)` block. ✅ *done*
 
    ```caddyfile
@@ -124,14 +124,14 @@ trusted certificate, which is what the edge vhost provides in production.
    that `deploy-all.sh` rsyncs over from `vindeckyy/slipstream`, and there is no `.git` there to warn you. A
    vhost added only on the box survives until the next deploy and no longer: this one was
    hand-added on 2026-07-26, and the 2026-07-31 hardening commit rewrote the file from the repo's
-   own copy and deleted it — its message says "all 7 vhosts" when there were 8 live.
+   own copy and deleted it - its message says "all 7 vhosts" when there were 8 live.
 
-   Until the vhost exists the hostname resolves but the TLS handshake fails — Caddy has no
+   Until the vhost exists the hostname resolves but the TLS handshake fails - Caddy has no
    certificate for a name it does not serve. That is the expected state on first setup, not a
    broken deploy, but it is also exactly how the clobber presents later: an `internal_error`
    (alert 80) with no peer certificate, which winget reports as
    `WINHTTP_CALLBACK_STATUS_FLAG_SECURITY_CHANNEL_ERROR` / `0x8a15003b` and which looks like a
-   client bug. Diagnose by SNI, not by port 80 — Caddy 308s *every* Host to https, including names
+   client bug. Diagnose by SNI, not by port 80 - Caddy 308s *every* Host to https, including names
    it has never heard of, so a redirect there proves nothing:
 
    ```bash
@@ -139,7 +139,7 @@ trusted certificate, which is what the edge vhost provides in production.
      -servername <your-winget-host> </dev/null 2>&1 | grep -E '^subject=|alert'
    ```
 3. Run `deploy-services.yml` to place the compose file and start the container. It serves 503 until
-   a catalogue exists — expected, and visible on `/healthz`.
+   a catalogue exists - expected, and visible on `/healthz`.
 4. Publish a stable tag, or build and ship the catalogue by hand:
 
 ```bash

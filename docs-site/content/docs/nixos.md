@@ -31,7 +31,7 @@ trusted LAN; drop `--gamestream` for native-only. See
 
 GPU drivers resolve at runtime from `/run/opengl-driver/lib`. On **NixOS** the module sets
 `hardware.graphics.enable = true` for you. On **other distros**, wrap the command in
-[nixGL](https://github.com/nix-community/nixGL) so that path is populated (`nixGL nix run …`).
+[nixGL](https://github.com/nix-community/nixGL) so that path is populated (`nixGL nix run ...`).
 
 Other flake packages you can build or run the same way: `slipstream-client`, `slipstream-web`,
 `slipstream-scripting`. `packages.x86_64-linux.default` is `slipstream-host`.
@@ -100,9 +100,9 @@ by hand the way the apt/RPM/Arch packages expect.
 |--------|---------|---------|
 | `enable` | `false` | Install the host and wire udev/sysctl/kernel modules/firewall and the user service |
 | `gamestream` | `true` | `serve --gamestream` (Moonlight-compatible). `false` = native-only, more secure, and drops the GameStream firewall ports |
-| `autoStart` | `false` | Add the user service to `default.target` (appliance mode — pair with lingering) |
+| `autoStart` | `false` | Add the user service to `default.target` (appliance mode - pair with lingering) |
 | `users` | `[ ]` | Users added to the `input` group (virtual gamepads) |
-| `settings` | `{ }` | `host.env` key/values (booleans render as `1`/`0`). Do not put secrets here — use `environmentFile` |
+| `settings` | `{ }` | `host.env` key/values (booleans render as `1`/`0`). Do not put secrets here - use `environmentFile` |
 | `environmentFile` | `null` | Extra `EnvironmentFile` for secrets (e.g. `SLIPSTREAM_MGMT_TOKEN`); loaded optionally |
 | `openFirewall` | `false` | Open the inbound ports |
 | `gamescopeHdr` | `true` | Put the HDR-patched `slipstream-gamescope` on the host service PATH |
@@ -129,7 +129,7 @@ auto-wired to the host's per-user `~/.config/slipstream/{mgmt-token,cert.pem,key
 follow the host's values by default.
 
 `services.slipstream.scripting` is also enabled with the host, but the unit is **not** auto-started
-(`autoStart` defaults to `false`) — the runner is inert until you add scripts or plugins. Turn it
+(`autoStart` defaults to `false`) - the runner is inert until you add scripts or plugins. Turn it
 on when you have something to run:
 
 ```sh
@@ -153,7 +153,7 @@ prebuilt Skia); streaming itself is unaffected, and the GTK shell is fully featu
 
 ## 3. GPU drivers
 
-The module enables `hardware.graphics` but does **not** install a vendor driver — set those yourself:
+The module enables `hardware.graphics` but does **not** install a vendor driver - set those yourself:
 
 - **NVIDIA:** `hardware.nvidia` plus `hardware.graphics.enable = true`. NVENC/CUDA come from the
   driver at runtime (nothing pinned in the closure).
@@ -169,7 +169,7 @@ host runs on NVIDIA, AMD/Intel, or software encode.
 `openFirewall = false` by default. When you set it `true`, the module opens:
 
 - **Native** always: UDP 9777 (QUIC control), UDP 5353 (mDNS), TCP 47990 (mgmt/library API)
-- **GameStream** when `gamestream = true`: TCP 47984, 47989, 48010 and UDP 47998–48000
+- **GameStream** when `gamestream = true`: TCP 47984, 47989, 48010 and UDP 47998-48000
 - **Web console** when `services.slipstream.web.openFirewall` is true (follows the host by
   default): TCP 47992
 
@@ -194,7 +194,7 @@ systemctl --user status slipstream-host
 journalctl --user -u slipstream-host -f
 ```
 
-If `detect-conflicts` reports another streaming host, remove it before going further — two hosts on
+If `detect-conflicts` reports another streaming host, remove it before going further - two hosts on
 one machine is the most common reason a clean install never streams. See
 [Troubleshooting](/docs/troubleshooting#another-streaming-host-sunshine-apollo--is-installed).
 
@@ -217,7 +217,7 @@ per-connect auto-detection), then follow the page for the desktop you run:
 
 For a **headless / appliance** box, set `autoStart = true`, enable lingering for the host user, and
 optionally pin a backend in `settings` (pinning `SLIPSTREAM_COMPOSITOR` disables live-session
-auto-detection — leave it out on any box that switches between a desktop and Game Mode):
+auto-detection - leave it out on any box that switches between a desktop and Game Mode):
 
 ```nix
 services.slipstream.host = {
@@ -250,7 +250,7 @@ systemctl --user restart slipstream-web slipstream-host
 
 The web console's **Host -> Updates** card shows the same command. Full notes:
 [Updating the Host](/docs/updating). To roll back a generation,
-`sudo nixos-rebuild switch --rollback`, or pin the flake input to a `v<x.y.z>` tag — see
+`sudo nixos-rebuild switch --rollback`, or pin the flake input to a `v<x.y.z>` tag - see
 [Release Channels](/docs/channels).
 
 ## Next steps

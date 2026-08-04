@@ -8,17 +8,17 @@ import { useState } from 'react'
 type Preset = { label: string; w: number; h: number }
 
 const RES_PRESETS: Preset[] = [
-  { label: '1280 × 800 — Steam Deck', w: 1280, h: 800 },
-  { label: '1920 × 1080 — 1080p', w: 1920, h: 1080 },
-  { label: '2560 × 1440 — 1440p', w: 2560, h: 1440 },
-  { label: '3440 × 1440 — ultrawide', w: 3440, h: 1440 },
-  { label: '3840 × 2160 — 4K', w: 3840, h: 2160 },
-  { label: '5120 × 1440 — super-ultrawide', w: 5120, h: 1440 },
+  { label: '1280 × 800 - Steam Deck', w: 1280, h: 800 },
+  { label: '1920 × 1080 - 1080p', w: 1920, h: 1080 },
+  { label: '2560 × 1440 - 1440p', w: 2560, h: 1440 },
+  { label: '3440 × 1440 - ultrawide', w: 3440, h: 1440 },
+  { label: '3840 × 2160 - 4K', w: 3840, h: 2160 },
+  { label: '5120 × 1440 - super-ultrawide', w: 5120, h: 1440 },
 ]
 
 const FPS_PRESETS = [30, 60, 90, 120, 144, 240]
 
-// Practical payload ceilings (a bit under line rate — headers, FEC, framing).
+// Practical payload ceilings (a bit under line rate - headers, FEC, framing).
 const LINKS = [
   { label: 'Gigabit', mbps: 940 },
   { label: '2.5 GbE', mbps: 2350 },
@@ -155,7 +155,7 @@ export default function BitrateCalculator() {
                 {p.label}
               </option>
             ))}
-            <option value="custom">Custom…</option>
+            <option value="custom">Custom...</option>
           </select>
         </div>
 
@@ -252,7 +252,7 @@ export default function BitrateCalculator() {
           }}
         >
           {bpp.toFixed(2)} bits/pixel · {Math.round(frameKB)} KB per frame ·{' '}
-          {needed ? `needs ${needed.label}` : 'over 10 GbE — lower the mode'}
+          {needed ? `needs ${needed.label}` : 'over 10 GbE - lower the mode'}
         </div>
       </div>
 

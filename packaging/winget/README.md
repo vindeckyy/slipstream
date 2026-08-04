@@ -1,4 +1,4 @@
-# winget manifests — Windows host
+# winget manifests - Windows host
 
 The reviewed source of truth for the `vindeckyy.SlipstreamHost` winget package. Everything except
 `PackageVersion` / `InstallerUrl` / `InstallerSha256` / `ReleaseNotesUrl` is edited **here**;
@@ -7,7 +7,7 @@ agreements and installation notes stay under normal code review.
 
 | File | Purpose |
 | --- | --- |
-| `vindeckyy.SlipstreamHost.yaml` | Version manifest — ties the other two together. |
+| `vindeckyy.SlipstreamHost.yaml` | Version manifest - ties the other two together. |
 | `vindeckyy.SlipstreamHost.installer.yaml` | Installer type, scope, silent switches, `ProductCode`, URL + hash. |
 | `vindeckyy.SlipstreamHost.locale.en-US.yaml` | User-facing metadata, `Agreements`, `InstallationNotes`. |
 
@@ -16,25 +16,25 @@ agreements and installation notes stay under normal code review.
 - **`InstallerType: inno`, `Scope: machine`, `ElevationRequirement: elevatesSelf`.** The host
   registers a SYSTEM service, installs drivers and opens firewall ports; `PrivilegesRequired=admin`
   in the `.iss` means Setup raises its own UAC prompt. There is no per-user scope.
-- **`ProductCode: {7C9E6A52-…}_is1`** — Inno's ARP key is `<AppId>_is1`. This is what correlates an
+- **`ProductCode: {7C9E6A52-...}_is1`** - Inno's ARP key is `<AppId>_is1`. This is what correlates an
   installed host with the package for `winget list` / `winget upgrade`. **It must track `AppId` in
-  `packaging/windows/slipstream-host.iss`** — if that GUID ever changes, change it here too or
+  `packaging/windows/slipstream-host.iss`** - if that GUID ever changes, change it here too or
   upgrades silently stop being detected.
 - **`interactive` is in `InstallModes`.** `winget install vindeckyy.SlipstreamHost --interactive` runs the
   full existing wizard: every task checkbox, the web-console password page, the VB-CABLE notice.
   Nothing about the installer changes to support it.
 - **No `/MERGETASKS` in the silent switches.** A silent install deliberately takes the *same* task
-  defaults the wizard shows, so the product does not differ by install channel — a per-channel
+  defaults the wizard shows, so the product does not differ by install channel - a per-channel
   default is a support trap ("it works when I install it by hand"). The disclosures the wizard puts
   on screen are carried by `Agreements` instead, which winget shows *before* install and requires
   the user to accept.
-- **`UpgradeBehavior: install`** — Inno upgrades in place (`UsePreviousAppDir=yes`). Uninstalling
+- **`UpgradeBehavior: install`** - Inno upgrades in place (`UsePreviousAppDir=yes`). Uninstalling
   first would run the `[UninstallRun]` service + driver teardown between versions.
 
 ## Opting out of individual tasks
 
 Inno's `/MERGETASKS` takes `!` prefixes to deselect a default-checked task. Use `--override`
-(replaces winget's switches) rather than `--custom` (appends — you would end up with two
+(replaces winget's switches) rather than `--custom` (appends - you would end up with two
 `/MERGETASKS` on one command line):
 
 ```powershell
@@ -50,13 +50,13 @@ Both are in `packaging/windows/slipstream-host.iss` and both also fix pre-existi
 plain double-click upgrade path:
 
 - **`InitializeSetup` uses `SuppressibleMsgBox`, not `MsgBox`.** A plain `MsgBox` ignores
-  `/SUPPRESSMSGBOXES` and displays even under `/VERYSILENT` — an unattended install on a box that
+  `/SUPPRESSMSGBOXES` and displays even under `/VERYSILENT` - an unattended install on a box that
   already runs Sunshine/Apollo would block on an invisible modal dialog. Suppressed it returns
   `IDNO`, so that install aborts (Setup exits non-zero) rather than proceeding into the unsupported
   dual-host state.
 - **`GamestreamParam` is fresh-install-only.** On an upgrade the flag is omitted entirely, which
   `service install` reads as "keep host.env as-is". Passing an explicit on/off would rewrite
-  `SLIPSTREAM_HOST_CMD` whenever it still holds either canonical value — so a silent upgrade, where
+  `SLIPSTREAM_HOST_CMD` whenever it still holds either canonical value - so a silent upgrade, where
   no wizard carries the old choice forward, would flip a user's GameStream setting with nothing on
   screen.
 - **`PublicFwParam` is fresh-install-only too**, and `--allow-public-network` is now tri-state
@@ -70,7 +70,7 @@ plain double-click upgrade path:
 ## Release flow
 
 `.github/workflows/windows-host.yml` runs on stable `v*` tags only, **after** the installer is
-attached to the GitHub release — winget validates the URL and hash, so a manifest must never be
+attached to the GitHub release - winget validates the URL and hash, so a manifest must never be
 published ahead of its artifact:
 
 ```powershell
@@ -94,7 +94,7 @@ Note the host needs a real GPU and installs drivers, so a Sandbox run exercises 
 
 ## Publishing
 
-Through **our own REST source** on github-actions — see [`server/`](server/README.md). It sits alongside the
+Through **our own REST source** on github-actions - see [`server/`](server/README.md). It sits alongside the
 docs (3220) and flatpak (3230) services, behind the same edge Caddy; `windows-host.yml` rebuilds and
 ships its catalogue on every stable tag, so releasing is one pipeline with no manual step.
 
@@ -110,7 +110,7 @@ below, and `Agreements` being verified-developers-only in the community repo.
 > **Signing.** The installer is currently signed with a self-signed cert (`CN=unom`, subject ==
 > issuer) and ships a `.cer` users import manually. winget does not sign anything; it downloads and
 > runs the same binary, so SmartScreen behaves exactly as it does for a browser download. That is a
-> pre-existing condition rather than something winget introduces — but the community repo
+> pre-existing condition rather than something winget introduces - but the community repo
 > (`microsoft/winget-pkgs`) gates on it via its `Binary-Validation-Error` /
 > `Validation-Defender-Error` checks, so a submission there needs a publicly-trusted cert (Azure
 > Trusted Signing is the cheap path). A self-hosted source has no such gate.

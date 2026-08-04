@@ -24,8 +24,8 @@
 //! legacy mode PipeWire's channel-mixer fills missing positions with silence (zero upmix).
 //! Dropping the capturer quits the loop thread (via a `pipewire::channel` Terminate message),
 //! tearing the stream — and in stream-sink mode the sink node itself — down promptly, so a
-//! surround session can replace a stereo capturer without leaking a PipeWire consumer (see
-//! CLAUDE.md: a wedged link head-blocks the daemon).
+//! surround session can replace a stereo capturer without leaking a PipeWire consumer (a wedged
+//! link head-blocks the daemon).
 
 mod stream_sink;
 

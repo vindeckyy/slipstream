@@ -6,7 +6,7 @@ description: Copy on one machine and paste on the other, the two switches that h
 Slipstream can share the clipboard between the machine you are sitting at and the host you are
 streaming. Copy a URL on your laptop, paste it into a browser on the host. Copy an error message on
 the host, paste it into a chat app on your laptop. For office remote-desktop setups this is one of
-the first features to turn on — see [Desktop at work](/docs/desktop-at-work).
+the first features to turn on - see [Desktop at work](/docs/desktop-at-work).
 
 **Two separate switches have to be on:**
 
