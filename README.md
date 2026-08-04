@@ -92,19 +92,23 @@ Manage the host from a browser: pairing, virtual-display presets, live sessions,
 configuration, and the plugin store. Same Sunshine-style workflows, Slipstream branding.
 
 <p align="center">
-  <img src="assets/screenshots/virtual-displays.png" alt="Virtual display presets (shared desktop, hot-desk, workstation, headless)" width="440" />
-  &nbsp;
-  <img src="assets/screenshots/pairing.png" alt="PIN pairing with slipstream/1 and Moonlight clients" width="440" />
+  <img src="assets/screenshots/virtual-displays.png" alt="Virtual display presets (shared desktop, hot-desk, workstation, headless)" width="900" />
 </p>
 
 <p align="center">
-  <img src="assets/screenshots/performance.png" alt="Per-session latency by stage and throughput charts" width="440" />
-  &nbsp;
-  <img src="assets/screenshots/host.png" alt="Host identity and preflight checks" width="440" />
+  <img src="assets/screenshots/pairing.png" alt="PIN pairing with slipstream/1 and Moonlight clients" width="900" />
 </p>
 
 <p align="center">
-  <img src="assets/screenshots/configuration.png" alt="Recommended host configuration with clickable toggles" width="700" />
+  <img src="assets/screenshots/performance.png" alt="Per-session latency by stage and throughput charts" width="900" />
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/host.png" alt="Host identity and preflight checks" width="900" />
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/configuration.png" alt="Recommended host configuration with clickable toggles" width="900" />
 </p>
 
 ## Status
