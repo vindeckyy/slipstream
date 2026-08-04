@@ -93,7 +93,32 @@ cp api/openapi.json docs-site/public/openapi.json
 Match the surrounding code's comment density and naming. Commit messages end with the
 `Co-Authored-By` trailer (see `git log`).
 
-See the [README's Build and test section](README.md#build-and-test) for the extra dev
-commands (the FEC loss harness, the standalone C-ABI proof) and
-[Design invariants](README.md#design-invariants) for the rules a change is expected to hold to, and
-the [local docs site](docs-site/) (`docs-site/content/docs/`) for architecture and per-platform guides.
+## Repository layout
+
+```
+crates/
+  slipstream-core/   protocol · FEC · crypto · QUIC · C ABI
+  slipstream-host/   host: displays · capture · encode · GameStream · slipstream/1 · mgmt
+  ss-*               capture, encode, inject, vdisplay, client-core, presenter, ...
+clients/             apple · android · decky · cli · ...
+web/                 TanStack management console
+api/openapi.json     mgmt OpenAPI (from `slipstream-host openapi`)
+docs-site/           Fumadocs documentation
+packaging/           distro packages + Flatpak + ...
+include/             slipstream_core.h
+```
+
+## Design invariants
+
+- **One core.** Protocol, FEC, and crypto live in `slipstream-core` once; native clients share it
+  (Rust crate or C ABI).
+- **No async on the frame path.** Native threads only; `tokio`/`quinn` stay on the control plane.
+- **Native client resolution.** Each session gets a virtual output at exact WxH@Hz.
+- **Packet-loss recovery scales.** GameStream stays Moonlight-compatible; `slipstream/1` can
+  protect larger frames without retransmitting them.
+
+See the [README's Developing section](README.md#developing) for the extra dev commands (the FEC
+loss harness, the standalone C-ABI proof), the [Repository layout](#repository-layout) and
+[Design invariants](#design-invariants) above for the rules a change is expected to hold to, and
+the [local docs site](docs-site/) (`docs-site/content/docs/`) for architecture and per-platform
+guides.
