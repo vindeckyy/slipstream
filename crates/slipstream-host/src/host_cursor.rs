@@ -1,11 +1,11 @@
 //! Session-scoped host-local cursor hide: while at least one client is streaming, hide the
 //! host OS cursor (restore when the last session ends). Mirrors [`crate::sleep_inhibit`]:
-//! refcounted across native + GameStream planes. Best-effort — platforms that cannot hide
+//! refcounted across native + GameStream planes. Best-effort - platforms that cannot hide
 //! log once and stream on. Off when `SLIPSTREAM_HIDE_HOST_CURSOR=0`.
 
 use std::sync::{Mutex, OnceLock};
 
-/// RAII share of the host-wide cursor hide — hold one per live session/stream.
+/// RAII share of the host-wide cursor hide - hold one per live session/stream.
 pub struct StreamHold(());
 
 struct State {
