@@ -149,7 +149,7 @@ pub struct HostConfig {
     /// per-client virtual output at the client's own mode) / `portal` (capture an existing
     /// monitor); anything else, including the literal `synthetic`, gets the test pattern.
     pub video_source: Option<String>,
-    /// `SLIPSTREAM_CAPTURE_METHOD` — SolarFlare-shaped desktop capture backend for mirror /
+    /// `SLIPSTREAM_CAPTURE_METHOD` - desktop capture backend for mirror /
     /// existing-desktop sessions: `auto` | `portal` | `kwin` | `wlr` | `kms` | `x11` | `nvfbc`.
     /// Hermes-KMS is intentionally not offered. Unset = `auto`. Independent of
     /// [`Self::video_source`]: `virtual` still creates a compositor virtual output; this knob
@@ -193,6 +193,10 @@ pub struct HostConfig {
     /// injected pointer. Default OFF: it forces relative mode, which breaks absolute-pointer titles
     /// and menus, so it's opt-in per host until validated on-glass.
     pub gamescope_grab_cursor: bool,
+    /// `SLIPSTREAM_HIDE_HOST_CURSOR` - hide the host's local OS cursor while any client is
+    /// streaming (restore when the last session ends). Default ON; `=0`/`false`/`off`/`no` disables.
+    /// The stream still gets a pointer via host-composite / cursor-channel.
+    pub hide_host_cursor: bool,
     /// `SLIPSTREAM_GAMESCOPE_SPLASH` — run the host's built-in splash client inside every bare
     /// headless gamescope spawn. gamescope only composites (and only then pushes a PipeWire capture
     /// buffer) when a client paints, and a dedicated Steam launch paints NOTHING
@@ -345,6 +349,7 @@ impl HostConfig {
                     "1" | "true" | "yes" | "on"
                 )
             }),
+            hide_host_cursor: default_on_gate(val("SLIPSTREAM_HIDE_HOST_CURSOR").as_deref()),
             // Default ON, explicit-off grammar: the splash is what makes a fresh bare spawn deliver
             // its first frames at all; `=0` is the A/B + escape hatch.
             gamescope_splash: default_on_gate(val("SLIPSTREAM_GAMESCOPE_SPLASH").as_deref()),

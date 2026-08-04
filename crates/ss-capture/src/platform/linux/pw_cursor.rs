@@ -187,6 +187,12 @@ pub(super) fn update_cursor_meta(cursor: &mut CursorState, spa_buf: *mut spa::sy
             rgba[d + 3] = a;
         }
     }
+    // While the host OS cursor is hidden via an invisible theme, Mutter may push a fully
+    // transparent replacement bitmap. Keep the last good shape so host-composite / forward
+    // still draw a pointer for the client (position updates above still apply).
+    if crate::host_cursor_flag::is_hidden_for_stream() && bitmap_is_blank(&rgba) {
+        return;
+    }
     cursor.rgba = Arc::new(rgba);
     cursor.bw = bw;
     cursor.bh = bh;
@@ -197,6 +203,11 @@ pub(super) fn update_cursor_meta(cursor: &mut CursorState, spa_buf: *mut spa::sy
     if cursor.serial == 1 {
         tracing::info!(w = bw, h = bh, "cursor meta: first cursor bitmap received");
     }
+}
+
+/// True when every pixel is fully transparent (invisible-theme / blank-cursor sprite).
+fn bitmap_is_blank(rgba: &[u8]) -> bool {
+    rgba.chunks_exact(4).all(|p| p[3] == 0)
 }
 
 /// The byte range inside the producer's cursor-meta region that a `bh`-row, `row`-wide,

@@ -124,6 +124,7 @@ mod session_status {
     pub(crate) use crate::session::status::*;
 }
 mod sleep_inhibit;
+mod host_cursor;
 mod spike;
 mod stats_recorder;
 // Start/stop/status for the per-user tray — the recovery path it has never had of its own.

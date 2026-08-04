@@ -29,6 +29,8 @@ tracing = "0.1"
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
 parking_lot = "0.12"
+# Host-cursor hide (XFixes) + gamescope XFixes cursor source share this stack.
+x11rb = { version = "0.13", default-features = false, features = ["xfixes"] }
 # The RemoteDesktop portal for the libei injector on KWin/GNOME (headless grant via kde-authorized).
 ashpd = { version = "0.13", features = ["remote_desktop"] }
 # Input injection into headless Sway via the wlroots virtual-input Wayland protocols.

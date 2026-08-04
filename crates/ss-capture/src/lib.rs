@@ -16,6 +16,10 @@
 
 use anyhow::Result;
 use ss_frame::{CapturedFrame, FramePayload, PixelFormat};
+
+/// Host-local cursor hide flag (stream sessions): capture keeps publishing overlays for the
+/// client while the OS cursor is suppressed on the host display.
+pub mod host_cursor_flag;
 // The Linux capturer reaches `DmabufFrame` through `super::`; `CursorOverlay` it names directly as
 // `ss_frame::CursorOverlay`, so only `DmabufFrame` needs to sit in this crate root's scope.
 #[cfg(target_os = "linux")]

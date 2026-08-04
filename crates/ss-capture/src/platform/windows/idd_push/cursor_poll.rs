@@ -216,7 +216,13 @@ fn run(
         }
 
         let flags = ci.flags.0;
-        let showing = flags & CURSOR_SHOWING != 0 && flags & CURSOR_SUPPRESSED == 0;
+        let os_showing = flags & CURSOR_SHOWING != 0 && flags & CURSOR_SUPPRESSED == 0;
+        // When the host OS cursor is hidden for streaming (`ShowCursor(FALSE)`), Win32 clears
+        // CURSOR_SHOWING. Keep publishing position + last shape so the client still gets a
+        // composited / forwarded pointer.
+        let showing = os_showing
+            || (crate::host_cursor_flag::is_hidden_for_stream()
+                && (ci.hCursor.0 as isize != 0 || cached_handle != 0 || shape.is_some()));
 
         // Rasterise on handle change only (position-only ticks are a header update). Hidden
         // cursors keep the cached shape — the forwarder's hidden-but-known contract needs the

@@ -164,6 +164,7 @@ pub fn register(reg: Registration) -> LiveSessionGuard {
     LiveSessionGuard {
         id,
         _sleep: crate::sleep_inhibit::hold(),
+        _host_cursor: crate::host_cursor::hold(),
     }
 }
 
@@ -173,6 +174,8 @@ pub struct LiveSessionGuard {
     /// While any native session lives, the box must not auto-suspend under a passive viewer
     /// ([`crate::sleep_inhibit`]) — refcounted, released with the guard.
     _sleep: crate::sleep_inhibit::StreamHold,
+    /// Hide the host OS cursor while clients stream ([`crate::host_cursor`]).
+    _host_cursor: crate::host_cursor::StreamHold,
 }
 
 impl Drop for LiveSessionGuard {

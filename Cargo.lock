@@ -4406,6 +4406,7 @@ dependencies = [
  "wayland-protocols-wlr",
  "wayland-scanner",
  "windows 0.62.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x11rb",
  "xkbcommon",
 ]
 

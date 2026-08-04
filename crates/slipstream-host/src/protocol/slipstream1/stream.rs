@@ -3334,8 +3334,16 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         }
         // The overlay surfaces hidden pointers too (for the hint above) — strip them
         // HERE, after forwarding, so no blend path ever draws an invisible cursor.
+        // Exception: while we hide the host OS cursor for streaming, keep drawing the
+        // last known shape for the client (Win32 CURSOR_SHOWING / blank-theme sprites).
         if frame.cursor.as_ref().is_some_and(|c| !c.visible) {
-            frame.cursor = None;
+            if ss_capture::host_cursor_flag::is_hidden_for_stream() {
+                if let Some(c) = frame.cursor.as_mut() {
+                    c.visible = true;
+                }
+            } else {
+                frame.cursor = None;
+            }
         }
         // The seat-pointer park schedule (state + rationale at the declarations above; armed by
         // the first frame of every (re)built display and by the capture-model flip). The first

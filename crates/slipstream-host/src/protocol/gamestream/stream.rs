@@ -96,6 +96,7 @@ pub fn start(
             // A GameStream viewer may be video-only too — hold the suspend/idle inhibitor for
             // this stream's lifetime (plane parity with the native LiveSessionGuard).
             let _sleep = crate::sleep_inhibit::hold();
+            let _host_cursor = crate::host_cursor::hold();
             tracing::info!(?cfg, "video stream starting");
             // Lifecycle events + the script-facing marker file, plane parity with the native loop
             // (RFC §4): `announce` emits `stream.started`/`stream.stopped` and holds the marker for

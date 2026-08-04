@@ -141,6 +141,10 @@ pub struct InputConfig {
     /// Default off (matches runtime `SLIPSTREAM_GAMESCOPE_GRAB_CURSOR`).
     #[serde(default)]
     pub gamescope_grab_cursor: bool,
+    /// Hide the host's local OS cursor while clients stream (`SLIPSTREAM_HIDE_HOST_CURSOR`).
+    /// Default on.
+    #[serde(default = "default_true")]
+    pub hide_host_cursor: bool,
 }
 
 impl Default for InputConfig {
@@ -149,6 +153,7 @@ impl Default for InputConfig {
             gamepad: None,
             pen: true,
             gamescope_grab_cursor: false,
+            hide_host_cursor: true,
         }
     }
 }
@@ -158,7 +163,7 @@ pub struct AudioVideoConfig {
     /// `virtual` | `portal` (`SLIPSTREAM_VIDEO_SOURCE`).
     pub video_source: Option<String>,
     /// Desktop capture backend (`SLIPSTREAM_CAPTURE_METHOD`):
-    /// `auto` | `portal` | `kwin` | `wlr` | `kms` | `x11` | `nvfbc` (no hermes-kms).
+    /// `auto` | `portal` | `kwin` | `wlr` | `kms` | `x11` | `nvfbc`.
     pub capture_method: Option<String>,
     /// Virtual-display compositor preference (`SLIPSTREAM_COMPOSITOR`):
     /// `kwin` | `mutter` | `wlroots` | `hyprland` | `gamescope`.
@@ -484,6 +489,11 @@ impl HostConfigFile {
             "SLIPSTREAM_GAMESCOPE_GRAB_CURSOR",
             self.input.gamescope_grab_cursor,
         );
+        set_bool(
+            &mut out,
+            "SLIPSTREAM_HIDE_HOST_CURSOR",
+            self.input.hide_host_cursor,
+        );
         if let Some(src) = &self.audio_video.video_source {
             if !src.trim().is_empty() {
                 set(&mut out, "SLIPSTREAM_VIDEO_SOURCE", src.trim());
@@ -723,6 +733,7 @@ mod tests {
         assert!(env.contains("SLIPSTREAM_FEC_PCT=30"));
         assert!(env.contains("SLIPSTREAM_CLIPBOARD=off"));
         assert!(env.contains("SLIPSTREAM_PEN=1"));
+        assert!(env.contains("SLIPSTREAM_HIDE_HOST_CURSOR=1"));
         assert!(env.contains("SLIPSTREAM_GAMESCOPE_SPLASH=1"));
         assert!(env.contains("SLIPSTREAM_VDISPLAY_HZ_MULT=1"));
         assert!(env.contains("SLIPSTREAM_PERFORMANCE_PROFILE=off"));
@@ -796,6 +807,7 @@ mod tests {
         assert!(cfg.network.mdns);
         assert!(!cfg.input.gamescope_grab_cursor);
         assert!(cfg.input.pen);
+        assert!(cfg.input.hide_host_cursor);
         assert!(cfg.audio_video.gamescope_splash);
         assert_eq!(cfg.audio_video.vdisplay_hz_mult, 1);
         assert_eq!(cfg.clipboard, ClipboardPolicy::Off);
@@ -814,6 +826,7 @@ mod tests {
         assert!(cfg.network.chacha20);
         assert!(cfg.network.mdns);
         assert!(!cfg.input.gamescope_grab_cursor);
+        assert!(cfg.input.hide_host_cursor);
     }
 
     #[test]

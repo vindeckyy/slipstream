@@ -527,3 +527,6 @@ mod sendinput;
 #[cfg(target_os = "linux")]
 #[path = "input/linux/wlr.rs"]
 mod wlr;
+
+/// Hide the host's local OS cursor while clients stream (restored when the last session ends).
+pub mod host_cursor;
