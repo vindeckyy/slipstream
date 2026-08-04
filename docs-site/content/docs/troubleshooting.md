@@ -15,9 +15,7 @@ and capture/display glitches.
 
 - Slipstream detects this automatically. It warns in the host's startup log, so it's on the web
   console's **Logs** page, and carries the finding in the status summary the management API
-  serves. The Windows installer additionally warns before installing, but only when a competing
-  host's *service* is set to start on its own; a dormant install isn't flagged. The tray icon
-  doesn't flag it at all. To check on demand, run:
+  serves. The tray icon doesn't flag it at all. To check on demand, run:
 
   ```sh
   slipstream-host detect-conflicts
@@ -25,16 +23,14 @@ and capture/display glitches.
 
   It lists any conflicting host found (installed or running) and exits non-zero if there is one.
 - **Fix:** stop and uninstall the other host, then start Slipstream, e.g. stop the service
-  (`sudo systemctl disable --now sunshine` / on Windows `sc stop SunshineService`) and uninstall it.
+  (`sudo systemctl disable --now sunshine`) and uninstall it.
   If you only want to try Slipstream without removing the other host, at least make sure the other
   host is fully **stopped** first (they cannot both run at once).
 
 ## The host isn't found on the network
 
-- Make sure the host is actually running, on Linux `systemctl --user status slipstream-host` (or you
-  see it listening in the terminal); on Windows `slipstream-host service status`, and if it isn't
-  running see [Windows: the host or the web console won't
-  start](#windows-the-host-or-the-web-console-wont-start).
+- Make sure the host is actually running: `systemctl --user status slipstream-host` (or you
+  see it listening in the terminal).
 - **On an Android phone or TV, check the app's local-network permission.** On Android 17 and newer,
   Android blocks Slipstream from touching anything on your LAN, discovery, the connect itself,
   Wake-on-LAN, the game library, until you allow it. The app asks when you open the host list, and
@@ -46,7 +42,7 @@ and capture/display glitches.
   client.
 - A firewall on the host can block it. The native protocol needs **two** fixed UDP ports open:
   **9777** (the QUIC control plane) and **5353** (mDNS, this is the one discovery itself runs on).
-  On Linux the packages ship a ready-made `slipstream-native` rule that opens both, plus TCP 47990 for
+  The packages ship a ready-made `slipstream-native` rule that opens both, plus TCP 47990 for
   the library API:
 
   ```sh
@@ -59,24 +55,8 @@ and capture/display glitches.
   rule (see [Video is slow to start, or fails across
   subnets](#video-is-slow-to-start-or-fails-across-subnets) for why, and the one case where opening it
   helps). GameStream/Moonlight (only with `--gamestream`) uses TCP **47984/47989/48010** + UDP
-  **47998/47999/48000** (video/FEC 47998, ENet control 47999, audio 48000) + mDNS UDP **5353**, 
+  **47998/47999/48000** (video/FEC 47998, ENet control 47999, audio 48000) + mDNS UDP **5353**,
   that's the packages' `slipstream-gamestream` rule.
-- **On a Windows host, check the network profile.** The installer opens the streaming and console
-  ports on **Private** and **Domain** networks only. If Windows has classified your LAN as **Public**,
-  no client can reach the host, the host logs a warning at startup when it sees this. Set the network
-  to Private in **Windows Settings -> Network & internet -> your network -> Network profile type**.
-  For a trusted network Windows insists on marking Public, the installer's *Allow connections on
-  Public networks* option (unattended: `/MERGETASKS="allowpublicfw"`) opts in, but it only takes
-  effect on a **first** install, so on a PC that already has the host, re-scope the streaming ports
-  from an elevated prompt instead:
-
-  ```powershell
-  slipstream-host service install --allow-public-network=on
-  ```
-
-  That leaves your GameStream choice and the rest of `host.env` alone. It covers the streaming ports;
-  the web console's own rule for TCP 47992 keeps the scope it was installed with. See
-  [Running as a Service -> Windows](/docs/running-as-a-service#windows).
 
 ## The Linux host service won't start
 
@@ -93,7 +73,7 @@ and capture/display glitches.
   ```
 
   On Bazzite copy `host.env.bazzite` instead of `host.env.example`.
-- **`status=203/EXEC`** instead means the unit that ran points at a binary that isn't there, 
+- **`status=203/EXEC`** instead means the unit that ran points at a binary that isn't there,
   usually an old hand-copied unit in `~/.config/systemd/user/` shadowing the packaged one and still
   aimed at a source checkout. Remove it, run `systemctl --user daemon-reload`, and start the
   packaged unit, see [Running as a
@@ -103,10 +83,9 @@ and capture/display glitches.
 
 Clients wake a saved host by themselves, auto-wake is on by default, but only once they have seen
 it awake, which is how they learn its MAC address, and only if the machine is armed to answer a magic
-packet. The arming is what's usually missing, and a **Linux** host tells you outright: search the web
+packet. The arming is what's usually missing, and the host tells you outright: search the web
 console's **Logs** page for `Wake-on-LAN`, and the line either confirms the card is armed or names
-the interface and the exact command to arm it. Windows and macOS hosts don't run that check, so go
-straight to the BIOS/UEFI and network-card steps in
+the interface and the exact command to arm it. Then go to the BIOS/UEFI and network-card steps in
 [Arming the machine](/docs/wake-on-lan#arming-the-machine).
 
 ## Video is slow to start, or fails across subnets
@@ -137,12 +116,12 @@ open exactly that one port. The host then binds that fixed port, skips the punch
 straight to the client, no timeout to pay:
 
 ```ini
-# ~/.config/slipstream/host.env (Linux) · %ProgramData%\slipstream\host.env (Windows)
+# ~/.config/slipstream/host.env
 SLIPSTREAM_DATA_PORT=9778
 ```
 
 ```sh
-systemctl --user restart slipstream-host    # pick the change up (Windows: slipstream-host service restart)
+systemctl --user restart slipstream-host
 sudo ufw allow 9778/udp                    # open exactly that one port
 ```
 
@@ -226,36 +205,30 @@ See [GNOME -> Headless session](/docs/gnome#headless-session) and
 ## My mouse and keyboard are stuck in the stream
 
 Nothing is broken, the stream captures them on purpose, from the moment it starts and again
-whenever you click into it, so your keys and pointer go to the host instead of your own desktop.
-**Ctrl+Alt+Shift+Q** hands them back (**⌃⌥⇧Q** on macOS), and with a pad in your hands
-**L1+R1+Start+Select** does the same on the Linux, Windows and Steam Deck clients. Whatever you
-were holding down is released on the host, so nothing sticks. The rest of the in-stream chords, 
-switch mouse mode, disconnect, fullscreen, are in
+whenever you click into it, so your keys and pointer go to the host instead of your own device.
+**Ctrl+Alt+Shift+Q** hands them back where the client supports that chord; with a pad in your hands
+**L1+R1+Start+Select** does the same on Steam Deck (and other clients that honour that chord).
+Whatever you were holding down is released on the host, so nothing sticks. The rest of the in-stream
+chords, switch mouse mode, disconnect, fullscreen, are in
 [Getting your input back](/docs/input#getting-your-input-back).
 
 ## A controller is detected but games don't see it
 
-- **Linux.** The host user needs to be in the `input` group. On Bazzite:
+The host user needs to be in the `input` group. On Bazzite:
 
-  ```sh
-  ujust add-user-to-input-group
-  ```
+```sh
+ujust add-user-to-input-group
+```
 
-  Then log out and back in. On other distros this is `sudo usermod -aG input $USER` + re-login. See
-  [Bazzite](/docs/bazzite).
-- **Windows, if this PC ever ran 0.22.0 or 0.22.1.** On those two releases the default emulated
-  controller bound one of Windows' own drivers instead of Slipstream's, so the app responded to your
-  controller normally but no game ever saw it. It's fixed from 0.22.2 on, but you have to update
-  **through the installer**: the setup `.exe`, `winget upgrade`, or the console's **Update now**
-  button (see [Updating](/docs/updating)). Swapping `slipstream-host.exe` by hand does not fix it,
-  because the stale controller device keeps the driver it was already bound to.
+Then log out and back in. On other distros this is `sudo usermod -aG input $USER` + re-login. See
+[Bazzite](/docs/bazzite).
 
 ## Copy and paste between host and client does nothing
 
 The shared clipboard needs **two** separate switches on, and turning on only one looks exactly like
 the feature not existing: the host operator has to allow it with `SLIPSTREAM_CLIPBOARD` in `host.env`
-and restart the host, and you have to turn it on for that one host in your client's **Edit...** sheet.
-Work through
+and restart the host, and you have to turn it on for that one host in your client's **Edit...** sheet
+(where the client offers one). Work through
 [Why the toggle does nothing](/docs/clipboard#why-the-toggle-does-nothing-or-is-greyed-out), it also
 names the clients and host sessions where nothing crosses no matter what you set.
 
@@ -277,10 +250,9 @@ few networking twists. The full guides are [Desktop at work](/docs/desktop-at-wo
   (native control **9777**, plus the negotiated media port). Overly strict ACLs that allow only TCP
   will break the stream. See [Video is slow to start, or fails across
   subnets](#video-is-slow-to-start-or-fails-across-subnets).
-- **Mouse feels wrong for desk work.** Desktop clients default to **Capture (game)** mouse. Switch
-  to **Desktop (absolute)** with **Ctrl+Alt+Shift+M**, or set it in client Input settings. gamescope
-  / Gaming Mode hosts cannot take absolute mouse - use a full desktop session for office work
-  ([Input](/docs/input#mouse-modes)).
+- **Mouse feels wrong for desk work.** Prefer **Desktop (absolute)** mouse where the client offers
+  it (`Ctrl+Alt+Shift+M` where supported). gamescope / Gaming Mode hosts cannot take absolute mouse;
+  use a full desktop session for office work ([Input](/docs/input#mouse-modes)).
 - **Clipboard does nothing.** Both host `SLIPSTREAM_CLIPBOARD` and the per-host client switch must
   be on ([Clipboard](/docs/clipboard)).
 - **Wake-on-LAN from the office does nothing.** WoL is a LAN broadcast; most VPNs will not deliver
@@ -288,27 +260,6 @@ few networking twists. The full guides are [Desktop at work](/docs/desktop-at-wo
   ([Wake-on-LAN](/docs/wake-on-lan)).
 - **Do not port-forward** Slipstream to the public internet. Use the VPN
   ([Security](/docs/security)).
-
-## The picture freezes for a moment, over and over (Windows)
-
-A freeze that comes back on a **rhythm**, every few seconds, every minute, always the same gap, is
-not a bandwidth problem, and lowering the bitrate won't touch it. The Windows capture path detects
-that pattern itself and writes the cause and the cure into the log.
-
-Open the web console's **Logs** page and search for `METRONOMIC`. You'll get one of two lines:
-
-- **...and coincide with Windows monitor hot-plug/re-enumeration events**, a display (or its
-  cable, switch or AVR) is re-probing its link on a timer and Windows reacts every time. Cures,
-  best first: turn that display's **auto input scan/detect** off in its own OSD (on TVs also
-  *instant-on / quick-start* and CEC), unplug its cable at the GPU, fit an HPD-holding adapter or
-  dummy plug, or simply keep the display active while you stream. The console's **Virtual displays**
-  page also has a *Disable monitor devices while streaming (PnP)* toggle that suppresses the
-  Windows-side reaction; the log line's `connected_inactive` field names the displays it suspects.
-- **...with NO coinciding OS display event**, the disturbance is below Windows: a connected but
-  sleeping screen being serviced by the GPU driver, display-poller software (the SteelSeries GG /
-  SignalRGB class), or the desktop present clock, try a different refresh rate. On a laptop panel
-  that the host deactivated, keeping it active with the **primary** topology usually settles it, 
-  see [Virtual displays -> Topology](/docs/virtual-displays#topology).
 
 ## Stutter, drops, or high latency
 
@@ -326,58 +277,6 @@ told your client so. [When the client and the host
 disagree](/docs/client-settings#when-the-client-and-the-host-disagree) lists what it does with each
 one.
 
-## Windows: the host or the web console won't start
-
-The **`SlipstreamHost` service** runs both halves of the Windows host: the streaming host itself and
-the web console. It restarts either one automatically if it stops, so most console outages heal
-themselves within a minute. The service commands need an **elevated** PowerShell or Command Prompt.
-
-1. **Is the service running?**
-
-   ```powershell
-   slipstream-host service status
-   slipstream-host service restart
-   ```
-
-   `restart` stops it, waits for it to actually reach *Stopped*, and starts it again.
-2. **Two `slipstream-host.exe` processes in Task Manager is normal, don't kill one.** The service
-   itself runs as SYSTEM in session 0, where it can neither capture the screen nor inject input, so
-   it launches a second copy into the interactive session and supervises it. One supervises, one
-   streams.
-3. **The console page never loads.** The service restarts the console on any failure, so give it a
-   minute first. If it stays down, the console's own log says why, check
-   `%ProgramData%\slipstream\logs\web.log` (and `service.log` next to it, which records every console
-   start and exit), then restart the service:
-
-   ```powershell
-   slipstream-host service restart
-   ```
-
-   Right after a very first install the console can lag the host by a few seconds on purpose: it
-   waits for the host to finish writing its certificate before serving.
-4. **The status icon is missing after an update.** Windows only launches the tray at sign-in, and an
-   upgrade closes the running ones. Put it back without signing out, from your **normal** (not
-   elevated) shell, so it runs as you:
-
-   ```powershell
-   slipstream-host tray start
-   ```
-
-   `slipstream-host tray status` says whether one is running and where it is installed. See
-   [Windows Host -> Status tray](/docs/windows-host).
-
-## Windows: "Slipstream Virtual Display" shows Code 10 in Device Manager
-
-Sessions end with *"ss-vdisplay driver interface not found"* and Device Manager shows the
-**Slipstream Virtual Display** device failed with **Code 10** (`STATUS_DEVICE_POWER_FAILURE`).
-(Installs older than 0.22.2 spell that device name in lower case.)
-
-This means your Windows version is too old. The virtual-display driver requires the **IddCx 1.10**
-driver framework, which first shipped in **Windows 11 22H2 (build 22621)**, on Windows 10
-(including LTSC) and Windows 11 21H2 the driver installs but cannot start. Reinstalling won't help;
-the fix is updating to Windows 11 22H2 or newer. (Current installers refuse to run on older
-Windows for this reason; if you see this, the host was likely installed with an older installer.)
-
 ## Still stuck?
 
 Read the host's log around the failed connect or capture.
@@ -389,16 +288,10 @@ Read the host's log around the failed connect or capture.
    can attach to a bug report. The button beside it hands the same text to your phone or tablet's
    share sheet, or copies it to the clipboard on a desktop.
 
-The same output also lands outside the console, on Linux in the journal
-(`journalctl --user -u slipstream-host`), on Windows in `%ProgramData%\slipstream\logs\host.log` (plus
-`service.log` for the service that supervises it). Those *do* follow the log level: raise it with
+The same output also lands outside the console in the journal
+(`journalctl --user -u slipstream-host`). Those *do* follow the log level: raise it with
 `RUST_LOG=debug` in [`host.env`](/docs/configuration) and restart the host. `RUST_LOG=info` is
 already the default, so setting it changes nothing.
-
-None of that covers the **client** side. If the picture, the decoder or the presenter is what
-failed, the Windows client keeps its own log at `%LOCALAPPDATA%\slipstream\logs\client.log` (rotated
-to `.old` at the next start once it passes 10 MB, one generation kept), that's the only place a
-receive, decode or present failure is recorded.
 
 For a performance problem rather than a failure, attach a **recording** instead of a log: see
 [Recording a capture for a bug report](/docs/stats#recording-a-capture-for-a-bug-report).

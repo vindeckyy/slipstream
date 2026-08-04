@@ -7,7 +7,7 @@
 </pre>
 </div>
 
-<p align="center"><b>Low-latency desktop and game streaming for Linux and Windows hosts. Play from the couch, or use your real desktop while you&apos;re at work.</b></p>
+<p align="center"><b>Low-latency desktop and game streaming for Linux hosts. Play from the couch, or use your real desktop while you&apos;re at work.</b></p>
 
 <p align="center">
   <a href="#what-it-is">What it is</a> ·
@@ -28,7 +28,7 @@
 
 ## What it is
 
-Slipstream turns a Linux or Windows machine into a private **desktop and game streaming** host.
+Slipstream turns a Linux machine into a private **desktop and game streaming** host.
 You install the host, pair a client once, and stream to any screen on your LAN or VPN at that
 screen's own resolution and refresh rate, for games on the couch, or for focused work on your
 real desktop from an office laptop. No accounts, no cloud relay, no subscription.
@@ -37,7 +37,8 @@ The stack has three pieces that work together:
 
 - A **host** that creates a virtual display per client, captures it, encodes it, and ships it
   over the network.
-- **Clients** for Mac, iPhone, iPad, Apple TV, Linux, Windows, Android, and the Steam Deck.
+- **Clients** for iPhone, Android, and the Steam Deck (plus any [Moonlight](https://moonlight-stream.org/)
+  client over GameStream when you enable it).
 - A **browser console** that manages pairing, displays, the game library, plugins, and host
   settings through a REST API.
 
@@ -78,11 +79,9 @@ split, plus decode and display stages where the client can see them. The docs ex
   presets, absolute mouse, and clipboard when you need the full desktop from the office.
 - **Display policy you control.** Keep a game alive across disconnects, dedicate a couch box, or
   extend the desktop. Presets live in the console.
-- **Windows IDD-push path.** Finished frames go into Slipstream's own indirect display driver,
-  not a scrape of a physical screen.
 - **GPU-first encode.** Zero-copy where the platform allows (dmabuf / CUDA / Vulkan / NVENC, plus
-  AMF/QSV and software fallbacks).
-- **Self-filling library.** Steam and plugins (ROM Manager, Playnite, VirtualHere, ...) from the
+  VAAPI and software fallbacks).
+- **Self-filling library.** Steam and plugins (ROM Manager, VirtualHere, ...) from the
   console Plugin store or `slipstream-host plugins add`.
 - **PIN pairing, no accounts.** SPAKE2 once, then pinned identities. mDNS discovery on the LAN.
 
@@ -118,8 +117,8 @@ configuration, and the plugin store. Same Sunshine-style workflows, Slipstream b
 | `slipstream-core` + C ABI | Complete |
 | GameStream → Moonlight | Live (opt-in `--gamestream` on trusted LAN) |
 | `slipstream/1` native path | Live |
-| Windows host | Beta (signed installer) |
-| Apple / Linux / Android / Windows clients | Streaming |
+| Linux host | Live |
+| iPhone / Android / Steam Deck clients | Streaming |
 | Web console (`web/`) | Live over the OpenAPI mgmt API |
 
 Bare `slipstream-host serve` is **native-only** (`slipstream/1` + mgmt/console). Add `--gamestream`
@@ -128,10 +127,10 @@ only on a LAN you trust.
 ## Install
 
 Local and private setup is the default for now. Build from source, or use the scripts under
-[`packaging/`](packaging/) for the platform you care about.
+[`packaging/`](packaging/) for the distro you care about.
 
 ```sh
-# Host + workspace (Linux example)
+# Host + workspace
 cargo build -p slipstream-host
 ./target/debug/slipstream-host serve --mgmt-bind 127.0.0.1:47990
 
@@ -139,22 +138,20 @@ cargo build -p slipstream-host
 cd web && bun install && bun run dev   # http://127.0.0.1:47992
 ```
 
-Packaged installs (apt / rpm / Arch / Bazzite / winget / Flatpak) live under `packaging/` with their
+Packaged installs (apt / rpm / Arch / Bazzite / Flatpak) live under `packaging/` with their
 own READMEs. Point package URLs and update feeds at **your** registry when you publish; this tree
 does not assume a public package host.
 
 Desktop-specific host tips live in [`docs-site/content/docs/`](docs-site/content/docs/) (KDE,
-GNOME, gamescope, Sway, Steam Deck, Windows).
+GNOME, gamescope, Sway, Steam Deck).
 
 ## Connect a client
 
 | Device | Client |
 |--------|--------|
-| Mac / iPhone / iPad / Apple TV | `clients/apple` |
-| Linux | `slipstream-client` (`clients/linux` + `clients/session`) |
-| Steam Deck | Decky plugin (`clients/decky`) or Flatpak |
+| iPhone | `clients/apple` |
 | Android | `clients/android` |
-| Windows | `clients/windows` or Moonlight |
+| Steam Deck | Decky plugin (`clients/decky`) or Flatpak |
 | Scripts | `slipstream` CLI (`clients/cli`) |
 | Anything else | Moonlight over GameStream |
 
@@ -172,8 +169,8 @@ cargo run -p loss-harness
 bash crates/slipstream-core/tests/c/run.sh
 ```
 
-The C header regenerates into `include/slipstream_core.h` on build. Apple, Android, and Windows
-clients have their own toolchains (see each client's README).
+The C header regenerates into `include/slipstream_core.h` on build. iPhone and Android clients have
+their own toolchains (see each client's README).
 
 ## Layout
 
@@ -182,11 +179,11 @@ crates/
   slipstream-core/   protocol · FEC · crypto · QUIC · C ABI
   slipstream-host/   host: displays · capture · encode · GameStream · slipstream/1 · mgmt
   ss-*               capture, encode, inject, vdisplay, client-core, presenter, ...
-clients/             apple · linux · session · windows · android · cli · probe · decky
+clients/             apple · android · decky · cli · ...
 web/                 TanStack management console
 api/openapi.json     mgmt OpenAPI (from `slipstream-host openapi`)
 docs-site/           Fumadocs documentation
-packaging/           distro + Windows installer + winget + Flatpak + ...
+packaging/           distro packages + Flatpak + ...
 include/             slipstream_core.h
 ```
 

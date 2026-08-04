@@ -1,6 +1,6 @@
 ---
 title: Quick Start
-description: From nothing to streaming, set up a host and connect your first client.
+description: From nothing to streaming, set up a Linux host and connect your first client.
 ---
 
 This is the shortest path to a working stream. Each step links to the details.
@@ -17,14 +17,14 @@ first checklist. You can always add the other path later with a second
 
 ### Playing tonight
 
-**Goal:** a game (or Desktop) streaming on your LAN to a couch client, TV, Deck, phone, or second PC.
+**Goal:** a game (or Desktop) streaming on your LAN to a couch client, Steam Deck, or phone.
 
 **Do first**
 
-1. Install and start the host on the gaming PC (steps 1-2 below).
+1. Install and start the host on the Linux gaming PC (steps 1-2 below).
 2. Open the [web console](/docs/web-console), set the password, arm pairing (steps 3-4).
-3. Install a [native client](/docs/clients) when one exists; use [Moonlight](/docs/moonlight) only if
-   you need a device without a native app.
+3. Install a [native client](/docs/clients) for iPhone, Android, or Steam Deck; use
+   [Moonlight](/docs/moonlight) only if you need a device without a named app.
 4. Pair on the home LAN, start a stream, leave mouse in **Capture** for mouse-look titles.
 
 **You are done when**
@@ -34,12 +34,12 @@ first checklist. You can always add the other path later with a second
 - A keyboard/mouse or [controller](/docs/controllers) moves something on the host.
 - Optional: a library title launches into the stream ([Game library](/docs/game-library)).
 
-**Next depth:** [Play](/docs/play) (presets, HDR, bitrate, Headless box), 
+**Next depth:** [Play](/docs/play) (presets, HDR, bitrate, Headless box),
 [Picture quality](/docs/picture-quality), [Controllers](/docs/controllers), [Audio](/docs/audio).
 
 ### Office tomorrow
 
-**Goal:** your real home/workstation desktop from an office laptop over a **private VPN** - not a
+**Goal:** your real home/workstation desktop from another device over a **private VPN** - not a
 public port-forward.
 
 **Do first**
@@ -48,7 +48,7 @@ public port-forward.
    and native client work before the VPN is in the picture (steps 1-5 below).
 2. Prefer a **native** client; turn **GameStream off** on a Work-oriented host if you do not need
    Moonlight ([Moonlight](/docs/moonlight), [Security](/docs/security#gamestream--moonlight-compatibility-is-the-weak-crypto-path)).
-3. Put host and laptop on the same VPN ([Network & VPN](/docs/network-and-vpn)); add the host **by
+3. Put host and client on the same VPN ([Network & VPN](/docs/network-and-vpn)); add the host **by
    VPN IP** when discovery is empty.
 4. Switch the client to **Desktop (absolute)** mouse; enable clipboard; pick **Workstation** or
    **Hot-desk**; tune picture for text.
@@ -71,7 +71,7 @@ same host - do not debug soft text and Tailscale ACLs at the same time.
 | | Playing tonight | Office tomorrow |
 |---|---|---|
 | Network | Home LAN | Private VPN after a proven LAN stream |
-| Client | Native if available; Moonlight OK for TVs | Native preferred; GameStream off if unused |
+| Client | Native (iPhone / Android / Steam Deck); Moonlight OK for other devices | Native preferred; GameStream off if unused |
 | Mouse | Capture (default) for games | Desktop (absolute) |
 | Display preset | Headless box / Shared desktop | Workstation / Hot-desk |
 | Picture | HDR / high refresh as the chain allows | HEVC, HDR off, bitrate for sharp text |
@@ -79,15 +79,15 @@ same host - do not debug soft text and Tailscale ACLs at the same time.
 
 ## 1. Set up the host
 
-On the machine you want to stream from - a gaming PC, a workstation, or any supported host with an
-NVIDIA, AMD, or Intel GPU - follow the install guide for your system:
+On the Linux machine you want to stream from - a gaming PC, a workstation, or any supported host
+with an NVIDIA, AMD, or Intel GPU - follow the install guide for your system:
 
 - [Ubuntu](/docs/ubuntu)
 - [Fedora](/docs/fedora)
 - [Arch](/docs/arch)
 - [Bazzite](/docs/bazzite)
 - [SteamOS](/docs/steamos-host)
-- [Windows host](/docs/windows-host)
+- [NixOS](/docs/nixos)
 
 Each one covers the GPU driver, the dependencies, and how to install and run the host. After
 installing, configure for your desktop ([KDE](/docs/kde) / [GNOME](/docs/gnome) /
@@ -99,22 +99,10 @@ absolute mouse needs a real desktop ([Desktop at work](/docs/desktop-at-work)).
 
 ## 2. Start the host
 
-**On Windows there's nothing to start.** The installer registered and started the `SlipstreamHost`
-service, so the host is already running and comes back on every boot. Confirm it:
-
-```powershell
-Get-Service SlipstreamHost
-```
-
-Don't run `slipstream-host serve` on top of it, a second host process refuses to touch the
-virtual-display driver and collides with the service on its ports. Details:
-[Running as a Service -> Windows](/docs/running-as-a-service#windows).
-
-**On Linux you don't run the host by hand either.** Every Linux package ships a systemd **user** unit.
-That unit reads `~/.config/slipstream/host.env` and won't start until the file exists, so put it in
-place first, your distro and desktop pages (step 1) have the template to copy and what to put in it.
-Then enable the unit once, from a terminal **inside your desktop session**, and it comes back at
-every login:
+You don't run the host by hand. Every Linux package ships a systemd **user** unit. That unit reads
+`~/.config/slipstream/host.env` and won't start until the file exists, so put it in place first,
+your distro and desktop pages (step 1) have the template to copy and what to put in it. Then enable
+the unit once, from a terminal **inside your desktop session**, and it comes back at every login:
 
 ```sh
 systemctl --user enable --now slipstream-host
@@ -132,7 +120,7 @@ extra planes pair over plain HTTP and belong on a trusted LAN only, for a native
 If the host runs a firewall (Fedora enables firewalld, CachyOS enables ufw), open its ports, the
 firewall step in your distro guide has the exact commands, for **both** `slipstream-native` and
 `slipstream-gamestream`, because the packaged unit serves both planes. Copy-paste also lives on
-[Network & VPN → Firewalls](/docs/network-and-vpn#firewalls--copy-paste). For a Work-only host you
+[Network & VPN -> Firewalls](/docs/network-and-vpn#firewalls--copy-paste). For a Work-only host you
 can open `slipstream-native` alone and leave GameStream closed.
 
 On **SteamOS** even that is done for you, the install script wrote its own `slipstream-host` user
@@ -144,11 +132,8 @@ script for a native-only host). Check it with `systemctl --user status slipstrea
 The console is a **separate** process from the host, and you need it in the next step, arming PIN
 pairing is done there.
 
-- **Windows:** the installer already set it up and starts it at boot. Open
-  `https://<host-ip>:47992`. The login password is the one the installer showed you on its final
-  page; it's stored in `%ProgramData%\slipstream\web-password`.
-- **Linux:** on Ubuntu, Fedora and Bazzite the `slipstream-web` package comes in with the host
-  but isn't enabled for you. On Arch it's an optional dependency, so install it first
+- On Ubuntu, Fedora and Bazzite the `slipstream-web` package comes in with the host but isn't
+  enabled for you. On Arch it's an optional dependency, so install it first
   (`sudo pacman -Syu slipstream-web`, a full `-Syu`, never a bare `-S`). Either way, start it as
   your desktop user, then open `https://<host-ip>:47992`:
 
@@ -172,8 +157,8 @@ continue. Full details and a page-by-page tour: [The Web Console](/docs/web-cons
 On the device you want to stream to, use a [native Slipstream client](/docs/clients) for the lowest
 latency, or any Moonlight client:
 
-- **Native client (Apple, Linux, Windows, Android):** install it first, 
-  [Install a Client](/docs/install-client) has the download for every device (Steam Deck: the
+- **Named clients (iPhone, Android, Steam Deck):** install first,
+  [Install a Client](/docs/install-client) has the download for each (Steam Deck: the
   [Decky plugin](/docs/steam-deck)). Then open the Slipstream app, your host appears in the list of
   hosts found on your network. Select it, and when prompted, **pair**.
 - **Anything with Moonlight:** add the host (it should be discovered automatically), then pair.
@@ -192,14 +177,13 @@ Once paired, select the host and start streaming. The host creates a virtual dis
 resolution and refresh, and the picture comes up. Mouse, keyboard, and controllers flow back to the
 host.
 
-Worth knowing before you need it: on the desktop clients the stream *takes* your mouse and keyboard
-when it starts, and again whenever you click into it. **Ctrl+Alt+Shift+Q** (**⌃⌥⇧Q** on macOS) hands
-them back. For remote desktop / office work, switch to **Desktop (absolute)** mouse
-(**Ctrl+Alt+Shift+M**) so the pointer is not locked - Capture mode is the default and is meant for
-games. The other in-stream shortcuts, and the mouse, touch and pen modes, are on
-[Mouse, touch and pen](/docs/input).
+Worth knowing before you need it: when a client **captures** input for games, you need a way to
+release it. On clients that support desktop shortcuts, **Ctrl+Alt+Shift+Q** hands mouse and keyboard
+back. For remote desktop / office work, switch to **Desktop (absolute)** mouse so the pointer is not
+locked - Capture mode is the default and is meant for games. The other in-stream shortcuts, and the
+mouse, touch and pen modes, are on [Mouse, touch and pen](/docs/input).
 
-**Playing tonight check:** Capture mouse + a launched game or Desktop feels responsive on LAN.  
+**Playing tonight check:** Capture mouse + a launched game or Desktop feels responsive on LAN.
 **Office tomorrow check:** Desktop mouse + readable UI over the VPN path you will actually use.
 
 ## Now that it works

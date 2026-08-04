@@ -662,11 +662,25 @@ mod kwin_output_mgmt;
 #[path = "display/windows/manager.rs"]
 pub mod manager;
 
-// DDC/CI panel power control (physical monitors), used only by the Windows manager to blank/wake the
-// box's real panels around a virtual-display session — moved in with the subsystem (plan §W6).
+// DDC/CI panel power control (physical monitors). Windows uses the Win32 physical-monitor API;
+// Linux shells out to `ddcutil` (see `display/linux/ddc.rs`).
 #[cfg(target_os = "windows")]
 #[path = "display/ddc.rs"]
 mod ddc;
+
+#[cfg(target_os = "linux")]
+#[path = "display/linux/ddc.rs"]
+mod ddc;
+
+/// Linux stand-in for `pnp_disable_monitors`: force DRM connectors off via sysfs.
+#[cfg(target_os = "linux")]
+#[path = "display/linux/drm_force.rs"]
+pub mod drm_force;
+
+/// DDC + DRM force-off arm/restore around Exclusive (and standby-TV) sessions.
+#[cfg(target_os = "linux")]
+#[path = "display/linux/monitor_hold.rs"]
+mod monitor_hold;
 
 #[cfg(target_os = "linux")]
 #[path = "display/linux/mutter.rs"]

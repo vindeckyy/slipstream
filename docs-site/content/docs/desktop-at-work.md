@@ -58,7 +58,6 @@ Do these once on the host and once on the office client:
 - On Linux, enable lingering if the host should stay up after you leave a local session, and prefer
   a real desktop session (KDE / GNOME / Hyprland / Sway) over **gamescope** for absolute mouse and
   normal desktop apps.
-- On Windows, the installer already installs the `SlipstreamHost` service.
 
 ### Headless vs logged-in
 
@@ -75,8 +74,6 @@ Practical rules:
 - A **locked GNOME** session can block capture ("Session creation inhibited") - for always-on
   office hosts, follow the headless GNOME notes so lock does not kill the stream
   ([Troubleshooting](/docs/troubleshooting#capture-fails-session-creation-inhibited-gnome)).
-- **Windows** can stream across logouts when the service is running as designed; still leave the
-  machine powered (or wakeable on the LAN) before you leave home.
 - **Do not** use a gamescope / Gaming Mode-only host as your office remote - see below.
 
 ### Display policy and keep-alive for the office
@@ -115,18 +112,16 @@ wrong for window chrome, text selection, and IDE tabs
 ([Mouse modes](/docs/input#mouse-modes), [gamescope](/docs/gamescope),
 [Virtual displays → Office work and gamescope](/docs/virtual-displays#office-work-and-gamescope)).
 
-For remote work, run a **full desktop session** on the host (KDE, GNOME, Hyprland, Sway, or a
-normal Windows desktop). Keep gamescope / Game Mode for the [Play](/docs/play) path on the same
-machine if you want both.
+For remote work, run a **full desktop session** on the host (KDE, GNOME, Hyprland, Sway). Keep
+gamescope / Game Mode for the [Play](/docs/play) path on the same machine if you want both.
 
 ### GameStream / Moonlight
 
 For a work-oriented host:
 
 - Prefer the **native** protocol and Slipstream clients.
-- If you never use Moonlight, run the host **without** `--gamestream` (Windows ships that way;
-  Linux packages often enable it - turn it off). GameStream pairing uses legacy plain HTTP and
-  belongs on a trusted LAN only -
+- If you never use Moonlight, run the host **without** `--gamestream` (packages often enable it;
+  turn it off). GameStream pairing uses legacy plain HTTP and belongs on a trusted LAN only -
   [Moonlight → when not to enable](/docs/moonlight),
   [Security](/docs/security#gamestream--moonlight-compatibility-is-the-weak-crypto-path).
 
@@ -207,8 +202,7 @@ After the first successful office stream, these are the habits that keep the pat
 
 ### Before you leave home
 
-- Confirm the host service is up (`systemctl --user status slipstream-host` or
-  `Get-Service SlipstreamHost`).
+- Confirm the host service is up (`systemctl --user status slipstream-host`).
 - Note the address you will use from the office (Tailscale IP, WireGuard peer, or LAN IP reachable
   through the tunnel). Discovery will often fail over VPN - that is normal.
 - If the machine sleeps, **wake it before you leave** or leave it on. [Wake-on-LAN](/docs/wake-on-lan)
@@ -272,8 +266,8 @@ Call these out so Work expectations stay accurate:
   use a full desktop session for office work ([gamescope](/docs/gamescope), [input](/docs/input)).
 - **Wake-on-LAN** usually does **not** work across a VPN - wake the machine before you leave, leave
   it on, or use another wake path ([Wake-on-LAN](/docs/wake-on-lan)).
-- **4:4:4 advertising is Apple-only today** on the client side; other clients may show a toggle
-  without negotiating full chroma yet ([Picture quality](/docs/picture-quality#honest-limits)).
+- **4:4:4 advertising is iPhone-only today** on the client side; other clients may not negotiate
+  full chroma yet ([Picture quality](/docs/picture-quality#honest-limits)).
 
 ## Troubleshooting deeper
 

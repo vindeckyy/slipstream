@@ -27,32 +27,6 @@ is the real per-session switch.
 
 ## Per host
 
-### Windows
-
-The Windows host creates a virtual display for your session and **turns HDR on for that display
-itself** when the session negotiated 10-bit. You do not have to enable "Use HDR" in Windows Settings
-first: Slipstream enables advanced colour at capture open, waits for it to settle, then composes in
-FP16 and encodes P010 BT.2020 PQ. The reverse is enforced too, a session that negotiated **SDR**
-forces advanced colour **off** on that display, so a client that asked for 8-bit is never handed PQ.
-If enabling it fails, the host logs a loud error and encodes 8-bit anyway: the client was already
-told HDR, so that is the one place a Slipstream label can outrun the picture. The log says so.
-
-Two details worth knowing:
-
-- **HDR usually beats 4:4:4.** For HEVC and AV1 there is no 10-bit full-chroma capture source, so an
-  HDR session drops to 4:2:0 and says so. If you want [full chroma](/docs/client-settings) with
-  those codecs, turn HDR off for that profile. [PyroWave](/docs/pyrowave) is the exception: its
-  Windows capture path writes full-resolution 10-bit chroma, so it can carry HDR and 4:4:4 together.
-- **Vulkan games need the bundled layer.** NVIDIA and AMD Vulkan drivers refuse to advertise any HDR
-  colour space for a surface on an indirect (virtual) display, so Vulkan games decide the device
-  "does not support HDR", even though the driver happily presents an HDR swapchain there. The host
-  installer ships an implicit Vulkan layer, `VK_LAYER_SLIPSTREAM_hdr_inject`, that adds those formats
-  back (installer task **Install the HDR Vulkan layer**, ticked by default). It self-gates on the
-  monitor's live advanced-colour state, so it does nothing on an SDR session, and it already skips a
-  built-in list of kernel-anti-cheat titles. `DISABLE_PF_VKHDR=1` in a game's environment switches it
-  off for that process; `PF_VKHDR_EXCLUDE=foo.exe,bar.exe` skips further executables by name.
-  D3D11/D3D12 games need none of this.
-
 ### Linux + gamescope
 
 A stock gamescope tone-maps its composite down to 8 bits before handing it over, so its capture
@@ -65,7 +39,7 @@ The host settles two facts before spawning anything: the gamescope binary it wil
 patch (its `--version` banner contains `+pfhdr`), and this host is the one **starting** the session
 rather than attaching to a node someone else started.
 
-**Attach mode is the trap.** The patched build only reaches sessions the host spawns itself, 
+**Attach mode is the trap.** The patched build only reaches sessions the host spawns itself,
 managed, `SLIPSTREAM_GAMESCOPE_SESSION`, or a bare spawn. A session started by your display manager
 runs the distro's own gamescope, which offers neither the 10-bit formats nor the in-node cursor. The
 host cannot tell that from the outside unless you pinned `SLIPSTREAM_GAMESCOPE_NODE`: with
@@ -88,7 +62,7 @@ too bright or too dim on your TV.
 ### Linux + GNOME
 
 A Slipstream host serves [two protocols](/docs/how-it-works#two-protocols): its own `slipstream/1`,
-which the Linux, Windows, Apple and Android apps speak, and GameStream, which
+which the iPhone, Android and Steam Deck apps speak, and GameStream, which
 [Moonlight](/docs/moonlight) speaks. GNOME HDR is available on the GameStream side only.
 
 GNOME 50 added HDR screencast for **real monitors** only, so this route mirrors a monitor instead of
@@ -112,20 +86,15 @@ mirror that can be HDR.
 
 | Client | HDR10 present | Advertises HDR when |
 |---|---|---|
-| **Linux** (GTK) · **Windows** (WinUI 3) | Yes, the Vulkan presenter switches to an HDR10 swapchain when the surface offers one | the setting is on. It does **not** check your display first |
-| **macOS · iPhone · iPad** | Yes, Metal, `rgba16Float` in BT.2100 PQ with EDR | the setting is on **and** the display reports HDR capability |
-| **Apple TV** | Yes, PQ passthrough once the session's display-mode switch lands; before that, tone-mapped to SDR in-shader | the setting is on **and** the TV is HDR-capable |
+| **iPhone** | Yes, Metal, `rgba16Float` in BT.2100 PQ with EDR | the setting is on **and** the display reports HDR capability |
 | **Android** (phone + TV) | Yes, HDR10 via the Surface dataspace plus static metadata | the setting is on **and** the panel reports HDR10 or HDR10+. On an SDR panel the toggle is disabled |
+| **Steam Deck** | Yes, through the same presenter path the Deck session client uses | the setting is on. Look for `HDR` versus `HDR->SDR` on the stats overlay |
 | **Moonlight** | Its own HDR toggle, which appears only when the host advertises a 10-bit codec |, |
-
-The Linux and Windows clients are deliberately looser: they advertise HDR whenever the setting is on
-and let the presenter sort out the display side, HDR10 swapchain where the compositor offers one,
-tone-mapped to SDR where it doesn't. The stats overlay says which happened: `HDR` versus `HDR->SDR`.
 
 One exception: frames from **software decode** never take the HDR10 swapchain, whatever the surface
 offers. On a client with no hardware HEVC decode an HDR stream is therefore presented on the SDR
 swapchain without a tone-map, which looks washed out. Turn the client's HDR setting off there. The
-[Steam Deck plugin](/docs/steam-deck) streams through this same client.
+[Steam Deck plugin](/docs/steam-deck) streams through this same client path.
 
 ## Codec rules
 
@@ -134,17 +103,16 @@ swapchain without a tone-map, which looks washed out. Turn the client's HDR sett
   one and not the other tells the truth about each.
 - **H.264**, never. High10 is not an encode mode on the hardware Slipstream targets, so negotiation
   never even asks. Pinning H.264 in your client settings pins the session to SDR.
-- **[PyroWave](/docs/pyrowave)**, carries HDR in 16-bit planes, but **only from a Windows host**.
-  The Linux PyroWave capture path has no HDR colour conversion, so a Linux-hosted PyroWave session
-  is SDR. Use HEVC or AV1 for HDR from Linux.
+- **[PyroWave](/docs/pyrowave)**, a Linux-hosted PyroWave session is SDR today. The Linux PyroWave
+  capture path has no HDR colour conversion. Use HEVC or AV1 for HDR from Linux.
 
-One more rule if you also use full chroma: a **Linux** host encodes 4:4:4 at 8 bits, so a session
-that negotiates both resolves back down to SDR before the stream starts. On Linux 4:4:4 wins; on
-Windows HDR does. Full chroma is off until you turn it on, so this only bites if you did.
+One more rule if you also use full chroma: the host encodes 4:4:4 at 8 bits, so a session that
+negotiates both resolves back down to SDR before the stream starts. On Linux 4:4:4 wins. Full chroma
+is off until you turn it on, so this only bites if you did.
 
 ## Check it
 
-On a **Linux** host, one subcommand answers every link in the chain:
+One subcommand answers every link in the chain:
 
 ```bash
 slipstream-host hdr-probe
@@ -163,19 +131,9 @@ set -a; . ~/.config/slipstream/host.env; set +a
 slipstream-host hdr-probe
 ```
 
-There is no `hdr-probe` on Windows. What Windows has instead is a GPU colour self-test for the
-capture conversion, which needs no display or session:
-
-```powershell
-slipstream-host hdr-p010-selftest 1920x1080 nvidia
-```
-
-Pass your real capture size (heights like 1080 are not 16-aligned and take a different driver path)
-and, on a dual-GPU box, the vendor that encodes, `intel`, `nvidia` or `amd`.
-
-From the client side, set the [stats overlay](/docs/stats) to **Detailed**. On Linux and Windows it
-adds an `HDR` tag, or `HDR->SDR` when a PQ stream is arriving but the local surface can't present
-it. Android prints the negotiated depth and colour outright at the same tier
+From the client side, set the [stats overlay](/docs/stats) to **Detailed**. Look for an `HDR` tag,
+or `HDR->SDR` when a PQ stream is arriving but the local surface can't present it. Android prints
+the negotiated depth and colour outright at the same tier
 (`HEVC · 10-bit · HDR (BT.2020 PQ) · 4:2:0`).
 
 ## The switches
@@ -190,9 +148,8 @@ Host, in [`host.env`](/docs/configuration):
 | `SLIPSTREAM_VIDEO_SOURCE=portal` | unset | Required for the GNOME 50+ monitor-mirror route. GameStream/Moonlight only, it has no effect on `slipstream/1` sessions. |
 
 Client: one toggle, in Settings under **Quality** with
-[the rest of the video settings](/docs/client-settings#video), **10-bit HDR** on the Linux, macOS,
-iOS, iPadOS and tvOS apps, **HDR (10-bit, BT.2020 PQ)** on Windows, **HDR** on Android. It is **on
-by default** on all of them. Turning it off means "never send me 10-bit", and the host then never
-upgrades the session. Like the other video settings it can be set per
+[the rest of the video settings](/docs/client-settings#video), **10-bit HDR** on iPhone, **HDR** on
+Android. It is **on by default**. Turning it off means "never send me 10-bit", and the host then
+never upgrades the session. Like the other video settings it can be set per
 [profile](/docs/profiles-and-links), so a Work profile can prefer 4:4:4 while a Couch profile
 prefers HDR.

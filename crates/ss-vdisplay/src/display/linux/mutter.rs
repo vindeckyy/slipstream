@@ -97,6 +97,9 @@ pub struct MutterDisplay {
     /// [`last_identity_slot`](VirtualDisplay::last_identity_slot) to key the group arrangement +
     /// `/display/state` slot, like the KWin backend.
     last_slot: Option<u32>,
+    /// DDC / DRM-force hold restore for the display group (§6.1), lifted by the registry via
+    /// [`take_topology_restore`](VirtualDisplay::take_topology_restore).
+    pending_restore: Option<Box<dyn FnOnce() + Send>>,
 }
 
 impl MutterDisplay {
@@ -106,6 +109,7 @@ impl MutterDisplay {
             hw_cursor: false,
             client_fp: None,
             last_slot: None,
+            pending_restore: None,
         })
     }
 }
@@ -153,6 +157,10 @@ impl VirtualDisplay for MutterDisplay {
         self.last_slot
     }
 
+    fn take_topology_restore(&mut self) -> Option<Box<dyn FnOnce() + Send>> {
+        self.pending_restore.take()
+    }
+
     fn create(&mut self, mode: Mode) -> Result<VirtualOutput> {
         // Identity (§5.4): resolve the client's stable slot per the `identity` policy (Linux
         // defaults to Shared when unconfigured, like KWin) — it keys the registry's group
@@ -174,7 +182,8 @@ impl VirtualDisplay for MutterDisplay {
         if let Some(scale) = remembered_scale {
             tracing::info!(scale, "mutter: reapplying the client's saved display scale");
         }
-        let (setup_tx, setup_rx) = std::sync::mpsc::channel::<Result<u32, String>>();
+        let (setup_tx, setup_rx) =
+            std::sync::mpsc::channel::<Result<(u32, crate::monitor_hold::Hold), String>>();
         let stop = Arc::new(AtomicBool::new(false));
         let stop_thread = stop.clone();
         let first_in_group = self.first_in_group;
@@ -203,11 +212,14 @@ impl VirtualDisplay for MutterDisplay {
         // 45 s (was 20 s): setups now queue on TOPOLOGY_LOCK, so a session behind a slow sibling
         // (whose guard spans up to a ~10 s stream wait + 6 s connector wait + the apply) must
         // outwait it plus its own handshake before this fires.
-        let node_id = match setup_rx.recv_timeout(Duration::from_secs(45)) {
+        let (node_id, hold) = match setup_rx.recv_timeout(Duration::from_secs(45)) {
             Ok(Ok(v)) => v,
             Ok(Err(e)) => bail!("Mutter virtual monitor failed: {e}"),
             Err(_) => bail!("timed out creating the Mutter virtual monitor"),
         };
+        self.pending_restore = (hold.ddc_armed || !hold.drm_forced.is_empty()).then(|| {
+            Box::new(move || crate::monitor_hold::restore(hold)) as Box<dyn FnOnce() + Send>
+        });
         tracing::info!(
             node_id,
             w = mode.width,
@@ -244,7 +256,7 @@ impl Drop for StopGuard {
 // (see TOPOLOGY_LOCK).
 #[allow(clippy::await_holding_lock)]
 fn session_thread(
-    setup_tx: Sender<Result<u32, String>>,
+    setup_tx: Sender<Result<(u32, crate::monitor_hold::Hold), String>>,
     stop: Arc<AtomicBool>,
     mode: Mode,
     first_in_group: bool,
@@ -315,17 +327,16 @@ fn session_thread(
                 return;
             }
         };
-        // Report the node id, and STOP if nobody is listening any more. Everything below this line
-        // mutates the operator's desktop topology on behalf of a session that, past this point,
-        // would have no way to undo it.
-        if !report_node(&setup_tx, &session).await {
-            return;
+        // DDC must run while physical panels are still active — before Exclusive drops them.
+        if want_config && exclusive {
+            crate::monitor_hold::arm_before_topology(true);
         }
-        // The send can also LAND in the moment the opener's `recv_timeout` gives up — the value sits
-        // in the queue, so the send reports success while `create` is already bailing. That drops
-        // the `StopGuard`, so check the flag HERE, before the topology work, rather than only at the
-        // park loop below: the point is that a doomed session never applies a sole-monitor config at
-        // all, instead of applying one and reverting it a tick later.
+        // Report the node id (+ hold placeholder filled after topology), and STOP if nobody is
+        // listening any more. Hold is completed after the topology apply below.
+        let mut hold = crate::monitor_hold::Hold::default();
+        // Everything below this line mutates the operator's desktop topology on behalf of a session
+        // that, past this point, would have no way to undo it — so check the opener is still waiting
+        // before Exclusive work (same belt-and-braces as report_node).
         if stop.load(Ordering::Relaxed) {
             tracing::warn!(
                 "mutter: the opener gave up as the handshake completed — stopping without touching \
@@ -374,6 +385,28 @@ fn session_thread(
                     "mutter: virtual connector not identified; topology + scale persistence off"
                 ),
             }
+        }
+
+        // DRM force-off (and mark DDC armed) after Exclusive / for standby-TV selector.
+        if first_in_group {
+            crate::monitor_hold::arm_after_topology(&mut hold, exclusive);
+        }
+
+        if setup_tx.send(Ok((session.node_id, hold))).is_err() {
+            tracing::warn!(
+                node_id = session.node_id,
+                "mutter: the virtual-output opener gave up before the handshake finished — stopping the \
+                 session instead of parking on it (a parked session keeps the monitor, and its topology, alive)"
+            );
+            let _ = session.rd_session.call_method("Stop", &()).await;
+            return;
+        }
+        if stop.load(Ordering::Relaxed) {
+            tracing::warn!(
+                "mutter: the opener gave up as the handshake completed — stopping without parking"
+            );
+            let _ = session.rd_session.call_method("Stop", &()).await;
+            return;
         }
 
         drop(topology_guard);
@@ -569,6 +602,9 @@ async fn open_rd_sc() -> Result<(zbus::Connection, zbus::Proxy<'static>, zbus::P
         .context("read SessionId")?;
 
     // 2. ScreenCast session anchored to it.
+    // Do NOT call SelectDevices here: that method exists only on the xdg RemoteDesktop
+    // portal. Mutter's direct org.gnome.Mutter.RemoteDesktop.Session has no such method
+    // (GNOME Shell 46: UnknownMethod).
     let sc = zbus::Proxy::new(
         &conn,
         BUS_SC,
@@ -625,6 +661,11 @@ async fn start_and_await_node(
         .body()
         .deserialize()
         .context("PipeWireStreamAdded body")?;
+
+    // RemoteDesktop.Session.Start alone starts the anchored ScreenCast on Mutter's direct API
+    // (GNOME Shell 46 / ScreenCast v4). Do not call ScreenCast.Session.Start afterward: with a
+    // remote-desktop-session-id anchor, that returns "Must be started from remote desktop
+    // session" and the PipeWire node is already live after RD.Start.
 
     Ok(MutterSession {
         rd_session,

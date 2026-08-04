@@ -5,8 +5,7 @@ description: Enable the Slipstream browser console, read or change its login pas
 
 The web console is the browser UI for a Slipstream host, live status, pairing, display policy, the
 game library, logs, plugins, host readiness, power controls and host updates. It ships as the
-**`slipstream-web`** systemd user unit
-on Linux and runs under the **Slipstream Host service** on Windows, and serves on **`https://<host-ip>:47992`**
+**`slipstream-web`** systemd user unit, and serves on **`https://<host-ip>:47992`**
 (HTTPS with the host's own self-signed identity cert, your browser warns once; trust it and
 continue). It's the surface you expose on the LAN to administer the host; the host's own management
 API (47990) keeps every admin action loopback-only and off-loopback serves only read-only status +
@@ -19,13 +18,12 @@ game-library browsing to paired clients.
 
 Do this once after install so the rest of the console has somewhere useful to point.
 
-1. **Enable the console** (Linux) or confirm the Windows / SteamOS install already started it -
-   commands in [Enable the console](#enable-the-console) below.
+1. **Enable the console**, or confirm the SteamOS install already started it - commands in
+   [Enable the console](#enable-the-console) below.
 2. From a device on the same trusted network, open `https://<host-ip>:47992`. Accept the
    self-signed certificate warning for this host.
-3. **Choose the login password** when the setup screen appears (new Linux / SteamOS installs), or
-   log in with the password the Windows installer showed. Details:
-   [Login password](#login-password).
+3. **Choose the login password** when the setup screen appears (new Linux / SteamOS installs).
+   Details: [Login password](#login-password).
 4. Open **Host** and skim **Preflight**. Fix any blocked checks (missing `host.env`, encoder,
    competing host) before you chase client issues.
 5. Open **Pairing** → **Pair a device**, then complete PIN entry (or approval) on your
@@ -63,10 +61,6 @@ device, changing display policy, reading logs, or updating the host.
   systemctl --user enable --now slipstream-web
   ```
 
-- **Windows host:** the installer sets up the console and its runtime; the Slipstream Host service
-  runs it and automatically brings it back if it ever stops. There is nothing to enable, open
-  `https://<this-PC>:47992`.
-
 - **SteamOS host:** the install script builds and starts the console as a user service for you. It
   prints the URL when it finishes.
 
@@ -103,16 +97,6 @@ sed -n 's/^SLIPSTREAM_UI_PASSWORD=//p' ~/.config/slipstream/web-password
 ```
 
 Edit that file and `systemctl --user restart slipstream-web` to change it.
-
-**Windows host.** You choose the password during install, a secure random default is pre-filled and
-shown again on the installer's final page. It's stored in `%ProgramData%\slipstream\web-password` (as
-`SLIPSTREAM_UI_PASSWORD=...`), readable only by Administrators and SYSTEM. To change it, edit the file
-and restart the Slipstream Host service (which runs the console) in an **elevated** PowerShell:
-
-```powershell
-notepad "$env:ProgramData\slipstream\web-password"   # set SLIPSTREAM_UI_PASSWORD=<your-password>
-slipstream-host service restart
-```
 
 Forgot it? See [Forgot your Password?](/docs/forgot-password).
 

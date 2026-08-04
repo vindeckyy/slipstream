@@ -7,12 +7,12 @@ Two features that landed together in 0.22.0 and work with each other: **settings
 bundles of stream settings you can attach to a host, and **`slipstream://` links**, URLs that start a
 stream you have already set up.
 
-Both live in the client apps, the Apple app, the Linux GTK client, the Windows client and the
-Android app. Neither exists in the host's [web console](/docs/web-console).
+Both live in the client apps: iPhone, Android and Steam Deck (where the controller shell uses a
+bound profile). Neither exists in the host's [web console](/docs/web-console).
 
-The controller-driven surfaces are a half-exception: Apple TV, the Android app's console mode and
-the Steam Deck console the Decky plugin launches all *use* the profile a host is bound to, but none
-of them can create or edit one. Do that on a desktop or a phone first.
+The controller-driven surfaces are a half-exception: the Android app's console mode and the Steam
+Deck console the Decky plugin launches all *use* the profile a host is bound to, but none of them can
+create or edit one. Do that on a phone first.
 
 ## What a profile is
 
@@ -28,13 +28,12 @@ Where the catalog is kept:
 
 | Client | Stored in |
 |---|---|
-| Linux | `~/.config/slipstream/client-profiles.json` |
-| Windows | `%APPDATA%\slipstream\client-profiles.json` |
-| Apple | the app-group store, beside your saved hosts |
+| iPhone | the app-group store, beside your saved hosts |
 | Android | app-private storage |
+| Steam Deck | `~/.config/slipstream/client-profiles.json` (shared with the session client) |
 
-The catalog is per device, and nothing syncs it, so a profile you make on your laptop doesn't appear
-on your phone.
+The catalog is per device, and nothing syncs it, so a profile you make on your phone doesn't appear
+on your Deck.
 
 ## Creating and editing one
 
@@ -42,10 +41,9 @@ Profiles are created and edited in the client's own **Settings** screen, there i
 so a profile can never drift from the surface it overrides.
 
 1. Open Settings. At the top is a scope switcher listing **Default settings**, your profiles, and a
-   **New profile** entry. Linux, Windows and iOS label the control **Editing**; macOS heads the
-   preferences window with the layer's name; Android shows the choices as a row of chips.
-2. Create a new profile. Linux, Apple and Android ask for a name (and a colour) first; Windows
-   creates one called *Profile 1* and opens its edit sheet, where you rename it. Names must be
+   **New profile** entry. iPhone labels the control **Editing**; Android shows the choices as a row
+   of chips.
+2. Create a new profile. iPhone and Android ask for a name (and a colour) first. Names must be
    unique, ignoring case.
 3. Change the rows you want. Every row shows the *effective* value, the inherited default until you
    touch it.
@@ -57,11 +55,10 @@ between apps). It tints the profile's chip on host cards, so a grid of hosts is 
 glance.
 
 Renaming, duplicating (overrides and colour included) and deleting sit next to the switcher on
-Linux and in the same menu on Apple. Windows puts them in the sheet the switcher's **Edit** entry
-opens; Android puts them on the selected profile's own chip, tap it a second time.
+iPhone. Android puts them on the selected profile's own chip, tap it a second time.
 
 While a stream runs with a profile, the profile's name closes the first line of the
-[stats overlay](/docs/stats), on the Apple client, from the Normal tier up.
+[stats overlay](/docs/stats), on the iPhone client, from the Normal tier up.
 
 ## What a profile can't change
 
@@ -78,7 +75,7 @@ The row-by-row list, and why each row stays global, is on
 ## Three ways to use a profile
 
 **Bind it to a host.** Open a saved host's edit sheet and set **Profile**. Every plain click on that
-host's card now uses it. This is the only sticky choice. (The Apple app also offers **Connect with ▸
+host's card now uses it. This is the only sticky choice. (The iPhone app also offers **Connect with ▸
 Set Default Profile** on the card itself.)
 
 **Use it once.** A card's menu has **Connect with**, pick a profile for this connect only. It never
@@ -86,9 +83,9 @@ rebinds the host. **Default settings** in that menu is a real choice: on a bound
 globals for one session. (Android lists the same choices flat, as *Connect with: ...*.)
 
 **Pin it as its own card.** A pinned profile gets its own card beside the host, one click, no menu.
-Pin it in the host's edit sheet on Linux, Android and Apple, or from a card menu: **Pin as Card** on
-Apple, **Pin as card: ...** on Android, **Pin tiles** on Windows. A pinned card is a shortcut, not a
-second host: unpinning changes neither the profile nor the host's binding.
+Pin it in the host's edit sheet on Android and iPhone, or from a card menu: **Pin as Card** on
+iPhone, **Pin as card: ...** on Android. A pinned card is a shortcut, not a second host: unpinning
+changes neither the profile nor the host's binding.
 
 ### Work vs Play on the same host
 
@@ -111,9 +108,9 @@ profile", which is exactly your defaults. Nothing errors and no connect is block
 
 ## `slipstream://` links
 
-A link starts a stream on a host this device already trusts. All four apps register the scheme with
-the operating system, so a link works from a browser (behind the browser's own "open this app?"
-prompt), a desktop shortcut, a home-automation rule or a script:
+A link starts a stream on a host this device already trusts. The apps register the scheme with the
+operating system, so a link works from a browser (behind the browser's own "open this app?"
+prompt), a home-automation rule or a script:
 
 ```text
 slipstream://connect/<host-ref>[?fp=<64-hex>][&host=<addr[:port]>][&launch=<id>][&profile=<ref>][&name=<label>]
@@ -158,49 +155,34 @@ could do, minus every trust decision.**
 - There is no `pair` route and never will be. `slipstream://pair/...` is refused outright;
   [pairing](/docs/pairing) stays something you do with the fingerprint on screen.
 - A link naming a host you don't know is never connected. When it carries an address, as
-  `<host-ref>` or as `host=`, Linux and Android open the app's normal trust prompt, pre-filled with
-  that address and any `fp` the link carried, so the first connect is verified rather than blind.
-  Windows and the Apple apps show a notice naming the host instead, and you pair from the host list
-  yourself. A link with no address to fall back on, a bare name or a stale record id, is simply
-  refused with a notice.
+  `<host-ref>` or as `host=`, Android opens the app's normal trust prompt, pre-filled with that
+  address and any `fp` the link carried, so the first connect is verified rather than blind. iPhone
+  shows a notice naming the host instead, and you pair from the host list yourself. A link with no
+  address to fall back on, a bare name or a stale record id, is simply refused with a notice.
 - If the link's `fp` contradicts the fingerprint already pinned for that host, it is a hard refusal
   with a notice. Nothing connects.
 - A `profile=` that names nothing on this device, or two profiles at once, refuses **before**
   anything is dialled, a shortcut that can't honour its profile says so rather than streaming with
   the wrong settings. A link with no `profile=` honours the host's binding, exactly like a click.
-- A link never preempts a running session. Linux and Windows say "A session is already running, end
-  it first". Apple and Android do the same, except when the link points at the host you are already
-  streaming, which just brings the app forward.
+- A link never preempts a running session. Clients say "A session is already running, end it first",
+  except when the link points at the host you are already streaming, which just brings the app
+  forward.
 
 ## Getting a link, and making a shortcut
 
-On Linux and Windows a host card's menu has **Copy link** and **Create shortcut...**. On macOS and iOS
-the card menu has **Copy Link** (tvOS has no clipboard, so it isn't offered; the Android app has no
-copy action yet).
-
-On Linux and Apple a pinned card has its own menu, and the link it hands out carries that card's
-profile. Windows pinned tiles have no menu, and neither Windows action adds a `profile=`, so a
-Windows link always uses the host's binding until you edit the URL yourself.
+On iPhone the card menu has **Copy Link**. Android has no copy action yet. On Steam Deck, use a
+pinned card or a `slipstream://` URL from a script where the CLI is available.
 
 A copied link carries the host's stable record id, plus `host=` and `fp=` (the fingerprint only when
 one is pinned). That is what keeps a shortcut written today working after the host changes address
 or you reinstall the client.
 
-**Create shortcut...** writes a launcher wrapped around that URL:
-
-- **Linux**, a desktop entry in `~/.local/share/applications/`, which shows up in your app menu.
-  Under Flatpak the sandbox can't write there, so the app offers you the URL to place yourself.
-- **Windows**, a `.lnk` on your Desktop that runs `slipstream-client.exe` with the URL as its
-  argument, so it keeps working across updates.
-
-Any other launcher works too, as long as it hands the URL to the client. From a script, or on a
-headless box, use the `slipstream` CLI:
+Any launcher works as long as it hands the URL to the client. From a script, use the `slipstream`
+CLI where packaged:
 
 ```bash
 slipstream profiles list                          # ids, names, how many settings each overrides
 slipstream open 'slipstream://connect/Desk?profile=Work'
 ```
 
-It ships in the Linux client packages and in the Windows MSIX. The Flatpak build has it too, but
-inside the sandbox, reach it with `flatpak run --command=slipstream io.slipstream`. See
-[Clients](/docs/clients) for the rest of its verbs.
+See [Clients](/docs/clients) for the rest of its verbs.

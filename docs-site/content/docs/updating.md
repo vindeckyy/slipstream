@@ -24,8 +24,6 @@ The console shows the right one of these automatically; for reference:
 
 | How you installed | How to update |
 |---|---|
-| Windows installer | download the newer `slipstream-host-setup-<version>.exe` from the [releases page](https://github.com/vindeckyy/slipstream/releases) and run it, it upgrades in place, keeping your settings, console password and paired devices |
-| Windows via winget | `winget upgrade vindeckyy.SlipstreamHost` after registering **your** private winget source (see `packaging/winget/`) |
 | Ubuntu (apt) | rebuild/install a newer `.deb`, or `sudo apt install --only-upgrade slipstream-host` if you mirror packages locally |
 | Fedora (dnf) | rebuild/install a newer RPM, or `sudo dnf upgrade slipstream` if you mirror packages locally |
 | Bazzite sysext (recommended) | `sudo slipstream-sysext update` |
@@ -33,10 +31,6 @@ The console shows the right one of these automatically; for reference:
 | Arch / CachyOS (pacman) | `sudo pacman -Syu` (a normal full system upgrade) |
 | Steam Deck (on-device build) | `bash ~/slipstream/scripts/steamdeck/update.sh --pull` |
 | NixOS (flake) | `nix flake update slipstream` in your flake directory, then rebuild your system |
-
-winget carries **stable** releases only. A Windows host on the canary channel updates by running the
-canary installer again from your canary feed or a canary release asset, see
-[Release Channels](/docs/channels).
 
 ### rpm-ostree layer: `rpm-ostree upgrade` is not enough
 
@@ -63,7 +57,7 @@ canary wins and the box quietly tracks canary, enable exactly the channel you wa
 [Release Channels](/docs/channels)). And if this box runs the Bazzite **sysext**, the sysext
 shadows any layered copy: update with `sudo slipstream-sysext update` instead.
 
-### Restart after a Linux package update
+### Restart after a package update
 
 Restart the host to pick up the new binary:
 
@@ -86,29 +80,11 @@ together, name both: `sudo apt install --only-upgrade slipstream-host slipstream
 `sudo dnf upgrade slipstream slipstream-web` (dnf). If you enabled the plugin/script runner, it is
 a third unit: `systemctl --user restart slipstream-scripting`.
 
-(The Windows installer restarts the service itself; `slipstream-sysext update` prints the same
-restart hint when it's needed.)
+`slipstream-sysext update` prints the same restart hint when it's needed.
 
-## One-click updating (Windows)
+## One-click updating (opt-in)
 
-On a Windows host the card shows an **Update now** button instead of a command. It asks for the
-console password again (a saved login alone can't restart your host), then the host downloads
-the installer, verifies it against the signed release manifest **and** its code signature, and
-runs it silently, the service restarts at the end and the page reconnects by itself. If a
-stream is live you'll be warned first: updating drops it.
-
-Every attempt leaves a result in the card (and an installer log under
-`C:\ProgramData\slipstream\logs\update-<version>.log`), including across the restart, so a
-failed update is never silent.
-
-If the newly installed host crash-loops, the service puts the previous installer back on its own
-(the last two are kept) and says so in the card, you end up on the version you started from,
-not on a dead host. That rollback writes
-`C:\ProgramData\slipstream\logs\update-rollback-from-<version>.log`.
-
-## One-click updating (Linux, opt-in)
-
-The apt, dnf, Bazzite-sysext, and rpm-ostree installs can one-click update too, via a small
+The apt, dnf, Bazzite-sysext, and rpm-ostree installs can one-click update via a small
 root helper the packages ship (`ss-update` + a `slipstream-update.service` oneshot). It's **off
 until you opt in**, because a web button that ends in root deserves an explicit decision:
 
@@ -138,10 +114,8 @@ lands in `~/.config/slipstream/logs/update-steamos.log`.
 
 ## Updating a client
 
-This page is about the host. Clients update on their own tracks, `flatpak update` on Linux, your
-normal `apt upgrade` / `dnf upgrade` for the packaged Linux client, a newer `.dmg` dragged over the
-old app on macOS, TestFlight on iPhone/iPad/Apple TV, Google Play on Android, and the Decky panel's
-own **Update** button on a Steam Deck. The per-platform table is in
+This page is about the host. Clients update on their own tracks: TestFlight on iPhone, Google Play
+on Android, and the Decky panel's own **Update** button on a Steam Deck. The per-platform table is in
 [Install a Client -> Keeping a client up to date](/docs/install-client#keeping-a-client-up-to-date).
 A host and a client don't have to be on the same version, but keeping them close is the least
 surprising.
@@ -156,13 +130,12 @@ nothing else, and sends nothing but a normal download request. If you'd rather t
 SLIPSTREAM_UPDATE_CHECK=0
 ```
 
-`host.env` lives at `~/.config/slipstream/host.env` on Linux and
-`%ProgramData%\slipstream\host.env` on Windows, see [Configuration](/docs/configuration). Then
-restart the host: `systemctl --user restart slipstream-host` on Linux, or restart the Slipstream
-host service on Windows. The card then shows checks as disabled; everything else keeps working.
+`host.env` lives at `~/.config/slipstream/host.env`, see [Configuration](/docs/configuration). Then
+restart the host: `systemctl --user restart slipstream-host`. The card then shows checks as
+disabled; everything else keeps working.
 
-`SLIPSTREAM_UPDATE_APPLY=0` in the same file removes the **Update now** button on any host,
-Windows or Linux; the card shows the manual command instead.
+`SLIPSTREAM_UPDATE_APPLY=0` in the same file removes the **Update now** button; the card shows the
+manual command instead.
 
 ## If the card says the feed is stale
 

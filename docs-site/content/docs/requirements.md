@@ -5,12 +5,12 @@ description: What you need to run a Slipstream host, GPU, driver, desktop, and n
 
 ## Supported setups
 
-A Slipstream host runs primarily on a Linux machine with a dedicated GPU, NVIDIA (NVENC) is the
-most-exercised path, and AMD/Intel GPUs work via Vulkan Video or VAAPI. A native [Windows host](/docs/windows-host)
-is also available. Setup splits along two axes: you **install** the package per distro, then
-**configure** the host, and learn its quirks, per desktop/compositor.
+A Slipstream host runs on a **Linux** machine with a dedicated GPU. NVIDIA (NVENC) is the
+most-exercised path, and AMD/Intel GPUs work via Vulkan Video or VAAPI. Setup splits along two
+axes: you **install** the package per distro, then **configure** the host, and learn its quirks,
+per desktop/compositor.
 
-> New here? Read [Security & Safe Use](/docs/security) first, a streaming host is remote control of
+> New here? Read [Security & Safe Use](/docs/security) first. A streaming host is remote control of
 > the machine, so keep it on a trusted LAN or VPN and require pairing.
 
 **Distros, install the package:**
@@ -29,27 +29,21 @@ is also available. Setup splits along two axes: you **install** the package per 
 - [Hyprland](/docs/hyprland)
 - [Sway / wlroots](/docs/sway)
 
-Pick your distro to install, then your desktop to configure, the two are independent. The host
+Pick your distro to install, then your desktop to configure. The two are independent. The host
 needs one of these compositor backends to create a virtual display.
 
 Support is deliberately non-uniform: each compositor and each GPU vendor gets its own capture,
 display and input backend, and they are not equally capable. The [Support
 matrix](/docs/support-matrix) has a row for every host desktop, GPU and client app, with each cell
-taken from the code that makes the decision, read it before assuming a feature is available on your
+taken from the code that makes the decision. Read it before assuming a feature is available on your
 combination.
-
-> **Windows host:** Slipstream also runs as a native host on **Windows 11 22H2 or newer (x64)**, a
-> signed installer that registers a service and bundles a virtual-display driver whose driver
-> framework (IddCx 1.10) makes 22H2 the hard floor, Windows 10 is not supported. It encodes on NVIDIA
-> (NVENC), AMD (AMF), or Intel (QSV), with a software fallback, and is newer than the Linux host; see
-> [Windows Host](/docs/windows-host).
 
 ## GPU and driver
 
 - **An NVIDIA GPU** with NVENC, effectively any GeForce RTX or workstation card. NVENC is what
   encodes the video in hardware.
 - **NVIDIA driver 535 or newer** (550+ recommended). The driver must include the **GL/EGL userspace**,
-  not just `nvidia-utils`, without it the compositor can't initialise the GPU and capture fails. Each
+  not just `nvidia-utils`. Without it the compositor can't initialise the GPU and capture fails. Each
   install guide installs the right package (e.g. `libnvidia-gl-<version>` on Ubuntu).
 - **`nvidia-drm modeset=1`** must be enabled (Wayland on NVIDIA needs it). The install guides cover this.
 - **AMD / Intel GPUs** encode without any of the NVIDIA pieces above. For **HEVC and AV1** the host
@@ -59,7 +53,7 @@ combination.
   everything else: a machine with only the VAAPI driver still streams, it just gives up the Vulkan
   path's cleaner recovery from packet loss. `SLIPSTREAM_VULKAN_ENCODE=0` pins VAAPI. Validated live
   on AMD RDNA3. On modern Intel (Gen12/Tiger Lake and newer, including Arc) the VAAPI driver only
-  offers the **low-power (VDEnc)** encode entrypoint, the host detects this and falls back automatically
+  offers the **low-power (VDEnc)** encode entrypoint. The host detects this and falls back automatically
   (`SLIPSTREAM_VAAPI_LOW_POWER=1|0` pins it), and low-power encode needs the **HuC firmware**
   loaded (the kernel default on those platforms; check `dmesg | grep -i huc` if encoding fails).
   A GPU-less software H.264 encoder also exists (`SLIPSTREAM_ENCODER=software`), meant as a
@@ -72,7 +66,7 @@ combination.
 
 HDR (10-bit BT.2020 PQ) is on by default, and what a Linux box needs for it is a **gamescope**
 session running the patched `slipstream-gamescope` build, or **GNOME 50 or newer** mirroring a real
-HDR monitor on the GameStream plane, the ordinary KWin, Mutter and wlroots virtual displays are
+HDR monitor on the GameStream plane. The ordinary KWin, Mutter and wlroots virtual displays are
 8-bit upstream and stream SDR. [HDR](/docs/hdr) has the full chain, per host and per client, and how
 to find the link that is missing.
 
@@ -87,7 +81,7 @@ session is running for the user the host runs as, or the host brings one up itse
 - **no session at all**, on the **gamescope** backend the host spawns its own headless gamescope
   per client connect (on a Steam appliance it can bring up the whole Steam session), so nothing has
   to be running beforehand. Auto-detection reads the *live* session, so on a box that boots to
-  nothing, set `SLIPSTREAM_COMPOSITOR=gamescope` in `host.env`, with a gamescope session already
+  nothing, set `SLIPSTREAM_COMPOSITOR=gamescope` in `host.env`. With a gamescope session already
   running the host finds it by itself. See [Steam / gamescope](/docs/gamescope).
 
 Minimum compositor versions (newer is fine):
@@ -97,20 +91,20 @@ Minimum compositor versions (newer is fine):
 - **gamescope ≥ 3.16.22** ([Bazzite/Steam](/docs/gamescope)), below this, headless capture
   deadlocks against PipeWire ≥ 1.6.
 - **gamescope ≥ 3.16.23** for the Steam overlay (Shift+Tab / Quick Access Menu) to reach the stream
-  at all, older builds never paint it into the node the host captures, so no host setting can bring
+  at all. Older builds never paint it into the node the host captures, so no host setting can bring
   it back.
 
 For **HDR** on gamescope you additionally need the patched `slipstream-gamescope` build, see
 [HDR and 10-bit](#hdr-and-10-bit) above.
 
 The same floors, with what each one gates, are in [Version floors worth
-knowing](/docs/support-matrix#version-floors-worth-knowing); where the two disagree, the matrix is
+knowing](/docs/support-matrix#version-floors-worth-knowing). Where the two disagree, the matrix is
 the one checked against the code.
 
 ## Network
 
 - Host and client on the **same network**, a LAN, or a VPN that puts them on one subnet. Slipstream
-  assumes a trusted local network; it's **not built to be exposed to the public internet, don't
+  assumes a trusted local network; it's **not built to be exposed to the public internet. Don't
   port-forward it.** To stream from outside your home, use a VPN so the remote client is on the same
   private subnet.
 - For best results, a wired or fast Wi-Fi link. The host can run a built-in **speed test** to pick a
@@ -119,5 +113,5 @@ the one checked against the code.
 ## A client
 
 You also need something to stream *to*, see [Connect a Client](/docs/clients). There are native
-Slipstream clients for **Apple (macOS, iOS, iPadOS, tvOS), Linux, Windows, and Android**, and any
-Moonlight client works too. All of them can discover the host on your network automatically.
+Slipstream clients for **iPhone**, **Android**, and **Steam Deck**, and any Moonlight client works
+too. All of them can discover the host on your network automatically.

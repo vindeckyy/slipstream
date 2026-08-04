@@ -5,23 +5,16 @@ description: The host.env settings and SLIPSTREAM_* environment variables you'd 
 
 The host reads its settings from **`~/.config/slipstream/host.env`** (a simple `KEY=value` file, `#`
 starts a comment; keys are **case-sensitive**, `slipstream_compositor` sets nothing, use the exact
-uppercase names). On Windows the service reads **`%ProgramData%\slipstream\host.env`** instead. Your
-[setup guide](/docs/requirements) gives you a starting `host.env` for your desktop; this page is the
-reference for the settings you set there. A few settings are documented on the page that owns their
-feature instead, they're listed under [Settings documented
+uppercase names). Your [setup guide](/docs/requirements) gives you a starting `host.env` for your
+desktop; this page is the reference for the settings you set there. A few settings are documented on
+the page that owns their feature instead, they're listed under [Settings documented
 elsewhere](#settings-documented-elsewhere) at the end.
 
-The file is read when the host starts, so **an edit does nothing until you restart the host.** On
-Linux, where the file is loaded by the `slipstream-host` user service:
+The file is read when the host starts, so **an edit does nothing until you restart the host.** The
+file is loaded by the `slipstream-host` user service:
 
 ```bash
 systemctl --user restart slipstream-host
-```
-
-On Windows, where it is loaded by the `SlipstreamHost` service, from an Administrator prompt:
-
-```powershell
-slipstream-host service restart
 ```
 
 ## Console configuration
@@ -59,7 +52,7 @@ The durable options exposed by the page are:
 **Finding your way.** The sections below go in this order: what session the host attaches to
 (*Session anchors*, *Core*, *gamescope / session following*, *Compositor-specific*, *Session
 recovery*), what it streams (*Video quality*, *Gamepads*, *Audio / microphone*, *Clipboard*), the
-platform and network bits (*Windows host*, *Network & discovery*, *Auth, API & paths*, *Updates*),
+platform and network bits (*Network & discovery*, *Auth, API & paths*, *Updates*),
 then *Advanced performance tuning* and *Diagnostics*. The last few sections are background rather
 than host settings: the handful of variables the **clients** read, bitrate, several devices at once,
 and codecs. Two things people come here for are **not** host settings: **resolution and refresh**
@@ -88,22 +81,21 @@ redundant or stale.
 | `SLIPSTREAM_VIDEO_SOURCE` | `virtual` (default) · `portal` | **GameStream/Moonlight sessions only**, it has no effect on the native `slipstream/1` plane. `virtual` creates a per-client display at the client's exact mode (the normal choice); `portal` captures an existing monitor instead, and is what the GNOME 50+ HDR monitor mirror needs, see [HDR](/docs/hdr#linux--gnome). To stream a physical monitor to a Slipstream app, use `SLIPSTREAM_CAPTURE_MONITOR` below, or the console's **Streamed screen**. |
 | `SLIPSTREAM_CAPTURE_METHOD` | `auto` (default) · `portal` · `kwin` · `wlr` · `kms` · `x11` · `nvfbc` | **Linux desktop-mirror path only.** `auto` uses a compositor-specific order: wlroots starts with direct screencopy, while Mutter, KWin and gamescope start with PipeWire/portal; every candidate is runtime-probed before the stream opens. `kms` exports the active DRM primary plane as a dma-buf; `nvfbc` requires an X11 display, an NVIDIA driver with NvFBC, and CUDA. Hermes-KMS is not included. |
 | `SLIPSTREAM_CAPTURE_MONITOR` | a connector name (`HDMI-A-1`, `DP-2`, ...) | Stream a **physical** monitor this host already has instead of creating a virtual display, see [Streamed screen](/docs/virtual-displays#stream-a-real-monitor-instead). List the names with `slipstream-host list-monitors`. Setting it here **outranks the web console's** choice, so an appliance stays aimed where its operator pointed it; leave it unset to steer from the console. A name that matches no monitor fails the session loudly rather than streaming a different screen. Linux only. |
-| `SLIPSTREAM_ZEROCOPY` | `1` · `0` *(default on)* | GPU zero-copy capture->encode (dmabuf -> CUDA -> NVENC, or D3D11 on Windows). **On by default**, no need to set it; it falls back to a CPU path automatically. Set `0` to force the CPU path. One exception: Windows **Intel/QSV** keeps the CPU path by default until zero-copy is validated on Intel hardware, set `1` to try it there. |
+| `SLIPSTREAM_ZEROCOPY` | `1` · `0` *(default on)* | GPU zero-copy capture->encode (dmabuf -> CUDA -> NVENC). **On by default**, no need to set it; it falls back to a CPU path automatically. Set `0` to force the CPU path. |
 | `SLIPSTREAM_PIPEWIRE_LATENCY_MS` | `1`-`40` *(default `8`)* | **Linux PipeWire capture hint.** Requests the video node's scheduling latency. It is a producer hint, not a guaranteed compositor period, and it has no effect on X11, wlroots SHM, KMS, or NvFBC sources. |
 | `SLIPSTREAM_CAPTURE_MAX_AGE_MS` | `1`-`500` *(default `50`)* | **Diagnostic threshold only.** Records when a captured frame reaches the encoder older than this limit; it does not drop frames or alter pacing. Use the capture-age counters in stream stats to separate compositor/capture delay from encoder and network delay. |
 | `SLIPSTREAM_KMS_PLANE_ID` | a DRM plane id | **KMS diagnostic pin.** Force the DRM plane used by the `kms` backend after inspecting the active plane ids. Leave unset to select the first active primary plane. |
 | `SLIPSTREAM_INPUT_BACKEND` | `libei` · `kwin` · `gamescope` · `wlr` | How input is injected. `kwin` (KWin fake-input) for KDE, direct injection with no portal approval dialog, so it also works on a headless KDE box; `libei` (the RemoteDesktop portal) for GNOME; `gamescope` for Bazzite/gamescope; `wlr` for Sway/wlroots **and Hyprland**. Auto-detected with the compositor; a value that isn't one of the four is ignored and detection runs anyway. |
-| `SLIPSTREAM_PEN` | `1` · `0` *(default on)* | Full-fidelity stylus input, pressure, tilt, hover, eraser, barrel buttons, for the clients that send it. **On by default**; `0` stops the host advertising pen at all and every client folds the stylus back into ordinary touch. The host also needs `/dev/uinput` on Linux (the same `input` group the virtual gamepads use) or Windows 10 1809+. See [Pen and stylus](/docs/input#pen-and-stylus). |
-| `SLIPSTREAM_ENCODER` | `auto` · `nvenc` · `vaapi` · `vulkan` (Linux) · `amf` · `qsv` (Windows) · `software` | Encoder backend. `auto` (default) detects the GPU vendor: NVIDIA->NVENC; on **Linux** AMD/Intel->**Vulkan Video** for HEVC and AV1 (falling back to VAAPI when the device or the codec can't take it, H.264 is always VAAPI), on **Windows** AMD->AMF and Intel->QSV. `software` (aliases `sw`/`openh264`) is the GPU-less H.264 path on both platforms, on Windows `auto` falls back to it when no GPU is found; on Linux it is **explicit-only** (`auto` never picks it). On a multi-GPU Windows box a forced hardware backend whose vendor contradicts the selected GPU (web-console preference) is **overridden**, the adapter wins and the host logs a warning; remove the stale pin. |
+| `SLIPSTREAM_PEN` | `1` · `0` *(default on)* | Full-fidelity stylus input, pressure, tilt, hover, eraser, barrel buttons, for the clients that send it. **On by default**; `0` stops the host advertising pen at all and every client folds the stylus back into ordinary touch. The host also needs `/dev/uinput` (the same `input` group the virtual gamepads use). See [Pen and stylus](/docs/input#pen-and-stylus). |
+| `SLIPSTREAM_ENCODER` | `auto` · `nvenc` · `vaapi` · `vulkan` · `software` | Encoder backend. `auto` (default) detects the GPU vendor: NVIDIA->NVENC; AMD/Intel->**Vulkan Video** for HEVC and AV1 (falling back to VAAPI when the device or the codec can't take it, H.264 is always VAAPI). `software` (aliases `sw`/`openh264`) is the GPU-less H.264 path and is **explicit-only** (`auto` never picks it). |
 | `SLIPSTREAM_VULKAN_ENCODE` | `1` · `0` *(default on)* | **(Linux, AMD/Intel)** Use the Vulkan Video encoder for HEVC/AV1 sessions. **On by default**, it recovers from packet loss without a full keyframe, which the VAAPI path can't express. `0` pins the libav VAAPI path; so does a device that can't encode the profile (the host falls back on its own). See [Requirements](/docs/requirements). |
 | `SLIPSTREAM_VAAPI_LOW_POWER` | `1` · `0` | **(Linux, Intel)** Pin the VAAPI entrypoint. Modern Intel (Gen12/Tiger Lake and newer, incl. Arc) only offers the low-power (VDEnc) entrypoint and the host detects that by itself; set this only to force one way or the other. See [Requirements](/docs/requirements). |
 | `SLIPSTREAM_RENDER_NODE` | path | Linux DRM render node for zero-copy (default `/dev/dri/renderD128`). Set on multi-GPU boxes to pick the right GPU. Superseded by a manual GPU preference in the console, see below. |
 
 > **Picking a GPU**, on a multi-GPU box, choose the GPU in the **web console** (Host -> *GPUs*),
-> which writes `gpu-settings.json`. A **manual** preference there outranks both
-> `SLIPSTREAM_RENDER_NODE` (Linux) and `SLIPSTREAM_RENDER_ADAPTER` (Windows); while the console is
-> left on **Automatic**, or the preferred GPU isn't present, those two still decide. They stay
-> useful on a headless/appliance box nobody opens the console on.
+> which writes `gpu-settings.json`. A **manual** preference there outranks `SLIPSTREAM_RENDER_NODE`;
+> while the console is left on **Automatic**, or the preferred GPU isn't present, that knob still
+> decides. It stays useful on a headless/appliance box nobody opens the console on.
 
 Resolution and refresh are **not** set here, **the client chooses them.** When a device connects,
 the host creates a virtual display at that device's resolution and refresh rate. A 1080p60 laptop and
@@ -127,6 +119,7 @@ the full picture (and [Bazzite](/docs/bazzite) for that distro's specifics).
 | `SLIPSTREAM_GAMESCOPE_BIN` | path | Force a specific gamescope binary for the sessions the host spawns. Unset = prefer `slipstream-gamescope` on `PATH`, then `gamescope`. |
 | `SLIPSTREAM_SESSION_WATCH` | `1` · `0` | Follow a Gaming ↔ Desktop switch **mid-stream** (rebuild the backend in place, no reconnect). **On by default** on Bazzite/SteamOS; set `0` to disable. |
 | `SLIPSTREAM_GAMESCOPE_GRAB_CURSOR` | `1` | Add `--force-grab-cursor` to a bare gamescope session the host spawns **to run an app or game** (never the empty keep-alive session), forcing relative-mouse capture so FPS mouselook works over the injected pointer. **Off by default**, relative mode breaks absolute-pointer titles and menus, so turn it on per host. |
+| `SLIPSTREAM_HIDE_HOST_CURSOR` | `1` · `0` *(default on)* | Hide the host's local OS cursor while any client is streaming; restore when the last session ends. The stream still shows a pointer via host-composite / cursor-channel. **On by default**; `0` leaves the host cursor alone. |
 | `SLIPSTREAM_GAMESCOPE_SPLASH` | `1` · `0` *(default on)* | Run the built-in splash client inside each bare gamescope session the host spawns. **Leave it on**: gamescope only produces capture buffers once something paints, and a Steam launch paints nothing for its whole bootstrap, without the splash a fresh session starves and times out. `0` is a debugging escape hatch. |
 | `SLIPSTREAM_GAMESCOPE_STEAM` | `1` | Launch every bare gamescope session the host spawns in Steam integration mode (`--steam`). A Steam title turns that on by itself; this forces it for non-Steam launches too. Managed / `gamescope-session-plus` sessions own their own flags and ignore it. |
 
@@ -134,11 +127,10 @@ the full picture (and [Bazzite](/docs/bazzite) for that distro's specifics).
 
 See your desktop page ([KDE](/docs/kde), [GNOME](/docs/gnome)) for when to set these.
 
-> **Managing virtual displays**, keep-alive after disconnect, exclusive vs. extend, and (on
-> Windows/KDE) persistent per-client scaling, now has its own settings surface in the web console
-> and `display-settings.json`. See [Virtual displays](/docs/virtual-displays). The two
-> `*_VIRTUAL_PRIMARY` knobs and `SLIPSTREAM_MONITOR_LINGER_MS` below still work but are superseded by
-> it (a settings file wins over them).
+> **Managing virtual displays**, keep-alive after disconnect, exclusive vs. extend, and (on KDE)
+> persistent per-client scaling, now has its own settings surface in the web console and
+> `display-settings.json`. See [Virtual displays](/docs/virtual-displays). The two
+> `*_VIRTUAL_PRIMARY` knobs below still work but are superseded by it (a settings file wins over them).
 
 | Setting | Values | Meaning |
 |---|---|---|
@@ -162,7 +154,7 @@ See your desktop page ([KDE](/docs/kde), [GNOME](/docs/gnome)) for when to set t
 | `SLIPSTREAM_444` | `1` · `0` *(default on)* | Host **policy gate** for full chroma 4:4:4, sharper text and thin lines, no chroma loss. **On by default**; `0` forces every session to 4:2:0. It only ever *allows*: the client's own 4:4:4 setting (default off) is the real per-session switch, and the codec, capture-path and GPU gates behind it are on [Client settings -> Full chroma](/docs/client-settings#video). Which GPUs and which clients can actually do it is in the [support matrix](/docs/support-matrix#encoders); how it interacts with HDR is on [HDR](/docs/hdr). **slipstream/1 native only**, Moonlight stays 4:2:0. |
 | `SLIPSTREAM_CHACHA20` | `1` · `0` *(default on)* | ChaCha20-Poly1305 session encryption for clients without hardware AES (old ARM TVs, e.g. webOS), lifting their ~100 Mbps software-AES decrypt ceiling. **On by default** on the host; a session uses it only when the client requests it, everyone else stays on AES-GCM. Purely a performance choice (both ciphers are full-strength); set `0` to force AES-GCM for all sessions. |
 | `SLIPSTREAM_PYROWAVE_MAX_MBPS` | `N` (Mbps) | Cap the [PyroWave](/docs/pyrowave) Automatic bitrate pin, for a host on a link that the open-loop pin can outrun (e.g. 4:4:4 + HDR at 5120x1440@240 pins ~5.3 Gbps, over a 5GbE link). Unset = no cap. Only affects Automatic (bitrate `0`) PyroWave sessions; an explicit client bitrate bypasses it. |
-| `SLIPSTREAM_DSCP` | `1` | Opt-in DSCP / `SO_PRIORITY` QoS tagging on the media sockets. No-op on the wire on Windows without a qWAVE policy. |
+| `SLIPSTREAM_DSCP` | `1` | Opt-in DSCP / `SO_PRIORITY` QoS tagging on the media sockets. |
 | `SLIPSTREAM_OH264_THREADS` / `SLIPSTREAM_OH264_GOP` | `N` | Software (openh264) encoder tuning: encode threads (default 2, latency over throughput) and GOP length in frames (unset = about ten minutes' worth, `fps x 600`; set `0` for encoder-auto). Only relevant with `SLIPSTREAM_ENCODER=software`. |
 | `SLIPSTREAM_MAX_FPS` | `N` (fps) *(default: no limit)* | **Frame limiter for the game**, how fast the compositor lets it render. It does *not* cap the stream: the client still negotiates and receives its full rate, because the encode loop re-encodes the held frame whenever the compositor produced no new one (an almost-empty P-frame). A 60-capped game on a 120 Hz session still sends 120 frames a second, and the GPU time the game gives up goes to capture and encode instead, and to heat and battery on a laptop or handheld. **gamescope only today**: it takes this as `--nested-refresh`, the rate it clamps the game to; that is the nested output's rate, so everything gamescope composites moves at it. Other compositors have no equivalent lever and ignore it. |
 | `SLIPSTREAM_VDISPLAY_HZ_MULT` | `1`-`4` *(default `1` = off)* | Run the **virtual display** at a multiple of the session's frame rate without sending a single extra frame. A compositor paints on its own vblank, so a frame finished just after the capture sampled waits nearly a whole interval to be picked up, the jittery part of the latency budget. At `2` that worst case halves. Costs the compositor and GPU the extra composites, so it's opt-in. If the backend won't give the multiplied rate it reports what it achieved and the stream paces to that. |
@@ -171,7 +163,7 @@ See your desktop page ([KDE](/docs/kde), [GNOME](/docs/gnome)) for when to set t
 
 | Setting | Values | Meaning |
 |---|---|---|
-| `SLIPSTREAM_GAMEPAD` | `xbox360` · `xboxone` · `dualsense` · `dualsenseedge` · `dualshock4` · `steamdeck` · `switchpro` · `steamcontroller` · `steamcontroller2` (aliases: `ps5`, `edge`, `ps4`, `deck`, `switch`, `sc2`, `ibex`, ...) | The virtual pad the host creates. Usually **auto-resolved from the client's physical controller**, set this only to force a type. `xbox360` (XInput) is the universal fallback. `dualsenseedge` gives the client's back paddles native buttons; `switchpro` gives Nintendo-family pads correct glyphs/layout + gyro. `steamcontroller2` (the 2026 Steam Controller) is passed through **as-is**, the host presents a real SC2 (`28DE:1302`) that Steam Input drives directly, mirroring the physical pad's raw reports (Linux only). DualSense (Edge)/DualShock 4 work on Linux (UHID) and Windows (UMDF); the Steam Deck pad too (Windows via the promoted UMDF identity); Switch Pro and the classic Steam Controller need Linux UHID. Unsupported choices fold to Xbox 360. |
+| `SLIPSTREAM_GAMEPAD` | `xbox360` · `xboxone` · `dualsense` · `dualsenseedge` · `dualshock4` · `steamdeck` · `switchpro` · `steamcontroller` · `steamcontroller2` (aliases: `ps5`, `edge`, `ps4`, `deck`, `switch`, `sc2`, `ibex`, ...) | The virtual pad the host creates. Usually **auto-resolved from the client's physical controller**, set this only to force a type. `xbox360` (XInput) is the universal fallback. `dualsenseedge` gives the client's back paddles native buttons; `switchpro` gives Nintendo-family pads correct glyphs/layout + gyro. `steamcontroller2` (the 2026 Steam Controller) is passed through **as-is**, the host presents a real SC2 (`28DE:1302`) that Steam Input drives directly, mirroring the physical pad's raw reports. DualSense (Edge)/DualShock 4 use UHID; Switch Pro and the classic Steam Controller need UHID too. Unsupported choices fold to Xbox 360. |
 | `SLIPSTREAM_STEAM_GADGET` | `1` · `0` | Force the raw USB-gadget virtual Steam Deck on/off. **On by default on SteamOS**, off elsewhere. Lets Steam promote the virtual Deck to full Steam Input. |
 
 ## Audio / microphone
@@ -179,11 +171,7 @@ See your desktop page ([KDE](/docs/kde), [GNOME](/docs/gnome)) for when to set t
 | Setting | Values | Meaning |
 |---|---|---|
 | `SLIPSTREAM_AUDIO_GAIN` | float (default `1.0`) | **(Moonlight/GameStream sessions only)** Linear gain applied to captured desktop audio, bump it for a quiet source. The native `slipstream/1` path ignores it; adjust the source's own volume there instead. |
-| `SLIPSTREAM_MIC_DEVICE` | name substring | **(Windows)** Target mic-uplink device by friendly-name substring (first match wins). |
-| `SLIPSTREAM_MIC_LEGACY_BUFFER` | `1` | Restore the fixed pre-adaptive mic buffering (a ~48 ms prime and ~120 ms cap on Windows; a buffer scaled to the recording app's audio quantum on Linux) instead of the adaptive per-client jitter target. One-release escape hatch: if the microphone coming out of the host only sounds right *with* this set, that's a bug, please report it. |
-| `SLIPSTREAM_NO_MIC_INSTALL` | set | **(Windows)** Skip installing the virtual-mic driver (e.g. when the host runs as SYSTEM). |
-| `SLIPSTREAM_HOST_AUDIO` | set | **(Windows)** Also play the stream's audio on the host's own speakers. While a session is capturing desktop audio the host parks the default playback device on a silent sink, so sound comes out of the *client* only, that's why the PC goes quiet when a stream starts. Set this to prefer a real output device instead (audible on both ends). The default is put back when the capture closes. |
-| `SLIPSTREAM_KEEP_DEFAULT` | set | **(Windows)** Never touch the default playback/recording devices at all, the host leaves whatever you chose in Sound settings in place. The mic uplink still picks a target device; you may then have to select it yourself. |
+| `SLIPSTREAM_MIC_LEGACY_BUFFER` | `1` | Restore the fixed pre-adaptive mic buffering (a buffer scaled to the recording app's audio quantum) instead of the adaptive per-client jitter target. One-release escape hatch: if the microphone coming out of the host only sounds right *with* this set, that's a bug, please report it. |
 
 ## Clipboard
 
@@ -195,21 +183,6 @@ This line is only half the switch, your client has a per-host toggle that also h
 the host needs a clipboard backend underneath. Both, and what a greyed-out toggle means, are on
 [Shared clipboard](/docs/clipboard).
 
-## Windows host
-
-Capture of the **secure desktop**, UAC prompts, the lock screen, the login screen, is always on
-and has no setting: the host reads the ss-vdisplay driver's ring directly, and those surfaces are in
-it. If an older `host.env` on your machine still carries a `SLIPSTREAM_SECURE_DDA` line, nothing reads
-it, leave it or delete it, it makes no difference.
-
-| Setting | Values | Meaning |
-|---|---|---|
-| `SLIPSTREAM_VDISPLAY` | `pf` | Virtual-display backend. The bundled ss-vdisplay IddCx driver is the only backend now, informational; leave as `pf`. |
-| `SLIPSTREAM_MONITOR_LINGER_MS` | ms (default `10000`) | Defer tearing a per-client virtual display down after disconnect. A reconnect inside the window preempts it and creates a fresh one (a reused IddCx swap-chain is dead); the stable per-client monitor id keeps Windows' saved display config applying either way. Superseded by the console's **Keep alive** setting, see [Virtual displays](/docs/virtual-displays). |
-| `SLIPSTREAM_EXCLUSIVE_REASSERT_MS` | ms (default `2000`), `0` = off | How often the host re-checks that **exclusive** display topology actually held. Windows (or a GPU driver / display-poller tool) can quietly re-activate a physical panel moments after the host disabled it, seen on hybrid Intel+NVIDIA laptops, putting windows, the cursor, and the lock screen on a screen that isn't streamed. The host re-asserts and logs when that happens; `0` restores the old fire-and-forget behavior. |
-| `SLIPSTREAM_RENDER_ADAPTER` | description substring | Multi-GPU boxes only: force the NVENC/capture GPU by adapter Description substring (e.g. `4090`). Leave unset on single-GPU machines. Superseded by a manual GPU preference in the console, see the *Picking a GPU* note under [Core](/docs/configuration#core); it still decides while the console is on Automatic. |
-| `SLIPSTREAM_NO_ISOLATE` | set | Legacy topology knob: leave the virtual display **extended** alongside your physical monitors instead of making it the sole desktop. Superseded by the console's **Topology** setting, see [Virtual displays](/docs/virtual-displays). |
-| `SLIPSTREAM_HOST_CMD` | `serve` · `serve --gamestream` | The host subcommand the service launches. A fresh install from the setup .exe writes **`serve`**, the secure, native-only host. `serve --gamestream` adds the Moonlight-compat planes; turn that on with `slipstream-host service install --gamestream=on` (and `=off` to go back) rather than editing this by hand. If the line is missing entirely the service falls back to `serve --gamestream`. |
 
 ## Network & discovery
 
@@ -246,11 +219,9 @@ notes for context.
 
 | Setting | Values | Meaning |
 |---|---|---|
-| `SLIPSTREAM_GSO` | `1` · `0` | UDP segmentation offload on the send path (coalesce a frame's packets into kernel super-buffers), cuts send CPU ~30%, but its line-rate packet trains can cost delivered throughput on constrained links (measured on a 2.5GbE hop). The default differs by platform. **Windows: on by default** (Send Offload, the lever that gets past ~1 Gbps, since Windows otherwise does one send call per packet); set `0` if a constrained link shows lost throughput. It also latches itself off for the rest of the run the first time the OS/NIC/path rejects an offloaded send. **Linux: off by default** until send pacing spaces the super-buffers; set `1` to opt in (auto-falls back to `sendmmsg` on kernels/paths without support). |
+| `SLIPSTREAM_GSO` | `1` · `0` | UDP segmentation offload on the send path (coalesce a frame's packets into kernel super-buffers), cuts send CPU ~30%, but its line-rate packet trains can cost delivered throughput on constrained links (measured on a 2.5GbE hop). **Off by default** until send pacing spaces the super-buffers; set `1` to opt in (auto-falls back to `sendmmsg` on kernels/paths without support). It also latches itself off for the rest of the run the first time the OS/NIC/path rejects an offloaded send. |
 | `SLIPSTREAM_SPLIT_ENCODE` | `0`/`disable` · `1`/`auto` · `2` · `3` | NVENC N-way split-encode for very high pixel rates (5K@240). `auto` picks automatically above ~1 Gpix/s. H.264 never splits (not applicable per the SDK); on HEVC a *forced* split disables sub-frame readback (mutually unsupported), set `0` to choose sub-frame instead. |
 | `SLIPSTREAM_NVENC_SUBFRAME` | `0` · `1` | NVENC sub-frame (slice-level) readback for lower latency on sync sessions. Default: on where the GPU supports it (Linux direct NVENC). `0` = never; `1` = force. On HEVC it yields to a forced split-encode (the SDK documents the pair unsupported). |
-| `SLIPSTREAM_GPU_PRIORITY_CLASS` | `off` · `normal` · `high` · `realtime` · `auto` | **(Windows)** GPU scheduling priority for capture/encode under a GPU-saturating game. Default `auto` (starts `high`, upgrades to `realtime` when it's safe, e.g. HAGS off); `high` pins the static pre-gate behaviour; `realtime` is the strongest lever but can freeze NVENC on some setups. |
-| `SLIPSTREAM_IDD_DEPTH` | `N` (default `2`) | **(Windows)** IDD-push pipeline depth. `1` cuts latency once GPU priority is raised; higher smooths a contended GPU. |
 
 ## Linux performance profile
 
@@ -268,7 +239,7 @@ notes for context.
 | Setting | Values | Meaning |
 |---|---|---|
 | `SLIPSTREAM_PERF` | `1` | Log per-stage timing (capture, encode, send), handy when tuning latency. |
-| `RUST_LOG` | `info` · `debug` · `trace` | Log verbosity. On Windows, logs land in `%ProgramData%\slipstream\logs\` (size-capped: a file over 10 MB is rotated to `.old` at the next service/host start, one generation kept). |
+| `RUST_LOG` | `info` · `debug` · `trace` | Log verbosity (journal on a systemd user service). |
 | `SLIPSTREAM_FFMPEG_DEBUG` | set | Verbose libavcodec/FFmpeg logging from the encoder. |
 | `SLIPSTREAM_VIDEO_DROP` | `N` (percent) | Deliberately drop N% of video packets to exercise FEC recovery. **Testing only.** |
 
@@ -278,18 +249,18 @@ A few knobs are read by the native **clients**, not the host:
 
 | Setting | Values | Meaning |
 |---|---|---|
-| `SLIPSTREAM_DECODER` | `software` · `vaapi` · `vulkan` (Linux) · `d3d11va` (Windows) | Force the decode path. Default auto-selects hardware per GPU vendor and falls back on its own: **Linux**, Vulkan Video first on NVIDIA and AMD, VAAPI first on Intel and anything else; **Windows**, Vulkan Video first on NVIDIA and AMD, D3D11VA first on Intel and anything else. Whichever isn't first is the next thing tried, with software last. |
+| `SLIPSTREAM_DECODER` | `software` · `vaapi` · `vulkan` | Force the decode path where the client reads it. Default auto-selects hardware per GPU vendor and falls back on its own (Vulkan Video first on NVIDIA and AMD, VAAPI first on Intel and anything else; software last). |
 | `SLIPSTREAM_PREFER_PYROWAVE` | `1` | Ask for the [PyroWave](/docs/pyrowave) wavelet codec on a wired link, where the client's own setting isn't reachable (the gamepad console, a headless launch). |
 | `SLIPSTREAM_OSD_SCALE` | multiplier, e.g. `1.5` *(default `1`)* | Size of the in-stream overlay, the stats OSD, the capture hint and the start banner. They already follow your display's scaling setting (200 % display -> twice the pixels), so set this only to nudge that: bigger for a TV across the room, smaller if your compositor reports an aggressive scale. Clamped to 0.5x-4x, and a line that would run off the screen is shrunk to fit. |
-| `SLIPSTREAM_NO_AEC` | `1` | Turn the microphone's echo cancellation off for this run, whatever **Echo cancellation** says in [client settings](/docs/client-settings#audio). One-way: it can only switch the processing off, never back on, and the setting is the normal way to control it. Linux and Windows clients. |
+| `SLIPSTREAM_NO_AEC` | `1` | Turn the microphone's echo cancellation off for this run, whatever **Echo cancellation** says in [client settings](/docs/client-settings#audio). One-way: it can only switch the processing off, never back on, and the setting is the normal way to control it. |
 
 ## Bitrate
 
 The client requests a bitrate; the host encodes to it. There's no host-side bitrate knob. To find a
 good value:
 
-- **Native clients (Apple, Linux, Windows, Android):** use the built-in **speed test** (from a
-  host's menu). It measures your link, suggests a bitrate, and applies it.
+- **Native clients (iPhone, Android, Steam Deck):** use the built-in **speed test** where the
+  client offers it (from a host's menu). It measures your link, suggests a bitrate, and applies it.
 - **Moonlight:** set the bitrate in Moonlight's settings. Start moderate and raise it.
 
 ## Multiple devices at once
@@ -314,7 +285,7 @@ that owns their feature:
 - **Virtual-display policy**, keep-alive, topology, per-client scaling, lives in the web console
   and `display-settings.json`: [Virtual displays](/docs/virtual-displays).
 - **Which GPU to use** on a multi-GPU box is a console choice (`gpu-settings.json`) that outranks
-  `SLIPSTREAM_RENDER_NODE` / `SLIPSTREAM_RENDER_ADAPTER`, see *Picking a GPU* above.
+  `SLIPSTREAM_RENDER_NODE`, see *Picking a GPU* above.
 - **Event hooks and webhooks** are `hooks.json`, not environment variables:
   [Events & hooks](/docs/automation).
 - **Updating**, including the one-click opt-in on Linux: [Updating the Host](/docs/updating).

@@ -5,21 +5,19 @@ description: Remove the Slipstream host or client for every install method, and 
 
 Every install method has a clean removal path. This page walks through each one, and, just as
 important, says what stays on the machine afterwards: the Linux packages run no removal scripts of
-their own, and the Windows uninstaller leaves a few things in place on purpose.
+their own.
 
-> **Your configuration always survives.** Removing Slipstream never deletes its config directory, 
-> `~/.config/slipstream` on Linux, `%ProgramData%\slipstream` for the Windows host. It holds the
-> host's identity certificate and key, its management token, your paired devices, the web-console
-> login password, `host.env`, the game library, the logs, and any installed
-> [plugins](/docs/plugins) and their state. Keeping it is what lets a reinstall pick up where you
-> left off, each section below gives the one command that clears it, for when you want a clean
-> slate instead.
+> **Your configuration always survives.** Removing Slipstream never deletes its config directory,
+> `~/.config/slipstream`. It holds the host's identity certificate and key, its management token,
+> your paired devices, the web-console login password, `host.env`, the game library, the logs, and
+> any installed [plugins](/docs/plugins) and their state. Keeping it is what lets a reinstall pick up
+> where you left off, each section below gives the one command that clears it, for when you want a
+> clean slate instead.
 
 Jump to what you installed:
 
 - Linux host, [apt](#ubuntu-apt) · [dnf](#fedora-dnf) · [rpm-ostree layer](#fedora-atomic--bazzite-rpm-ostree-layer) · [Bazzite sysext](#bazzite--fedora-atomic-systemd-sysext) · [pacman](#arch--cachyos-pacman) · [SteamOS on-device build](#steamos--steam-deck-host-on-device-build) · [NixOS](#nixos)
-- [Windows host](#windows-host) (installer or winget)
-- [Clients](#clients), Flatpak, Linux packages, Windows, macOS, iOS/tvOS, Android, Steam Deck, LG webOS
+- [Clients](#clients), iPhone, Android, Steam Deck
 - [Plugins and the script runner](#plugins-and-the-script-runner)
 
 ## Linux hosts
@@ -46,7 +44,7 @@ sudo loginctl disable-linger "$USER"
 ### Ubuntu (apt)
 
 ```sh
-sudo apt purge slipstream-host slipstream-web slipstream-client slipstream-scripting
+sudo apt purge slipstream-host slipstream-web slipstream-scripting
 sudo apt autoremove
 ```
 
@@ -76,7 +74,7 @@ allowed those too).
 The host package is called **`slipstream`** on RPM, not `slipstream-host`:
 
 ```sh
-sudo dnf remove slipstream slipstream-web slipstream-client slipstream-scripting
+sudo dnf remove slipstream slipstream-web slipstream-scripting
 sudo rm -f /etc/yum.repos.d/slipstream.repo
 ```
 
@@ -152,7 +150,7 @@ sudo firewall-cmd --reload
 
 ```sh
 sudo pacman -Rns slipstream-host slipstream-web slipstream-gamescope \
-  slipstream-client slipstream-scripting
+  slipstream-scripting
 ```
 
 Name only what you installed. `-Rns` also takes the dependencies nothing else needs and removes the
@@ -195,112 +193,12 @@ The unit, udev rules, sysctl tuning, firewall ports and `input` group membership
 the generation. The store paths stay until you garbage-collect, and `~/.config/slipstream`, which
 the module never managed, stays regardless.
 
-## Windows host
-
-Uninstall from Add/Remove Programs (**Settings -> Apps -> Installed apps**) -> **Slipstream Host**, or,
-if you installed with winget:
-
-```powershell
-winget uninstall vindeckyy.SlipstreamHost
-```
-
-Both run the same uninstaller, which takes the `SlipstreamHost` service, the scheduled tasks, the
-virtual-display and gamepad drivers and every firewall rule it added back off the machine, the
-full inventory is on [Windows Host -> Uninstalling](/docs/windows-host#uninstalling).
-
-Three things are left on purpose:
-
-- **`%ProgramData%\slipstream`**, `host.env`, the host certificate and key, the management token,
-  the console password, your paired devices and the logs. For a clean slate:
-
-  ```powershell
-  Remove-Item -Recurse -Force "$env:ProgramData\slipstream"
-  ```
-
-- **VB-CABLE**, unless you cleared its checkbox during setup, it is ticked by default. It is a
-  third-party VB-Audio component other apps may be using, so the Slipstream uninstaller never touches
-  it. Remove it with its own uninstaller, 
-  `VBCABLE_Setup_x64.exe -u -h`, or the **VB-Audio Virtual Cable** entry in Installed apps.
-- **The publisher certificate**, if you imported it by hand to silence the Unknown Publisher prompt.
-  Remove it in `certlm.msc` under **Trusted Publishers** and **Trusted Root Certification
-  Authorities**. (This is *not* the driver certificate above, which the uninstaller does remove.)
-
-If you registered the winget source, drop it too, in an **admin** PowerShell, the same as
-registering it:
-
-```powershell
-winget source remove -n slipstream
-```
-
-**If a Slipstream display or gamepad survives in Device Manager**, an older build could leave one
-behind, run the host's own cleanup from an elevated prompt, which is exactly what the uninstaller
-calls. Do this **while the host is still installed**:
-
-```powershell
-slipstream-host driver uninstall
-slipstream-host driver uninstall --gamepad
-```
-
-If you have already uninstalled, `slipstream-host.exe` went with it. Install the current version
-again and uninstall it, its uninstaller runs both commands for you.
-
-See [Windows Host -> Install](/docs/windows-host#install) for the installer's side of the same story.
-
 ## Clients
 
 Removing a client does **not** tell the host to forget it. Unpair the device from the host's
 [web console](/docs/web-console) (Pairing -> unpair) if you want its pairing gone as well.
 
-### Linux, Flatpak
-
-```sh
-flatpak uninstall --user --delete-data io.slipstream
-```
-
-`--delete-data` clears the Flatpak's own per-app directory. It does **not** clear
-`~/.config/slipstream`, the client keeps its identity, known hosts and settings in your real config
-directory (that is what lets the Flatpak, a native package and the Decky plugin share one paired
-identity). Remove it with `rm -rf ~/.config/slipstream`.
-
-The remote it was installed from also stays. Its name depends on how you installed: if you added the
-repo by hand it is **`unom`**, and if you installed straight from the `.flatpakref`, the route
-[Install a Client](/docs/install-client#linux-desktop-flatpak) gives, Flatpak named its own origin
-remote for it. List them and delete the one that served Slipstream, if no other app uses it:
-
-```sh
-flatpak remotes --user
-flatpak remote-delete --user <name>
-```
-
-### Linux, apt / dnf / pacman packages
-
-```sh
-sudo apt purge slipstream-client       # Ubuntu
-sudo dnf remove slipstream-client      # Fedora
-sudo pacman -Rns slipstream-client     # Arch / CachyOS
-```
-
-Then remove the repository as described under the host sections above, if this box had no host on
-it. To clear the client's own state without uninstalling, saved hosts and stream settings, keeping
-the paired identity, run `slipstream-client --reset` instead.
-
-### Windows client (MSIX)
-
-```powershell
-Get-AppxPackage vindeckyy.Slipstream | Remove-AppxPackage
-```
-
-The client's saved hosts, settings and pairing identity live under `%APPDATA%\slipstream` and are not
-removed with the package, delete that folder for a clean slate. The publisher certificate you
-imported to install the MSIX stays in **Trusted People**; remove it in `certlm.msc` if you're done
-with Slipstream on that machine.
-
-### macOS
-
-Quit Slipstream and drag it from **Applications** to the Trash. If you installed it through
-TestFlight instead, remove it from TestFlight.
-
-### iPhone, iPad, Apple TV
+### iPhone
 
 Delete the app the usual way. To leave the beta entirely, open **TestFlight**, select Slipstream, and
 stop testing, that removes the app and its data with it.
@@ -317,13 +215,7 @@ Uninstall **Slipstream** from Decky's own plugin list (Quick Access Menu -> the 
 -> the **gear** (Settings), where the installed plugins are listed). Decky's uninstall hook does
 nothing beyond that, the two Steam shortcuts it created, the Steam Input template, the client it
 launched and `~/.config/slipstream` all survive. The step-by-step is on
-[Steam Deck -> Uninstalling](/docs/steam-deck#uninstalling); the client itself comes off as in
-[Linux, Flatpak](#linux--flatpak) above.
-
-### LG webOS TV
-
-Remove the app from the TV's launcher like any other Homebrew Channel app. [`ss-webos`](https://github.com/dyptan-io/ss-webos)
-is a community project, its repository is the place for anything beyond that.
+[Steam Deck -> Uninstalling](/docs/steam-deck#uninstalling).
 
 ## Plugins and the script runner
 
@@ -336,12 +228,9 @@ slipstream-host plugins remove <name>    # uninstall one
 slipstream-host plugins disable          # stop and disable the runner
 ```
 
-On Windows run these from an elevated PowerShell; if `slipstream-host` isn't on your `PATH` yet, use
-the full path: `& "$env:ProgramFiles\slipstream\slipstream-host.exe" plugins list`.
-
 `plugins remove` takes the plugin's code out of `plugins/`, but nothing else. These stay in the
-config directory, `~/.config/slipstream` (Linux) or `%ProgramData%\slipstream` (Windows), whether
-you removed the plugins first or uninstalled the host with them still installed:
+config directory, `~/.config/slipstream`, whether you removed the plugins first or uninstalled the
+host with them still installed:
 
 - `plugins/`, the plugin code itself, for any plugin you did **not** `plugins remove`.
 - `plugin-state/<plugin>/`, each plugin's own config and cache, including any API keys you put in
@@ -349,8 +238,7 @@ you removed the plugins first or uninstalled the host with them still installed:
 - `plugin-token`, the runner's scoped credential for the management API.
 
 Deleting the whole config directory removes all three. The runner package itself
-(`slipstream-scripting` on Linux) comes off with your package manager, as in the sections above; on
-Windows it is part of the host installer and goes with it.
+(`slipstream-scripting`) comes off with your package manager, as in the sections above.
 
 ## Removing the pairing, not the software
 
@@ -359,11 +247,9 @@ separate:
 
 - **On the host**, unpair the device from the [web console](/docs/web-console); it stops being
   trusted immediately.
-- **On a Linux client**, `slipstream-client --forget-host <fingerprint|host[:port]>` drops a saved
-  host from that client's list, and `slipstream-client --reset` clears all of them plus the stream
-  settings (the client keeps its identity, so a re-pair doesn't look like a brand-new device).
-- **On a Linux or Windows client**, the headless `slipstream` command that ships with the same
-  package does the same two jobs: `slipstream hosts forget <host-ref>` for one host,
-  `slipstream reset` for all of them plus the stream settings.
+- **On the client**, forget the saved host from that client's host list (or reset its saved hosts
+  and stream settings). The client keeps its identity, so a re-pair doesn't look like a brand-new
+  device. Where a headless `slipstream` CLI is available, `slipstream hosts forget <host-ref>` drops
+  one host and `slipstream reset` clears all of them plus the stream settings.
 
 See [Pairing](/docs/pairing) for the full model.

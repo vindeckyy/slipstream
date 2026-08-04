@@ -7,13 +7,11 @@ Every Slipstream client has an in-stream stats overlay. All clients use **the sa
 vocabulary and the same four measurement points**, so a stage name on your phone means
 what the same name means on your desktop.
 
-Two platforms differ in the *math*: on **iOS and tvOS** the headline is **floor-shaved**.
-The fixed depth of Apple's present pipeline, roughly two refresh intervals, which no
-client can pace under, is excluded from it, and the Detailed tier prints the excluded
-term on its own line as `os present +X.X excluded (display pipeline minimum)`. Add that
-floor back before holding an iPhone, iPad or Apple TV's `capture→on-glass` next to a
-macOS, Linux, Windows or Android one. (The macOS client shaves nothing: it presents
-straight to the display, with no such pipeline depth to measure, so its numbers are raw.)
+On **iPhone** the headline is **floor-shaved**. The fixed depth of Apple's present pipeline,
+roughly two refresh intervals, which no client can pace under, is excluded from it, and the
+Detailed tier prints the excluded term on its own line as
+`os present +X.X excluded (display pipeline minimum)`. Add that floor back before holding an
+iPhone's `capture→on-glass` next to an Android or Steam Deck reading.
 
 ## The four measurement points
 
@@ -35,9 +33,8 @@ in-stream:
 
 | Platform | Cycle with |
 |---|---|
-| Linux · Windows · Steam Deck | **Ctrl+Alt+Shift+S** |
-| macOS / iPad (pointer or trackpad) | **⌃⌥⇧S** or a **three-finger tap** |
-| Android · iPhone | a **three-finger tap** |
+| Steam Deck | **Ctrl+Alt+Shift+S** |
+| Android · iPhone | a **three-finger tap** (or **⌃⌥⇧S** on iPhone with a keyboard) |
 
 **Ctrl+Alt+Shift+S** is one of a small set of shortcuts a stream reserves; the others, release
 captured input, switch mouse mode, disconnect, mute the microphone, are in
@@ -45,9 +42,9 @@ captured input, switch mouse mode, disconnect, mute the microphone, are in
 
 **Compact** is a one-line pill (fps · end-to-end ms · Mb/s, plus a loss flag when frames are being
 lost). **Normal** adds the stream line and the p50/p95 headline. **Detailed** adds the per-stage
-breakdown everywhere; on Linux/Windows it also adds the encoder's target bitrate, the decode path,
+breakdown everywhere; on Steam Deck it also adds the encoder's target bitrate, the decode path,
 an HDR tag and a chroma tag, on Android the decoder plus the full codec/bit-depth/colour line, and
-on iOS/tvOS the excluded OS present floor.
+on iPhone the excluded OS present floor.
 You can also set the level a stream starts at in each client's
 [Settings](/docs/client-settings#overlay). The examples below are the **Detailed** view.
 
@@ -58,7 +55,7 @@ Client-side](/docs/configuration#client-side-native-clients).
 ## Reading the overlay
 
 Every client reports the same measurements, but each family lays them out a little
-differently. Linux · Windows · Steam Deck:
+differently. Steam Deck:
 
 ```
 1920x1080@120 · 120 fps · 24.3 Mb/s · target 30 Mb/s (auto) · vulkan · HDR
@@ -78,9 +75,8 @@ end-to-end 14.2 ms p50 · 19.8 p95 · capture→displayed
 lost 3 (2.4%) · skipped 1 · FEC 12
 ```
 
-iOS · tvOS (headline and `display` both floor-shaved, so they still add up, the raw
-end-to-end here is 30.7 ms, the 16.7 ms floor of a 120 Hz screen included). macOS lays the
-same lines out, but with raw numbers and no `os present` line:
+iPhone (headline and `display` both floor-shaved, so they still add up, the raw
+end-to-end here is 30.7 ms, the 16.7 ms floor of a 120 Hz screen included):
 
 ```
 1920x1080@120  120 fps  24.3 Mb/s
@@ -91,7 +87,7 @@ lost 3 (2.4%)
 ```
 
 - **Line 1, the stream.** Resolution@refresh, frames received per second, and the
-  received video bitrate (goodput, FEC overhead not counted). Linux/Windows follow the
+  received video bitrate (goodput, FEC overhead not counted). Steam Deck follows the
   measured rate with `target N Mb/s`, what the host's encoder is currently *allowed* to
   produce, so a quiet desktop under a large grant (measured far below target) reads
   differently from an encoder pinned at its cap (measured hugging the target). `(auto)`
@@ -101,16 +97,15 @@ lost 3 (2.4%)
   stream is tone-mapped onto an SDR screen), and, when you asked for
   [full chroma](/docs/client-settings), the resolved chroma: `4:4:4` when the host
   granted it, `4:4:4→4:2:0` when it couldn't. Android puts its decoder and the negotiated
-  codec, bit depth, colour and chroma on rows of their own underneath; the Apple clients
-  don't report a codec at all.
+  codec, bit depth, colour and chroma on rows of their own underneath; iPhone doesn't report a
+  codec at all.
   If the session resolved to a [settings profile](/docs/profiles-and-links), its name closes this
   line. On **Android** a `⚠ panel NN Hz` warning joins it whenever the device's panel is refreshing
   *below* the stream's rate, the tell for a phone or TV governor that ignored the requested mode,
   which otherwise reads as inexplicable judder plus a refresh of extra latency.
-- **Line 2, the headline.** `end-to-end` (`e2e` on Linux/Windows) is the *directly
-  measured* time from host capture to the endpoint named at the end of the line, 
-  `capture→on-glass` or `capture→displayed`. Linux/Windows don't spell the endpoint out,
-  because their presenter always measures to the present instant. `p50` = the typical
+- **Line 2, the headline.** `end-to-end` (`e2e` on Steam Deck) is the *directly measured* time from host capture to the
+  endpoint named at the end of the line, `capture→on-glass` or `capture→displayed`. Steam Deck
+  doesn't spell the endpoint out, because its presenter always measures to the present instant. `p50` = the typical
   frame (median), `p95` = the slow outliers. This is the one number that summarizes your
   stream.
 - **Line 3, where the time goes.** The first four stages **tile the end-to-end interval**, 
@@ -119,15 +114,15 @@ lost 3 (2.4%)
   stage that's already counted.
   - `host`, capture → sent: the host's own share (capture read, encode, error
     coding, the paced send), reported by the host itself once per frame.
-  - `network` (`net` on Linux/Windows), sent → received: the network flight plus
+  - `network` (`net` on Steam Deck), sent → received: the network flight plus
     reassembly on your device.
   - `decode`, received -> decoded, on your device.
   - `display`, decoded -> displayed: waiting for the right screen refresh, rendering,
     and vsync.
-  - `os present` *(iOS and tvOS)*, the fixed depth of the OS present pipeline, which is
+  - `os present` *(iPhone)*, the fixed depth of the OS present pipeline, which is
     excluded from both the headline and `display` and printed here so you can add it
     back.
-  - `client queue` *(Apple only)*, how long a received frame waited before the decoder
+  - `client queue` *(iPhone)*, how long a received frame waited before the decoder
     pulled it. It's the front part of `decode`, not time on top of it. Hidden below 2 ms;
     a value that persists is a standing receive backlog on the client.
   - `display X (pace A + latch B)` and `presents N` *(Android only)*, when the timeline presenter
@@ -138,8 +133,8 @@ lost 3 (2.4%)
     the client.
 
   Against an **older host** that doesn't report its share yet, the first two terms
-  merge into a single `host+network` number (`host+net` on Linux/Windows), same total,
-  one split fewer. On Linux/Windows, Detailed adds one further line, `host: queue ... ·
+  merge into a single `host+network` number (`host+net` on Steam Deck), same total,
+  one split fewer. On Steam Deck, Detailed adds one further line, `host: queue ... ·
   encode ... · xfer ... · pace ...`, splitting the host's own share into its stages, when the
   host reports them.
 
@@ -186,15 +181,14 @@ pretending:
 
 | client | headline | why |
 |---|---|---|
-| Windows, Linux | `capture→on-glass` | present instant available (measured right after the Vulkan swapchain present); published raw |
-| macOS (Metal presenter) | `capture→on-glass` | present instant available (the system's on-glass time for the flip); published raw |
-| iOS/tvOS (Metal presenter) | `capture→on-glass` | present instant available, but the OS present floor is **excluded** from the number and printed separately as `os present +X.X excluded` |
+| Steam Deck | `capture→on-glass` | present instant available (measured right after the Vulkan swapchain present); published raw |
+| iPhone (Metal presenter) | `capture→on-glass` | present instant available, but the OS present floor is **excluded** from the number and printed separately as `os present +X.X excluded` |
 | Android | `capture→displayed` | MediaCodec's per-frame render callback reports SurfaceFlinger's render timestamp; on the rare window where no callback is delivered (the platform may drop them under load) the HUD falls back to `capture->decoded` |
-| macOS/iOS fallback presenter | `capture->received` | the system video layer hides decode and present timing entirely |
+| iPhone fallback presenter | `capture->received` | the system video layer hides decode and present timing entirely |
 
 A shorter chain means the number is **smaller because it measures less**, check the
 endpoint before comparing two devices, and add the excluded `os present` floor back to an
-iOS or tvOS client's headline before holding it next to another platform's.
+iPhone client's headline before holding it next to another platform's.
 
 ## Comparing with Moonlight / Sunshine
 
@@ -244,7 +238,7 @@ Other differences worth knowing when squinting at both overlays side by side:
 - **Averages vs percentiles.** Moonlight's time values are means; Slipstream shows
   medians (p50) with a p95 for the headline. Under jitter, a mean sits above the
   median, Moonlight's numbers read slightly "worse" than an equivalent p50.
-- **Windows.** Both refresh about once per second; Moonlight over a ~1-2 s sliding
+- **Refresh window.** Both overlays refresh about once per second; Moonlight over a ~1-2 s sliding
   window, Slipstream over the last full second.
 - **Host frame rate.** Moonlight's headline FPS estimates what the *host* produced
   (received + lost). Slipstream shows what your client actually received, and reports
@@ -269,5 +263,4 @@ published, overwritten, and drained source-frame counts, so a rising age or over
 to the compositor handoff rather than the encoder.
 
 **Download** saves it as a `.json` file you can attach to a report; **Delete** removes it. On disk
-they live on the host in `~/.config/slipstream/captures/` (`%ProgramData%\slipstream\captures\` on
-Windows) until you delete them.
+they live on the host in `~/.config/slipstream/captures/` until you delete them.

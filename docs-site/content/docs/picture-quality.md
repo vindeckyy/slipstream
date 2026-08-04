@@ -44,7 +44,7 @@ speed...** entry on a host card to measure the link and suggest a value -
 **Automatic** is a soft preference: the host emits your choice when it can also produce it,
 otherwise the best codec you both speak, in the order **HEVC → AV1 → H.264**.
 **[PyroWave](/docs/pyrowave) is never auto-picked** - you must choose it explicitly on a client that
-offers it. Android and Apple hide AV1 unless the device has a hardware AV1 decoder; Android never
+offers it. Android and iPhone hide AV1 unless the device has a hardware AV1 decoder; Android never
 offers PyroWave.
 
 Practical rule of thumb:
@@ -114,10 +114,9 @@ Honest gates today (do not skip these when diagnosing):
 - **Only NVENC and PyroWave** produce it on the host. AMD (VCN / AMF) and Intel (QSV / VAAPI /
   Vulkan Video) decline HEVC 4:4:4 - that is a hardware or backend limit, not a missing toggle.
   See the [encoder matrix](/docs/support-matrix#encoders).
-- **Today only the Apple app actually advertises 4:4:4**, and only when its hardware decode probe
-  passes. The Linux and Windows apps store the toggle but their session does not advertise the
-  capability yet, so **it has no effect there**. Android, Decky, and the console home do not offer
-  it. Moonlight / GameStream sessions are always 4:2:0.
+- **Today only the iPhone app actually advertises 4:4:4**, and only when its hardware decode probe
+  passes. Android, Decky, and the console home do not offer it. Moonlight / GameStream sessions are
+  always 4:2:0.
 - On Detailed stats, asking for full chroma prints `4:4:4` when granted or `4:4:4→4:2:0` when the
   host could not - [Stats](/docs/stats).
 
@@ -130,16 +129,12 @@ encoder can do 10-bit. Full chain: [HDR](/docs/hdr).
 HDR is not free picture quality for desk work:
 
 - Office UIs and most SDR panels want **HDR off**. A PQ stream tone-mapped onto an SDR laptop, or
-  software-decoded HDR without a proper swapchain, looks washed or clipped. The Linux/Windows
-  overlay says `HDR` versus `HDR→SDR`.
-- **HDR and 4:4:4 fight each other** on HEVC/AV1 in ways that differ by host:
-  - **Windows:** for HEVC and AV1 there is no 10-bit full-chroma capture source, so an HDR session
-    **drops to 4:2:0**. If you want full chroma with those codecs, turn HDR off for that profile.
-    **PyroWave on Windows** is the exception: it can carry HDR and 4:4:4 together.
-  - **Linux:** a host encodes 4:4:4 at **8 bits**, so a session that negotiates both resolves back
-    down to **SDR** before the stream starts. On Linux **4:4:4 wins**; on Windows **HDR does**.
-- H.264 never does HDR. PyroWave HDR needs a **Windows** host today; Linux-hosted PyroWave is SDR
-  - stay on HEVC or AV1 for HDR from Linux.
+  software-decoded HDR without a proper swapchain, looks washed or clipped. Where the client
+  overlays it, look for `HDR` versus `HDR→SDR`.
+- **HDR and 4:4:4 fight each other** on HEVC/AV1: the host encodes 4:4:4 at **8 bits**, so a
+  session that negotiates both resolves back down to **SDR** before the stream starts (**4:4:4
+  wins**).
+- H.264 never does HDR. Linux-hosted PyroWave is SDR today - stay on HEVC or AV1 for HDR.
 
 Use two [profiles](/docs/profiles-and-links): Work with HDR off (and 4:4:4 when you can get it),
 Play with HDR as you like it for games and films.
@@ -156,15 +151,14 @@ Create a **Work** settings profile and bind it to the office host:
 |---|---|---|
 | **Video codec** | **HEVC** when the host supports it | Better quality at the same bitrate for UI than H.264 |
 | **Full chroma / 4:4:4** | **On** when the client advertises it, the host GPU can encode it, and the link can carry it | Sharper coloured text and thin lines |
-| **10-bit HDR** | **Off** | Avoids washed / clipped office UI on typical SDR laptop panels; frees HEVC/AV1 sessions to keep 4:4:4 on Windows |
+| **10-bit HDR** | **Off** | Avoids washed / clipped office UI on typical SDR laptop panels; frees HEVC/AV1 sessions to keep 4:4:4 |
 | **Bitrate** | Higher than couch defaults if the VPN or LAN can carry it; or Automatic with a speed-test check | Soft text is usually bitrate or chroma, not a "broken" host |
 | **Resolution / refresh** | Match the laptop panel (Native) | Host builds a virtual display at your client mode - no local upscale of a smaller stream |
 | **Render scale** | Native (1x) first; try >1x only if you have spare bitrate and decode headroom | Supersampling helps sharpness but spends bandwidth |
 
-On an Apple client talking to an **NVIDIA** host (NVENC) over a capable path, HEVC + 4:4:4 + HDR
-off is the sharpest shipping desk-work picture Slipstream offers today. On Linux or Windows
-*clients*, turn the 4:4:4 toggle on if you want it ready when advertising lands, but expect
-**4:2:0** until the session advertises the capability - raise bitrate and keep HEVC meanwhile.
+On an iPhone talking to an **NVIDIA** host (NVENC) over a capable path, HEVC + 4:4:4 + HDR off is
+the sharpest shipping desk-work picture Slipstream offers today. Other clients that do not advertise
+4:4:4 stay on **4:2:0** - raise bitrate and keep HEVC meanwhile.
 
 Over a **VPN**, raise bitrate until text stops looking muddy, then stop. If the VPN cannot carry
 more, drop refresh or resolution before chasing settings the product does not have. Over a **wired
@@ -209,19 +203,18 @@ corrupt host.
    expected; soft glyphs at 50 Mbps on a quiet LAN usually point elsewhere.
 3. **Chroma (4:2:0).** Coloured text and red/blue edges look fringed while grayscale looks
    acceptable - classic 4:2:0. Enable full chroma **when your client advertises it and the host
-   GPU can encode it**; otherwise raise bitrate and stay on HEVC. Remember Linux/Windows clients
-   do not advertise yet.
+   GPU can encode it**; otherwise raise bitrate and stay on HEVC. Remember only iPhone advertises
+   4:4:4 today.
 4. **HDR fighting the panel or chroma.** Office UI on an SDR laptop with HDR left on → turn HDR
-   off. Wanted 4:4:4 on Windows HEVC but left HDR on → session dropped to 4:2:0; turn HDR off for
-   that Work profile.
+   off. Wanted 4:4:4 but left HDR on → session may resolve to SDR; turn HDR off for that Work
+   profile.
 5. **Wrong resolution / upscale.** You asked for a smaller mode than the panel, or the host is
    pinned to a real monitor and the client scales. Prefer Native / Match window for desk work -
    [Virtual displays](/docs/virtual-displays).
 6. **Render scale below 1x.** Deliberately softer and cheaper; set Native if you did not mean to.
 7. **H.264 instead of HEVC.** Same bitrate, worse UI. Pin HEVC when the host can encode it.
-8. **Decoder / presentation path.** Software decode of an HDR stream on Linux/Windows can look
-   washed (no HDR10 swapchain path). Turn client HDR off there -
-   [HDR → Per client](/docs/hdr#per-client).
+8. **Decoder / presentation path.** Software decode of an HDR stream can look washed (no HDR10
+   swapchain path). Turn client HDR off there - [HDR → Per client](/docs/hdr#per-client).
 
 If text is sharp but the pointer fights you, that is **mouse mode**, not picture quality -
 [Input → Mouse modes](/docs/input#mouse-modes).
@@ -251,23 +244,24 @@ Ethernet tops out around 940 Mbps of payload, so big 4K / 4:4:4 / HDR / high-ref
 
 Turn-on summary:
 
-1. Host: Linux and Windows hosts advertise it in default builds (Linux: any GPU vendor via Vulkan
-   import; no special `host.env` line).
-2. Client: set **Video codec → PyroWave (wired LAN)** on Linux, Windows (x64), or Apple devices
-   whose decode probe passes. Or `SLIPSTREAM_PREFER_PYROWAVE=1` where the UI is hard to reach.
+1. Host: Linux hosts advertise it in default builds (any GPU vendor via Vulkan import; no special
+   `host.env` line).
+2. Client: set **Video codec → PyroWave (wired LAN)** on iPhone or Steam Deck where the decode probe
+   passes. Or `SLIPSTREAM_PREFER_PYROWAVE=1` where the UI is hard to reach. Android has no PyroWave
+   decoder.
 3. Leave bitrate on Automatic unless you need a lower explicit pin or a host
    `SLIPSTREAM_PYROWAVE_MAX_MBPS` cap.
 
-PyroWave carries 4:4:4 on Linux and Windows hosts. PyroWave **HDR** needs a **Windows** host
-today. For sharp desk work on a wired LAN to an NVIDIA box, PyroWave + 4:4:4 (HDR off) is the
-latency-and-chroma extreme; for HDR games from Linux, stay on HEVC or AV1.
+PyroWave carries 4:4:4 on Linux hosts. PyroWave **HDR** is not available on the Linux host today
+(session is SDR). For sharp desk work on a wired LAN to an NVIDIA box, PyroWave + 4:4:4 (HDR off) is
+the latency-and-chroma extreme; for HDR games, stay on HEVC or AV1.
 
 ## Honest limits
 
 Call these out so expectations stay accurate:
 
-- **4:4:4 advertising is Apple-only today.** Linux and Windows client toggles do not affect the
-  session yet. AMD and Intel hosts cannot encode HEVC 4:4:4; use NVIDIA NVENC or PyroWave.
+- **4:4:4 advertising is iPhone-only today.** AMD and Intel hosts cannot encode HEVC 4:4:4; use
+  NVIDIA NVENC or PyroWave.
 - **Moonlight stays 4:2:0.** Full chroma is native `slipstream/1` only (`SLIPSTREAM_444` has no
   effect on GameStream).
 - **Automatic bitrate starts at 20 Mbps** for the hardware codecs, then may climb. It is not a
@@ -290,7 +284,7 @@ Call these out so expectations stay accurate:
 - [Configuration → Video quality](/docs/configuration#video-quality) - `SLIPSTREAM_444`,
   `SLIPSTREAM_10BIT`, `SLIPSTREAM_PYROWAVE_MAX_MBPS`
 - [Configuration → Bitrate](/docs/configuration#bitrate) - speed test; no host bitrate knob
-- [HDR](/docs/hdr) - four-link chain, Windows vs Linux, codec rules, HDR vs 4:4:4
+- [HDR](/docs/hdr) - four-link chain, codec rules, HDR vs 4:4:4
 - [PyroWave](/docs/pyrowave) - wired codec, bitrate table, 4:4:4 and HDR
 - [Support matrix → Encoders](/docs/support-matrix#encoders) - which GPUs encode 10-bit / 4:4:4
 - [Desktop at work](/docs/desktop-at-work) - Work path (mouse, clipboard, VPN, presets)

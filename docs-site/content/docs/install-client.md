@@ -1,9 +1,9 @@
 ---
 title: Install a Client
-description: Install the Slipstream client for the device you're streaming to, Linux, Steam Deck, Windows, macOS, iOS, or Android.
+description: Install the Slipstream client for iPhone, Android, or Steam Deck, or use Moonlight.
 ---
 
-This page is the **install path for each client device**. For what each client *is* and which to
+This page is the **install path for each named client**. For what each client *is* and which to
 pick, see [Clients](/docs/clients); to install the **host**, see [Install the Host](/docs/install).
 Whichever client you install, the first connection needs a one-time [pairing](/docs/pairing). If the
 app installs but your host doesn't appear in its list, start at [Troubleshooting -> The host isn't
@@ -13,143 +13,22 @@ Already installed? Skip to [Keeping a client up to date](#keeping-a-client-up-to
 [Removing a client](#removing-a-client).
 
 > The links below are the **stable** channel (moves on `vX.Y.Z` releases). For the latest `main`
-> build, use the **canary** channel, TestFlight / Play Internal, the `...Canary.flatpakref`, or the
-> `canary/` download URLs. See [Release Channels](/docs/channels).
+> build, use the **canary** channel, TestFlight / Play Internal, or the `canary/` download URLs. See
+> [Release Channels](/docs/channels).
 
 ## Pick your device
 
 | Device | Install |
 |--------|---------|
-| **Linux** desktop / laptop | [Flatpak](#linux-desktop-flatpak) (any distro) or native apt/rpm/Arch packages |
+| **iPhone** | [TestFlight beta](#iphone) |
+| **Android / Android TV** | [Play test track, or sideload the APK](#android) |
 | **Steam Deck** | [Decky plugin](/docs/steam-deck) for Gaming Mode, or [Flatpak in Desktop Mode](#steam-deck) |
-| **Windows** | [Signed MSIX](#windows) from GitHub Releases (or a local build) |
-| **macOS** | [Notarized `.dmg`](#macos) from the releases page |
-| **iPhone / iPad / Apple TV** | [TestFlight beta](#ios-ipados-apple-tv) |
-| **Android / Android TV** | [Beta, a Play test track, or sideload the APK](#android) |
-| **LG webOS TV** | [Community client](#lg-webos-tv-community) (sideloaded `.ipk`) |
 | Anything else (browser, old phone, TV) | [Moonlight](/docs/moonlight) |
 
-## Linux desktop (Flatpak)
+## iPhone
 
-The **recommended** path on any Flatpak distro is a local Flatpak build (or a `.flatpak` from
-[GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached). There is no
-public Flatpak remote. Build with [`packaging/flatpak`](https://github.com/vindeckyy/slipstream/blob/main/packaging/flatpak/README.md):
-
-```sh
-bash packaging/flatpak/build-flatpak.sh
-flatpak install --user --bundle dist/slipstream-client-*.flatpak
-flatpak run io.slipstream
-```
-
-Updates, from then on, **without `sudo`** (this is a `--user` install; `sudo flatpak update` only
-touches the *system* scope and silently skips it):
-
-```sh
-flatpak update                       # or: flatpak update --user io.slipstream
-```
-
-Prefer your native package manager? The client also ships as real packages (add the repo once, 
-see the linked guide, then it tracks updates with your normal `apt upgrade` / `dnf upgrade` /
-`pacman -Syu`; a *layered* Atomic install needs one extra step, under
-[Keeping a client up to date](#keeping-a-client-up-to-date)):
-
-| Distro | Install | Guide |
-|--------|---------|-------|
-| **Ubuntu 26.04 or newer** | build/install a local `.deb` | [packaging/debian](https://github.com/vindeckyy/slipstream/blob/main/packaging/debian/README.md) |
-| **Fedora** | build/install a local RPM | [Fedora](/docs/fedora) · [packaging/rpm](https://github.com/vindeckyy/slipstream/blob/main/packaging/rpm/README.md) |
-| **Fedora Atomic / Bazzite** | The Flatpak above, no layering. Local RPM + `rpm-ostree install` only if you already layer packages | [Bazzite](/docs/bazzite) · [packaging/rpm](https://github.com/vindeckyy/slipstream/blob/main/packaging/rpm/README.md) |
-| **Arch** | `makepkg -si` from `packaging/arch` | [Arch Linux](/docs/arch) |
-
-> **The client `.deb` needs SDL3 and GTK4 ≥ 4.20**, which Ubuntu 24.04 LTS doesn't ship, so
-> `apt install slipstream-client` can't satisfy its dependencies there. On 24.04 (or any older
-> distro) use the **Flatpak above**, it carries its own libadwaita and SDL3. This limit is the
-> *client's* alone: the host `.deb` is built separately and installs on 24.04 LTS through 26.04.
-
-Then launch it, pick your host from the list, and stream. Every one of these packages, Flatpak
-included, also installs the headless **`slipstream`** command for scripts:
-
-```sh
-slipstream hosts list --probe    # saved hosts, each with a live reachability check
-slipstream launch <host-ref>     # stream to one, waking it first if it's asleep
-```
-
-Under the Flatpak, reach it as `flatpak run --command=slipstream io.slipstream hosts list`.
-The older `slipstream-client --connect <host>:9777` still works for existing scripts. Full verb
-list: [Clients -> the `slipstream` CLI](/docs/clients#scripting-the-slipstream-cli).
-
-## Steam Deck
-
-Most Deck users want **Gaming Mode**: install the **[Decky plugin](/docs/steam-deck)** and a
-**Slipstream** panel lands in the Quick Access Menu, so you can discover hosts, pair with a PIN, and
-stream **without dropping to the desktop**. Follow the **[Steam Deck (Decky) guide](/docs/steam-deck)**
-, it walks through Decky Loader, the plugin, and the one-time client install.
-
-> The plugin doesn't decode video itself, it drives whichever `slipstream-client` is installed on
-> the Deck. The Flatpak below is the tested default; a native package or a sysext works too. If your
-> client isn't one the plugin can update for you (a sysext, a nix profile, a source build), the panel
-> shows you the update command instead of an **Update** button. The Gaming Mode panel comes from the
-> plugin, so a client on its own won't add it. The Decky guide covers installing both, so start there.
-
-For **Desktop Mode** (or to add the client to Game Mode as a non-Steam app yourself), install the
-Flatpak exactly as [above](#linux-desktop-flatpak), it carries its own libadwaita + SDL3 and
-survives SteamOS updates:
-
-```sh
-# Build locally, or install a .flatpak from GitHub Releases when attached:
-# flatpak install --user --bundle /path/to/slipstream-client.flatpak
-bash packaging/flatpak/build-flatpak.sh
-flatpak install --user --bundle dist/slipstream-client-*.flatpak
-```
-
-See [packaging/flatpak](https://github.com/vindeckyy/slipstream/blob/main/packaging/flatpak/README.md).
-
-## Windows
-
-The Windows client ships as a **signed MSIX**. Builds use a self-signed certificate, so you import
-that certificate once before Windows will install the package.
-
-1. Download the package and its certificate from
-   [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached (or build from
-   `clients/windows/`). Swap `_x64` for `_arm64` on an Arm device.
-2. **Trust the publisher certificate**, then install. The MSIX won't install until the certificate is
-   trusted, but it's the **same certificate for every release**, so this is genuinely one-time and
-   later updates need nothing. In an **admin** PowerShell:
-
-   ```powershell
-   # use the _arm64 files instead on an Arm device
-   Import-Certificate -FilePath .\slipstream-client-windows_x64.cer `
-     -CertStoreLocation Cert:\LocalMachine\TrustedPeople
-   Add-AppxPackage .\slipstream-client-windows_x64.msix
-   ```
-
-   If Windows reports a missing dependency, install the
-   [Windows App Runtime 2.x](https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads)
-   (the MSIX depends on `Microsoft.WindowsAppRuntime.2`), then re-run `Add-AppxPackage`.
-
-3. Launch **Slipstream** from the Start menu and pick your host. The package also adds a second
-   entry, **Slipstream Console**, the same client as a controller-driven fullscreen interface for a
-   TV or HTPC, and the headless `slipstream` command on your PATH.
-
-> The Windows client's hardware decode and HDR10 present are validated on glass on NVIDIA and Intel
-> (including HDR pass-through on the Intel D3D11VA path). If anything misbehaves,
-> **[Moonlight](/docs/moonlight)** is a solid alternative for Windows.
-
-## macOS
-
-Download the notarized disk image from the [releases page](https://github.com/vindeckyy/slipstream/releases)
-, `Slipstream-<version>.dmg`. It's Developer-ID signed, notarized, and stapled, so Gatekeeper opens
-it without warnings:
-
-1. Open `Slipstream-<version>.dmg` and drag **Slipstream** to **Applications**.
-2. Launch it, pick your host from *On this network*, and [pair](/docs/pairing).
-
-The Mac app is also in the [TestFlight beta](https://testflight.apple.com/join/Qr7uSemk); the DMG
-is the no-account path.
-
-## iOS, iPadOS, Apple TV
-
-The Apple app is in **TestFlight** beta, one universal build covers iPhone, iPad, Apple TV, and the
-Mac. Install Apple's [TestFlight](https://apps.apple.com/app/testflight/id899247664) app, then join:
+The iPhone app is in **TestFlight** beta. Install Apple's
+[TestFlight](https://apps.apple.com/app/testflight/id899247664) app, then join:
 
 **[Join the Slipstream beta on TestFlight ->](https://testflight.apple.com/join/Qr7uSemk)**
 
@@ -188,25 +67,30 @@ the client probes the decoder and falls back to 1680 x 1050 or 1920 x 1080 when 
 AV1 is not advertised on this model. If HEVC cannot be configured, select H.264 in the host or
 client profile. Keep the tablet on a 5 GHz Wi-Fi network for high-bitrate streams.
 
-## LG webOS TV (community)
+## Steam Deck
 
-> **Community project.** [`ss-webos`](https://github.com/dyptan-io/ss-webos) is built and maintained
-> by [dyptan-io](https://github.com/dyptan-io), not the Slipstream team, file issues and bugs on
-> [its own repo](https://github.com/dyptan-io/ss-webos/issues).
+Most Deck users want **Gaming Mode**: install the **[Decky plugin](/docs/steam-deck)** and a
+**Slipstream** panel lands in the Quick Access Menu, so you can discover hosts, pair with a PIN, and
+stream **without dropping to the desktop**. Follow the **[Steam Deck (Decky) guide](/docs/steam-deck)**
+, it walks through Decky Loader, the plugin, and the one-time client install.
 
-LG's webOS doesn't allow apps outside the LG Content Store without sideloading, so install needs
-**Developer Mode** and the **Homebrew Channel** once:
+> The plugin doesn't decode video itself, it drives the Flatpak `slipstream-client` installed on
+> the Deck. If your client isn't one the plugin can update for you (a sysext, a nix profile, a source
+> build), the panel shows you the update command instead of an **Update** button. The Gaming Mode
+> panel comes from the plugin, so a client on its own won't add it. The Decky guide covers installing
+> both, so start there.
 
-1. Enable Developer Mode on the TV and install the [Homebrew Channel](https://www.webosbrew.org/), 
-   follow its [install guide](https://www.webosbrew.org/guide/getting-started.html) if you haven't
-   done this before.
-2. Grab the latest `.ipk` from the
-   [ss-webos releases page](https://github.com/dyptan-io/ss-webos/releases/latest).
-3. Install it: either sideload with `ares-install` / the project's `task deploy TV_HOST=root@<tv-ip>`
-   (see the repo's README), or side-copy the `.ipk` onto the TV and install it from the Homebrew
-   Channel's app.
-4. Launch **Slipstream** from the TV's launcher, discover your host over LAN (or add it by IP), and
-   [pair](/docs/pairing) with a PIN.
+For **Desktop Mode** (or to add the client to Game Mode as a non-Steam app yourself), install the
+Flatpak; it carries its own libadwaita + SDL3 and survives SteamOS updates:
+
+```sh
+# Build locally, or install a .flatpak from GitHub Releases when attached:
+# flatpak install --user --bundle /path/to/slipstream-client.flatpak
+bash packaging/flatpak/build-flatpak.sh
+flatpak install --user --bundle dist/slipstream-client-*.flatpak
+```
+
+See [packaging/flatpak](https://github.com/vindeckyy/slipstream/blob/main/packaging/flatpak/README.md).
 
 ## Anything else, Moonlight
 
@@ -222,55 +106,10 @@ but keeping them close is the least surprising. (Updating the **host** is its ow
 
 | Client | How it updates |
 |---|---|
-| **Linux Flatpak** | `flatpak update --user io.slipstream`, **without `sudo`** (see the [Flatpak section](#linux-desktop-flatpak)) |
-| **Linux apt / dnf / pacman** | your normal `sudo apt upgrade` / `sudo dnf upgrade` / `sudo pacman -Syu`, or the app's own updater below |
-| **Fedora Atomic (layered)** | `rpm-ostree upgrade` on its own is not enough, see the note below the table |
-| **Windows MSIX** | no self-update, download the newer `.msix` as in [Windows](#windows) and re-run `Add-AppxPackage`. The certificate is the same every release, so you don't import it again |
-| **macOS `.dmg`** | download the newer `Slipstream-<version>.dmg` and drag it over the copy in Applications |
-| **iOS / iPadOS / tvOS** | TestFlight updates it |
+| **iPhone** | TestFlight updates it |
 | **Android** | Google Play updates it; if you sideloaded, download the APK again and install over it |
 | **Steam Deck (Decky)** | the panel's **Update** button, see [Steam Deck -> Updating](/docs/steam-deck#updating) |
-| **LG webOS** | install the newer `.ipk` the same way you installed the first one |
-
-**Fedora Atomic, if you layered the client.** `rpm-ostree upgrade` upgrades the *base image* and
-only re-resolves layered packages when that base actually changes, so on a base that sits still it
-keeps reporting no updates while a newer `slipstream-client` waits in the repo. Force a re-resolve of
-just that layer, in one transaction, then reboot to activate it:
-
-```sh
-sudo rpm-ostree refresh-md --force
-sudo rpm-ostree update --uninstall slipstream-client --install slipstream-client
-systemctl reboot
-```
-
-The client's own updater below runs exactly that dance for you, if you'd rather not remember it. (A
-layered **host** has the same trap, [Updating](/docs/updating) covers it.)
-
-### The Linux client can update itself
-
-The native Linux client checks its own channel and can apply the update in place, so you don't have
-to remember which package manager installed it:
-
-```sh
-slipstream-client --check-update    # prints installed vs available for this box's channel
-slipstream-client --apply-update    # install it
-```
-
-`--check-update` is scriptable: it exits **0** when you're up to date, **10** when an update is
-available, and **1** when it couldn't tell (offline, or the check is disabled), "couldn't tell" is
-deliberately not "up to date". Add `--json` to either for machine-readable output.
-
-Applying an update needs root, so it's **opt-in**: join the `slipstream-update` group once, and a
-packaged root helper does the install (the same group and the same grant as the host's one-click
-updating, described in [Updating](/docs/updating)).
-
-```sh
-sudo usermod -aG slipstream-update $USER
-```
-
-Membership is re-read on every check, so there's no need to log out and back in. Without it,
-`--check-update` prints the opt-in line and the plain package-manager command instead. On a Flatpak
-install `--apply-update` isn't used at all, the client tells you to run `flatpak update`.
+| **Steam Deck (Flatpak alone)** | `flatpak update --user io.slipstream`, **without `sudo`** |
 
 ## Removing a client
 

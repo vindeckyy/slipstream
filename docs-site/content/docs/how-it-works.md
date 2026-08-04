@@ -4,27 +4,27 @@ description: Virtual displays per client, the capture→encode→network→decod
 ---
 
 You don't need to know any of this to use Slipstream, but it helps to understand what's happening
-when you connect, whether you're launching a game to the couch or opening your real desktop from an
-office laptop.
+when you connect, whether you're launching a game to the couch or opening your real desktop from a
+phone or Deck.
 
-Slipstream is a **host** on a Linux or Windows machine and one or more **clients** on other devices.
-The host creates a display, captures it, encodes frames on the GPU, sends them over the network, and
-injects your mouse, keyboard, and controllers back into that session. The same pipeline serves both
-**game streaming** and **remote desktop / office** use; what changes is how you configure mouse mode,
+Slipstream is a **host** on a Linux machine and one or more **clients** on other devices. The host
+creates a display, captures it, encodes frames on the GPU, sends them over the network, and injects
+your mouse, keyboard, and controllers back into that session. The same pipeline serves both **game
+streaming** and **remote desktop / office** use; what changes is how you configure mouse mode,
 bitrate, display policy, and which network path you trust.
 
 ## A virtual display, sized to your device
 
 When a client connects, the host asks your desktop to create a **new virtual display** at exactly the
 client's resolution and refresh rate, captures that display, and streams it. The virtual display is
-real to your desktop, apps can be moved onto it, games open on it, but it isn't tied to any physical
+real to your desktop: apps can be moved onto it, games open on it, but it isn't tied to any physical
 monitor. When the client disconnects, the virtual display goes away (unless you've set
 [keep-alive](/docs/virtual-displays#keep-alive) to linger or hold it). That same path is what makes
-Slipstream work for remote desktop at the office: you get a full desktop session sized to your
-laptop, not a scaled mirror of a physical monitor.
+Slipstream work for remote desktop: you get a full desktop session sized to your client, not a
+scaled mirror of a physical monitor.
 
-That's why a 1080p60 laptop and a 1440p120 desktop can stream from the same host **at the same time**,
-each at its own mode, they each get their own virtual display.
+That's why a 1080p60 phone and a 1440p120 Deck can stream from the same host **at the same time**,
+each at its own mode. They each get their own virtual display.
 
 ### Why per-client modes matter
 
@@ -36,7 +36,7 @@ panel.
 
 For **games**, that means the title can run at the TV's or Deck's native resolution and refresh
 instead of whatever the desk monitor happens to be. For **desk work**, it means your IDE, browser,
-and terminals render at the laptop's pixel grid, so UI chrome and text stay crisp when bitrate and
+and terminals render at the client's pixel grid, so UI chrome and text stay crisp when bitrate and
 chroma allow.
 
 How the virtual display is created depends on your host:
@@ -48,14 +48,6 @@ How the virtual display is created depends on your host:
 | **Bazzite / Steam** (gamescope) | A nested gamescope session launched at the client's mode |
 | **[Hyprland](/docs/hyprland)** | A headless output added with `hyprctl`, captured through xdg-desktop-portal-hyprland |
 | **Sway** (wlroots) | A headless output added to the running session |
-| **Windows** | A virtual-display driver, including Slipstream's own **indirect display driver** the host pushes frames straight into, a real virtual display, no physical monitor, even on the secure desktop |
-
-That last one is the distinctive part on Windows: rather than only capturing an existing screen,
-Slipstream has **its own indirect display driver (IDD)**, and the host can push finished frames
-**straight into the driver**. You get the same on-the-fly virtual display the Linux compositors give
-you, at the client's exact mode, with no physical monitor or dummy HDMI dongle, and even on the
-secure desktop (UAC / lock screen). That tight, push-based integration is unusual among Windows
-streaming hosts.
 
 ### Display policy in brief
 
@@ -65,9 +57,8 @@ presets (Default, Headless box, Shared desktop, Hot-desk, Workstation), keep-ali
 **Workstation** and **Hot-desk** are the usual starting points; for a couch-only box,
 **Headless box** keeps the game session ready to resume. You rarely need to touch these on day one.
 
-On Linux you can also pin a **physical** monitor and mirror it instead of creating a virtual one
-(shop-floor PCs, media boxes). That path is intentional and documented on the same page; Windows
-sessions always get a virtual display.
+You can also pin a **physical** monitor and mirror it instead of creating a virtual one (shop-floor
+PCs, media boxes). That path is intentional and documented on the same page.
 
 ## From screen to GPU to wire to your device
 
@@ -76,10 +67,8 @@ End to end, a frame travels through four stages. Understanding them makes bitrat
 
 ### 1. Capture
 
-The host grabs frames from the virtual display (or a pinned physical monitor on Linux) as GPU
-buffers. On Linux that usually means the compositor's screen-cast / PipeWire dmabuf path. On Windows
-the IDD direct-push path copies finished frames into a host-owned shared GPU texture ring, no Desktop
-Duplication, no Windows.Graphics.Capture.
+The host grabs frames from the virtual display (or a pinned physical monitor) as GPU buffers. That
+usually means the compositor's screen-cast / PipeWire dmabuf path.
 
 Captured frames never touch the CPU on their way to the encoder on the validated zero-copy paths, a
 **zero-copy GPU path** that keeps latency low even at high resolutions and frame rates. Which
@@ -88,11 +77,10 @@ combinations are zero-copy today is spelled out in the
 
 ### 2. Encode
 
-Which encoder runs depends on your GPU: **NVIDIA** -> NVENC on both platforms; **AMD** -> AMF and
-**Intel** -> QSV on Windows. On Linux AMD and Intel share one path, **Vulkan Video** for HEVC and
-AV1, with **VAAPI** for H.264 and as the fallback when Vulkan encode isn't available. There's also a
-GPU-less software H.264 encoder: on Windows the host picks it when it finds no supported GPU, and on
-Linux you turn it on yourself (`SLIPSTREAM_ENCODER=software`, see [Configuration](/docs/configuration)).
+Which encoder runs depends on your GPU: **NVIDIA** -> NVENC; **AMD** and **Intel** share one path,
+**Vulkan Video** for HEVC and AV1, with **VAAPI** for H.264 and as the fallback when Vulkan encode
+isn't available. There's also a GPU-less software H.264 encoder you turn on yourself
+(`SLIPSTREAM_ENCODER=software`, see [Configuration](/docs/configuration)).
 
 Client and host then negotiate the codec: **HEVC** by default, **AV1** where both sides support it,
 **H.264** on the software path, and, if you pick it on a wired link, **[PyroWave](/docs/pyrowave)**,
@@ -109,7 +97,7 @@ quality choice, not a separate product mode.
 
 Encoded packets leave the host over the active protocol plane (native `slipstream/1` or GameStream).
 The native path uses a **QUIC** control channel and a **UDP** media data channel with encryption and
-**forward error correction** so brief Wi‑Fi loss does not always mean a frozen frame. GameStream uses
+**forward error correction** so brief Wi-Fi loss does not always mean a frozen frame. GameStream uses
 the classic Moonlight ports and transport.
 
 Both ends must be on a **trusted private network**: your LAN, or a VPN that makes the client look
@@ -118,10 +106,10 @@ VPN patterns live on [Network & VPN](/docs/network-and-vpn).
 
 ### 4. Decode and present
 
-The client hardware-decodes the stream (VideoToolbox on Apple, Vulkan Video / VAAPI / vendor paths on
-Linux, hardware decode on Windows and Android where available) and presents it fullscreen or in a
-window. Input travels the other way: mouse, keyboard, touch, pen, and controllers are injected into
-the host session. See [Clients](/docs/clients) and [Mouse, touch and pen](/docs/input).
+The client hardware-decodes the stream (VideoToolbox on iPhone, MediaCodec on Android, Vulkan Video /
+VAAPI on Steam Deck) and presents it fullscreen or in a window. Input travels the other way: mouse,
+keyboard, touch, pen, and controllers are injected into the host session. See [Clients](/docs/clients)
+and [Mouse, touch and pen](/docs/input).
 
 Audio follows the same session: host output to the client, optional microphone uplink when you enable
 it. Clipboard can cross the boundary when both host policy and the client's per-host trust toggle
@@ -135,24 +123,24 @@ Slipstream speaks two protocols over the same host:
   [Moonlight](/docs/moonlight) client connects with no special software. This is the most compatible way in.
 - **slipstream/1 (native)**, a purpose-built protocol with a QUIC control channel and a UDP data
   channel hardened with forward error correction and encryption. It's lower-latency and more resilient
-  on imperfect networks, and it's what the [native clients](/docs/clients) (Apple, Linux, Windows,
-  Android) use.
+  on imperfect networks, and it's what the [native clients](/docs/clients) (iPhone, Android, Steam Deck)
+  use.
 
 The native `slipstream/1` plane runs by default (the secure default); add `--gamestream` and both planes
-serve from a single host process, Moonlight clients use GameStream, the native clients use slipstream/1.
+serve from a single host process. Moonlight clients use GameStream; the native clients use slipstream/1.
 
 ### Which should you use?
 
 | Situation | Prefer |
 |---|---|
-| Native app available (macOS, iOS/tvOS, Linux, Windows, Android) | **slipstream/1** |
+| Native app available (iPhone, Android, Steam Deck) | **slipstream/1** |
 | Couch / TV / device with only Moonlight | **GameStream** (`--gamestream`) |
-| Office laptop over VPN, security-sensitive host | **Native only**; turn GameStream off if you do not need Moonlight |
+| Office client over VPN, security-sensitive host | **Native only**; turn GameStream off if you do not need Moonlight |
 | Maximum compatibility on a trusted home LAN | Both planes on the same host |
 
 GameStream pairing uses legacy plain HTTP and weaker control crypto than the native plane. That is
 fine on a trusted LAN for Moonlight convenience; it is a poor default for a work-oriented host you
-reach over a wide VPN. Windows ships GameStream **off**; many Linux packages ship it **on**. Details:
+reach over a wide VPN. Many Linux packages ship GameStream **on**. Details:
 [Security](/docs/security#gamestream--moonlight-compatibility-is-the-weak-crypto-path),
 [Moonlight](/docs/moonlight).
 
@@ -207,7 +195,7 @@ pushes zero-copy capture→encode, keeps the native transport UDP-oriented with 
 codecs like PyroWave for wired LAN when you want to spend bandwidth to shrink codec time.
 
 High refresh (120 Hz+) only helps if capture, encode, network, and decode can keep up. A saturated
-Wi‑Fi link or an undersized bitrate will stutter before the encoder is the bottleneck. Use the
+Wi-Fi link or an undersized bitrate will stutter before the encoder is the bottleneck. Use the
 [stats overlay](/docs/stats) to see whether you are network-bound or decode-bound.
 
 ### Desk work and text UI
@@ -219,8 +207,7 @@ tolerable. What hurts more is **soft text**, chroma blur, and pointer mismatch:
   4:4:4 when supported before assuming the host is wrong.
 - **Mouse mode** matters more than codec for "can I work?". Capture (relative) mouse is the gaming
   default and fights window chrome; **Desktop (absolute)** mouse is what office use wants. Toggle
-  with `Ctrl+Alt+Shift+M` on Linux/Windows clients, or set it in
-  [Input](/docs/input#mouse-modes).
+  with `Ctrl+Alt+Shift+M` on Steam Deck, or set it in [Input](/docs/input#mouse-modes).
 - **gamescope / Gaming Mode** hosts are excellent for games and a poor fit for absolute desktop mouse;
   use a full KDE / GNOME / Hyprland / Sway session for office work.
 
@@ -230,36 +217,34 @@ features Slipstream does not claim. Practical Work setup:
 
 ## Multiple devices at once
 
-A host can stream to several clients simultaneously, your laptop and your TV both viewing (and
+A host can stream to several clients simultaneously, your phone and your Deck both viewing (and
 controlling) the desktop, each at its own resolution. The native `serve` host allows up to **4**
 concurrent sessions by default (an encoder bound); further clients wait until a slot frees. Display
-policy decides whether a second client gets its own screen, joins, steals, or is rejected. On
-Windows today a second concurrent client is rejected even under "separate" conflict handling, two
-clients cannot yet share one virtual display's capture there. See
+policy decides whether a second client gets its own screen, joins, steals, or is rejected. See
 [Multiple devices](/docs/configuration#multiple-devices-at-once) and
 [Virtual displays](/docs/virtual-displays).
 
 What is **not** shipping yet: one client opening **multiple host monitors as separate windows**.
-Several clients can each become a monitor of one desktop on Linux; a single laptop showing several
-host heads as multi-window remote desktop is still on the [roadmap](/docs/roadmap). Webcam / camera
-uplink for video calls on the host is likewise not a finished product story.
+Several clients can each become a monitor of one desktop; a single device showing several host heads
+as multi-window remote desktop is still on the [roadmap](/docs/roadmap). Webcam / camera uplink for
+video calls on the host is likewise not a finished product story.
 
 ## Two common shapes of use
 
 ### Play (game streaming)
 
-Host on a powerful PC or Steam Deck / Bazzite box, client on TV, phone, another PC, or Deck. Enable
-GameStream if you want Moonlight on a smart TV. Prefer Capture mouse, game-oriented bitrate, and
-often a gamescope or dedicated game session so a library launch boots straight into the title. Pair
-once on the LAN; stream from the couch.
+Host on a powerful PC or Steam Deck / Bazzite box, client on TV, phone, or Deck. Enable GameStream if
+you want Moonlight on a smart TV. Prefer Capture mouse, game-oriented bitrate, and often a gamescope
+or dedicated game session so a library launch boots straight into the title. Pair once on the LAN;
+stream from the couch.
 
 ### Work (remote desktop)
 
-Host on the workstation you left at home, client on the office laptop over a **private VPN**. Prefer
-native clients, Desktop mouse, clipboard on, Workstation or Hot-desk display presets, and GameStream
-off if you never use Moonlight. Add the host by VPN IP when discovery does not cross the tunnel.
-Step-by-step: [Desktop at work](/docs/desktop-at-work). Networking and ports:
-[Network & VPN](/docs/network-and-vpn).
+Host on the workstation you left at home, client on a phone, Deck, or other device over a **private
+VPN**. Prefer native clients, Desktop mouse, clipboard on where available, Workstation or Hot-desk
+display presets, and GameStream off if you never use Moonlight. Add the host by VPN IP when discovery
+does not cross the tunnel. Step-by-step: [Desktop at work](/docs/desktop-at-work). Networking and
+ports: [Network & VPN](/docs/network-and-vpn).
 
 Neither path requires a cloud account. Both use the same host process, the same virtual-display idea,
 and the same pairing model.
@@ -268,7 +253,7 @@ and the same pairing model.
 
 - **[Quick Start](/docs/quickstart)** - from nothing to a first stream
 - **[Virtual displays](/docs/virtual-displays)** - presets, keep-alive, topology, multi-client layout
-- **[Desktop at work](/docs/desktop-at-work)** - office laptop → home desktop checklist
+- **[Desktop at work](/docs/desktop-at-work)** - remote desktop checklist
 - **[Network & VPN](/docs/network-and-vpn)** - Tailscale / WireGuard, discovery, ports, firewalls
 - **[Pairing & Trust](/docs/pairing)** - PIN, console approve, pinned reconnects
 - **[Clients](/docs/clients)** / **[Moonlight](/docs/moonlight)** - how to connect

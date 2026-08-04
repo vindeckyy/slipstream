@@ -37,7 +37,7 @@ export default function Footer() {
                 </span>
               </div>
               <p className="mt-2 max-w-sm text-sm leading-6 text-fd-muted-foreground">
-                Private desktop and game streaming for Linux and Windows hosts. Play on the couch,
+                Private desktop and game streaming for Linux hosts. Play on the couch,
                 Work from the office.
               </p>
             </div>

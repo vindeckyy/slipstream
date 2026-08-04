@@ -1,6 +1,6 @@
 ---
 title: Plugins
-description: First-party plugins, sync your ROM collection or Playnite library into the game library, or hand a real USB device on the couch to the host, and how to install them.
+description: First-party plugins, sync your ROM collection into the game library, or hand a real USB device on the couch to the host, and how to install them.
 ---
 
 Plugins extend the host through the **scripting runner** (see [Events & hooks](/docs/automation)). A
@@ -12,7 +12,6 @@ Three first-party plugins today:
 | Plugin | What it does |
 |---|---|
 | **ROM Manager** | Scans your ROM directories, matches each platform to an installed emulator, and syncs them into the library with box art. |
-| **Playnite** | Mirrors your [Playnite](https://playnite.link) library, every store and emulator it manages, into the library, launched back through Playnite. |
 | **VirtualHere** | Hands a real USB device on the couch, wheel, HOTAS, pad, to the host while you play, and gives it back after. Needs [VirtualHere](https://www.virtualhere.com/), sold separately. |
 
 ## Installing from the console
@@ -74,36 +73,14 @@ format and what review looks for.
 Two commands: install the plugin, then turn the runner on. The host CLI handles the rest, creating
 the plugins directory, pointing it at the package registry, and starting the supervisor.
 
-<Tabs items={['Linux', 'Windows']}>
-<Tab value="Linux">
-
 ```sh
-slipstream-host plugins add playnite     # or: rom-manager
+slipstream-host plugins add rom-manager
 slipstream-host plugins enable           # turn the runner on (once)
 ```
 
 On **SteamOS** the [host installer](/docs/steamos-host) ships the runner automatically (user-scoped
 under `~/.local`, the read-only `/usr` can't take the package). If the console reports the runner
 isn't installed on an older setup, re-run `scripts/steamdeck/update.sh` once.
-
-</Tab>
-<Tab value="Windows">
-
-Run these from an **elevated** PowerShell, right-click **PowerShell** -> **Run as administrator**.
-The plugins directory lives under `%ProgramData%\slipstream`, which is admin-owned. The runner task
-itself runs as the low-privilege `NT AUTHORITY\LocalService` account, `plugins enable` sets that
-up (including read access to the runner's scoped API token).
-
-```powershell
-slipstream-host plugins add playnite     # or: rom-manager
-slipstream-host plugins enable           # turn the runner on (once)
-```
-
-If `slipstream-host` isn't found, open a **new** terminal (the installer adds it to `PATH`), or use
-the full path: `& "$env:ProgramFiles\slipstream\slipstream-host.exe" plugins add playnite`.
-
-</Tab>
-</Tabs>
 
 Open the [web console](/docs/web-console) and the plugin's page appears in the nav automatically, 
 that's the whole install.
@@ -128,8 +105,9 @@ and it carries its catalog badge instead.
 | `slipstream-host plugins disable` | Stop + disable the runner. |
 | `slipstream-host plugins status` | Is the runner enabled and running? |
 
-A bare name resolves to the first-party package, `playnite` installs `@slipstream/plugin-playnite`,
-always from Slipstream's own package registry. Any other name (`slipstream-plugin-*`, a foreign
+A bare name resolves to the first-party package, `rom-manager` installs
+`@slipstream/plugin-rom-manager`, always from Slipstream's own package registry. Any other name
+(`slipstream-plugin-*`, a foreign
 `@scope/pkg`) would install from the **public npm registry** and is refused unless you add
 `--allow-public-registry`, a guard against typos and look-alike packages pulling untrusted code
 onto your host.
@@ -145,7 +123,7 @@ fresh install, and the console restarts the runner for you. There is no `plugins
 from a terminal, re-run `slipstream-host plugins add <name>`. That installs the newest version the
 package registry has rather than the version the catalog pins, and it does **not** restart the
 runner: restart it yourself so the new code is picked up
-(`systemctl --user restart slipstream-scripting`, or `Restart` the `SlipstreamScripting` task).
+(`systemctl --user restart slipstream-scripting`).
 
 **Remove.** The **Uninstall** (bin) button on the **Installed** tab removes the package *and*
 restarts the runner, so the plugin stops straight away. `slipstream-host plugins remove <name>`
@@ -153,9 +131,8 @@ removes the package only, restart the runner yourself, as above, to stop a plugi
 running.
 
 Uninstalling removes the package and nothing else. A plugin's own config and cache stay where it
-wrote them, `~/.config/slipstream/plugin-state/<plugin>/` on Linux,
-`%ProgramData%\slipstream\plugin-state\<plugin>\` on Windows, so re-installing later picks your
-settings back up. Delete that directory yourself if you want it gone.
+wrote them, `~/.config/slipstream/plugin-state/<plugin>/`, so re-installing later picks your settings
+back up. Delete that directory yourself if you want it gone.
 
 To stop *every* plugin without uninstalling anything, turn the runner off: **Disable runner** on the
 Installed tab, or `slipstream-host plugins disable`.
@@ -174,9 +151,6 @@ slipstream-host plugins add rom-manager
 
 Then add a root or two, from the console's **ROM Manager** page, or in the config file:
 
-<Tabs items={['Linux', 'Windows']}>
-<Tab value="Linux">
-
 `~/.config/slipstream/plugin-state/rom-manager/config.json`:
 
 ```jsonc
@@ -189,56 +163,11 @@ Then add a root or two, from the console's **ROM Manager** page, or in the confi
 }
 ```
 
-</Tab>
-<Tab value="Windows">
-
-`%ProgramData%\slipstream\plugin-state\rom-manager\config.json`:
-
-```jsonc
-{
-  "roots": [
-    { "dir": "D:\\roms\\snes", "platform": "snes" },
-    { "dir": "D:\\roms\\ps1", "platform": "ps1", "excludes": ["*.sav"] }
-  ],
-  "art": { "provider": "auto", "steamGridDbKey": "" }
-}
-```
-
-</Tab>
-</Tabs>
-
-`plugin-state` is where a plugin reads and writes its own files, on Windows it is the one
-directory `plugins enable` grants the low-privilege runner write access to. A config file placed
-anywhere else under `%ProgramData%\slipstream` is not read.
+`plugin-state` is where a plugin reads and writes its own files.
 
 Full options and the platform/emulator list are in
 `slipstream-plugin-rom-manager`.
 
-## Playnite
-
-`@slipstream/plugin-playnite`, mirrors your **[Playnite](https://playnite.link)** library (Steam,
-GOG, Epic, Xbox, itch, emulators, manually-added games, everything Playnite manages) into your
-library. Launching a title hands it back to Playnite, which performs the real launch, so there are no
-per-store launch commands to maintain. Covers are served by the host, so it scales to large libraries.
-
-Playnite is Windows-only, so both halves of this one live on the **Windows host**. Because Playnite
-keeps its library locked while running, there are **two parts**:
-
-1. **The plugin**, from an elevated PowerShell:
-
-   ```powershell
-   slipstream-host plugins add playnite
-   slipstream-host plugins enable
-   ```
-
-2. **The Slipstream Sync extension** (in Playnite), download `slipstream-sync.pext` from the
-   `slipstream-plugin-playnite` and **double-click
-   it** to install it in Playnite like any add-on, then restart Playnite once.
-
-Open the console's **Playnite** page, it shows "Exporter connected", and your games sync within
-seconds of any library change. Filters (installed-only, per-store, hidden) live on that page or in
-`%ProgramData%\slipstream\plugin-state\playnite\config.json`. Details are in
-`slipstream-plugin-playnite`.
 
 ## VirtualHere (USB passthrough)
 
@@ -260,9 +189,8 @@ You need both halves of VirtualHere running before the plugin is any use:
   the client as a service, VirtualHere requires a purchased licence.
 - **The USB Client on the host**, ideally installed as a service so it survives logging out.
 
-Servers exist for Windows, Linux, macOS and Android couches. **There is no VirtualHere server for
-iOS or tvOS**, so iPhones, iPads and Apple TVs cannot pass devices through, nothing on the
-Slipstream side can change that.
+Servers exist for Linux and Android couches. **There is no VirtualHere server for iOS**, so iPhones
+cannot pass devices through, nothing on the Slipstream side can change that.
 
 ```sh
 slipstream-host plugins add virtualhere
@@ -284,39 +212,20 @@ Full configuration is in
 
 ## Troubleshooting
 
-**`slipstream-host: command not found`**, on Windows, open a new terminal so it picks up the
-installer's `PATH` change, or call the exe by full path. On Linux the host package installs it to
-`/usr/bin/slipstream-host`.
+**`slipstream-host: command not found`**, the host package installs it to `/usr/bin/slipstream-host`.
 
 **"the plugin runner isn't installed"**, the runner ships as its own package. On Ubuntu:
 `sudo apt install slipstream-scripting`. On Fedora: `sudo dnf install slipstream-scripting` from the
 [same RPM repo you installed the host from](/docs/fedora). On Arch:
 `sudo pacman -Syu slipstream-scripting` (a full `-Syu`, like every other install from that repo).
-On SteamOS, re-run `scripts/steamdeck/install.sh` (or
-`scripts/steamdeck/update.sh`). On Windows, re-run the installer and keep the scripting component.
+On SteamOS, re-run `scripts/steamdeck/install.sh` (or `scripts/steamdeck/update.sh`).
 
 **The plugin doesn't show up in the console**, check the runner is actually running with
 `slipstream-host plugins status`, then look at its log:
 
-<Tabs items={['Linux', 'Windows']}>
-<Tab value="Linux">
-
 ```sh
 journalctl --user -u slipstream-scripting -f
 ```
-
-</Tab>
-<Tab value="Windows">
-
-The runner task doesn't write a log file, so run it in the foreground to watch it start your
-plugins (stop it with <kbd>Ctrl</kbd>+<kbd>C</kbd>):
-
-```powershell
-& "$env:ProgramFiles\slipstream\bun\bun.exe" "$env:ProgramFiles\slipstream\scripting\runner-cli.js"
-```
-
-</Tab>
-</Tabs>
 
 ## Writing your own
 
@@ -325,5 +234,5 @@ by the runner. The kit owns lifecycle, config and state, the library sync engine
 plugin's console page; `@slipstream/host` (`definePlugin`) is the lower-level host client underneath
 it. Start from the
 [plugin-kit README](https://github.com/vindeckyy/slipstream/blob/main/plugin-kit) and
-`slipstream-plugin-rom-manager`, which is the reference
-implementation, or any of the three plugins above.
+`slipstream-plugin-rom-manager`, which is the reference implementation, or either of the plugins
+above.

@@ -124,6 +124,7 @@ mod session_status {
     pub(crate) use crate::session::status::*;
 }
 mod sleep_inhibit;
+mod host_cursor;
 mod spike;
 mod stats_recorder;
 // Start/stop/status for the per-user tray — the recovery path it has never had of its own.
@@ -412,10 +413,12 @@ fn real_main() -> Result<()> {
             #[cfg(target_os = "windows")]
             vdisplay::manager::claim_instance_eagerly();
             // Crash recovery for the experimental `pnp_disable_monitors` axis: re-enable any
-            // monitor devnodes a previous host disabled for an Exclusive session and never
-            // restored (crash/kill/power loss) — before any new session touches the topology.
+            // monitor leftovers a previous host silenced for a stream and never restored
+            // (crash/kill/power loss) — before any new session touches the topology.
             #[cfg(target_os = "windows")]
             monitor_devnode::startup_recover();
+            #[cfg(target_os = "linux")]
+            ss_vdisplay::drm_force::startup_recover();
             gamestream::serve(mgmt_opts, native, gamestream)
         }
         // Report other Moonlight-compatible hosts (Sunshine/Apollo/…) installed or running on this

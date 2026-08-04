@@ -41,8 +41,8 @@ Step-by-step that matches how people actually get a first office stream:
 
 1. Install Tailscale on the **host** PC and on the **office client**.
 2. Sign both into the **same tailnet**. On each machine, confirm a Tailscale IP appears
-   (`100.x.y.z` and/or a Tailscale IPv6 address). On Linux/macOS: `tailscale ip -4`. On Windows:
-   the Tailscale app's Machine details.
+   (`100.x.y.z` and/or a Tailscale IPv6 address). On Linux: `tailscale ip -4`. On phone clients,
+   use the Tailscale app's machine details.
 3. From the office client, **ping the host's Tailscale IP** (or use Tailscale's peer status). If
    that fails, fix Tailscale ACLs / key expiry / offline peer before touching Slipstream.
 4. On the host firewall, treat the Tailscale interface like a private LAN: the packaged
@@ -133,10 +133,8 @@ must add the host manually.
 Work top to bottom. Most "VPN is broken" reports stop at step 3 or 5.
 
 1. **Is the host process running?**  
-   Linux: `systemctl --user status slipstream-host`. Windows: `slipstream-host service status` /
-   `Get-Service SlipstreamHost`. If it is down, fix that first
-   ([Troubleshooting](/docs/troubleshooting#the-linux-host-service-wont-start),
-   [Windows console/host won't start](/docs/troubleshooting#windows-the-host-or-the-web-console-wont-start)).
+   `systemctl --user status slipstream-host`. If it is down, fix that first
+   ([Troubleshooting](/docs/troubleshooting#the-linux-host-service-wont-start)).
 
 2. **Are you on the same path you think you are?**  
    On LAN: same Wi‑Fi/subnet. On VPN: client shows connected, and you can ping the host's VPN or
@@ -154,16 +152,11 @@ Work top to bottom. Most "VPN is broken" reports stop at step 3 or 5.
    UDP **9777** + **5353**, TCP **47990** via `slipstream-native` (commands below). Without
    **9777**, nothing connects even if you typed the IP correctly.
 
-6. **Windows network profile Public?**  
-   Installer rules are **Private/Domain** only by default. Mis-marked Public → set Private, or
-   re-scope with `slipstream-host service install --allow-public-network=on` when the network
-   truly is trusted.
-
-7. **Competing GameStream host running?**  
+6. **Competing GameStream host running?**  
    Sunshine / Apollo / forks binding the same ports -
    `slipstream-host detect-conflicts`, then stop the other host.
 
-8. **Still stuck?**  
+7. **Still stuck?**  
    Full checklist: [The host isn't found on the network](/docs/troubleshooting#the-host-isnt-found-on-the-network).
    Office-specific: [Office / VPN](/docs/troubleshooting#office--vpn).
 
@@ -263,26 +256,6 @@ sudo firewall-cmd --list-services
 
 `slipstream-native` opens UDP **9777**, UDP **5353**, and TCP **47990**. `slipstream-web` is TCP
 **47992**. `slipstream-gamestream` is the Moonlight port set above.
-
-### Windows
-
-The installer opens streaming and console ports on **Private** and **Domain** profiles only.
-
-- If the LAN is mis-marked **Public**, set it to **Private**:
-  **Settings → Network & internet → your network → Network profile type**.
-- Trusted network that Windows insists is Public (some headless / no-gateway LANs): either tick
-  *Allow connections on Public networks* at first install, or from an elevated prompt later:
-
-  ```powershell
-  slipstream-host service install --allow-public-network=on
-  slipstream-host service restart
-  ```
-
-  That re-scopes streaming ports without wiping the rest of `host.env`. Details:
-  [Troubleshooting](/docs/troubleshooting#the-host-isnt-found-on-the-network),
-  [Running as a Service → Windows](/docs/running-as-a-service#windows).
-
-VPN interfaces must be treated as private/trusted by the OS firewall the same way your LAN is.
 
 ## Latency and bandwidth expectations
 

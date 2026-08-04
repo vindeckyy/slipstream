@@ -38,9 +38,6 @@ The empty `ExecStart=` is required, without it systemd adds a second command ins
 the first, and the path must match the one `systemctl --user cat` printed (the distro packages use
 `/usr/bin`). Save, then `systemctl --user restart slipstream-host`.
 
-Windows is the other way round: an install from the setup `.exe` leaves GameStream **off** unless you
-tick it, and it is configured differently, see [Windows](#windows) below.
-
 ## A. A desktop you log into
 
 If you sit at the machine (or it auto-logs-in to a desktop), run the host as a **systemd user
@@ -144,52 +141,6 @@ on that session.
 On Bazzite, the host launches its own gamescope/Steam session per client, so you don't need a separate
 session unit, see [Bazzite](/docs/bazzite) and [gamescope](/docs/gamescope).
 
-## Windows
-
-> Slipstream has first-class **Linux and Windows** hosts. On Windows it ships as a signed installer
-> with an SCM service and a virtual-display driver, including Slipstream's own **indirect display
-> driver** the host pushes frames straight into. The Windows host is newer than the Linux host. (Not
-> to be confused with the Windows *client*, which streams *to* a Windows PC.)
-
-On Windows the host runs as a `LocalSystem` service that launches into the interactive session, so it
-captures the secure desktop (UAC / lock screen) and survives reboots with nobody logged in, the same
-model Sunshine/Apollo use. Because it runs at that privilege level, keep it on a trusted network and be
-deliberate about which machine you host on, see [Security & Safe Use](/docs/security).
-
-The easy path is the **signed installer**: download `slipstream-host-setup-<ver>.exe` from
-[GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached (or build from
-`packaging/windows/`) and run it. It drops the host
-into `C:\Program Files\slipstream`, installs the bundled **ss-vdisplay** virtual-display driver, and
-registers + starts the service for you (`/VERYSILENT` for unattended). Upgrades and uninstall are
-handled through Add/Remove Programs.
-
-Prefer the CLI? Run `slipstream-host service install` from an elevated prompt, see
-[Windows Host](/docs/windows-host). For hardware encode you need a GPU, NVIDIA (NVENC), AMD (AMF), or
-Intel (QSV); the host falls back to software H.264 without one.
-
-**GameStream on Windows.** Unlike the Linux unit, the installer leaves Moonlight compatibility
-**off**, it's a checkbox in the wizard (`/MERGETASKS="gamestream"` to select it unattended). There's
-no `ExecStart` to edit here: the service launches whatever `SLIPSTREAM_HOST_CMD` in
-`%ProgramData%\slipstream\host.env` says, which is also where the rest of the Windows host's
-configuration lives. To change it later, from an elevated prompt:
-
-```powershell
-slipstream-host service install --gamestream=on   # or --gamestream=off
-slipstream-host service restart
-```
-
-Registering the service by hand is the exception. A bare `slipstream-host service install` writes a
-fresh `host.env` with `SLIPSTREAM_HOST_CMD` left commented out, and with no value set the service
-falls back to `serve --gamestream`, so add `--gamestream=off` to that command if you want the
-native-only host.
-
-> **Firewall scope.** The installer opens the streaming + console ports on **Private and Domain**
-> networks only, not **Public**. If your LAN is (mis)classified Public, clients won't connect until
-> you set it to Private (Windows Settings -> Network), and the host logs a warning when it's on a Public
-> network. For a trusted network Windows insists is Public, tick **"Allow connections on Public
-> networks"** at install (or pass `--allow-public-network` to `service install`). See
-> [Security & Safe Use](/docs/security) for the reasoning.
-
 ## Verifying
 
 After a reboot, from another machine on the network:
@@ -199,26 +150,22 @@ slipstream reachable 192.168.1.50   # exit 0 = the host answered, 2 = it didn't
 slipstream hosts list --probe       # every saved host, online or offline
 ```
 
-`slipstream` is the headless client CLI, it ships in the Linux client packages (`slipstream-client`)
-and with the Windows client. From a source checkout, `slipstream-probe --discover` browses the LAN
-instead; it's a dev tool and isn't packaged. Or just open a native client / Moonlight and look for
-the host.
+`slipstream` is the headless client CLI that ships with client tooling where packaged. From a source
+checkout, `slipstream-probe --discover` browses the LAN instead; it's a dev tool and isn't packaged.
+Or just open a native client / Moonlight and look for the host.
 
-If the host answers, it's up. If not, check `journalctl --user -u slipstream-host` on the host, on
-a Windows host, run `slipstream-host service status` from an elevated prompt on the machine itself.
+If the host answers, it's up. If not, check `journalctl --user -u slipstream-host` on the host.
 
 ## Stopping and removing
 
-After a Linux package update the user service keeps running the old binary until it's restarted, and
+After a package update the user service keeps running the old binary until it's restarted, and
 a package can't restart another user's `--user` units for you, [Updating](/docs/updating) has the
-update command for every install method and the restart that finishes the job. The Windows installer
-restarts its own service.
+update command for every install method and the restart that finishes the job.
 
 To stop the host for now:
 
 ```sh
-systemctl --user stop slipstream-host          # Linux
-slipstream-host service stop                   # Windows, elevated prompt
+systemctl --user stop slipstream-host
 ```
 
 To stop it for good, so it doesn't come back at login or boot:
@@ -230,9 +177,5 @@ rm -rf ~/.config/systemd/user/slipstream-host.service.d   # any drop-ins you add
 sudo loginctl disable-linger "$USER"                     # only if you enabled lingering
 ```
 
-On Windows, `slipstream-host service uninstall` from an elevated prompt stops the service, removes it,
-and removes the firewall rules it added. To remove the whole install instead, use Add/Remove Programs.
-
-Neither removes `~/.config/slipstream` (Linux) or `%ProgramData%\slipstream` (Windows), your
-certificate, pairings and console password stay, so a reinstall picks up where you left off. See
-[Uninstall](/docs/uninstall) to clear them out.
+Neither removes `~/.config/slipstream`, your certificate, pairings and console password stay, so a
+reinstall picks up where you left off. See [Uninstall](/docs/uninstall) to clear them out.

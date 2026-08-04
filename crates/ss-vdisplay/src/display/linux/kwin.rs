@@ -77,9 +77,10 @@ const MAX_VERSION: u32 = 5;
 /// (`Virtual-slipstream-<id>`) — KWin persists per-output config (scale/mode) keyed by name in
 /// `kwinoutputconfig.json`, so a stable name makes KDE reapply that client's scaling on reconnect
 /// (Stage 3). Each `create` spins up its own Wayland connection/thread that owns the output.
-#[derive(Default)]
 pub struct KwinDisplay {
     client_fp: Option<[u8; 32]>,
+    /// Whether this display is the FIRST of its group (§6.1) — set by the registry before `create`.
+    first_in_group: bool,
     /// The identity slot the last [`create`](VirtualDisplay::create) resolved (the per-client id, or
     /// `None` for shared/anonymous) — reported to the registry via [`last_identity_slot`] so it can key
     /// the group arrangement + `/display/state` slot to the same id this backend named the output with.
@@ -102,6 +103,20 @@ pub struct KwinDisplay {
     /// Out-of-band cursor request (`set_hw_cursor`, i.e. the session negotiated the cursor
     /// channel): METADATA pointer mode at creation; off = EMBEDDED (see the consts above).
     hw_cursor: bool,
+}
+
+impl Default for KwinDisplay {
+    fn default() -> Self {
+        Self {
+            client_fp: None,
+            first_in_group: true,
+            last_slot: None,
+            last_name: None,
+            our_uuid: None,
+            pending_restore: None,
+            hw_cursor: false,
+        }
+    }
 }
 
 impl Drop for KwinDisplay {
@@ -166,6 +181,10 @@ impl KwinDisplay {
 impl VirtualDisplay for KwinDisplay {
     fn name(&self) -> &'static str {
         "kwin"
+    }
+
+    fn set_first_in_group(&mut self, first: bool) {
+        self.first_in_group = first;
     }
 
     fn set_client_identity(&mut self, fingerprint: Option<[u8; 32]>) {
@@ -361,7 +380,15 @@ impl VirtualDisplay for KwinDisplay {
         // bootstrap output. Applied over kde_output_management_v2 in-process (immune to a wedged
         // kscreen-doctor backend; see `apply_topology`), with a kscreen-doctor fallback. `disabled`
         // is the physical/bootstrap outputs, each `(name, "WxH@Hz")`, to restore on teardown.
+        let exclusive = matches!(crate::effective_topology(), crate::policy::Topology::Exclusive);
+        if self.first_in_group && exclusive {
+            crate::monitor_hold::arm_before_topology(true);
+        }
         let disabled = self.apply_topology(&name, &our_prefix, final_dims);
+        let mut hold = crate::monitor_hold::Hold::default();
+        if self.first_in_group {
+            crate::monitor_hold::arm_after_topology(&mut hold, exclusive);
+        }
         // A plain managed name is enough for apply_position's kscreen-doctor fallback when the
         // in-process UUID path isn't set (single-output sessions are unambiguous; a supersede uses
         // the UUID path instead). `want_high` already set `last_name` to the resolved kscreen id.
@@ -373,12 +400,16 @@ impl VirtualDisplay for KwinDisplay {
         // sessions drops — under a still-live sibling). Instead stash it as a closure the registry lifts
         // into the display group and runs once, when the group's LAST member is torn down (ordered before
         // that display's output is reclaimed, so KWin never sees zero outputs). Empty ⇒ nothing to restore.
-        self.pending_restore = (!disabled.is_empty()).then(|| {
+        let need_restore = !disabled.is_empty() || hold.ddc_armed || !hold.drm_forced.is_empty();
+        self.pending_restore = need_restore.then(|| {
             let disabled = disabled.clone();
             // In-process first; fall back to kscreen-doctor if the compositor doesn't answer in budget.
             Box::new(move || {
-                if !crate::kwin_output_mgmt::reenable_outputs(&disabled) {
-                    reenable_outputs_kscreen(&disabled);
+                crate::monitor_hold::restore(hold);
+                if !disabled.is_empty() {
+                    if !crate::kwin_output_mgmt::reenable_outputs(&disabled) {
+                        reenable_outputs_kscreen(&disabled);
+                    }
                 }
             }) as Box<dyn FnOnce() + Send>
         });

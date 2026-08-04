@@ -10,9 +10,8 @@ monitors, what happens when a second client connects, and how desktop environmen
 per-client settings like scaling.
 
 You set this policy in the **web console** (the **Virtual displays** page), or by editing
-`~/.config/slipstream/display-settings.json` directly (`%ProgramData%\slipstream\display-settings.json`
-on Windows). A change applies to the **next** connection, a running session keeps the display it
-opened on.
+`~/.config/slipstream/display-settings.json` directly. A change applies to the **next** connection, a
+running session keeps the display it opened on.
 
 > **You rarely need to touch this.** The default behavior matches how Slipstream has always worked.
 > Reach for a preset when you want a specific experience, a dedicated box you only stream from, a
@@ -26,16 +25,13 @@ different setting and it turns most of this page off, see
 [Stream a real monitor instead](#stream-a-real-monitor-instead) right below.
 
 > **What's live today:** **keep-alive** (linger, or **forever**), **topology** (extend / primary /
-> exclusive), **conflict handling**, **per-client identity + persistent scaling** (Windows, KDE/KWin
-> *and* GNOME/Mutter), and **multi-monitor layout** (several clients as monitors of one desktop) are
-> all enforced. A reconnect always resumes the kept display, even a fast one, instead of spawning a
-> second. The remaining gaps are noted inline: the Linux `primary` physical-keep *effect*, Sway
+> exclusive), **conflict handling**, **per-client identity + persistent scaling** (KDE/KWin *and*
+> GNOME/Mutter), and **multi-monitor layout** (several clients as monitors of one desktop) are all
+> enforced. A reconnect always resumes the kept display, even a fast one, instead of spawning a
+> second. The remaining gaps are noted inline: the `primary` physical-keep *effect*, Sway
 > `exclusive`, and multi-display for a *single* client (that last is the next stage).
 
 ## Stream a real monitor instead
-
-> **Linux only.** A Windows host enumerates its monitors but has no backend that can capture one, so
-> the Streamed screen card is read-only there and every Windows session gets a virtual display.
 
 Sometimes you don't want a new screen, you want *that* screen. A shop-floor PC on a wall mount, a
 lab bench machine, a media box whose TV output you'd like to watch from the couch: what matters is
@@ -76,8 +72,7 @@ picker is empty there.
 
 ### Naming the monitor from the host
 
-Monitors are named by **connector**, `HDMI-A-1`, `DP-2`, `eDP-1`. List what this host has (these
-subcommands are Linux-only, like the setting itself):
+Monitors are named by **connector**, `HDMI-A-1`, `DP-2`, `eDP-1`. List what this host has:
 
 ```sh
 slipstream-host list-monitors
@@ -195,9 +190,9 @@ Headless box for the game-mode or dedicated-stream path.
 ### Default - when to leave it alone
 
 Default is today's behavior made explicit: a short **10-second** keep-alive, **Automatic** topology
-(Exclusive on a normal Windows or KDE/GNOME desktop), extra viewers get **separate** displays, and
-per-client identity with an automatic row layout. Reconnects resume quickly; you do not have to
-think about forever pins, steal-on-connect, or manual layouts.
+(Exclusive on a normal KDE/GNOME desktop), extra viewers get **separate** displays, and per-client
+identity with an automatic row layout. Reconnects resume quickly; you do not have to think about
+forever pins, steal-on-connect, or manual layouts.
 
 Leave Default alone until you have a reason not to. The callout at the top of this page is the
 rule: reach for a named preset when you want a specific experience (shared desk, roaming office
@@ -263,8 +258,7 @@ this also keeps the **game itself running** so you can reconnect straight back i
 - **Forever**, keep it until you stop the host or **release it** from the console (**Virtual
   displays** -> *Release*). This is the headless-box model.
 
-Default: **10 seconds**. Windows has always lingered 10 s; the Linux backends previously tore down
-immediately, a short linger makes reconnects smoother on both.
+Default: **10 seconds**. A short linger makes reconnects smoother.
 
 **A reconnect always resumes the kept display**, the host recognises your device and hands back the
 same display, even if you reconnect a second or two after dropping (before it has noticed you left).
@@ -287,27 +281,25 @@ What Slipstream does with your monitor layout while it streams.
 - **Exclusive**, the virtual display becomes your **only** enabled output (physical monitors are
   disabled, then restored when streaming ends). This is what makes the streamed surface *be* the
   desktop, so panels and windows land on it.
-- **Automatic** *(default)*, Exclusive on Windows and on an auto-detected KDE/GNOME desktop
-  ("stream this desktop" means the streamed output *is* the desktop); Extend when you've pinned a
-  specific compositor with `SLIPSTREAM_COMPOSITOR` (a test/CI posture).
+- **Automatic** *(default)*, Exclusive on an auto-detected KDE/GNOME desktop ("stream this
+  desktop" means the streamed output *is* the desktop); Extend when you've pinned a specific
+  compositor with `SLIPSTREAM_COMPOSITOR` (a test/CI posture).
 
 Per-backend support:
 
-| | KWin | Mutter/GNOME | Sway/wlroots · Hyprland | Windows |
-|---|---|---|---|---|
-| Extend | ✅ | ✅ | ✅ | ✅ |
-| Primary | ✅ | ✅ | ⚠️ treated as Extend | ✅ |
-| Exclusive | ✅ | ✅ | ⏳ following release | ✅ |
+| | KWin | Mutter/GNOME | Sway/wlroots · Hyprland |
+|---|---|---|---|
+| Extend | ✅ | ✅ | ✅ |
+| Primary | ✅ | ✅ | ⚠️ treated as Extend |
+| Exclusive | ✅ | ✅ | ⏳ following release |
 
 ### Conflict handling · identity · layout
 
 - **Conflict handling**, what happens when a *different* client connects while one is already
   streaming and asks for a different resolution: give it its own display (**separate**), take the
   box over (**steal**), share the existing display at its current mode (**join**), or refuse it
-  (**reject**). On Linux, `separate` gives each client its own display on the shared desktop. On
-  **Windows** a second client is **rejected** (a clean "host busy") even under `separate`, two
-  clients can't yet share one virtual display's capture there (that's a later stage), so the live
-  session is protected instead. A same-client *reconnect* never conflicts, it resumes.
+  (**reject**). `separate` gives each client its own display on the shared desktop. A same-client
+  *reconnect* never conflicts, it resumes.
 - **Identity**, whether each client gets a **stable display identity** so your desktop environment
   remembers its settings (see [Persistent scaling](#persistent-scaling)): one shared identity, one
   **per client**, or one **per client + resolution**.
@@ -401,7 +393,6 @@ client a *stable display identity*, so your desktop environment keys its per-mon
 
 | Host | Supported | How |
 |---|---|---|
-| **Windows** | ✅ today | Connect, set scaling in Settings while streaming, Windows remembers it per client. |
 | **KDE / KWin** | ✅ today | Set scaling in System Settings while streaming; KWin keys it to a stable per-client output name and reapplies it on reconnect. Validated live (150 %/125 % survive a full disconnect + reconnect). |
 | **GNOME / Mutter** | ✅ today | GNOME's virtual-monitor API exposes no stable identity to key config on, so the **host persists the scale itself**: set scaling in Settings while streaming, the host captures the change, remembers it per client, and reapplies it on reconnect. |
 | **Sway / wlroots** | ❌ | Headless outputs can't carry a stable identity; pin scale in your sway config instead. |
@@ -413,8 +404,6 @@ them, when a settings file exists, it wins.
 
 | Legacy knob | Now expressed as |
 |---|---|
-| `SLIPSTREAM_MONITOR_LINGER_MS` | **Keep alive** -> duration *(Windows)* |
-| `SLIPSTREAM_NO_ISOLATE` | **Topology** -> Extend *(Windows)* |
 | `SLIPSTREAM_KWIN_VIRTUAL_PRIMARY` / `SLIPSTREAM_MUTTER_VIRTUAL_PRIMARY` | **Topology** -> Exclusive (when set) / Extend (when `0`) |
 
 One knob has no console equivalent, it's a transport tuning, not display policy:

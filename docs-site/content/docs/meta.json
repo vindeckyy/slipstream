@@ -18,7 +18,6 @@
     "nixos",
     "bazzite",
     "steamos-host",
-    "windows-host",
     "updating",
     "uninstall",
     "---Configure the host---",

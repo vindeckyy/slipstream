@@ -7,28 +7,24 @@ The host is one binary, `slipstream-host`. Most of the time you'll run a single 
 its settings from [`host.env`](/docs/configuration). On the machine you stream *to*, there's a second
 command, [`slipstream`](#slipstream-on-the-client-machine), which ships with the client.
 
-| Command | What it does | Platform |
-|---|---|---|
-| [`serve`](#serve) | Run the host. | all |
-| [`slipstream1-host`](#slipstream1-host) | Standalone native-only test host. | all |
-| [`service`](#service-windows) | Register, start, stop and remove the Windows service. | Windows |
-| [`tray`](#tray-windows) | Start, stop or query the status-tray icon. | Windows |
-| [`driver`](#driver-windows) | Install or remove the bundled virtual-display / virtual-gamepad drivers. | Windows |
-| [`plugins`](#plugins) | Install, remove and list plugins, and switch the runner on. | all |
-| [`list-monitors`](#list-monitors) | List the physical monitors, by connector name. | Linux |
-| `mirror-test` | Prove capture works from one of them, see [`list-monitors`](#list-monitors). | Linux |
-| [`hdr-probe`](#hdr-probe-and-probe-compositor) | Report whether this box can deliver a 10-bit HDR stream, and what's missing. | Linux |
-| [`probe-capture`](#probe-capture) | Show the compositor-aware Linux capture order and runtime availability. | Linux |
-| [`hdr-p010-selftest`](#hdr-probe-and-probe-compositor) | Check the GPU's HDR capture colour conversion, with no display or session. | Windows |
-| [`probe-compositor`](#hdr-probe-and-probe-compositor) | Exit 0 when the compositor is up and can create a virtual output. | Linux |
-| [`detect-conflicts`](#detect-conflicts) | Report other Moonlight-compatible hosts on this machine. | all |
-| [`doctor`](#doctor) | Run read-only host readiness checks before starting a stream. | all |
-| `library` | Print [the resolved game library](/docs/game-library) as JSON, "does the host see my games?". | all |
-| `openapi` | Print the management API's OpenAPI document. | all |
-| `--version` | Print the host version. | all |
+| Command | What it does |
+|---|---|
+| [`serve`](#serve) | Run the host. |
+| [`slipstream1-host`](#slipstream1-host) | Standalone native-only test host. |
+| [`plugins`](#plugins) | Install, remove and list plugins, and switch the runner on. |
+| [`list-monitors`](#list-monitors) | List the physical monitors, by connector name. |
+| `mirror-test` | Prove capture works from one of them, see [`list-monitors`](#list-monitors). |
+| [`hdr-probe`](#hdr-probe-and-probe-compositor) | Report whether this box can deliver a 10-bit HDR stream, and what's missing. |
+| [`probe-capture`](#probe-capture) | Show the compositor-aware capture order and runtime availability. |
+| [`probe-compositor`](#hdr-probe-and-probe-compositor) | Exit 0 when the compositor is up and can create a virtual output. |
+| [`detect-conflicts`](#detect-conflicts) | Report other Moonlight-compatible hosts on this machine. |
+| [`doctor`](#doctor) | Run read-only host readiness checks before starting a stream. |
+| `library` | Print [the resolved game library](/docs/game-library) as JSON, "does the host see my games?". |
+| `openapi` | Print the management API's OpenAPI document. |
+| `--version` | Print the host version. |
 
-`slipstream-host --help` prints the most-used of these. `plugins`, `service`, `driver` and `tray`
-print their own usage when you run them with no arguments.
+`slipstream-host --help` prints the most-used of these. `plugins` prints its own usage when you run
+it with no arguments.
 
 ## `doctor`
 
@@ -129,55 +125,6 @@ have already saved by asking each one directly, which is how you confirm a route
 Where multicast doesn't work (some Docker/VLAN setups), pass `--no-mdns` (or set
 `SLIPSTREAM_MDNS=0`) and add the host in the client by address instead.
 
-## `service` (Windows)
-
-The Windows lifecycle surface. The installer runs `service install` for you, so you only need these
-when you change something or when the service needs a nudge. Run them from an **Administrator**
-prompt.
-
-```powershell
-slipstream-host service install [--gamestream=on|off] [--allow-public-network]
-slipstream-host service uninstall
-slipstream-host service start | stop | restart | status
-```
-
-| Subcommand | What it does |
-|---|---|
-| `install` | Registers the auto-start `SlipstreamHost` service, adds the firewall rules, and writes a default `%ProgramData%\slipstream\host.env` if there isn't one. Safe to re-run: it's also how you change the two options below. |
-| `--gamestream=on\|off` | Sets `SLIPSTREAM_HOST_CMD` in `host.env`, `on` adds the GameStream/Moonlight planes, `off` goes back to the native-only host. A command line you edited by hand is left alone. |
-| `--allow-public-network` | Also opens the ports on networks Windows classifies **Public**. By default only Private and Domain are opened. |
-| `uninstall` | Stops and deletes the service and removes its firewall rules. It does **not** remove the host itself, see [Uninstalling](/docs/uninstall) for that. |
-| `start` / `stop` / `restart` | Service control. `restart` waits for the old process to exit first, this is what picks up a `host.env` edit. |
-| `status` | Queries the service (the same thing `sc query SlipstreamHost` prints). |
-
-See [Running as a Service](/docs/running-as-a-service) and [Windows Host](/docs/windows-host).
-
-## `tray` (Windows)
-
-The status tray is a per-user program started at sign-in, so an update or a crash otherwise leaves
-you without the icon until the next logon. This is how you get it back without signing out:
-
-```powershell
-slipstream-host tray start
-slipstream-host tray status
-slipstream-host tray stop
-```
-
-`start` reports the process it started, or says the tray is already running; `status` says whether
-the tray is installed at all (it's an optional component at install time) and whether it's running.
-
-## `driver` (Windows)
-
-The installer installs and removes the bundled drivers, so you rarely touch this. It exists for
-removing one without uninstalling the host:
-
-```powershell
-slipstream-host driver uninstall            # the ss-vdisplay virtual display driver
-slipstream-host driver uninstall --gamepad  # the virtual-gamepad driver instead
-```
-
-`driver install --dir <stage> [--gamepad]` is the install half; it takes the staged driver files the
-installer lays down, which is why it isn't something you run by hand.
 
 ## `plugins`
 
@@ -204,9 +151,8 @@ Kwin:
 
 Tags flag what's worth knowing before you pick: `primary`, `disabled` (nothing to stream),
 `slipstream virtual display` (one of ours, not a real head), and `PINNED` for the one currently
-selected. Linux
-only, it reads the live compositor, so run it in (or with the environment of) the session you want
-to stream.
+selected. It reads the live compositor, so run it in (or with the environment of) the session you
+want to stream.
 
 `slipstream-host mirror-test --monitor <CONNECTOR> [--seconds N] [--cpu]` then proves the whole path, 
 mirror, capture, frames, with no client involved. It reports the first frame, the frame count and
@@ -247,20 +193,8 @@ answers describe your shell rather than the host, [HDR -> Check it](/docs/hdr#ch
 one-liner and reads the output line by line. See
 [HDR on gamescope](/docs/gamescope#hdr-on-gamescope) for the gamescope half.
 
-`probe-compositor` exits **0** only when the compositor is up and can create a virtual output now, 
+`probe-compositor` exits **0** only when the compositor is up and can create a virtual output now,
 what a session-bringup script should gate on instead of a blind `sleep`.
-
-There is no `hdr-probe` on Windows. The Windows equivalent is a GPU colour self-test of the HDR
-capture conversion, it needs no display and no session, and prints PASS or FAIL with the largest
-error it saw:
-
-```powershell
-slipstream-host hdr-p010-selftest 1920x1080 nvidia
-```
-
-Both arguments are optional: your real capture size (heights like 1080 aren't 16-aligned and take a
-different driver path, the default is a token `64x64`) and, on a dual-GPU box, the vendor that
-encodes: `intel`, `nvidia` or `amd`.
 
 ## `detect-conflicts`
 
@@ -269,8 +203,7 @@ forks) installed or running on this machine. Running one alongside Slipstream is
 they fight over the same ports and virtual-display driver. Prints what it found and exits **1** if
 any conflict exists, **0** if clean (so installers and scripts can gate on it). The host also runs
 this check at `serve` startup and reports it in the logs and in the management API's status
-summary; on Windows the installer warns you before it installs. (The tray stays quiet about it on
-purpose, an installed-but-idle Sunshine isn't a conflict until it runs.)
+summary. An installed-but-idle Sunshine isn't a conflict until it runs.
 See [Troubleshooting -> another streaming host is installed](/docs/troubleshooting#another-streaming-host-sunshine-apollo--is-installed).
 
 ## `slipstream` on the client machine

@@ -11,7 +11,7 @@ const journeys = [
     eyebrow: 'Play',
     title: 'Games on every screen you own',
     description:
-      'Stream from a powerful host to a TV, Steam Deck, phone, or couch PC. Launch from the game library, use Capture mouse for shooters, and keep Moonlight when you want it.',
+      'Stream from a powerful Linux host to a TV, Steam Deck, iPhone, or Android device. Launch from the game library, use Capture mouse for shooters, and keep Moonlight when you want it.',
     href: 'play',
     cta: 'Open the Play guide',
     secondary: [
@@ -39,13 +39,13 @@ const steps = [
   {
     number: '01',
     title: 'Install the host',
-    description: 'Linux packages, Windows installer, Bazzite, SteamOS, or NixOS.',
+    description: 'Linux packages for Ubuntu, Fedora, Arch, Bazzite, SteamOS, or NixOS.',
     slug: 'install',
   },
   {
     number: '02',
     title: 'Pair a client',
-    description: 'Native apps on every major platform, or Moonlight when you enable GameStream.',
+    description: 'iPhone, Android, Steam Deck, or Moonlight when you enable GameStream.',
     slug: 'pairing',
   },
   {

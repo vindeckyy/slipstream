@@ -4,7 +4,7 @@ description: Game streaming hub - host setup, Capture mouse, game library, displ
 ---
 
 Slipstream is built for games as much as for desk work. A lot of people run the host on a powerful
-PC (or a Steam Deck / Bazzite couch box) and connect from a TV, another PC, a phone, or a Deck so
+PC (or a Steam Deck / Bazzite couch box) and connect from a TV, a phone, or a Deck so
 they can play **on the machine that has the GPU**, with a virtual display sized to the client and
 controllers flowing back into the host session.
 
@@ -23,7 +23,7 @@ display, and picture choices.
 ## Who this is for
 
 - You have a **gaming PC, HTPC, or handheld host** you want to stream from.
-- You sit on a **couch client** (TV, laptop, phone, Steam Deck) and want low-latency play with
+- You sit on a **couch client** (TV, phone, Steam Deck) and want low-latency play with
   mouse-look, pads, and often HDR.
 - You already accept that this is **full desktop / game control** of the host, not a cloud game
   rental or a sandboxed remote app.
@@ -67,7 +67,6 @@ Do these once on the host and once on the couch client:
 - On a Steam Deck or Bazzite couch box, follow the platform guides:
   [SteamOS (Host)](/docs/steamos-host), [Bazzite](/docs/bazzite). Streaming **to** a Deck as a client
   is [Steam Deck (Decky)](/docs/steam-deck).
-- On Windows, the installer already installs the `SlipstreamHost` service.
 - Optional: arm [Wake-on-LAN](/docs/wake-on-lan) so a sleeping host can be woken from the client on
   the same LAN (magic packets usually do **not** cross a VPN).
 
@@ -112,8 +111,8 @@ Every host keeps one library: scanned launchers (Steam, and on each OS the other
 hand-added custom titles, and plugin-synced entries. Clients browse posters and send only an **id**;
 the host runs what it already knows.
 
-- Enable **Show game library** on Linux / Windows native clients if it is off (on by default on
-  Apple and Android).
+- Enable **Show game library** on clients that default it off (on by default on iPhone and
+  Android).
 - Moonlight sees the same library when GameStream is enabled.
 - Deck clients can pin titles in the Decky plugin.
 
@@ -130,7 +129,7 @@ For a play-oriented host:
 - GameStream pairing uses legacy plain HTTP; leave it on a **trusted LAN** only
   ([Security](/docs/security)).
 
-You can run both planes: native for the living-room PC / Deck, Moonlight for the TV.
+You can run both planes: native for the living-room phone / Deck, Moonlight for the TV.
 
 ## Recommended client settings for play
 

@@ -224,26 +224,23 @@ pub struct DisplayPolicy {
     /// so existing `display-settings.json` files are untouched.
     #[serde(default)]
     pub game_session: GameSession,
-    /// EXPERIMENTAL (Windows): command physical monitors' panels off over DDC/CI (VCP 0xD6 →
-    /// DPMS off) right before an `Exclusive` isolate deactivates them, and back on at restore.
-    /// Targets the "connected-but-dark head" periodic-stutter class (monitor standby
-    /// auto-input-scan / DP link churn while the virtual display is the sole active display) at
-    /// the monitor-firmware level. Best-effort — monitors without DDC/CI (or with it disabled in
-    /// the OSD) are skipped. Orthogonal to `preset` (like `game_session`): preserved across
-    /// preset changes; `#[serde(default)]` = off so existing `display-settings.json` files are
-    /// untouched.
+    /// EXPERIMENTAL: command physical monitors' panels off over DDC/CI (VCP 0xD6 → DPMS off)
+    /// right before an `Exclusive` isolate deactivates them, and back on at restore. Targets the
+    /// "connected-but-dark head" periodic-stutter class (monitor standby auto-input-scan / DP link
+    /// churn while the virtual display is the sole active display) at the monitor-firmware level.
+    /// Linux uses `ddcutil` when available; Windows uses the Win32 physical-monitor API.
+    /// Best-effort - monitors without DDC/CI (or with it disabled in the OSD) are skipped.
+    /// Orthogonal to `preset` (like `game_session`): preserved across preset changes;
+    /// `#[serde(default)]` = off so existing `display-settings.json` files are untouched.
     #[serde(default)]
     pub ddc_power_off: bool,
-    /// EXPERIMENTAL (Windows): DISABLE physical monitors' PnP device nodes for the stream's
-    /// duration (persistently, so a standby monitor/TV whose hot-plug events re-arrive stays
-    /// disabled) and re-enable them at teardown. Two selectors: the monitors an `Exclusive`
-    /// isolate deactivated, plus — in ANY topology — external monitors that are connected but not
-    /// part of the desktop (the standby TV that was never active, whose input auto-scan /
-    /// instant-on HPD cycling re-probes the link every few seconds). Targets the same
-    /// "connected-but-dark head" periodic-stutter class as [`Self::ddc_power_off`], but at the
-    /// Windows-reaction level: a disabled devnode's wake events trigger no PnP arrival, no CCD
-    /// re-evaluation, no DWM invalidation. A crash-recovery journal re-enables leftovers on host
-    /// startup. Orthogonal to `preset` (like `game_session`); `#[serde(default)]` = off.
+    /// EXPERIMENTAL: silence idle / standby monitors for the stream's duration and restore them
+    /// at teardown. On Linux this force-offs connected external DRM connectors via sysfs
+    /// (`/sys/class/drm/*/status`); on Windows it disables monitor PnP device nodes. Targets the
+    /// same "connected-but-dark head" periodic-stutter class as [`Self::ddc_power_off`], but at the
+    /// OS reaction level (HPD / auto-input scan no longer wakes the desktop stack). A crash-recovery
+    /// journal restores leftovers on host startup. Orthogonal to `preset` (like `game_session`);
+    /// `#[serde(default)]` = off.
     #[serde(default)]
     pub pnp_disable_monitors: bool,
     /// **Mirror a physical monitor instead of creating a virtual display**: the connector name

@@ -1,17 +1,16 @@
 ---
 title: Install the Host
-description: Install the Slipstream host, on Linux from local packaging or GitHub Releases, or on Windows from a signed installer.
+description: Install the Slipstream host on Linux from local packaging or GitHub Releases.
 ---
 
-On Linux, build packages from this repo (or install artifacts from
+Build packages from this repo (or install artifacts from
 [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached). There is no
 public apt/rpm/npm package host. Pick your distro and follow the guide; each row links to the full
-per-distro walkthrough. On **Windows**, the host ships as a signed installer instead, see
-[Windows](#windows).
+per-distro walkthrough.
 
 > **First, read [Security & Safe Use](/docs/security).** A streaming host is remote control of the
 > machine. Designed for trusted local networks, don't expose it to the internet, and be thoughtful
-> about which machine you host on (especially on Windows).
+> about which machine you host on.
 
 ## Pick your distro
 
@@ -31,54 +30,6 @@ an input and enable its module, see [NixOS](/docs/nixos).
 > **Stable vs canary.** When you publish your own package feeds, keep stable and canary separate so
 > a release never traps rolling builds. See [Release Channels](/docs/channels).
 
-## Windows
-
-Slipstream also runs as a native host on **Windows 11 22H2+ (x64)**, shipped as a signed
-installer, see [Windows Host](/docs/windows-host) for what it includes and its limitations.
-
-For hardware encode you need a GPU, NVIDIA (NVENC), AMD (AMF), or Intel (QSV); there's a software
-fallback without one. More detail, including the CLI `slipstream-host service install` path, is in
-[Running as a Service -> Windows](/docs/running-as-a-service#windows).
-
-### winget (optional)
-
-If you host a private winget REST source (see `packaging/winget/`), register it once in an **admin**
-PowerShell, then install. There is no public Slipstream winget source:
-
-```powershell
-# winget source add -n slipstream https://<your-winget-host> -t Microsoft.Rest
-winget install vindeckyy.SlipstreamHost
-```
-
-Otherwise use the manual installer below. winget carries **stable** releases only when you publish
-them that way.
-
-### Manual download
-
-Download `slipstream-host-setup-<ver>.exe` from
-[GitHub Releases](https://github.com/vindeckyy/slipstream/releases) (when attached) and run it
-elevated. The full procedure, everything the installer puts on the machine, its optional tasks, the
-console password, and the `/VERYSILENT` unattended switch, lives on one page:
-[Windows Host -> Install](/docs/windows-host#install). This is also the path for **canary** builds.
-You can also build the installer locally from `packaging/windows/`.
-
-> **About the Unknown Publisher prompt.** The installer is signed with a self-signed certificate, so
-> Windows warns before it runs, accepting the prompt is enough, nothing else is required. If you'd
-> rather silence it, the matching **`slipstream-host-windows_<ver>.cer`** is published next to the
-> installer when available, and it's the **same certificate for every release**, so this is one-time.
-> A self-signed certificate is its own root, so it has to go in both stores. In an **admin**
-> PowerShell:
->
-> ```powershell
-> Import-Certificate -FilePath .\slipstream-host-windows_<ver>.cer `
->   -CertStoreLocation Cert:\LocalMachine\Root
-> Import-Certificate -FilePath .\slipstream-host-windows_<ver>.cer `
->   -CertStoreLocation Cert:\LocalMachine\TrustedPublisher
-> ```
->
-> This is a different certificate from the one the bundled **drivers** are signed with, the
-> installer imports that one for you.
-
 ## NixOS
 
 The repo's `flake.nix` is a supported install path (**`x86_64-linux`**, NixOS **24.11+**): `nix run`
@@ -94,17 +45,16 @@ updates, and headless appliance setup - is on [NixOS](/docs/nixos). Packaging re
   host. On apt and RPM the host package *recommends* it, so your package manager pulls it in by
   default when both packages are available, and the Bazzite sysext image already contains it when
   you build one. On **Arch** it's an optional dependency, so name it yourself when you makepkg.
-- **`slipstream-client`**, the GTK4 desktop client, for streaming *to* a Linux box (build via
-  apt / RPM / Arch packaging, or Flatpak). On a **Steam Deck** prefer the Flatpak, SteamOS's
-  `/usr` is read-only, so the native package isn't the path there:
+- **`slipstream-client`**, the GTK4 client used under the hood on **Steam Deck** (Flatpak /
+  Decky). SteamOS's `/usr` is read-only, so the Flatpak is the path there:
 
   ```sh
   # Build locally (packaging/flatpak) or install a .flatpak from GitHub Releases when attached:
   # flatpak install --user --bundle /path/to/slipstream-client.flatpak
   ```
 
-  For Gaming Mode, add the [Decky plugin](/docs/steam-deck) on top of it. Full client instructions
-  for every device: [Install a Client](/docs/install-client).
+  For Gaming Mode, add the [Decky plugin](/docs/steam-deck) on top of it. Full client instructions:
+  [Install a Client](/docs/install-client).
 
 - **`slipstream-scripting`**, the plugin/script runner. Install it if you want
   [plugins](/docs/plugins) or [automation](/docs/automation). It's inert until you add something to
@@ -116,9 +66,8 @@ updates, and headless appliance setup - is on [NixOS](/docs/nixos). Packaging re
 
 ## After installing
 
-These three steps are for the **Linux packages**. On Windows the installer does the equivalent for
-you; on NixOS the module does steps 1 and 2 (and writes `settings` instead of a hand-copied
-`host.env`), and [NixOS](/docs/nixos) has the units to enable.
+These three steps are for the **Linux packages**. On NixOS the module does steps 1 and 2 (and writes
+`settings` instead of a hand-copied `host.env`), and [NixOS](/docs/nixos) has the units to enable.
 
 1. Add yourself to the `input` group, virtual gamepads and [pen
    input](/docs/input#pen-and-stylus) both need `/dev/uinput`, then re-login. The exact

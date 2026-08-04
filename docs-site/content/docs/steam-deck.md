@@ -8,12 +8,11 @@ button), so you can find a host, pair, and start streaming **without leaving Gam
 couch-friendly front end for the Steam Deck, built from real Steam UI, gamepad-navigable end to end.
 
 Under the hood the plugin doesn't decode video itself: it discovers hosts, runs the PIN pairing, and
-**launches the regular [Linux client](/docs/clients#linux-desktop-client-gtk4)** (usually the
-`io.slipstream` Flatpak) the way gamescope needs so it fullscreens correctly. So the Deck has two
-ways to stream, and they share one client + one paired identity:
+**launches the Flatpak client** (`io.slipstream`) the way gamescope needs so it fullscreens
+correctly. So the Deck has two ways to stream, and they share one client + one paired identity:
 
 - **Gaming Mode** -> the **Decky plugin** (this page).
-- **Desktop Mode** -> run the [Flatpak](/docs/install-client#steam-deck) directly, like any Linux app.
+- **Desktop Mode** -> run the [Flatpak](/docs/install-client#steam-deck) directly.
 
 ## Before you start
 

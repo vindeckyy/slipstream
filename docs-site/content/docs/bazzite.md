@@ -223,5 +223,5 @@ These apply to the **Gaming Mode (gamescope)** path; the KDE Desktop path is una
 Those are the two that bite on Bazzite. The full set, touch, mouse modes, the clipboard, is on
 [gamescope -> Known limits](/docs/gamescope#known-limits).
 
-Then [connect a client](/docs/clients), Moonlight works great for couch gaming, and the Apple app for
-Apple TV / iPad. Trouble? See [Troubleshooting](/docs/troubleshooting).
+Then [connect a client](/docs/clients): iPhone, Android, Steam Deck, or Moonlight for a smart TV.
+Trouble? See [Troubleshooting](/docs/troubleshooting).

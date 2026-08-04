@@ -31,7 +31,7 @@ and nothing you configure here runs anywhere near the streaming path.
 | `pairing.completed` / `pairing.denied` | a pairing is approved+stored / denied | device name, fingerprint, plane |
 | `display.created` / `display.released` | a virtual display is minted / kept displays are released | backend + mode / count |
 | `library.changed` | the game library is mutated | source: `manual`, or the provider id that reconciled (`PUT /api/v1/library/provider/{p}`) |
-| `update.available` | a verified manifest announces a release newer than the running host, once per discovered version, not on every check | version, channel (`stable`/`canary`), and this host's install kind (`apt`, `windows-installer`, ...) |
+| `update.available` | a verified manifest announces a release newer than the running host, once per discovered version, not on every check | version, channel (`stable`/`canary`), and this host's install kind (`apt`, `rpm`, `sysext`, ...) |
 | `update.applied` | the new binary's first start after a successful update | `from`, `to` |
 | `plugins.changed` | a plugin's registration changes (registered, restarted, deregistered, or its lease expired) | plugin id |
 | `store.changed` | an install or uninstall finished, or a plugin catalog was refreshed | none, re-read `GET /api/v1/store/catalog` / `.../installed` |
@@ -49,7 +49,7 @@ version (additive-only, fields get added, never renamed), and the fields above. 
 
 ## Hooks: `hooks.json`
 
-Create `~/.config/slipstream/hooks.json` (Windows: `%ProgramData%\slipstream\hooks.json`), or PUT
+Create `~/.config/slipstream/hooks.json`, or PUT
 the same document to `/api/v1/hooks` from a script, changes apply immediately, no restart:
 
 ```json
@@ -93,8 +93,8 @@ rules:
 - If `hmac_secret_file` is set but unreadable, the host **skips** that POST rather than sending it
   unsigned.
 
-Check the log after editing the file: `journalctl --user -u slipstream-host` on Linux, or the web
-console's **Logs** page on either platform.
+Check the log after editing the file: `journalctl --user -u slipstream-host`, or the web
+console's **Logs** page.
 
 A `run` command's shell one-liner vocabulary, the event flattened to env, values sanitized:
 
@@ -107,10 +107,7 @@ A `run` command's shell one-liner vocabulary, the event flattened to env, values
 [ "$PF_EVENT_KIND" = stream.started ] && makoctl mode -a do-not-disturb
 ```
 
-Richer payloads (and the full document) are on stdin, `jq` away. On a Windows host running as
-the service, the command runs **in your interactive session** (never as SYSTEM); that path can't
-carry per-process env or stdin, so the event JSON's path is appended as the command's last
-argument instead.
+Richer payloads (and the full document) are on stdin, `jq` away.
 
 Verify a signed webhook (Python):
 
@@ -127,8 +124,7 @@ Linux, when a command starts with an **absolute path** to a script, the host che
 owned by you (or root) and not group/world-writable, and refuses to run it, loudly, in the log, 
 if it isn't. Write the full path (`/home/me/.config/slipstream/scripts/on-stream.sh`, not `~/...`) if
 you want that check: the shell expands `~` and looks up PATH names like `makoctl` only afterwards,
-so those are never checked. On Windows there is no per-script check, the ACL on the config
-directory is the boundary.
+so those are never checked.
 
 The two simplest cases also exist as plain [host.env](/docs/configuration) settings, no
 `hooks.json` needed: `SLIPSTREAM_ON_CONNECT_CMD` and `SLIPSTREAM_ON_DISCONNECT_CMD`.
@@ -204,7 +200,7 @@ directory of scripts and installed plugins as one service: crash-restarts with b
 `systemctl stop` that interrupts plugins structurally so their cleanup runs. See the SDK README
 for the five-line quickstart and unit templates.
 
-For ready-made plugins, sync your ROM collection or your Playnite library into the game library, or
+For ready-made plugins, sync your ROM collection into the game library, or
 hand a USB device on the couch to the host, see [Plugins](/docs/plugins). Install one from the web
 console's **Plugins** page (Browse -> pick -> confirm; the host installs it and restarts the runner),
 or from a terminal with `slipstream-host plugins add <name>` followed by

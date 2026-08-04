@@ -882,11 +882,11 @@ const DisplayForm: FC<{
 					/>
 				</div>
 
-				{/* EXPERIMENTAL toggles — orthogonal like game-session (survive preset switches, apply
-				    immediately). Windows-only in effect, acted on at the Exclusive isolate. */}
+				{/* EXPERIMENTAL toggles - orthogonal like game-session (survive preset switches, apply
+				    immediately). Linux: ddcutil + DRM sysfs force-off around Exclusive / standby TVs. */}
 				<ExperimentalToggle
 					label={m.display_ddc()}
-					hint="Windows Exclusive only. Leave off unless monitors stutter while dark."
+					hint="Needs ddcutil. Leave off unless Exclusive leaves a dark panel probing."
 					help={m.display_ddc_help()}
 					recommended={m.display_ddc_disabled()}
 					recommendedValue={false}
@@ -898,7 +898,7 @@ const DisplayForm: FC<{
 				/>
 				<ExperimentalToggle
 					label={m.display_pnp()}
-					hint="Windows Exclusive only. Leave off unless a standby TV wakes the link."
+					hint="Force-offs idle DRM connectors. Leave off unless a standby TV wakes the link."
 					help={m.display_pnp_help()}
 					recommended={m.display_pnp_disabled()}
 					recommendedValue={false}
@@ -1080,7 +1080,7 @@ const ExperimentalToggle: FC<{
 							recommendedValue === on
 								? `Recommended: ${on ? onLabel : offLabel}`
 								: on
-									? "Enable this experimental Windows Exclusive behavior."
+									? "Enable this experimental behavior."
 									: "Leave this experimental axis off (typical setups)."
 						}
 						onClick={() => onSet(on)}
@@ -1559,8 +1559,7 @@ const DisplayRow: FC<{
 };
 
 /** Presets the host can't honor yet (one-click apply would 400) are surfaced but disabled. Empty
- * now that `gaming-rig` (`keep_alive: forever`) ships: the display is Pinned (Linux + Windows) and
- * freed via Release. */
+ * now that `gaming-rig` (`keep_alive: forever`) ships: the display is Pinned and freed via Release. */
 const DISABLED_PRESETS: ReadonlySet<string> = new Set<string>();
 
 const PRESET_LABEL: Record<string, () => string> = {

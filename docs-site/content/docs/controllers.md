@@ -6,9 +6,9 @@ description: How Slipstream turns a pad on the couch into a virtual gamepad on t
 A stream does not "share" your physical controller. The client reads the pad in your hands, and
 the host builds a **virtual gamepad** that games and the desktop see as a normal device. Most of
 the time that is automatic: connect, press A, the title responds. This page is what sits under
-that, the host permission that makes virtual pads work on Linux, the type the host emulates, what
-DualSense and rumble actually carry, when you need a real USB device instead, and how Play and
-Work use pads differently.
+that, the host permission that makes virtual pads work, the type the host emulates, what DualSense
+and rumble actually carry, when you need a real USB device instead, and how Play and Work use pads
+differently.
 
 Mouse, touch, pen, and the in-stream keyboard chords live on [Mouse, touch and pen](/docs/input).
 The Controllers rows in Preferences are listed with every other client setting in
@@ -24,17 +24,15 @@ The Controllers rows in Preferences are listed with every other client setting i
 4. Each connected pad gets its own player slot. Pads can arrive and leave independently during a
    session.
 
-What the host can actually build depends on the OS:
+What the host can actually build:
 
 | Host | Virtual pads |
 |---|---|
 | **Linux** | uinput Xbox 360, plus UHID DualSense / DualShock 4 (and related rich types). Needs `/dev/uinput` access, see [Linux: the `input` group](#linux-the-input-group) below. |
-| **Windows** | Bundled UMDF drivers for DualSense, DualShock 4, and Xbox 360 (XUSB), with rumble. The installer puts them in place; there is no separate "grant gamepad access" step. |
 
 A type the host has no backend for **degrades to an Xbox 360 pad** rather than failing the
-session. Xbox One on a Windows host, or a Sony pad on a Linux host that cannot open `/dev/uhid`,
-are the usual examples. That rule is also what
-[Client settings → when the client and the host disagree](/docs/client-settings#when-the-client-and-the-host-disagree)
+session. A Sony pad on a host that cannot open `/dev/uhid` is the usual example. That rule is also
+what [Client settings → when the client and the host disagree](/docs/client-settings#when-the-client-and-the-host-disagree)
 lists for a gamepad-type request.
 
 Operators who want to **force** a type for every session can set `SLIPSTREAM_GAMEPAD` in
@@ -43,9 +41,9 @@ you have a reason; Automatic from the client is the normal path.
 
 ## Linux: the `input` group
 
-Virtual gamepads inject through `/dev/uinput`. On Linux that node is gated by the **`input`
-group**. If the host user is not in it, clients still "see" your controller and the stream looks
-fine, but **games on the host never get a pad**. The same membership is what [pen
+Virtual gamepads inject through `/dev/uinput`. That node is gated by the **`input` group**. If the
+host user is not in it, clients still "see" your controller and the stream looks fine, but **games
+on the host never get a pad**. The same membership is what [pen
 input](/docs/input#pen-and-stylus) and GNOME's virtual touchscreen path need.
 
 After installing the host package, add yourself and **log out and back in** so the new group
@@ -65,18 +63,15 @@ On **SteamOS** the host installer adds you to `input`, installs the gamepad udev
 the first-install reboot**. Until then the pad degrades to a generic Xbox 360 controller (still
 playable). See [SteamOS (Host)](/docs/steamos-host).
 
-**Windows** has no equivalent step: the virtual gamepad drivers ship in the installer
-([Windows Host](/docs/windows-host)).
-
 ## Client settings that matter
 
 Under **Controllers** (wording varies a little by app):
 
-- **Gamepad type** (*Controller type* on Apple, Android, and the console home), *default:
+- **Gamepad type** (*Controller type* on iPhone, Android, and the console home), *default:
   Automatic*. Pickers offer Xbox 360, Xbox One, DualSense, and DualShock 4 everywhere, plus Steam
-  Deck on Linux, Android, the console home, and Decky. Automatic declares what that controller
+  Deck on Android, the console home, and Decky. Automatic declares what that controller
   really is; an explicit choice declares yours.
-- **Forwarded controller** (*Use controller* on Apple and the console home), *default:
+- **Forwarded controller** (*Use controller* on iPhone and the console home), *default:
   Automatic*, which forwards **every** connected controller as its own player. Pinning one
   restricts the session to that pad alone. Android has no such picker.
 
@@ -90,23 +85,16 @@ forwards (rumble, gyro, DualSense HID) is tabulated in
 
 ## DualSense, rumble, and rich input
 
-On the Linux and Windows desktop clients, SDL3 gamepads carry **rumble**, and a real DualSense
-gets **lightbar, player LEDs, touchpad, motion, and adaptive-trigger replay** when the host is
-emulating a DualSense-family pad. The Windows client README and Linux client README both call
-that out as first-class; the support matrix is the precise per-client table.
-
 In short:
 
-- **Linux and Windows desktop.** DualSense / DualShock 4 touchpad and motion are forwarded; host
-  adaptive-trigger and lightbar effects replay on a real DualSense. Any controller SDL exposes a
-  gyro on can forward motion (Switch Pro and the Steam Deck's own pad included); the Deck's
-  trackpads ride the same touchpad surface.
-- **Apple clients.** Rich capture is gated to the DualSense / DualShock 4 family; other pads get
-  rumble only.
+- **iPhone.** Rich capture is gated to the DualSense / DualShock 4 family; other pads get rumble
+  only.
 - **Android.** Rumble uses the controller's own motor where the kernel exposes it (many phones do
   not). An opt-in setting can also play player 1's rumble on the phone's own motor for clip-on
   pads. Motion / touchpad / adaptive triggers need the pad claimed over **USB**; over Bluetooth
   those paths are missing or dropped.
+- **Steam Deck.** The Deck's own pad and attached controllers forward through the Decky / session
+  client path; trackpads ride the touchpad surface where supported.
 - **Moonlight / GameStream.** Classic multi-controller events reach the host; the extension
   packets for motion, touchpad, and trigger effects are **not** implemented on Slipstream's
   GameStream plane, so none of that rich input arrives there.
@@ -125,8 +113,7 @@ play, and gives it back afterwards.
 
 VirtualHere itself is a commercial USB-over-IP product **sold separately**; Slipstream does not
 bundle or download it. You need the USB Server on the couch and the USB Client on the host. There
-is no VirtualHere server for iOS or tvOS, so iPhones, iPads, and Apple TVs cannot pass devices
-through.
+is no VirtualHere server for iOS, so iPhones cannot pass devices through.
 
 Install and configure from the [Plugins → VirtualHere](/docs/plugins#virtualhere-usb-passthrough)
 page. The console's **Diagnostics** tab (and `slipstream-plugin-virtualhere doctor`) walks the
@@ -140,12 +127,9 @@ VirtualHere when the game needs the real USB identity.
 Every client reserves one controller chord: **L1 + R1 + Start + Select** (LB + RB + Start + Back
 on an Xbox pad), held on any connected pad.
 
-- **Linux, Windows**, a press releases captured input (and leaves fullscreen if you did not start
-  fullscreen). Hold about 1.5 seconds to disconnect.
 - **Steam Deck**, a press releases capture only (Decky always launches fullscreen). Holding
   disconnects.
-- **macOS, iPhone/iPad, Apple TV**, holding about 1.5 seconds disconnects; there is no quick-press
-  step.
+- **iPhone**, holding about 1.5 seconds disconnects; there is no quick-press step.
 - **Android**, holding about a second disconnects; a quick press does nothing, and a **Hold to
   quit...** cue appears when the chord completes.
 
@@ -175,7 +159,7 @@ Same host process, different pad expectations:
 
 ### Play (game streaming)
 
-Host on a powerful PC, Steam Deck, or Bazzite box; client on a TV, phone, another PC, or Deck.
+Host on a powerful PC, Steam Deck, or Bazzite box; client on a TV, phone, or Deck.
 Prefer **Capture (games)** mouse, game-oriented bitrate, and often gamescope or a dedicated game
 session so a library launch boots straight into the title. Forward every pad you care about
 (Automatic), or pin one for single-player. DualSense fidelity and rumble matter here; VirtualHere
@@ -185,7 +169,7 @@ matters for wheels and HOTAS. Pair once on the LAN and stream from the couch. Sh
 
 ### Work (remote desktop)
 
-Host on the workstation you left at home; client on an office laptop over a **private VPN**. You
+Host on the workstation you left at home; client on an office device over a **private VPN**. You
 usually want **Desktop (absolute)** mouse, clipboard on, and **Stream microphone** off unless you
 need it. A gamepad is optional: useful for media remotes or the odd game at lunch, not required
 for IDEs and browsers. Prefer a full desktop session over gamescope. Step-by-step:
@@ -197,23 +181,17 @@ mouse and game-oriented bitrate for the same host when you are home on the couch
 
 ### A controller is detected but games don't see it
 
-- **Linux.** The host user needs the `input` group. On Bazzite run
-  `ujust add-user-to-input-group`, then log out and back in. Elsewhere:
-  `sudo usermod -aG input $USER` and re-login. See
-  [Troubleshooting](/docs/troubleshooting#a-controller-is-detected-but-games-dont-see-it) and
-  [Bazzite → Allow controller input](/docs/bazzite#allow-controller-input).
-- **Windows, if this PC ever ran 0.22.0 or 0.22.1.** Those two releases bound the default emulated
-  controller to one of Windows' own drivers instead of Slipstream's, so the app responded to your
-  pad but no game saw it. Fixed from **0.22.2**, but you must update **through the installer**
-  (setup `.exe`, `winget upgrade`, or the console's **Update now**). Swapping
-  `slipstream-host.exe` by hand does not rebind a stale device.
+The host user needs the `input` group. On Bazzite run `ujust add-user-to-input-group`, then log
+out and back in. Elsewhere: `sudo usermod -aG input $USER` and re-login. See
+[Troubleshooting](/docs/troubleshooting#a-controller-is-detected-but-games-dont-see-it) and
+[Bazzite → Allow controller input](/docs/bazzite#allow-controller-input).
 
 ### The pad works as Xbox 360 but not as DualSense / Deck
 
-On Linux, DualSense / DualShock 4 need UHID; Steam Deck native passthrough on SteamOS needs
-`input` plus `vhci-hcd` after the first reboot. An unsupported type folds to Xbox 360 by design.
-Check `SLIPSTREAM_GAMEPAD` is not forcing a type the host cannot build, and that Automatic is
-declaring what you expect in [Client settings](/docs/client-settings#input).
+DualSense / DualShock 4 need UHID; Steam Deck native passthrough on SteamOS needs `input` plus
+`vhci-hcd` after the first reboot. An unsupported type folds to Xbox 360 by design. Check
+`SLIPSTREAM_GAMEPAD` is not forcing a type the host cannot build, and that Automatic is declaring
+what you expect in [Client settings](/docs/client-settings#input).
 
 ### Rumble or adaptive triggers are missing
 

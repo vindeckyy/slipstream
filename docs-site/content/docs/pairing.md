@@ -77,7 +77,7 @@ systemd user unit, which you enable once, see [The Web Console](/docs/web-consol
 
 Then, on the client:
 
-- **[Native clients](/docs/clients) (Apple, Linux, Windows, Android):** select the host (or use
+- **[Native clients](/docs/clients) (iPhone, Android, Steam Deck):** select the host (or use
   *Pair with PIN...* from its menu) and enter the PIN the host displays.
 - **[Steam Deck](/docs/steam-deck) (the Decky plugin):** open Slipstream from the Quick Access menu
   and pick the host, an unpaired one's button reads **Pair & Stream**. Enter the PIN on the
@@ -95,8 +95,8 @@ you've never paired with can at most open the app's own trust prompt.
 
 GameStream pairing only works when all of these are true:
 
-1. The host was started **with GameStream enabled** (`serve --gamestream`, or the packaged unit /
-   installer option that turns it on). Bare `serve` has no Moonlight pairing card.
+1. The host was started **with GameStream enabled** (`serve --gamestream`, or the packaged unit
+   that turns it on). Bare `serve` has no Moonlight pairing card.
 2. The **web console** is running and reachable - it is the only UI where a Moonlight PIN can be
    entered ([Web console](/docs/web-console)).
 3. Moonlight can reach the GameStream ports (firewall `slipstream-gamestream`, and no competing
@@ -107,29 +107,21 @@ GameStream pairing only works when all of these are true:
    host handshake.
 
 If the Moonlight card never appears in the console, GameStream is off on that host - that is
-expected on stock Windows installs and on Linux hosts you deliberately hardened for
-[Desktop at work](/docs/desktop-at-work).
+expected on hosts you deliberately hardened for [Desktop at work](/docs/desktop-at-work).
 
 ### Pairing from a terminal
 
-On Linux the client package also installs `slipstream`, a headless CLI. Arm pairing in the console,
-read the PIN, then run:
+Where the `slipstream` headless CLI is packaged, arm pairing in the console, read the PIN, then run:
 
 ```sh
 slipstream pair 192.168.1.50 --pin 1234 --name "Living Room"
 ```
 
-It prints `paired <addr>:<port> fp=<fingerprint>` and saves the host in the same store the desktop
-client uses, so later connects are silent. `--name` is the label the host files this device under
-(default: this machine's name), and the port defaults to **9777**, write `host:port` to use another
-one. Without `--pin` the command asks for one; in a script with no terminal it exits **6** rather
-than hanging, and exit **3** means the host refused or the PIN was wrong.
-
-The GTK client can do the same thing without opening a window:
-
-```sh
-slipstream-client --connect 192.168.1.50:9777 --pair 1234 --name "Living Room"
-```
+It prints `paired <addr>:<port> fp=<fingerprint>` and saves the host. `--name` is the label the host
+files this device under (default: this machine's name), and the port defaults to **9777**, write
+`host:port` to use another one. Without `--pin` the command asks for one; in a script with no
+terminal it exits **6** rather than hanging, and exit **3** means the host refused or the PIN was
+wrong.
 
 Over a VPN, substitute the Tailscale / WireGuard IP for `192.168.1.50` - same ceremony
 ([Network & VPN](/docs/network-and-vpn)).
