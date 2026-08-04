@@ -94,7 +94,12 @@ an Xbox pad), held on any connected pad.
 
 ## Mouse modes
 
-There are two, and they are a per-client setting called **Mouse input**:
+There are two, and they are a per-client setting called **Mouse input**. Pick based on the job:
+
+| Job | Mode |
+|---|---|
+| Games with mouse-look, shooters, many 3D titles | **Capture (games)** |
+| Remote desktop, office apps, browsers, IDEs | **Desktop (absolute)** |
 
 - **Capture (games)**, the pointer locks to the stream and only relative movement is sent. The only
   cursor you see is the host's. This is what mouse-look in a game needs. The session window also
@@ -103,7 +108,8 @@ There are two, and they are a per-client setting called **Mouse input**:
   [client settings](/docs/client-settings#input) to keep them local.
 - **Desktop (absolute)**, the pointer is not locked. It moves in and out of the stream freely and
   its position is sent as an absolute point, what you want for remote desktop work. Your local
-  cursor is hidden over the stream; the one you see there is the host's.
+  cursor is hidden over the stream; the one you see there is the host's. This is the mode the
+  [Desktop at work](/docs/desktop-at-work) checklist expects.
 
 **Capture is the default** on the Linux, Windows and macOS clients. **Android defaults to Desktop**
 , a phone or TV is more often driven by touch or a pad than by a locked mouse.

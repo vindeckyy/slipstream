@@ -9,9 +9,78 @@ This is the shortest path to a working stream. Each step links to the details.
 > it on your LAN or a VPN and don't expose it to the internet. Two minutes on
 > [Security & Safe Use](/docs/security) before you start is worth it.
 
+## Pick your goal early
+
+Before you install, decide which success story you are chasing tonight. Same product, different
+first checklist. You can always add the other path later with a second
+[settings profile](/docs/profiles-and-links).
+
+### Playing tonight
+
+**Goal:** a game (or Desktop) streaming on your LAN to a couch client, TV, Deck, phone, or second PC.
+
+**Do first**
+
+1. Install and start the host on the gaming PC (steps 1–2 below).
+2. Open the [web console](/docs/web-console), set the password, arm pairing (steps 3–4).
+3. Install a [native client](/docs/clients) when one exists; use [Moonlight](/docs/moonlight) only if
+   you need a device without a native app.
+4. Pair on the home LAN, start a stream, leave mouse in **Capture** for mouse-look titles.
+
+**You are done when**
+
+- The client lists the host (or you added it by LAN IP) and pairing succeeds once.
+- A stream shows a picture at roughly the mode you asked for.
+- A keyboard/mouse or [controller](/docs/controllers) moves something on the host.
+- Optional: a library title launches into the stream ([Game library](/docs/game-library)).
+
+**Next depth:** [Play](/docs/play) (presets, HDR, bitrate, Headless box), 
+[Picture quality](/docs/picture-quality), [Controllers](/docs/controllers), [Audio](/docs/audio).
+
+### Office tomorrow
+
+**Goal:** your real home/workstation desktop from an office laptop over a **private VPN** — not a
+public port-forward.
+
+**Do first**
+
+1. Complete **Playing tonight** style setup **once on the home LAN** so you know the host, console,
+   and native client work before the VPN is in the picture (steps 1–5 below).
+2. Prefer a **native** client; turn **GameStream off** on a Work-oriented host if you do not need
+   Moonlight ([Moonlight](/docs/moonlight), [Security](/docs/security#gamestream--moonlight-compatibility-is-the-weak-crypto-path)).
+3. Put host and laptop on the same VPN ([Network & VPN](/docs/network-and-vpn)); add the host **by
+   VPN IP** when discovery is empty.
+4. Switch the client to **Desktop (absolute)** mouse; enable clipboard; pick **Workstation** or
+   **Hot-desk**; tune picture for text.
+
+**You are done when**
+
+- From the office network, the native client connects using the VPN address (empty mDNS list is OK).
+- Desktop mouse lets you click window chrome and select text without capture-lock fighting you.
+- Text in an IDE or browser is readable after bitrate / HEVC / chroma tuning —
+  [Picture quality](/docs/picture-quality).
+- Clipboard text crosses when both host and client switches are on ([Clipboard](/docs/clipboard)),
+  or you have an agreed file-share alternative for large files.
+
+**Next depth:** [Desktop at work](/docs/desktop-at-work), [Network & VPN](/docs/network-and-vpn),
+[Virtual displays](/docs/virtual-displays), [Input](/docs/input).
+
+If you need both, finish the LAN stream first, then layer the VPN and a **Work** profile on the
+same host — do not debug soft text and Tailscale ACLs at the same time.
+
+| | Playing tonight | Office tomorrow |
+|---|---|---|
+| Network | Home LAN | Private VPN after a proven LAN stream |
+| Client | Native if available; Moonlight OK for TVs | Native preferred; GameStream off if unused |
+| Mouse | Capture (default) for games | Desktop (absolute) |
+| Display preset | Headless box / Shared desktop | Workstation / Hot-desk |
+| Picture | HDR / high refresh as the chain allows | HEVC, HDR off, bitrate for sharp text |
+| Success | Picture + input on the couch | VPN connect + readable desktop + clipboard or file share |
+
 ## 1. Set up the host
 
-On your gaming machine (NVIDIA, AMD, or Intel GPU), follow the install guide for your system:
+On the machine you want to stream from — a gaming PC, a workstation, or any supported host with an
+NVIDIA, AMD, or Intel GPU — follow the install guide for your system:
 
 - [Ubuntu](/docs/ubuntu)
 - [Fedora](/docs/fedora)
@@ -24,6 +93,9 @@ Each one covers the GPU driver, the dependencies, and how to install and run the
 installing, configure for your desktop ([KDE](/docs/kde) / [GNOME](/docs/gnome) /
 [gamescope](/docs/gamescope) / [Hyprland](/docs/hyprland) / [Sway](/docs/sway)). Check the
 [Requirements](/docs/requirements) first if you're not sure your machine is a fit.
+
+**Office note:** for remote desktop, prefer a full desktop session over gamescope / Gaming Mode —
+absolute mouse needs a real desktop ([Desktop at work](/docs/desktop-at-work)).
 
 ## 2. Start the host
 
@@ -59,7 +131,9 @@ extra planes pair over plain HTTP and belong on a trusted LAN only, for a native
 
 If the host runs a firewall (Fedora enables firewalld, CachyOS enables ufw), open its ports, the
 firewall step in your distro guide has the exact commands, for **both** `slipstream-native` and
-`slipstream-gamestream`, because the packaged unit serves both planes.
+`slipstream-gamestream`, because the packaged unit serves both planes. Copy-paste also lives on
+[Network & VPN → Firewalls](/docs/network-and-vpn#firewalls--copy-paste). For a Work-only host you
+can open `slipstream-native` alone and leave GameStream closed.
 
 On **SteamOS** even that is done for you, the install script wrote its own `slipstream-host` user
 service and started it (GameStream on by default there too; pass `--no-gamestream` to the install
@@ -91,7 +165,7 @@ after you sign in. On the Dashboard, follow **Getting started** to check host re
 device, then open the library. You can dismiss that checklist if you already know the setup path.
 
 The certificate is the host's own self-signed one, so your browser warns once, trust it and
-continue. Full details: [The Web Console](/docs/web-console).
+continue. Full details and a page-by-page tour: [The Web Console](/docs/web-console).
 
 ## 4. Connect and pair a client
 
@@ -109,6 +183,9 @@ console you opened in step 3, the host displays a 4-digit PIN, you type it into 
 trust each other from then on. Pairing is required by default. Full details:
 [Pairing & Trust](/docs/pairing).
 
+**Office / VPN:** discovery often fails across the tunnel — **Add host** by VPN IP, then pair the
+same way ([Network & VPN](/docs/network-and-vpn#discovery-across-a-vpn)).
+
 ## 5. Stream
 
 Once paired, select the host and start streaming. The host creates a virtual display at your device's
@@ -117,26 +194,52 @@ host.
 
 Worth knowing before you need it: on the desktop clients the stream *takes* your mouse and keyboard
 when it starts, and again whenever you click into it. **Ctrl+Alt+Shift+Q** (**⌃⌥⇧Q** on macOS) hands
-them back. The other in-stream shortcuts, and the mouse, touch and pen modes, are on
+them back. For remote desktop / office work, switch to **Desktop (absolute)** mouse
+(**Ctrl+Alt+Shift+M**) so the pointer is not locked — Capture mode is the default and is meant for
+games. The other in-stream shortcuts, and the mouse, touch and pen modes, are on
 [Mouse, touch and pen](/docs/input).
+
+**Playing tonight check:** Capture mouse + a launched game or Desktop feels responsive on LAN.  
+**Office tomorrow check:** Desktop mouse + readable UI over the VPN path you will actually use.
 
 ## Now that it works
 
-Slipstream does more than mirror a screen:
+Pick the path that matches what you hired Slipstream for.
 
-- Browse the host's installed games and launch one straight into the stream, 
+### Play
+
+- Full couch checklist and presets: [Play](/docs/play).
+- Browse the host's installed games and launch one straight into the stream,
   [Game library](/docs/game-library).
-- Save named stream settings, bind them to a host, and start a session from a shortcut or a script, 
-  [Profiles and links](/docs/profiles-and-links).
-- Copy on one machine and paste on the other, [Shared clipboard](/docs/clipboard).
-- Connect to a host that's asleep, [Wake-on-LAN](/docs/wake-on-lan).
+- Use Capture (game) mouse for mouse-look titles, [Mouse, touch and pen](/docs/input).
+- Controllers and pads: [Controllers](/docs/controllers).
 - Get a 10-bit HDR picture where the whole chain allows it, [HDR](/docs/hdr).
+- Bitrate, chroma, soft vs sharp picture: [Picture quality](/docs/picture-quality).
+- Connect to a host that's asleep, [Wake-on-LAN](/docs/wake-on-lan) (LAN only for magic packets).
+
+### Work
+
+- Follow the office checklist: VPN, Desktop mouse, clipboard, Workstation / Hot-desk,
+  [Desktop at work](/docs/desktop-at-work).
+- Reach the host from another network safely, [Network & VPN](/docs/network-and-vpn).
+- Soft text and Work picture recipe: [Picture quality](/docs/picture-quality).
+- Copy on one machine and paste on the other, [Shared clipboard](/docs/clipboard).
+- Audio mute / mic defaults for desk sessions: [Audio](/docs/audio).
+- Save a Work settings profile separate from your couch profile,
+  [Profiles and links](/docs/profiles-and-links).
+
+### Either way
+
+- Save named stream settings, bind them to a host, and start a session from a shortcut or a script,
+  [Profiles and links](/docs/profiles-and-links).
+- Tune resolution, refresh, bitrate, codec and HDR in
+  [client settings](/docs/client-settings); the host's own knobs are in
+  [Configuration](/docs/configuration).
 
 ## Keep it running
 
-- Tune the picture, resolution, refresh, bitrate, codec and HDR are all
-  [client settings](/docs/client-settings); the host's own knobs are in
-  [Configuration](/docs/configuration).
 - Make it always-on, no login, no monitor: [Running as a Service](/docs/running-as-a-service).
 - Keep it current with [Updating](/docs/updating); changed your mind? [Uninstall](/docs/uninstall).
-- Hit a snag? See [Troubleshooting](/docs/troubleshooting).
+- Hit a snag? See [Troubleshooting](/docs/troubleshooting), including
+  [Office / VPN](/docs/troubleshooting#office--vpn) and
+  [Host isn't found](/docs/troubleshooting#the-host-isnt-found-on-the-network).

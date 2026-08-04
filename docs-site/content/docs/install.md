@@ -22,11 +22,11 @@ per-distro walkthrough. On **Windows**, the host ships as a signed installer ins
 | **Fedora (dnf)** | dnf / rpm-ostree | build with `packaging/rpm`, then `sudo dnf install ./dist/slipstream-*.rpm` | [Fedora](/docs/fedora) · [packaging/rpm](https://github.com/vindeckyy/slipstream/blob/main/packaging/rpm/README.md) |
 | **Arch** | pacman / makepkg | `cd packaging/arch && PF_SRCDIR="$(git rev-parse --show-toplevel)" makepkg -si` | [Arch Linux](/docs/arch) · [packaging/arch](https://github.com/vindeckyy/slipstream/blob/main/packaging/arch/README.md) |
 | **SteamOS (host)** | on-device script | clone the repo, then `bash ~/slipstream/scripts/steamdeck/install.sh` (builds on-device) | [SteamOS (Host)](/docs/steamos-host) |
-| **NixOS / Nix** | nix flake | `nix run github:vindeckyy/slipstream#slipstream-host -- serve --gamestream` | [NixOS](#nixos) · [packaging/nix](https://github.com/vindeckyy/slipstream/blob/main/packaging/nix/README.md) |
+| **NixOS / Nix** | nix flake | `nix run github:vindeckyy/slipstream#slipstream-host -- serve --gamestream` | [NixOS](/docs/nixos) · [packaging/nix](https://github.com/vindeckyy/slipstream/blob/main/packaging/nix/README.md) |
 
 After you install a package once, rebuild or re-download for updates (or use
 `sudo slipstream-sysext update` on Bazzite when you publish a feed). On **NixOS** add the flake as
-an input and enable its module, see [NixOS](#nixos).
+an input and enable its module, see [NixOS](/docs/nixos).
 
 > **Stable vs canary.** When you publish your own package feeds, keep stable and canary separate so
 > a release never traps rolling builds. See [Release Channels](/docs/channels).
@@ -81,47 +81,15 @@ You can also build the installer locally from `packaging/windows/`.
 
 ## NixOS
 
-The repo's `flake.nix` is a supported install path: it builds `slipstream-host`, `slipstream-client`,
-`slipstream-web` and `slipstream-scripting`, and ships a NixOS module. **`x86_64-linux` only**, and
-NixOS **24.11 or newer**.
-
-You can run it straight from the flake without NixOS (on other distros, wrap it in
-[nixGL](https://github.com/nix-community/nixGL) so the GPU drivers resolve):
-
-```sh
-nix run github:vindeckyy/slipstream#slipstream-host -- serve --gamestream
-```
-
-On NixOS, add the flake as an input, add `slipstream.nixosModules.default` to your system's modules,
-and enable the host:
-
-```nix
-services.slipstream.host = {
-  enable = true;
-  users = [ "alice" ];     # added to the `input` group, for virtual gamepads
-  openFirewall = true;
-  settings = { RUST_LOG = "info"; };   # these become host.env
-};
-```
-
-The module does declaratively what the deb/RPM scriptlets do, the systemd user service, udev rules,
-kernel modules, sysctl tuning, the firewall ports and `input` group membership, and brings in the
-web console alongside the host. Because `settings` writes the environment file for you, skip the
-`host.env` step in [After installing](#after-installing). The user services are defined but not
-started, so from your graphical session enable the host and the console:
-
-```sh
-systemctl --user enable --now slipstream-host slipstream-web
-```
-
-The full option reference (client, console and scripting options, GPU driver notes, headless
-appliance setup) is in
-[packaging/nix](https://github.com/vindeckyy/slipstream/blob/main/packaging/nix/README.md). To
-update, run `nix flake update slipstream` in your flake directory, then `sudo nixos-rebuild switch`.
+The repo's `flake.nix` is a supported install path (**`x86_64-linux`**, NixOS **24.11+**): `nix run`
+for a quick try, or the NixOS module for a declarative host (systemd user units, udev, firewall,
+`input` group, web console). Full walkthrough — module options, GameStream toggle, GPU/nixGL notes,
+updates, and headless appliance setup — is on [NixOS](/docs/nixos). Packaging reference:
+[packaging/nix](https://github.com/vindeckyy/slipstream/blob/main/packaging/nix/README.md).
 
 ## What the packages are
 
-- **`slipstream-host`**, the streaming host. Install this on your Linux gaming machine.
+- **`slipstream-host`**, the streaming host. Install this on the Linux machine you want to stream from (gaming PC, workstation, or streaming box).
 - **`slipstream-web`**, the browser management console (pairing + status). Recommended alongside the
   host. On apt and RPM the host package *recommends* it, so your package manager pulls it in by
   default when both packages are available, and the Bazzite sysext image already contains it when
@@ -149,7 +117,8 @@ update, run `nix flake update slipstream` in your flake directory, then `sudo ni
 ## After installing
 
 These three steps are for the **Linux packages**. On Windows the installer does the equivalent for
-you; on NixOS the module does steps 1 and 2, and [NixOS](#nixos) above has the units to enable.
+you; on NixOS the module does steps 1 and 2 (and writes `settings` instead of a hand-copied
+`host.env`), and [NixOS](/docs/nixos) has the units to enable.
 
 1. Add yourself to the `input` group, virtual gamepads and [pen
    input](/docs/input#pen-and-stylus) both need `/dev/uinput`, then re-login. The exact

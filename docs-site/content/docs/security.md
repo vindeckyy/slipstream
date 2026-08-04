@@ -54,7 +54,9 @@ If you want to stream from outside your home, tunnel in instead of opening up:
 - **Use a VPN**, WireGuard, Tailscale, or your router's built-in VPN. This puts your remote client on
   the *same private subnet* as the host, so from Slipstream's point of view it's still a local
   connection, and the tunnel (not Slipstream) handles internet-facing authentication and encryption.
-  Discovery, pairing, and streaming then work exactly as they do at home.
+  Discovery, pairing, and streaming then work exactly as they do at home. Step-by-step patterns,
+  ports, and discovery notes: [Network & VPN](/docs/network-and-vpn). For office laptop → home
+  desktop, also read [Desktop at work](/docs/desktop-at-work).
 - **Don't** map a router port to the host. A port-forward turns "trusted LAN service" into
   "internet-facing service" with none of the protections that implies.
 

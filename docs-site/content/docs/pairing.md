@@ -22,6 +22,25 @@ automatically on a pinned cryptographic identity.
   it was awake also teaches the client its MAC address, so a later connect can
   [wake it from sleep](/docs/wake-on-lan).
 
+## Native vs GameStream pairing
+
+Two planes, two ceremonies. Do not mix up which UI shows the PIN.
+
+| | **Native (`slipstream/1`)** | **GameStream / Moonlight** |
+|---|---|---|
+| When available | Always (native plane is always on) | Only if the host runs with `--gamestream` |
+| Who shows the PIN | **Host** (console **Pair a device**) | **Moonlight** client |
+| Who types the PIN | Native Slipstream client (or CLI) | Host console **Moonlight (GameStream) pairing** card |
+| Arming required? | Yes — arm pairing in the console (2‑minute window) | No arming; submit the PIN Moonlight shows |
+| Console card visible? | Always (Pairing page) | Only when GameStream plane is running |
+| Crypto posture | SPAKE2 binding + pinned identity on the native plane | Legacy GameStream pairing over **plain HTTP**; weaker control encryption — trusted LAN only |
+| Office / VPN recommendation | **Prefer this** | Leave **off** on Work-oriented hosts unless you need Moonlight |
+
+Native clients: [Clients](/docs/clients). Moonlight path: [Connect with Moonlight](/docs/moonlight).
+Why GameStream is the weak-crypto path:
+[Security](/docs/security#gamestream--moonlight-compatibility-is-the-weak-crypto-path).
+Work checklist: [Desktop at work](/docs/desktop-at-work).
+
 ## Approving a device from the console (no PIN)
 
 The fastest way to admit a new device: just **try to connect** from it. On a pairing-required host,
@@ -72,6 +91,25 @@ A link can't stand in for any of this. A
 host this device already trusts; `slipstream://pair/...` is refused outright, and a link naming a host
 you've never paired with can at most open the app's own trust prompt.
 
+### Moonlight PIN conditions
+
+GameStream pairing only works when all of these are true:
+
+1. The host was started **with GameStream enabled** (`serve --gamestream`, or the packaged unit /
+   installer option that turns it on). Bare `serve` has no Moonlight pairing card.
+2. The **web console** is running and reachable — it is the only UI where a Moonlight PIN can be
+   entered ([Web console](/docs/web-console)).
+3. Moonlight can reach the GameStream ports (firewall `slipstream-gamestream`, and no competing
+   Sunshine/Apollo process) — [Moonlight](/docs/moonlight),
+   [Network & VPN](/docs/network-and-vpn).
+4. You start **Pair** in Moonlight **while** you are ready to type the PIN into the console; there
+   is no separate “arm” step, but the waiting-client state is still time-bounded by the Moonlight /
+   host handshake.
+
+If the Moonlight card never appears in the console, GameStream is off on that host — that is
+expected on stock Windows installs and on Linux hosts you deliberately hardened for
+[Desktop at work](/docs/desktop-at-work).
+
 ### Pairing from a terminal
 
 On Linux the client package also installs `slipstream`, a headless CLI. Arm pairing in the console,
@@ -92,6 +130,27 @@ The GTK client can do the same thing without opening a window:
 ```sh
 slipstream-client --connect 192.168.1.50:9777 --pair 1234 --name "Living Room"
 ```
+
+Over a VPN, substitute the Tailscale / WireGuard IP for `192.168.1.50` — same ceremony
+([Network & VPN](/docs/network-and-vpn)).
+
+## Pairing over a VPN
+
+Pairing does not require multicast. As long as the client can reach the host's control port
+(native UDP **9777**, or GameStream ports for Moonlight) on the private overlay, the ceremony is
+the same as on LAN.
+
+Practical tips:
+
+- **Add the host by VPN IP** first if discovery is empty — normal over Tailscale / WireGuard.
+- Open the [web console](/docs/web-console) at `https://<vpn-ip>:47992` to arm native pairing or
+  submit a Moonlight PIN (firewall: `slipstream-web`).
+- Prefer **native** pairing on office paths; keep GameStream off on Work hosts when you can.
+- Pair once from the office laptop you will actually use; a second device (tablet, phone) is a
+  separate allow-list entry — see multi-device notes in
+  [Desktop at work](/docs/desktop-at-work).
+- The VPN is **not** a substitute for PIN / console approval. Anyone who can reach the host still
+  needs a successful ceremony unless you deliberately ran `serve --open`.
 
 ## Requiring pairing (the default)
 
@@ -124,14 +183,60 @@ to the PIN ceremony.
 Once a host is pinned, a fingerprint change is treated as the impostor signal: the client forces
 re-pairing through the PIN ceremony rather than offering to re-trust the new identity.
 
+**When TOFU is a bad fit**
+
+- Office / VPN paths where the network is not solely yours.
+- Any host that still has GameStream enabled on a segment you do not fully trust.
+- Shared houses, labs, or corp VPN egress where another device could answer first.
+
+Prefer PIN or console approval everywhere you would also refuse `serve --open`.
+
+## Revoke and re-pair
+
+### Revoke (remove a device)
+
+The [web console](/docs/web-console) **Pairing** page lists every paired device. Remove one to
+revoke its access immediately — that identity is no longer on the allow-list. Use this when:
+
+- You lost a laptop or phone that was paired.
+- You reinstalled a client OS and want a clean label.
+- You are retiring a living-room device.
+
+Revoke does not block the device's IP forever; it only drops the stored client identity. The same
+physical machine can pair again with a new ceremony.
+
+### Re-pair
+
+Re-pairing is the PIN ceremony (or console approval) again:
+
+1. Optionally remove the old entry on the host so labels stay clear.
+2. Arm pairing (native) or start Moonlight **Pair** (GameStream).
+3. Complete the PIN / approval flow.
+
+**Host identity changed** (reinstall, wiped config, new machine with the same name): clients that
+pinned the old fingerprint treat this as the impostor signal and **force** re-pairing — they will
+not silently accept the new cert. That is intentional. After you trust the new fingerprint via PIN,
+reconnects are automatic again.
+
+If a client can't pair at all, see [Troubleshooting → Pairing is
+rejected](/docs/troubleshooting#pairing-is-rejected--the-client-cant-connect).
+
 ## Managing paired devices
 
 The [web console](/docs/web-console) lists every paired device and lets you remove one (revoking its
-access). Re-pairing is just the PIN ceremony again.
-
-If a client can't pair at all, see [Troubleshooting -> Pairing is
-rejected](/docs/troubleshooting#pairing-is-rejected--the-client-cant-connect).
+access). Re-pairing is just the PIN ceremony again — see [Revoke and re-pair](#revoke-and-re-pair)
+above.
 
 (There is also a developer/measurement host, `slipstream-host slipstream1-host`, a subcommand of the
 same binary, not the host you install. It has its own `--allow-tofu` / `--pairing-pin` flags for test
 harnesses; nothing on this page applies to it.)
+
+## Related pages
+
+- [The Web Console](/docs/web-console)
+- [Connect with Moonlight](/docs/moonlight)
+- [Network & VPN](/docs/network-and-vpn)
+- [Desktop at work](/docs/desktop-at-work)
+- [Security & Safe Use](/docs/security)
+- [Clients](/docs/clients)
+- [Troubleshooting → Pairing](/docs/troubleshooting#pairing-is-rejected--the-client-cant-connect)

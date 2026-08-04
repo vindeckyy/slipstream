@@ -2,8 +2,8 @@ import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared'
 import BrandMark from '@/components/BrandMark'
 import Wordmark from '@/components/Wordmark'
 
-// Shared chrome for the docs and home layouts. Keep the product identity visible
-// while the links answer the questions people arrive with.
+// Shared chrome for the docs and home layouts. Primary links answer the jobs
+// people arrive with; community and source stay secondary.
 export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
@@ -17,16 +17,23 @@ export function baseOptions(): BaseLayoutProps {
         </div>
       ),
     },
+    githubUrl: 'https://github.com/vindeckyy/slipstream',
     links: [
-      { text: 'Start here', url: '/docs/quickstart' },
-      { text: 'Install host', url: '/docs/install' },
-      { text: 'Connect a client', url: '/docs/clients' },
-      { text: 'Browser console', url: '/docs/web-console' },
+      { text: 'Quick Start', url: '/docs/quickstart' },
+      { text: 'Play', url: '/docs/play' },
+      { text: 'Work', url: '/docs/desktop-at-work' },
+      { text: 'Install', url: '/docs/install' },
+      { text: 'Clients', url: '/docs/clients' },
       { text: 'API', url: '/api' },
-      { text: 'Support', url: 'https://ko-fi.com/slipstream' },
-      { text: 'Source code', url: 'https://github.com/vindeckyy/slipstream' },
-      { text: 'Discord', url: 'https://discord.gg/kaPNvzMuGU' },
-      { text: 'Reddit', url: 'https://www.reddit.com/r/Slipstream/' },
+      {
+        type: 'menu',
+        text: 'Community',
+        items: [
+          { text: 'Discord', url: 'https://discord.gg/kaPNvzMuGU' },
+          { text: 'Reddit', url: 'https://www.reddit.com/r/Slipstream/' },
+          { text: 'Support on Ko-fi', url: 'https://ko-fi.com/slipstream' },
+        ],
+      },
     ],
   }
 }

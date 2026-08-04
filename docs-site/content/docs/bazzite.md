@@ -15,7 +15,7 @@ mid-stream. You flip between Gaming Mode and Desktop with Bazzite's normal Steam
 "Switch to Desktop"; the host just re-targets whatever's running and keeps streaming. Nothing in
 `host.env` forces a mode.
 
-> Ideal for a dedicated game-streaming box that you also occasionally want as a remote desktop. For a
+> Ideal when you want one box for game streaming and for remote desktop from the office. For a
 > pure desktop machine, install on [Ubuntu](/docs/ubuntu) or [Fedora](/docs/fedora) and configure the
 > [KDE](/docs/kde) or [GNOME](/docs/gnome) desktop directly, simpler.
 

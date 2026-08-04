@@ -4,8 +4,9 @@ description: Start the host at boot, for a desktop you log into, or a fully head
 ---
 
 Running `serve` in a terminal is fine for trying Slipstream out. To make a machine an
-always-available host, run it as a service. First, what that service starts, then the two cases, a
-desktop you log into and a fully headless box.
+always-available host, run it as a service. That is the usual setup when you leave a workstation at
+home and connect from the office ([Desktop at work](/docs/desktop-at-work)). First, what that service
+starts, then the two cases, a desktop you log into and a fully headless box.
 
 ## What the unit starts
 
