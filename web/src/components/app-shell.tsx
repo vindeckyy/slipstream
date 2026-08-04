@@ -1,18 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
-	AppWindow,
-	GaugeCircle,
-	Home,
-	KeyRound,
 	LogOut,
-	MonitorPlay,
 	MoreHorizontal,
-	Puzzle,
 	Server,
-	Settings,
-	Users,
-	Workflow,
-	Wrench,
 	X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -30,136 +20,43 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { changeLocale, type Locale, locales, useLocale } from "@/lib/i18n";
+import {
+	destinationsFor,
+	MOBILE_OVERFLOW_IDS,
+	MOBILE_PRIMARY_IDS,
+	type NavDestination,
+	NAV_GROUPS,
+	navDestination,
+	pathMatchesDestination,
+} from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages";
 
 const MLink = motion(Link);
 
-type NavItem = {
-	to: string;
-	icon: typeof Home;
-	label: () => string;
-	help: () => string;
-};
+const MOBILE_PRIMARY = destinationsFor(MOBILE_PRIMARY_IDS);
+const MOBILE_OVERFLOW = destinationsFor(MOBILE_OVERFLOW_IDS);
+const PAIRING = navDestination("pairing");
 
-const navDashboard: NavItem = {
-	to: "/",
-	icon: Home,
-	label: () => m.nav_dashboard(),
-	help: () =>
-		"Live host overview: session state, paired clients, and recent activity.",
-};
-const navPairing: NavItem = {
-	to: "/pin",
-	icon: KeyRound,
-	label: () => m.nav_pairing(),
-	help: () =>
-		"Pair Moonlight or Slipstream clients with a PIN, and manage already-paired devices.",
-};
-const navLibrary: NavItem = {
-	to: "/apps",
-	icon: AppWindow,
-	label: () => m.nav_library(),
-	help: () =>
-		"Browse and manage the game library the host advertises to clients.",
-};
-const navConfig: NavItem = {
-	to: "/config",
-	icon: Settings,
-	label: () => m.nav_config(),
-	help: () =>
-		"Host capture, input, network, and encoder defaults. Changes usually need a host restart.",
-};
-const navLogs: NavItem = {
-	to: "/troubleshoot",
-	icon: Wrench,
-	label: () => m.nav_logs(),
-	help: () => "Read live host logs and export them for troubleshooting.",
-};
-const navHost: NavItem = {
-	to: "/host",
-	icon: Server,
-	label: () => m.nav_host(),
-	help: () =>
-		"Host identity, GPU status, updates, power controls, and competing GameStream host warnings.",
-};
-const navDisplays: NavItem = {
-	to: "/displays",
-	icon: MonitorPlay,
-	label: () => m.nav_displays(),
-	help: () =>
-		"Virtual display policy, presets, keep-alive, and live monitor layout.",
-};
-const navStats: NavItem = {
-	to: "/stats",
-	icon: GaugeCircle,
-	label: () => m.nav_stats(),
-	help: () =>
-		"Capture performance graphs, recordings, and live stream health.",
-};
-const navAutomation: NavItem = {
-	to: "/automation",
-	icon: Workflow,
-	label: () => m.nav_automation(),
-	help: () =>
-		"Run shell commands or webhooks when host events fire (connect, stream, pair, and more).",
-};
-const navPluginStore: NavItem = {
-	to: "/plugins",
-	icon: Puzzle,
-	label: () => m.nav_plugin_store(),
-	help: () => m.nav_plugin_store_help(),
-};
-
-const EXACT: readonly string[] = ["/", "/plugins"];
-
-/**
- * The desktop rail is grouped by the operator's job: watch the host, manage clients and displays,
- * reach host tools, then change the console. The existing route targets stay intact, including the
- * compatibility aliases (`/pin`, `/apps`, and `/troubleshoot`).
- */
-const NAV_GROUPS: readonly {
-	id: string;
-	label: () => string;
-	items: readonly NavItem[];
-}[] = [
-	{
-		id: "observe",
-		label: () => m.status_title(),
-		items: [navDashboard, navStats, navLogs],
-	},
-	{
-		id: "operate",
-		label: () => m.nav_library(),
-		items: [navLibrary, navPairing, navDisplays],
-	},
-	{
-		id: "host",
-		label: () => m.nav_host(),
-		items: [navHost, navAutomation],
-	},
-	{
-		id: "system",
-		label: () => m.nav_tools(),
-		items: [navConfig, navPluginStore],
-	},
-];
-
-/** Keep the most useful observatory views one tap away on a phone. */
-const MOBILE_PRIMARY: readonly NavItem[] = [
-	navDashboard,
-	navLibrary,
-	navHost,
-	navStats,
-];
-const MOBILE_OVERFLOW: readonly NavItem[] = [
-	navPairing,
-	navConfig,
-	navLogs,
-	navDisplays,
-	navAutomation,
-	navPluginStore,
-];
+/** Shared status poll options so shell header and mobile Pairing share one query. */
+const statusQueryOptions = {
+	refetchInterval: (
+		query: {
+			state: {
+				data?: {
+					video_streaming?: boolean;
+					audio_streaming?: boolean;
+					active_sessions?: number;
+				};
+			};
+		},
+	) =>
+		query.state.data?.video_streaming ||
+		query.state.data?.audio_streaming ||
+		(query.state.data?.active_sessions ?? 0) > 0
+			? 3_000
+			: 15_000,
+} as const;
 
 /** Keycap nav: crisp top edge, subtle bottom shadow, press travel. The active key is
     lit cyan (ON AIR) with a mono silkscreen label — not a side border. */
@@ -204,11 +101,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 							className="flex flex-col gap-4"
 							aria-label={m.app_name()}
 						>
-							{NAV_GROUPS.map(({ id, label, items }) => (
+							{NAV_GROUPS.map(({ id, label, itemIds }) => (
 								<div key={id} className="flex flex-col gap-0.5">
 									<p className={sectionLabelClass}>{label()}</p>
-									{items.map((item) => (
-										<NavTooltipLink key={item.to} item={item} />
+									{destinationsFor(itemIds).map((item) => (
+										<NavTooltipLink key={item.id} item={item} />
 									))}
 								</div>
 							))}
@@ -249,8 +146,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 	);
 }
 
-function NavTooltipLink({ item }: { item: NavItem }) {
+function NavTooltipLink({ item }: { item: NavDestination }) {
 	const { to, icon: Icon, label, help } = item;
+	// Registry match (canonical + aliases, exact/nested) — TanStack only knows `to`.
+	const pathname = useRouterState({ select: (s) => s.location.pathname });
+	const isActive = pathMatchesDestination(pathname, item);
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
@@ -258,11 +158,15 @@ function NavTooltipLink({ item }: { item: NavItem }) {
 					whileTap={{ scale: 0.985 }}
 					to={to}
 					title={help()}
-					activeOptions={{ exact: EXACT.includes(to) }}
-					className={navItemClass}
-					activeProps={{ className: navItemActiveClass }}
+					aria-current={isActive ? "page" : undefined}
+					className={cn(navItemClass, isActive && navItemActiveClass)}
 				>
-					<Icon className="relative size-4 shrink-0 opacity-80 transition-colors [[data-status=active]_&]:text-primary [[data-status=active]_&]:opacity-100" />
+					<Icon
+						className={cn(
+							"relative size-4 shrink-0 opacity-80 transition-colors",
+							isActive && "text-primary opacity-100",
+						)}
+					/>
 					<span className="relative min-w-0 flex-1 truncate">{label()}</span>
 				</MLink>
 			</TooltipTrigger>
@@ -281,14 +185,7 @@ function ConsoleStatusHeader() {
 		},
 	});
 	const status = useGetStatus({
-		query: {
-			refetchInterval: (query) =>
-				query.state.data?.video_streaming ||
-				query.state.data?.audio_streaming ||
-				(query.state.data?.active_sessions ?? 0) > 0
-					? 3_000
-					: 15_000,
-		},
+		query: statusQueryOptions,
 	});
 	const data = status.data;
 	const isActive =
@@ -307,12 +204,6 @@ function ConsoleStatusHeader() {
 		: isActive
 			? "border-primary/35 bg-primary/10 text-primary"
 			: "border-border/70 bg-muted/45 text-muted-foreground";
-	const pairedClients =
-		(data?.paired_clients ?? 0) + (data?.native_paired_clients ?? 0);
-	const sessionLabel =
-		data && data.active_sessions > 0
-			? m.status_sessions_active({ count: data.active_sessions })
-			: m.status_no_session();
 
 	return (
 		<header className="mb-5 flex flex-col gap-3 border-b border-border/70 pb-4 sm:flex-row sm:items-center sm:justify-between">
@@ -359,26 +250,15 @@ function ConsoleStatusHeader() {
 					/>
 					{statusLabel}
 				</span>
-				{data && (
-					<>
-						<span className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-border/70 bg-card/70 px-2.5 py-1 text-muted-foreground">
-							{sessionLabel}
-						</span>
-						<span className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-border/70 bg-card/70 px-2.5 py-1 text-muted-foreground">
-							<Users className="size-3.5" aria-hidden />
-							<span className="tabular-nums">{pairedClients}</span>
-							<span>{m.status_paired_count()}</span>
-						</span>
-						{data.pin_pending && (
-							<Link
-								to="/pin"
-								className="inline-flex min-h-7 items-center rounded-full border border-[var(--warning)]/40 bg-[var(--warning)]/10 px-2.5 py-1 font-medium text-[var(--warning)] outline-none transition-colors hover:bg-[var(--warning)]/20 focus-visible:ring-2 focus-visible:ring-ring/50"
-							>
-								{m.status_pin_pending()}
-							</Link>
-						)}
-					</>
-				)}
+				{data?.pin_pending ? (
+					<Link
+						to={PAIRING.to}
+						title={m.nav_pairing_pending_hint()}
+						className="inline-flex min-h-7 items-center rounded-full border border-[var(--warning)]/40 bg-[var(--warning)]/10 px-2.5 py-1 font-medium text-[var(--warning)] outline-none transition-colors hover:bg-[var(--warning)]/20 focus-visible:ring-2 focus-visible:ring-ring/50"
+					>
+						{m.status_pin_pending()}
+					</Link>
+				) : null}
 			</div>
 		</header>
 	);
@@ -429,12 +309,17 @@ function PluginNavSection() {
 	);
 }
 
-/** Mobile bottom navigation (< sm): four observatory tabs + a larger, readable More sheet. */
+/** Mobile bottom navigation (< sm): four primary tabs + a larger, readable More sheet. */
 function MobileNav() {
 	const [moreOpen, setMoreOpen] = useState(false);
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const { data } = usePlugins();
 	const plugins = uiPlugins(data);
+	// Same React Query key/options as ConsoleStatusHeader — no extra poll.
+	const status = useGetStatus({
+		query: statusQueryOptions,
+	});
+	const pinPending = Boolean(status.data?.pin_pending);
 	const moreTriggerRef = useRef<HTMLButtonElement>(null);
 	const moreMenuRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
@@ -485,9 +370,7 @@ function MobileNav() {
 	// Highlight "More" when the current route lives in the overflow — plugins included.
 	const overflowActive =
 		pathname.startsWith("/plugins/") ||
-		MOBILE_OVERFLOW.some(
-			(n) => pathname === n.to || pathname.startsWith(`${n.to}/`),
-		);
+		MOBILE_OVERFLOW.some((n) => pathMatchesDestination(pathname, n));
 	const tab =
 		"relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-2 text-muted-foreground outline-none transition-colors focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50";
 	const tabActive = "text-primary";
@@ -551,29 +434,36 @@ function MobileNav() {
 									</button>
 								</div>
 								<div className="grid max-h-[min(68vh,34rem)] grid-cols-2 gap-2 overflow-y-auto px-3 pb-3">
-									{MOBILE_OVERFLOW.map(({ to, icon: Icon, label, help }) => (
-										<Link
-											key={to}
-											to={to}
-											title={help()}
-											onClick={() => setMoreOpen(false)}
-											activeOptions={{ exact: EXACT.includes(to) }}
-											className={menuItem}
-											activeProps={{
-												className: cn(
+									{MOBILE_OVERFLOW.map((item) => {
+										const { to, icon: Icon, label, help } = item;
+										const isActive = pathMatchesDestination(pathname, item);
+										return (
+											<Link
+												key={to}
+												to={to}
+												title={help()}
+												onClick={() => setMoreOpen(false)}
+												aria-current={isActive ? "page" : undefined}
+												className={cn(
 													menuItem,
-													"border-primary/35 bg-primary/10 text-primary",
-												),
-											}}
-										>
-											<span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted/55 [[data-status=active]_&]:bg-primary/15">
-												<Icon className="size-5" aria-hidden />
-											</span>
-											<span className="min-w-0 text-left text-xs font-medium leading-snug">
-												{label()}
-											</span>
-										</Link>
-									))}
+													isActive &&
+														"border-primary/35 bg-primary/10 text-primary",
+												)}
+											>
+												<span
+													className={cn(
+														"flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted/55",
+														isActive && "bg-primary/15",
+													)}
+												>
+													<Icon className="size-5" aria-hidden />
+												</span>
+												<span className="min-w-0 text-left text-xs font-medium leading-snug">
+													{label()}
+												</span>
+											</Link>
+										);
+									})}
 									{plugins.map((p) => {
 										const Icon = pluginIcon(p.ui?.icon);
 										const help = `${p.title} plugin UI.`;
@@ -634,29 +524,47 @@ function MobileNav() {
 					)}
 				</AnimatePresence>
 				<div className="grid grid-cols-5 border-t border-border/80 bg-card/95 backdrop-blur-md">
-					{MOBILE_PRIMARY.map(({ to, icon: Icon, label, help }) => (
-						<Link
-							key={to}
-							to={to}
-							title={help()}
-							onClick={() => setMoreOpen(false)}
-							activeOptions={{ exact: EXACT.includes(to) }}
-							className={tab}
-							activeProps={{ className: tabActive }}
-						>
-							<span
-								aria-hidden
-								className="absolute top-1 h-0.5 w-4 rounded-full bg-primary opacity-0 [[data-status=active]_&]:opacity-100"
-							/>
-							<Icon className="size-5 shrink-0" />
-							<span className={lbl}>{label()}</span>
-						</Link>
-					))}
+					{MOBILE_PRIMARY.map((item) => {
+						const { id, to, icon: Icon, label, help } = item;
+						const isActive = pathMatchesDestination(pathname, item);
+						const pairingPending = id === "pairing" && pinPending;
+						const pendingHint = m.nav_pairing_pending_hint();
+						const title = pairingPending ? pendingHint : help();
+						return (
+							<Link
+								key={to}
+								to={to}
+								title={title}
+								aria-label={pairingPending ? pendingHint : label()}
+								aria-current={isActive ? "page" : undefined}
+								onClick={() => setMoreOpen(false)}
+								className={cn(tab, isActive && tabActive)}
+							>
+								<span
+									aria-hidden
+									className={cn(
+										"absolute top-1 h-0.5 w-4 rounded-full bg-primary opacity-0",
+										isActive && "opacity-100",
+									)}
+								/>
+								<span className="relative">
+									<Icon className="size-5 shrink-0" />
+									{pairingPending ? (
+										<span
+											aria-hidden
+											className="absolute -right-1 -top-0.5 size-2 rounded-full bg-[var(--warning)]"
+										/>
+									) : null}
+								</span>
+								<span className={lbl}>{label()}</span>
+							</Link>
+						);
+					})}
 					<button
 						type="button"
 						ref={moreTriggerRef}
 						onClick={() => setMoreOpen((o) => !o)}
-						title="Open the rest of the console pages."
+						title={m.nav_more()}
 						aria-expanded={moreOpen}
 						aria-controls="mobile-nav-menu"
 						aria-haspopup="dialog"

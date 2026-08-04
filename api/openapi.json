@@ -1182,6 +1182,58 @@
         }
       }
     },
+    "/api/v1/host/moonlight": {
+      "put": {
+        "tags": [
+          "host"
+        ],
+        "summary": "Set the Moonlight broadcast switch",
+        "description": "This is the only write path for the GameStream/Moonlight compatibility plane. The general\nconfiguration form preserves the current value when it saves a draft.",
+        "operationId": "setMoonlightBroadcast",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoonlightBroadcastRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Moonlight broadcast setting stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostConfigState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Could not persist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/host/restart": {
       "post": {
         "tags": [
@@ -4381,6 +4433,27 @@
       "AudioVideoConfig": {
         "type": "object",
         "properties": {
+          "audio_capture": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Linux audio capture source (`SLIPSTREAM_STREAM_SINK`): `stream-sink` (default, a\nhost-owned sink apps play into) or `monitor` (record the default sink)."
+          },
+          "audio_fec": {
+            "type": "boolean",
+            "description": "Audio FEC over the native plane (`SLIPSTREAM_AUDIO_FEC`). Default on: RS parity over\ngroups of 5 ms Opus frames so a lost packet is rebuilt instead of clicking. Off only\nas an escape hatch."
+          },
+          "audio_gain": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float",
+            "description": "Linear audio gain applied to captured samples (`SLIPSTREAM_AUDIO_GAIN`, default 1.0).\nFor quiet sources; 1.0 = unchanged, 0.5 = half, 2.0 = double.",
+            "maximum": 4,
+            "minimum": 0
+          },
           "capture_max_age_ms": {
             "type": [
               "integer",
@@ -4407,11 +4480,25 @@
           },
           "four_four_four": {
             "type": "boolean",
-            "description": "Prefer 4:4:4 when supported (`SLIPSTREAM_444`)."
+            "description": "Prefer 4:4:4 when supported (`SLIPSTREAM_444`). Default on."
           },
           "gamescope_hdr": {
             "type": "boolean",
-            "description": "Gamescope HDR."
+            "description": "Gamescope HDR. Default on."
+          },
+          "gamescope_sdr_nits": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "SDR luminance inside an HDR Gamescope session (`SLIPSTREAM_GAMESCOPE_SDR_NITS`).",
+            "maximum": 10000,
+            "minimum": 1
+          },
+          "gamescope_splash": {
+            "type": "boolean",
+            "description": "Keep a bare Gamescope session painting during application startup.\nDefault on because a blank Gamescope session produces no capture buffers."
           },
           "headless_compositor": {
             "type": [
@@ -4441,7 +4528,13 @@
           },
           "ten_bit": {
             "type": "boolean",
-            "description": "Prefer 10-bit encode when the client asks (`SLIPSTREAM_TEN_BIT`)."
+            "description": "Prefer 10-bit encode when the client asks (`SLIPSTREAM_10BIT`). Default on."
+          },
+          "vdisplay_hz_mult": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Virtual-display refresh multiplier (`SLIPSTREAM_VDISPLAY_HZ_MULT`), from 1x to 4x.",
+            "minimum": 0
           },
           "video_source": {
             "type": [
@@ -4790,6 +4883,14 @@
             "$ref": "#/components/schemas/Plane"
           }
         }
+      },
+      "ClipboardPolicy": {
+        "type": "string",
+        "enum": [
+          "off",
+          "text-only",
+          "on"
+        ]
       },
       "CustomEntry": {
         "allOf": [
@@ -6040,6 +6141,10 @@
           "audio_video": {
             "$ref": "#/components/schemas/AudioVideoConfig"
           },
+          "clipboard": {
+            "$ref": "#/components/schemas/ClipboardPolicy",
+            "description": "Host clipboard policy. The client must also enable clipboard sharing for a session."
+          },
           "encoders": {
             "$ref": "#/components/schemas/EncoderConfig"
           },
@@ -6049,8 +6154,20 @@
           "input": {
             "$ref": "#/components/schemas/InputConfig"
           },
+          "latency_profile": {
+            "$ref": "#/components/schemas/LatencyProfile",
+            "description": "Named encoder latency profile (`SLIPSTREAM_LATENCY_PROFILE`)."
+          },
           "network": {
             "$ref": "#/components/schemas/NetworkConfig"
+          },
+          "network_policy": {
+            "$ref": "#/components/schemas/NetworkPolicy",
+            "description": "Named transport starting policy (`SLIPSTREAM_NETWORK_POLICY`)."
+          },
+          "performance_profile": {
+            "$ref": "#/components/schemas/PerformanceProfile",
+            "description": "Named worker scheduling profile (`SLIPSTREAM_PERFORMANCE_PROFILE`)."
           },
           "version": {
             "type": "integer",
@@ -6234,7 +6351,11 @@
           },
           "gamescope_grab_cursor": {
             "type": "boolean",
-            "description": "Gamescope: grab cursor into the nested session."
+            "description": "Gamescope: grab cursor into the nested session.\nDefault off (matches runtime `SLIPSTREAM_GAMESCOPE_GRAB_CURSOR`)."
+          },
+          "pen": {
+            "type": "boolean",
+            "description": "Advertise full-fidelity pen/stylus input (`SLIPSTREAM_PEN`). Default on."
           }
         }
       },
@@ -6470,6 +6591,13 @@
           }
         ],
         "description": "How long a virtual display (and, on gamescope's bare spawn, the nested session + its game)\nsurvives after the last client session detaches. Serialized as an object tagged on `mode`\n(`{\"mode\":\"off\"}` / `{\"mode\":\"duration\",\"seconds\":300}` / `{\"mode\":\"forever\"}`) so the web form\nand the OpenAPI schema stay simple."
+      },
+      "LatencyProfile": {
+        "type": "string",
+        "enum": [
+          "balanced",
+          "low_latency"
+        ]
       },
       "LaunchSpec": {
         "type": "object",
@@ -6720,6 +6848,18 @@
           }
         }
       },
+      "MoonlightBroadcastRequest": {
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether to run and advertise the GameStream/Moonlight compatibility plane."
+          }
+        }
+      },
       "NativeClient": {
         "type": "object",
         "description": "A paired native (slipstream/1) client.",
@@ -6786,7 +6926,7 @@
         "properties": {
           "chacha20": {
             "type": "boolean",
-            "description": "Prefer ChaCha20-Poly1305 for soft-AES clients (`SLIPSTREAM_CHACHA20`)."
+            "description": "Prefer ChaCha20-Poly1305 for soft-AES clients (`SLIPSTREAM_CHACHA20`). Default on."
           },
           "fec_pct": {
             "type": [
@@ -6809,6 +6949,14 @@
             "description": "Advertise over mDNS (`SLIPSTREAM_MDNS`). Default on."
           }
         }
+      },
+      "NetworkPolicy": {
+        "type": "string",
+        "enum": [
+          "auto",
+          "lan",
+          "wan"
+        ]
       },
       "PairedClient": {
         "type": "object",
@@ -6892,6 +7040,13 @@
             "example": "Enrico's MacBook"
           }
         }
+      },
+      "PerformanceProfile": {
+        "type": "string",
+        "enum": [
+          "balanced",
+          "low_latency"
+        ]
       },
       "Plane": {
         "type": "string",

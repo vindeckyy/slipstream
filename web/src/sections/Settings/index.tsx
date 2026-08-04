@@ -6,12 +6,27 @@ import { OptionLabel } from "@/components/option-help";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { changeLocale, type Locale, locales, useLocale } from "@/lib/i18n";
+import {
+	type ThemePreference,
+	useThemePreference,
+} from "@/lib/theme";
+import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages";
 
-// Settings reads no API (just the locale + a logout button), so it's a single
+const THEME_OPTIONS: readonly {
+	value: ThemePreference;
+	label: () => string;
+}[] = [
+	{ value: "system", label: () => m.settings_theme_system() },
+	{ value: "light", label: () => m.settings_theme_light() },
+	{ value: "dark", label: () => m.settings_theme_dark() },
+];
+
+// Settings reads no host API (locale, theme, logout), so it's a single
 // presentational section — no container/view split needed.
 export const SectionSettings: FC = () => {
 	const current = useLocale();
+	const { preference, setPreference } = useThemePreference();
 
 	const onLogout = async () => {
 		try {
@@ -40,19 +55,23 @@ export const SectionSettings: FC = () => {
 						<CardHeader className="space-y-1">
 							<OptionLabel
 								label={m.settings_language()}
-								help="Chooses the language for labels and messages in this management console."
+								help={m.settings_language_help()}
 								recommended="en"
 								labelClassName="text-base tracking-tight font-semibold"
 							/>
 						</CardHeader>
 						<CardContent>
-							<div className="inline-flex flex-wrap rounded-lg border border-border/70 bg-muted/30 p-0.5">
+							<div
+								className="inline-flex flex-wrap rounded-lg border border-border/70 bg-muted/30 p-0.5"
+								role="group"
+								aria-label={m.settings_language()}
+							>
 								{locales.map((l: Locale) => (
 									<Button
 										key={l}
 										variant={l === current ? "secondary" : "ghost"}
 										size="sm"
-										className="h-8 uppercase"
+										className="h-8 min-h-8 uppercase"
 										aria-pressed={l === current}
 										onClick={() => changeLocale(l)}
 									>
@@ -66,8 +85,39 @@ export const SectionSettings: FC = () => {
 					<Card>
 						<CardHeader className="space-y-1">
 							<OptionLabel
+								label={m.settings_theme()}
+								help={m.settings_theme_help()}
+								recommended={m.settings_theme_system()}
+								labelClassName="text-base tracking-tight font-semibold"
+							/>
+						</CardHeader>
+						<CardContent>
+							<div
+								className="inline-flex flex-wrap rounded-lg border border-border/70 bg-muted/30 p-0.5"
+								role="group"
+								aria-label={m.settings_theme()}
+							>
+								{THEME_OPTIONS.map(({ value, label }) => (
+									<Button
+										key={value}
+										variant={preference === value ? "secondary" : "ghost"}
+										size="sm"
+										className={cn("h-8 min-h-8")}
+										aria-pressed={preference === value}
+										onClick={() => setPreference(value)}
+									>
+										{label()}
+									</Button>
+								))}
+							</div>
+						</CardContent>
+					</Card>
+
+					<Card>
+						<CardHeader className="space-y-1">
+							<OptionLabel
 								label={m.action_logout()}
-								help="Clears your signed-in session in this browser. You will need the console password to open Settings and other management pages again."
+								help={m.settings_logout_help()}
 								labelClassName="text-base tracking-tight font-semibold"
 							/>
 						</CardHeader>

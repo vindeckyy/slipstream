@@ -1,16 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import {
-	AppWindow,
-	Command as CommandIcon,
-	GaugeCircle,
-	KeyRound,
-	MonitorPlay,
-	Puzzle,
-	Server,
-	Settings,
-	Workflow,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { Command as CommandIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
 	Dialog,
@@ -22,120 +11,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/lib/i18n";
+import { NAV_DESTINATIONS, type NavDestination } from "@/lib/navigation";
 import { m } from "@/paraglide/messages";
 
-type CommandTarget =
-	| "/"
-	| "/sessions"
-	| "/host"
-	| "/displays"
-	| "/pin"
-	| "/apps"
-	| "/config"
-	| "/automation"
-	| "/stats"
-	| "/plugins";
-
-type CommandItem = {
-	to: CommandTarget;
-	icon: LucideIcon;
-	label: () => string;
-	description: () => string;
-	keywords: readonly string[];
-	/** Frequent destinations operators jump to first. */
-	common?: boolean;
-};
-
-const COMMANDS: readonly CommandItem[] = [
-	{
-		to: "/",
-		icon: GaugeCircle,
-		label: () => m.status_title(),
-		description: () =>
-			"Live host overview: session state, paired clients, and recent activity.",
-		keywords: ["dashboard", "overview", "status", "live"],
-		common: true,
-	},
-	{
-		to: "/sessions",
-		icon: MonitorPlay,
-		label: () => m.status_session(),
-		description: () =>
-			"Inspect and stop active streaming sessions on this host.",
-		keywords: ["session", "stream", "play", "active"],
-	},
-	{
-		to: "/host",
-		icon: Server,
-		label: () => m.nav_host(),
-		description: () =>
-			"Host identity, GPU status, updates, power controls, and competing GameStream host warnings.",
-		keywords: ["host", "gpu", "update", "system", "restart", "shutdown"],
-	},
-	{
-		to: "/displays",
-		icon: MonitorPlay,
-		label: () => m.nav_displays(),
-		description: () =>
-			"Virtual display policy, presets, keep-alive, and live monitor layout.",
-		keywords: ["display", "screen", "virtual"],
-	},
-	{
-		to: "/pin",
-		icon: KeyRound,
-		label: () => m.nav_pairing(),
-		description: () =>
-			"Pair Moonlight or Slipstream clients with a PIN, and manage already-paired devices.",
-		keywords: ["pair", "pin", "client"],
-		common: true,
-	},
-	{
-		to: "/apps",
-		icon: AppWindow,
-		label: () => m.nav_library(),
-		description: () =>
-			"Browse and manage the game library the host advertises to clients.",
-		keywords: ["library", "game", "app"],
-		common: true,
-	},
-	{
-		to: "/config",
-		icon: Settings,
-		label: () => m.nav_config(),
-		description: () =>
-			"Host capture, input, network, and encoder defaults. Changes usually need a host restart.",
-		keywords: ["config", "configuration", "capture", "encoder", "network", "input"],
-		common: true,
-	},
-	{
-		to: "/automation",
-		icon: Workflow,
-		label: () => m.nav_automation(),
-		description: () =>
-			"Run shell commands or webhooks when host events fire (connect, stream, pair, and more).",
-		keywords: ["automation", "hook", "webhook"],
-	},
-	{
-		to: "/stats",
-		icon: GaugeCircle,
-		label: () => m.nav_stats(),
-		description: () =>
-			"Capture performance graphs, recordings, and live stream health.",
-		keywords: ["stats", "capture", "recording", "monitor", "performance"],
-	},
-	{
-		to: "/plugins",
-		icon: Puzzle,
-		label: () => m.nav_plugin_store(),
-		description: () => m.nav_plugin_store_help(),
-		keywords: ["plugin", "store", "install", "package"],
-	},
-];
-
-function matchesCommand(command: CommandItem, query: string): boolean {
+function matchesCommand(command: NavDestination, query: string): boolean {
 	if (!query.trim()) return true;
 	const haystack =
-		`${command.label()} ${command.description()} ${command.keywords.join(" ")}`.toLocaleLowerCase();
+		`${command.label()} ${command.help()} ${command.keywords.join(" ")}`.toLocaleLowerCase();
 	return haystack.includes(query.trim().toLocaleLowerCase());
 }
 
@@ -146,7 +28,7 @@ export function CommandPalette() {
 	const [query, setQuery] = useState("");
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const filteredCommands = useMemo(
-		() => COMMANDS.filter((command) => matchesCommand(command, query)),
+		() => NAV_DESTINATIONS.filter((command) => matchesCommand(command, query)),
 		[query],
 	);
 
@@ -165,7 +47,7 @@ export function CommandPalette() {
 		setSelectedIndex(0);
 	}, [query, open]);
 
-	const selectCommand = (command: CommandItem | undefined) => {
+	const selectCommand = (command: NavDestination | undefined) => {
 		if (!command) return;
 		setOpen(false);
 		setQuery("");
@@ -239,10 +121,10 @@ export function CommandPalette() {
 							filteredCommands.map((command, index) => {
 								const Icon = command.icon;
 								const selected = index === selectedIndex;
-								const description = command.description();
+								const description = command.help();
 								return (
 									<button
-										key={command.to}
+										key={command.id}
 										type="button"
 										role="option"
 										aria-selected={selected}

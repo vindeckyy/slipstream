@@ -89,6 +89,9 @@ export const SetupView: FC<{
 							<CardDescription className="text-sm leading-relaxed text-muted-foreground">
 								{m.setup_subtitle()}
 							</CardDescription>
+							<p className="text-sm leading-relaxed text-muted-foreground">
+								{m.setup_pairing_note()}
+							</p>
 						</CardHeader>
 
 						<CardContent>
@@ -104,8 +107,8 @@ export const SetupView: FC<{
 									<OptionLabel
 										htmlFor="setup-password"
 										label={m.setup_password()}
-										help="Sets the password used to sign in to this management console. Keep it private; it does not affect Moonlight client pairing."
-										recommended="At least 8 characters. Prefer a long passphrase you can remember."
+										help={m.setup_password_help()}
+										recommended={m.setup_password_recommended()}
 									/>
 									<Input
 										id="setup-password"
@@ -125,8 +128,8 @@ export const SetupView: FC<{
 									<OptionLabel
 										htmlFor="setup-confirmation"
 										label={m.setup_confirm()}
-										help="Re-enter the same password to catch typos before it is saved."
-										recommended="Must match the password above"
+										help={m.setup_confirm_help()}
+										recommended={m.setup_confirm_recommended()}
 									/>
 									<Input
 										id="setup-confirmation"
@@ -150,9 +153,10 @@ export const SetupView: FC<{
 									)}
 								</div>
 
+								{/* Same safety-orange commit action as Login. */}
 								<Button
 									type="submit"
-									className="mt-1 w-full"
+									className="mt-1 w-full bg-[var(--ss-action)] text-white hover:bg-[var(--ss-action-light)]"
 									disabled={!canSubmit}
 									aria-busy={busy || undefined}
 								>

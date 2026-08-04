@@ -26,9 +26,13 @@ function ShellHarness({
 
 	const navPaths = [
 		"/",
+		"/sessions",
+		"/pairing",
 		"/pin",
+		"/library",
 		"/apps",
 		"/config",
+		"/logs",
 		"/troubleshoot",
 		"/host",
 		"/displays",
@@ -217,7 +221,7 @@ export const Overview: Story = {
 
 export const Session: Story = {
 	render: () => (
-		<ShellHarness initialPath="/host">
+		<ShellHarness initialPath="/sessions">
 			<SessionFixture />
 		</ShellHarness>
 	),

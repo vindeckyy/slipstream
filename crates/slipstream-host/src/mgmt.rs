@@ -192,6 +192,7 @@ fn api_router_parts() -> (Router<Arc<MgmtState>>, utoipa::openapi::OpenApi) {
                 .routes(routes!(host::restart_host))
                 .routes(routes!(host::shutdown_host))
                 .routes(routes!(host::get_host_config, host::set_host_config))
+                .routes(routes!(host::set_moonlight_broadcast))
                 .routes(routes!(host::list_compositors))
                 .routes(routes!(host::list_capture_methods))
                 .routes(routes!(host::list_headless_compositors))

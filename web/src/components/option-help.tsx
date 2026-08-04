@@ -8,6 +8,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { m } from "@/paraglide/messages";
 
 /** Compact ? button that shows a hover/focus description for a control.
  *
@@ -33,7 +34,7 @@ export function HelpTip({
 							"inline-flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50",
 							className,
 						)}
-						aria-label={`About ${label}`}
+						aria-label={m.config_help_about({ label })}
 						title={text}
 					>
 						<CircleHelp className="size-3.5" aria-hidden="true" />
@@ -63,7 +64,7 @@ export function RecommendedMark({
 			)}
 		>
 			<Badge variant="secondary" className="font-normal">
-				Recommended
+				{m.config_recommended_badge()}
 			</Badge>
 			<span className="min-w-0">{value}</span>
 		</div>
@@ -120,15 +121,17 @@ export function OptionLabel({
 /** `<option>` helper that can mark the preferred choice and carry a hover title. */
 export function HelpOption({
 	recommended = false,
+	recommendedSuffix = m.config_recommended_option_suffix(),
 	children,
 	...props
 }: OptionHTMLAttributes<HTMLOptionElement> & {
 	recommended?: boolean;
+	recommendedSuffix?: string;
 }) {
 	const label =
 		typeof children === "string" || typeof children === "number"
 			? recommended
-				? `${children} (recommended)`
+				? `${children} ${recommendedSuffix}`
 				: children
 			: children;
 	return <option {...props}>{label}</option>;

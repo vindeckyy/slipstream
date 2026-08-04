@@ -1,6 +1,7 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@unom/ui/toast";
 import type { FC } from "react";
+import { getPreflight } from "@/api/diagnostics";
 import { getGetStatusQueryKey, useGetStatus } from "@/api/gen/host/host";
 import { useGetLibrary } from "@/api/gen/library/library";
 import type { ActiveGame } from "@/api/gen/model/activeGame";
@@ -12,11 +13,13 @@ import {
 import { apiErrorMessage } from "@/lib/errors";
 import { useLocale } from "@/lib/i18n";
 import { m } from "@/paraglide/messages";
+import { useGettingStartedDismissed } from "./getting-started-dismiss";
 import { DashboardView } from "./view";
 
 export const SectionDashboard: FC = () => {
 	useLocale();
 	const qc = useQueryClient();
+	const { dismissed, dismiss } = useGettingStartedDismissed();
 	// Session/game transitions arrive on the event stream now (api/events.ts invalidates this key),
 	// so the timer only has to cover what events cannot: the live stream numbers — codec, resolution,
 	// fps, bitrate — which change continuously while something is streaming. Idle, it is a slow
@@ -28,6 +31,22 @@ export const SectionDashboard: FC = () => {
 					? 2_000
 					: 15_000,
 		},
+	});
+	const paired =
+		(status.data?.paired_clients ?? 0) +
+		(status.data?.native_paired_clients ?? 0);
+	// Wait for status so a paired host does not flash the checklist during the first fetch.
+	const showGettingStarted =
+		status.data !== undefined && paired === 0 && !dismissed;
+	// Soft preflight for the first-run card only. Skip when the card cannot show.
+	// A failure must not blank the Dashboard.
+	const preflight = useQuery({
+		queryKey: ["diagnostics", "preflight"],
+		queryFn: getPreflight,
+		enabled: showGettingStarted,
+		staleTime: 10_000,
+		refetchInterval: 30_000,
+		retry: false,
 	});
 	// The catalog, for the running-game card's box art. Fetched once and held: a library scan touches
 	// every installed store's on-disk metadata, so it must not ride the 2 s status poll.
@@ -110,6 +129,15 @@ export const SectionDashboard: FC = () => {
 			isStopping={stop.isPending}
 			isRequestingIdr={idr.isPending}
 			isEndingGame={endGame.isPending || stop.isPending}
+			gettingStarted={
+				showGettingStarted
+					? {
+							pinPending: status.data?.pin_pending ?? false,
+							preflightReady: preflight.data?.ready ?? null,
+							onDismiss: dismiss,
+						}
+					: null
+			}
 		/>
 	);
 };

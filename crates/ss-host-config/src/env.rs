@@ -12,10 +12,22 @@
 /// `1|true|yes|on`, everything else off) — see the module docs: independent features that share a
 /// name prefix.
 pub fn env_on(name: &str) -> Option<bool> {
-    std::env::var(name).ok().map(|s| {
+    parse_env_on(std::env::var(name).ok().as_deref())
+}
+
+/// Pure explicit-off parse for tests and callers that already hold the raw value.
+///
+/// `None` (unset) stays `None` so default-ON vs default-OFF knobs can `unwrap_or` themselves.
+pub fn parse_env_on(raw: Option<&str>) -> Option<bool> {
+    raw.map(|s| {
         !matches!(
             s.trim().to_ascii_lowercase().as_str(),
             "0" | "false" | "off" | "no"
         )
     })
+}
+
+/// Default-ON policy gate: unset → on; explicit off grammar → off; any other value → on.
+pub fn default_on_gate(raw: Option<&str>) -> bool {
+    parse_env_on(raw).unwrap_or(true)
 }

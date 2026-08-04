@@ -39,9 +39,9 @@ mod env;
 use std::sync::OnceLock;
 
 pub use config::{
-    HostConfig, LatencyProfile, NetworkPolicy, PerformanceProfile,
+    HostConfig, LatencyProfile, NetworkPolicy, PerformanceProfile, TEN_BIT_ENV,
 };
-pub use env::env_on;
+pub use env::{default_on_gate, env_on, parse_env_on};
 
 /// The process-wide host configuration, parsed once on first access.
 pub fn config() -> &'static HostConfig {
@@ -111,5 +111,30 @@ mod tests {
         for v in ["", "auto", "fast", "0"] {
             assert_eq!(NetworkPolicy::parse(v), NetworkPolicy::Auto);
         }
+    }
+
+    #[test]
+    fn ten_bit_env_key_is_slipstream_10bit() {
+        // Runtime `HostConfig::from_env` must read this key (not SLIPSTREAM_TEN_BIT).
+        assert_eq!(TEN_BIT_ENV, "SLIPSTREAM_10BIT");
+    }
+
+    #[test]
+    fn default_on_policy_gates_match_runtime_ten_bit_444_chacha_hdr() {
+        // Unset → on (the shipped default for SLIPSTREAM_10BIT / 444 / CHACHA20 / GAMESCOPE_HDR).
+        assert!(default_on_gate(None));
+        assert!(default_on_gate(Some("1")));
+        assert!(default_on_gate(Some("true")));
+        assert!(default_on_gate(Some(" yes ")));
+        for off in ["0", "false", "off", "no", "OFF", " 0 "] {
+            assert!(!default_on_gate(Some(off)), "expected off for {off:?}");
+        }
+    }
+
+    #[test]
+    fn parse_env_on_distinguishes_unset_from_off() {
+        assert_eq!(parse_env_on(None), None);
+        assert_eq!(parse_env_on(Some("0")), Some(false));
+        assert_eq!(parse_env_on(Some("1")), Some(true));
     }
 }

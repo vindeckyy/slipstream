@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import Section from "@unom/ui/section";
 import { toast } from "@unom/ui/toast";
 import {
@@ -17,10 +18,17 @@ import {
 	useState,
 } from "react";
 import {
+	captureMethodsQueryKey,
+	compositorsQueryKey,
+	getCaptureMethods,
+	getCompositors,
+	getHeadlessCompositors,
 	getHostConfig,
+	headlessCompositorsQueryKey,
 	hostConfigQueryKey,
-	type HostConfigFile,
+	restartHost,
 	setHostConfig,
+	type HostConfigFile,
 } from "@/api/host-config";
 import {
 	HelpOption,
@@ -28,7 +36,7 @@ import {
 	RecommendedMark,
 } from "@/components/option-help";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -43,6 +51,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages";
+import {
+	buildCaptureMethodOptions,
+	buildCompositorOptions,
+	buildHeadlessCompositorOptions,
+	formatCapabilityOptionLabel,
+	type CapabilityOption,
+} from "./capability-options";
+import { ConfigModeToggle, type ConfigMode } from "./ConfigModeToggle";
+import { DirtySaveBar } from "./DirtySaveBar";
+import {
+	clearConfigDraft,
+	readConfigDraft,
+	restoreConfigDraft,
+	writeConfigDraft,
+} from "./draft-session";
+import { RestartOffer } from "./RestartOffer";
 
 const fieldControlClass =
 	"h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 sm:w-56";
@@ -56,6 +80,52 @@ function FieldSelect({
 		<select className={cn(fieldControlClass, className)} {...props}>
 			{children}
 		</select>
+	);
+}
+
+function CapabilitySelect({
+	id,
+	value,
+	options,
+	loading = false,
+	loadingLabel,
+	onChange,
+	className,
+}: {
+	id: string;
+	value: string;
+	options: CapabilityOption[];
+	loading?: boolean;
+	loadingLabel: string;
+	onChange: (value: string) => void;
+	className?: string;
+}) {
+	const marks = {
+		detected: m.config_option_detected(),
+		unavailable: m.config_option_unavailable(),
+	};
+	return (
+		<FieldSelect
+			id={id}
+			className={className}
+			value={value}
+			onChange={(e) => onChange(e.target.value)}
+		>
+			{loading ? (
+				<option value={value}>{loadingLabel}</option>
+			) : (
+				options.map((option) => (
+					<option
+						key={option.value || "__auto__"}
+						value={option.value}
+						disabled={!option.available && option.value !== value}
+						title={option.title}
+					>
+						{formatCapabilityOptionLabel(option, marks)}
+					</option>
+				))
+			)}
+		</FieldSelect>
 	);
 }
 
@@ -170,7 +240,7 @@ function ConfigCard({
 						variant={advanced ? "outline" : "secondary"}
 						className="shrink-0"
 					>
-						{advanced ? "Advanced" : "Basic"}
+						{advanced ? m.config_advanced_badge() : m.config_basic_badge()}
 					</Badge>
 				</div>
 			</CardHeader>
@@ -232,35 +302,142 @@ function ToggleRow(props: {
 }
 
 export const SectionConfig: FC = () => {
-	useLocale();
+	const locale = useLocale();
 	const qc = useQueryClient();
+	const capabilityCopy = useMemo(
+		() => ({
+			savedUnavailable: m.config_capability_saved_unavailable(),
+			detectedDefault: m.config_capability_detected_default(),
+			unavailable: m.config_capability_unavailable(),
+			autoDetect: m.config_compositor_auto_detect(),
+			autoDetectHelp: m.config_compositor_auto_detect_help(),
+			headlessOff: m.config_headless_off(),
+			headlessOffHelp: m.config_headless_off_help(),
+		}),
+		[locale],
+	);
 	const q = useQuery({
 		queryKey: hostConfigQueryKey,
 		queryFn: getHostConfig,
 		staleTime: 5_000,
 	});
+	const compositorsQ = useQuery({
+		queryKey: compositorsQueryKey,
+		queryFn: getCompositors,
+		staleTime: 30_000,
+		retry: false,
+	});
+	const captureQ = useQuery({
+		queryKey: captureMethodsQueryKey,
+		queryFn: getCaptureMethods,
+		staleTime: 30_000,
+		retry: false,
+	});
+	const headlessQ = useQuery({
+		queryKey: headlessCompositorsQueryKey,
+		queryFn: getHeadlessCompositors,
+		staleTime: 30_000,
+		retry: false,
+	});
+
 	const [draft, setDraft] = useState<HostConfigFile | null>(null);
+	const [mode, setMode] = useState<ConfigMode>("recommended");
+	const [showRestartOffer, setShowRestartOffer] = useState(false);
+	const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
+	const [seeded, setSeeded] = useState(false);
 
 	useEffect(() => {
-		if (q.data) setDraft(structuredClone(q.data.settings));
-	}, [q.data]);
+		if (!q.data || seeded) return;
+		const saved = readConfigDraft<HostConfigFile>();
+		setDraft(restoreConfigDraft(q.data.settings, saved));
+		setSeeded(true);
+	}, [q.data, seeded]);
 
 	const dirty = useMemo(() => {
 		if (!q.data || !draft) return false;
 		return JSON.stringify(draft) !== JSON.stringify(q.data.settings);
 	}, [draft, q.data]);
 
+	useEffect(() => {
+		if (!seeded || !draft || !q.data) return;
+		if (dirty) writeConfigDraft(draft);
+		else clearConfigDraft();
+	}, [draft, dirty, q.data, seeded]);
+
+	// When the server snapshot updates and there is no session draft, stay in sync.
+	useEffect(() => {
+		if (!q.data || !seeded || dirty) return;
+		if (readConfigDraft<HostConfigFile>()) return;
+		setDraft(structuredClone(q.data.settings));
+	}, [q.data, seeded, dirty]);
+
 	const save = useMutation({
 		mutationFn: setHostConfig,
 		onSuccess: (state) => {
 			qc.setQueryData(hostConfigQueryKey, state);
 			setDraft(structuredClone(state.settings));
-			toast.success("Configuration saved. Restart the host to apply.");
+			clearConfigDraft();
+			setShowRestartOffer(true);
+			toast.success(m.config_saved());
 		},
 		onError: (e: Error) => {
-			toast.error(e.message || "Could not save configuration.");
+			toast.error(e.message || m.config_save_failed());
 		},
 	});
+
+	const restart = useMutation({
+		mutationFn: restartHost,
+		onSuccess: () => {
+			setRestartConfirmOpen(false);
+			setShowRestartOffer(false);
+			toast.success(m.config_restart_pending());
+		},
+	});
+
+	const captureOptions = useMemo(
+		() =>
+			buildCaptureMethodOptions(
+				captureQ.isError ? null : captureQ.data,
+				draft?.audio_video.capture_method ?? "auto",
+				capabilityCopy,
+			),
+		[
+			captureQ.data,
+			captureQ.isError,
+			capabilityCopy,
+			draft?.audio_video.capture_method,
+		],
+	);
+
+	const compositorOptions = useMemo(
+		() =>
+			buildCompositorOptions(
+				compositorsQ.isError ? null : compositorsQ.data,
+				draft?.audio_video.compositor ?? "",
+				capabilityCopy,
+			),
+		[
+			compositorsQ.data,
+			compositorsQ.isError,
+			capabilityCopy,
+			draft?.audio_video.compositor,
+		],
+	);
+
+	const headlessOptions = useMemo(
+		() =>
+			buildHeadlessCompositorOptions(
+				headlessQ.isError ? null : headlessQ.data,
+				draft?.audio_video.headless_compositor ?? "off",
+				capabilityCopy,
+			),
+		[
+			headlessQ.data,
+			headlessQ.isError,
+			capabilityCopy,
+			draft?.audio_video.headless_compositor,
+		],
+	);
 
 	if (q.isError) {
 		return (
@@ -279,9 +456,7 @@ export const SectionConfig: FC = () => {
 								{m.common_error()}
 							</p>
 							<p className="text-sm leading-relaxed text-muted-foreground">
-								Could not load host configuration. Is the host management API
-								up? This page needs slipstream-host with GET /api/v1/host/config
-								(0.23+).
+								{m.config_load_failed()}
 							</p>
 						</div>
 					</div>
@@ -322,26 +497,61 @@ export const SectionConfig: FC = () => {
 		});
 	};
 
-	const onSave = () => save.mutate(draft);
+	const onSave = () => {
+		if (!q.data) return;
+		const payload = structuredClone(draft);
+		// Moonlight broadcast is owned by Host. Keep a current server value in this
+		// payload so a stale Configuration draft cannot undo a Host-page change.
+		payload.network.gamestream = q.data.settings.network.gamestream;
+		save.mutate(payload);
+	};
+
+	const onDiscard = () => {
+		if (!confirm(m.config_discard_confirm())) return;
+		if (!q.data) return;
+		clearConfigDraft();
+		setDraft(structuredClone(q.data.settings));
+		setShowRestartOffer(false);
+	};
+
+	const moonlightOn = draft.network.gamestream ?? false;
+	const gamescopePathRelevant =
+		draft.audio_video.gamescope_hdr &&
+		(!draft.audio_video.compositor ||
+			draft.audio_video.compositor === "gamescope" ||
+			draft.audio_video.headless_compositor === "gamescope");
 
 	return (
 		<Section maxWidth={false}>
-			<div className={cn("flex flex-col gap-card", dirty && "pb-20 sm:pb-0")}>
-					<header className="flex flex-col gap-5 rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm sm:p-5 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
-						<div className="min-w-0 space-y-2">
-							<p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-								{m.nav_host()}
-							</p>
-							<h1 className="text-3xl font-semibold tracking-tight">
-								{m.display_config_title()}
-							</h1>
-							<p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-								Manage the host's capture, input, network, and encoder defaults
-								from one workspace. Hover the help icons for what each option
-								does.
-							</p>
-						</div>
-						<div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+			<div
+				className={cn(
+					"flex flex-col gap-card",
+					dirty && "pb-[calc(12rem+env(safe-area-inset-bottom,0px))] sm:pb-0",
+				)}
+			>
+				<header className="flex flex-col gap-5 rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm sm:p-5 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+					<div className="min-w-0 space-y-2">
+						<p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+							{m.nav_host()}
+						</p>
+						<h1 className="text-3xl font-semibold tracking-tight">
+							{m.display_config_title()}
+						</h1>
+						<p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+							{m.config_intro()}
+						</p>
+					</div>
+					<div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+						<div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+							<Button
+								type="button"
+								variant="outline"
+								disabled={!dirty || save.isPending}
+								onClick={onDiscard}
+								className="hidden w-full min-w-28 sm:inline-flex sm:w-auto"
+							>
+								{m.config_discard()}
+							</Button>
 							<Button
 								type="button"
 								disabled={!dirty || save.isPending}
@@ -353,12 +563,72 @@ export const SectionConfig: FC = () => {
 								<SaveIcon className="size-4" aria-hidden="true" />
 								{save.isPending ? m.common_loading() : m.display_save()}
 							</Button>
-							<p
-								id="config-save-status"
-								role="status"
-								aria-live="polite"
-								className="text-right text-xs text-muted-foreground"
-							>
+						</div>
+						<p
+							id="config-save-status"
+							role="status"
+							aria-live="polite"
+							className="text-right text-xs text-muted-foreground"
+						>
+							{save.isPending
+								? m.common_loading()
+								: dirty
+									? m.display_unsaved_hint()
+									: m.display_all_saved()}
+						</p>
+					</div>
+				</header>
+
+				<ConfigModeToggle
+					mode={mode}
+					label={m.config_mode_label()}
+					recommendedLabel={m.config_mode_recommended()}
+					allLabel={m.config_mode_all()}
+					onChange={setMode}
+				/>
+
+				{mode === "all" ? (
+					<div
+						role="note"
+						data-testid="config-all-warning"
+						className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm leading-relaxed"
+					>
+						<CircleAlert
+							className="mt-0.5 size-4 shrink-0 text-[var(--warning)]"
+							aria-hidden="true"
+						/>
+						<p className="min-w-0">{m.config_all_warning()}</p>
+					</div>
+				) : null}
+
+				<div
+					role="status"
+					aria-live="polite"
+					aria-busy={save.isPending || undefined}
+					className={cn(
+						"flex flex-col gap-2 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between",
+						dirty
+							? "border-warning/40 bg-warning/10"
+							: "border-border/70 bg-muted/20",
+					)}
+				>
+					<div className="flex min-w-0 items-start gap-3">
+						{dirty ? (
+							<CircleAlert
+								className="mt-0.5 size-4 shrink-0 text-[var(--warning)]"
+								aria-hidden="true"
+							/>
+						) : (
+							<CheckCircle2
+								className="mt-0.5 size-4 shrink-0 text-[var(--success)]"
+								aria-hidden="true"
+							/>
+						)}
+						<div className="min-w-0 space-y-0.5">
+							<p className="text-sm font-medium">
+								{dirty ? m.display_unsaved() : m.display_all_saved()}
+							</p>
+							<p className="min-w-0 break-words text-xs leading-relaxed text-muted-foreground">
 								{save.isPending
 									? m.common_loading()
 									: dirty
@@ -366,102 +636,455 @@ export const SectionConfig: FC = () => {
 										: m.display_all_saved()}
 							</p>
 						</div>
-					</header>
+					</div>
+					{save.isPending ? (
+						<Badge variant="secondary" className="self-start sm:self-auto">
+							{m.common_loading()}
+						</Badge>
+					) : null}
+				</div>
 
+				{save.isError ? (
+					<div
+						role="alert"
+						className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/5 px-3.5 py-3 text-sm"
+					>
+						<CircleAlert
+							className="mt-0.5 size-4 shrink-0 text-destructive"
+							aria-hidden="true"
+						/>
+						<p className="min-w-0 text-destructive">
+							{save.error instanceof Error && save.error.message
+								? save.error.message
+								: m.common_error()}
+						</p>
+					</div>
+				) : null}
+
+				{q.data?.requires_restart ? (
 					<div
 						role="status"
 						aria-live="polite"
-						aria-busy={save.isPending || undefined}
-						className={cn(
-							"flex flex-col gap-2 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between",
-							dirty
-								? "border-warning/40 bg-warning/10"
-								: "border-border/70 bg-muted/20",
-						)}
+						className="flex items-start gap-3 rounded-lg border border-warning/40 bg-warning/10 px-3.5 py-3 text-sm leading-relaxed text-foreground"
 					>
-						<div className="flex min-w-0 items-start gap-3">
-							{dirty ? (
-								<CircleAlert
-									className="mt-0.5 size-4 shrink-0 text-[var(--warning)]"
-									aria-hidden="true"
-								/>
-							) : (
-								<CheckCircle2
-									className="mt-0.5 size-4 shrink-0 text-[var(--success)]"
-									aria-hidden="true"
-								/>
-							)}
-							<div className="min-w-0 space-y-0.5">
-								<p className="text-sm font-medium">
-									{dirty ? m.display_unsaved() : m.display_all_saved()}
-								</p>
-								<p className="min-w-0 break-words text-xs leading-relaxed text-muted-foreground">
-									{save.isPending
-										? m.common_loading()
-										: dirty
-											? m.display_unsaved_hint()
-											: m.display_all_saved()}
-								</p>
-							</div>
-						</div>
-						{save.isPending ? (
-							<Badge variant="secondary" className="self-start sm:self-auto">
-								{m.common_loading()}
-							</Badge>
-						) : null}
+						<Info
+							className="mt-0.5 size-4 shrink-0 text-[var(--warning)]"
+							aria-hidden="true"
+						/>
+						<p className="min-w-0 break-words">
+							{m.config_restart_banner({ path: q.data.env_path })}
+						</p>
 					</div>
+				) : null}
 
-					{save.isError ? (
-						<div
-							role="alert"
-							className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/5 px-3.5 py-3 text-sm"
+				<RestartOffer
+					open={showRestartOffer}
+					confirmOpen={restartConfirmOpen}
+					pending={restart.isPending}
+					error={
+						restart.isError
+							? restart.error instanceof Error
+								? restart.error.message
+								: m.config_restart_failed()
+							: null
+					}
+					title={m.config_restart_offer_title()}
+					body={m.config_restart_offer_body()}
+					restartLabel={m.config_restart_now()}
+					laterLabel={m.config_restart_later()}
+					confirmTitle={m.config_restart_confirm_title()}
+					confirmBody={m.config_restart_confirm_body()}
+					confirmLabel={m.config_restart_confirm()}
+					cancelLabel={m.config_restart_cancel()}
+					pendingLabel={m.config_restart_pending()}
+					onLater={() => {
+						setShowRestartOffer(false);
+						setRestartConfirmOpen(false);
+						restart.reset();
+					}}
+					onConfirmOpenChange={(open) => {
+						setRestartConfirmOpen(open);
+						if (!open) restart.reset();
+					}}
+					onRestart={() => restart.mutate()}
+				/>
+
+				{mode === "recommended" ? (
+					<div className="space-y-5" data-testid="config-recommended">
+						<ConfigCard
+							title={m.config_mode_recommended()}
+							description={m.config_intro()}
 						>
-							<CircleAlert
-								className="mt-0.5 size-4 shrink-0 text-destructive"
-								aria-hidden="true"
-							/>
-							<p className="min-w-0 text-destructive">
-								{save.error instanceof Error && save.error.message
-									? save.error.message
-									: m.common_error()}
-							</p>
-						</div>
-					) : null}
+							<FieldGroup title={m.host_identity()}>
+								<Row
+									label={m.host_hostname()}
+									hint={m.config_host_name_hint()}
+									help={m.config_host_name_help()}
+									recommended={m.config_host_name_recommended()}
+									htmlFor="cfg-rec-host-name"
+								>
+									<Input
+										id="cfg-rec-host-name"
+										className={fieldControlClass}
+										value={draft.general.host_name ?? ""}
+										placeholder={m.config_host_name_placeholder()}
+										onChange={(e) =>
+											patch((d) => {
+												d.general.host_name = e.target.value || null;
+											})
+										}
+									/>
+								</Row>
+								<Row
+									label={m.config_video_source()}
+									hint={m.config_video_source_hint()}
+									help={m.config_video_source_help()}
+									recommended={m.config_video_source_virtual()}
+									htmlFor="cfg-rec-video-source"
+								>
+									<FieldSelect
+										id="cfg-rec-video-source"
+										value={draft.audio_video.video_source ?? "virtual"}
+										onChange={(e) =>
+											patch((d) => {
+												d.audio_video.video_source = e.target.value || null;
+											})
+										}
+									>
+										<HelpOption value="virtual" recommended>
+											{m.config_video_source_virtual()}
+										</HelpOption>
+										<HelpOption value="portal">
+											{m.config_video_source_portal()}
+										</HelpOption>
+									</FieldSelect>
+								</Row>
+							</FieldGroup>
 
-					{q.data?.requires_restart ? (
-						<div
-							role="status"
-							aria-live="polite"
-							className="flex items-start gap-3 rounded-lg border border-warning/40 bg-warning/10 px-3.5 py-3 text-sm leading-relaxed text-foreground"
+							<FieldGroup title={m.config_network()}>
+								<ToggleRow
+									label={m.config_mdns()}
+									hint={m.config_mdns_hint()}
+									help={m.config_mdns_help()}
+									recommended={m.config_on()}
+									checked={draft.network.mdns}
+									onChange={(v) =>
+										patch((d) => {
+											d.network.mdns = v;
+										})
+									}
+								/>
+								<Row
+									label={m.config_moonlight()}
+									hint={m.config_moonlight_hint()}
+									help={m.config_moonlight_help_readonly()}
+								>
+									<div className="flex w-full flex-col items-stretch gap-2 sm:w-56 sm:items-end">
+										<div className="flex items-center gap-2 text-sm">
+											<span
+												aria-hidden
+												className={cn(
+													"size-2 rounded-full",
+													moonlightOn
+														? "bg-emerald-500"
+														: "bg-muted-foreground/40",
+												)}
+											/>
+											<span className="text-muted-foreground">
+												{moonlightOn
+													? m.config_moonlight_on()
+													: m.config_moonlight_off()}
+											</span>
+										</div>
+										<Link
+											to="/host"
+											className={cn(
+												buttonVariants({ variant: "outline" }),
+												"w-full justify-center",
+											)}
+										>
+											{m.config_moonlight_open_host()}
+										</Link>
+									</div>
+								</Row>
+								<Row
+									label={m.config_clipboard()}
+									hint={m.config_clipboard_hint()}
+									help={m.config_clipboard_hint()}
+									recommended={m.config_clipboard_off()}
+									htmlFor="cfg-rec-clipboard"
+								>
+									<FieldSelect
+										id="cfg-rec-clipboard"
+										value={draft.clipboard}
+										onChange={(e) =>
+											patch((d) => {
+												d.clipboard =
+													e.target.value as HostConfigFile["clipboard"];
+											})
+										}
+									>
+										<HelpOption value="off" recommended>
+											{m.config_clipboard_off()}
+										</HelpOption>
+										<HelpOption value="text-only">
+											{m.config_clipboard_text_only()}
+										</HelpOption>
+										<HelpOption value="on">
+											{m.config_clipboard_on()}
+										</HelpOption>
+									</FieldSelect>
+								</Row>
+							</FieldGroup>
+
+							<FieldGroup title={m.config_input()}>
+								<ToggleRow
+									label={m.config_pen()}
+									hint={m.config_pen_hint()}
+									help={m.config_pen_help()}
+									recommended={m.config_on()}
+									checked={draft.input.pen}
+									onChange={(v) =>
+										patch((d) => {
+											d.input.pen = v;
+										})
+									}
+								/>
+							</FieldGroup>
+
+							<FieldGroup title={m.config_hdr_audio()}>
+								<ToggleRow
+									label={m.config_ten_bit()}
+									hint={m.config_ten_bit_hint()}
+									help={m.config_ten_bit_help()}
+									recommended={m.config_on()}
+									checked={draft.audio_video.ten_bit}
+									onChange={(v) =>
+										patch((d) => {
+											d.audio_video.ten_bit = v;
+										})
+									}
+								/>
+								<ToggleRow
+									label={m.config_four_four_four()}
+									hint={m.config_four_four_four_hint()}
+									help={m.config_four_four_four_help()}
+									recommended={m.config_on()}
+									checked={draft.audio_video.four_four_four}
+									onChange={(v) =>
+										patch((d) => {
+											d.audio_video.four_four_four = v;
+										})
+									}
+								/>
+								<ToggleRow
+									label={m.config_gamescope_hdr()}
+									hint={m.config_gamescope_hdr_hint()}
+									help={m.config_gamescope_hdr_help()}
+									recommended={m.config_on()}
+									checked={draft.audio_video.gamescope_hdr}
+									onChange={(v) =>
+										patch((d) => {
+											d.audio_video.gamescope_hdr = v;
+										})
+									}
+								/>
+								<ToggleRow
+									label={m.config_audio_fec()}
+									hint={m.config_audio_fec_hint()}
+									help={m.config_audio_fec_help()}
+									recommended={m.config_on()}
+									checked={draft.audio_video.audio_fec ?? true}
+									onChange={(v) =>
+										patch((d) => {
+											d.audio_video.audio_fec = v;
+										})
+									}
+								/>
+							</FieldGroup>
+
+							<FieldGroup title={m.config_encoders()}>
+								<Row
+									label={m.config_encoder()}
+									hint={m.config_encoder_hint()}
+									help={m.config_encoder_help()}
+									recommended={m.config_encoder_auto()}
+									htmlFor="cfg-rec-encoder"
+								>
+									<FieldSelect
+										id="cfg-rec-encoder"
+										value={draft.encoders.encoder || "auto"}
+										onChange={(e) =>
+											patch((d) => {
+												d.encoders.encoder = e.target.value;
+											})
+										}
+									>
+										<HelpOption
+											value="auto"
+											recommended
+											title={m.config_encoder_auto_title()}
+										>
+											{m.config_encoder_auto()}
+										</HelpOption>
+										<HelpOption
+											value="nvenc"
+											title={m.config_encoder_nvenc_title()}
+										>
+											NVENC
+										</HelpOption>
+										<HelpOption
+											value="amf"
+											title={m.config_encoder_amf_title()}
+										>
+											AMF
+										</HelpOption>
+										<HelpOption
+											value="qsv"
+											title={m.config_encoder_qsv_title()}
+										>
+											QSV
+										</HelpOption>
+										<HelpOption
+											value="vaapi"
+											title={m.config_encoder_vaapi_title()}
+										>
+											VAAPI
+										</HelpOption>
+										<HelpOption
+											value="software"
+											title={m.config_encoder_software_title()}
+										>
+											{m.config_encoder_software()}
+										</HelpOption>
+									</FieldSelect>
+								</Row>
+							</FieldGroup>
+						</ConfigCard>
+						<ConfigCard
+							title={m.config_stream_profiles()}
+							description={m.config_stream_profiles_hint()}
 						>
-							<Info
-								className="mt-0.5 size-4 shrink-0 text-[var(--warning)]"
-								aria-hidden="true"
-							/>
-							<p className="min-w-0 break-words">
-								Saved values write to{" "}
-								<code className="break-all rounded bg-muted px-1 py-0.5 font-mono text-xs">
-									{q.data.env_path}
-								</code>
-								. Restart{" "}
-								<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-									slipstream-host
-								</code>{" "}
-								for them to take effect in the running process.
-							</p>
-						</div>
-					) : null}
-
-					<Tabs defaultValue="general" className="flex flex-col gap-5">
+							<FieldGroup title={m.config_stream_profiles()}>
+								<Row
+									label={m.config_performance_profile()}
+									hint={m.config_performance_profile_hint()}
+									help={m.config_profile_low_latency_help()}
+									recommended={m.config_profile_balanced()}
+									htmlFor="cfg-rec-performance-profile"
+								>
+									<FieldSelect
+										id="cfg-rec-performance-profile"
+										value={draft.performance_profile}
+										onChange={(e) =>
+											patch((d) => {
+												d.performance_profile =
+													e.target.value as HostConfigFile["performance_profile"];
+											})
+										}
+									>
+										<HelpOption
+											value="balanced"
+											recommended
+											title={m.config_profile_balanced_help()}
+										>
+											{m.config_profile_balanced()}
+										</HelpOption>
+										<HelpOption
+											value="low_latency"
+											title={m.config_profile_low_latency_help()}
+										>
+											{m.config_profile_low_latency()}
+										</HelpOption>
+									</FieldSelect>
+								</Row>
+								<Row
+									label={m.config_latency_profile()}
+									hint={m.config_latency_profile_hint()}
+									help={m.config_profile_low_latency_help()}
+									recommended={m.config_profile_balanced()}
+									htmlFor="cfg-rec-latency-profile"
+								>
+									<FieldSelect
+										id="cfg-rec-latency-profile"
+										value={draft.latency_profile}
+										onChange={(e) =>
+											patch((d) => {
+												d.latency_profile =
+													e.target.value as HostConfigFile["latency_profile"];
+											})
+										}
+									>
+										<HelpOption
+											value="balanced"
+											recommended
+											title={m.config_profile_balanced_help()}
+										>
+											{m.config_profile_balanced()}
+										</HelpOption>
+										<HelpOption
+											value="low_latency"
+											title={m.config_profile_low_latency_help()}
+										>
+											{m.config_profile_low_latency()}
+										</HelpOption>
+									</FieldSelect>
+								</Row>
+								<Row
+									label={m.config_network_policy()}
+									hint={m.config_network_policy_hint()}
+									help={m.config_profile_auto_help()}
+									recommended={m.config_profile_auto()}
+									htmlFor="cfg-rec-network-policy"
+								>
+									<FieldSelect
+										id="cfg-rec-network-policy"
+										value={draft.network_policy}
+										onChange={(e) =>
+											patch((d) => {
+												d.network_policy =
+													e.target.value as HostConfigFile["network_policy"];
+											})
+										}
+									>
+										<HelpOption
+											value="auto"
+											recommended
+											title={m.config_profile_auto_help()}
+										>
+											{m.config_profile_auto()}
+										</HelpOption>
+										<HelpOption
+											value="lan"
+											title={m.config_profile_lan_help()}
+										>
+											{m.config_profile_lan()}
+										</HelpOption>
+										<HelpOption
+											value="wan"
+											title={m.config_profile_wan_help()}
+										>
+											{m.config_profile_wan()}
+										</HelpOption>
+									</FieldSelect>
+								</Row>
+							</FieldGroup>
+						</ConfigCard>
+					</div>
+				) : (
+					<Tabs
+						defaultValue="general"
+						className="flex flex-col gap-5"
+						data-testid="config-all-settings"
+					>
 						<div className="grid gap-5 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start">
 							<aside className="space-y-3">
 								<div className="space-y-1 px-1">
 									<p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-										Configuration areas
+										{m.config_areas()}
 									</p>
 									<p className="text-sm leading-relaxed text-muted-foreground">
-										Start with the core controls, then tune the advanced capture
-										and encoder paths.
+										{m.config_areas_hint()}
 									</p>
 								</div>
 								<div className="overflow-x-auto rounded-xl lg:overflow-visible">
@@ -471,28 +1094,28 @@ export const SectionConfig: FC = () => {
 									>
 										<ConfigTabTrigger
 											value="general"
-											label="General"
-											description="Host basics"
+											label={m.config_general()}
+											description={m.config_general_desc()}
 										/>
 										<ConfigTabTrigger
 											value="input"
-											label="Input"
-											description="Input routing"
+											label={m.config_input()}
+											description={m.config_input_desc()}
 										/>
 										<ConfigTabTrigger
 											value="av"
-											label={`${m.status_audio()} / ${m.status_video()}`}
-											description="Capture paths"
+											label={m.config_av_title()}
+											description={m.config_av_tab_desc()}
 										/>
 										<ConfigTabTrigger
 											value="network"
-											label="Network"
-											description="Discovery and FEC"
+											label={m.config_network()}
+											description={m.config_network_desc()}
 										/>
 										<ConfigTabTrigger
 											value="encoders"
-											label="Encoders / GPU"
-											description="Encode and GPU"
+											label={m.config_encoders()}
+											description={m.config_encoders_desc()}
 										/>
 									</TabsList>
 								</div>
@@ -501,23 +1124,23 @@ export const SectionConfig: FC = () => {
 							<div className="min-w-0">
 								<TabsContent value="general" className="mt-0 outline-none">
 									<ConfigCard
-										title="General"
-										description="Set the host identity and diagnostic behavior."
+										title={m.config_general()}
+										description={m.config_general_card_desc()}
 									>
 										<FieldGroup title={m.host_identity()}>
 											<Row
 												label={m.host_hostname()}
-												hint="Shown in Moonlight and on the LAN."
-												help="Friendly name clients use when discovering this host. Leave blank to use this PC's system hostname."
-												recommended="Blank (use the system hostname)"
+												hint={m.config_host_name_hint()}
+												help={m.config_host_name_help()}
+												recommended={m.config_host_name_recommended()}
 												htmlFor="cfg-host-name"
 											>
 												<Input
 													id="cfg-host-name"
 													className={fieldControlClass}
 													value={draft.general.host_name ?? ""}
-													placeholder="This PC"
-													title="Leave blank to use the system hostname."
+													placeholder={m.config_host_name_placeholder()}
+													title={m.config_host_name_title()}
 													onChange={(e) =>
 														patch((d) => {
 															d.general.host_name = e.target.value || null;
@@ -526,10 +1149,10 @@ export const SectionConfig: FC = () => {
 												/>
 											</Row>
 											<ToggleRow
-												label="Performance logging"
-												hint="Extra host diagnostics in the log."
-												help="Writes per-stage timing into the host log. Useful when chasing stutter or encode delays. Leave off for normal use; it adds noise and a little overhead."
-												recommended="Off"
+												label={m.config_perf()}
+												hint={m.config_perf_hint()}
+												help={m.config_perf_help()}
+												recommended={m.config_off()}
 												checked={draft.general.perf}
 												onChange={(v) =>
 													patch((d) => {
@@ -543,23 +1166,23 @@ export const SectionConfig: FC = () => {
 
 								<TabsContent value="input" className="mt-0 outline-none">
 									<ConfigCard
-										title="Input"
-										description="Choose how local input is exposed to streaming sessions."
+										title={m.config_input()}
+										description={m.config_input_card_desc()}
 									>
-										<FieldGroup title="Input routing">
+										<FieldGroup title={m.config_input_routing_group()}>
 											<Row
-												label="Gamepad backend"
-												hint="Leave blank for auto."
-												help="Which virtual gamepad stack the host uses for client controllers. Blank lets Slipstream pick the best backend for this OS."
-												recommended="Blank / auto"
+												label={m.config_gamepad()}
+												hint={m.config_gamepad_hint()}
+												help={m.config_gamepad_help()}
+												recommended={m.config_gamepad_recommended()}
 												htmlFor="cfg-gamepad"
 											>
 												<Input
 													id="cfg-gamepad"
 													className={fieldControlClass}
 													value={draft.input.gamepad ?? ""}
-													placeholder="auto"
-													title="Leave blank for automatic gamepad backend selection."
+													placeholder={m.config_gamepad_placeholder()}
+													title={m.config_gamepad_title()}
 													onChange={(e) =>
 														patch((d) => {
 															d.input.gamepad = e.target.value || null;
@@ -567,11 +1190,23 @@ export const SectionConfig: FC = () => {
 													}
 												/>
 											</Row>
+												<ToggleRow
+													label={m.config_pen()}
+													hint={m.config_pen_hint()}
+													help={m.config_pen_help()}
+													recommended={m.config_on()}
+													checked={draft.input.pen}
+													onChange={(v) =>
+														patch((d) => {
+															d.input.pen = v;
+														})
+													}
+												/>
 											<ToggleRow
-												label="Gamescope grab cursor"
-												hint="Force relative mouse capture in bare gamescope launches."
-												help="Adds --force-grab-cursor so FPS mouselook works over the injected pointer. Can break absolute-pointer menus and some desktop apps, so leave it off unless a title needs it."
-												recommended="Off"
+												label={m.config_gamescope_grab()}
+												hint={m.config_gamescope_grab_hint()}
+												help={m.config_gamescope_grab_help()}
+												recommended={m.config_off()}
 												checked={draft.input.gamescope_grab_cursor}
 												onChange={(v) =>
 													patch((d) => {
@@ -585,16 +1220,16 @@ export const SectionConfig: FC = () => {
 
 								<TabsContent value="av" className="mt-0 outline-none">
 									<ConfigCard
-										title={`${m.status_audio()} / ${m.status_video()}`}
-										description="Choose the display pipeline, then tune stream output. Linux resolves the compositor and capture backend together."
+										title={m.config_av_title()}
+										description={m.config_av_card_desc()}
 										advanced
 									>
-										<FieldGroup title="Capture and display">
+										<FieldGroup title={m.config_capture_display_group()}>
 											<Row
-												label="Video source"
-												hint="Where the stream picture comes from."
-												help="Virtual display creates a per-client output at the client's resolution. Portal / PipeWire mirrors an existing desktop instead."
-												recommended="Virtual display"
+												label={m.config_video_source()}
+												hint={m.config_video_source_hint()}
+												help={m.config_video_source_help()}
+												recommended={m.config_video_source_virtual()}
 												htmlFor="cfg-video-source"
 											>
 												<FieldSelect
@@ -609,205 +1244,98 @@ export const SectionConfig: FC = () => {
 												>
 													<HelpOption
 														value=""
-														title="Use the host default (virtual display)."
+														title={m.config_video_source_default_title()}
 													>
-														Default
+														{m.config_video_source_default()}
 													</HelpOption>
 													<HelpOption
 														value="virtual"
 														recommended
-														title="Create a dedicated virtual display at the client's mode. Best for streaming and multi-client use."
+														title={m.config_video_source_virtual_title()}
 													>
-														Virtual display
+														{m.config_video_source_virtual()}
 													</HelpOption>
 													<HelpOption
 														value="portal"
-														title="Capture an existing monitor through XDG Portal / PipeWire. Good for mirroring your current desktop."
+														title={m.config_video_source_portal_title()}
 													>
-														Portal / PipeWire
+														{m.config_video_source_portal()}
 													</HelpOption>
 												</FieldSelect>
 											</Row>
 											<Row
-												label="Capture method"
-												hint="How an existing desktop is grabbed."
-												help="Only matters on the portal/mirror path. Auto picks the best backend for this desktop. Hermes-KMS is not offered."
-												recommended="Auto"
+												label={m.config_capture_method()}
+												hint={m.config_capture_method_hint()}
+												help={m.config_capture_method_help()}
+												recommended={m.config_profile_auto()}
 												htmlFor="cfg-capture-method"
 											>
-												<FieldSelect
+												<CapabilitySelect
 													id="cfg-capture-method"
 													value={draft.audio_video.capture_method ?? "auto"}
-													onChange={(e) =>
+													options={captureOptions}
+													loading={captureQ.isPending && !captureQ.data}
+													loadingLabel={m.common_loading()}
+													onChange={(value) =>
 														patch((d) => {
-															d.audio_video.capture_method =
-																e.target.value || null;
+															d.audio_video.capture_method = value || null;
 														})
 													}
-												>
-													<HelpOption
-														value="auto"
-														recommended
-														title="Let Slipstream choose the capture backend for this desktop."
-													>
-														Auto
-													</HelpOption>
-													<HelpOption
-														value="portal"
-														title="XDG Desktop Portal screencast. Works across many Wayland desktops, may prompt for permission."
-													>
-														XDG Portal
-													</HelpOption>
-													<HelpOption
-														value="kwin"
-														title="KWin Screencast API. Prefer this on Plasma when auto is wrong."
-													>
-														KWin Screencast
-													</HelpOption>
-													<HelpOption
-														value="wlr"
-														title="wlroots screencopy. Prefer this on Sway, Hyprland, and similar."
-													>
-														wlroots screencopy
-													</HelpOption>
-													<HelpOption
-														value="kms"
-														title="DRM/KMS primary-plane dma-buf capture. Best when the display is already scanning out on a usable DRM card."
-													>
-														DRM/KMS primary plane
-													</HelpOption>
-													<HelpOption
-														value="x11"
-														title="X11 capture path for X sessions."
-													>
-														X11
-													</HelpOption>
-													<HelpOption
-														value="nvfbc"
-														title="NVIDIA NvFBC shared-CUDA capture. Requires an X11 display, NVIDIA capture support, and CUDA."
-													>
-														NVIDIA NvFBC
-													</HelpOption>
-												</FieldSelect>
+												/>
 											</Row>
 											<Row
-												label="Virtual compositor"
-												hint="Backend for virtual displays (live session)."
-												help="Pin which compositor owns virtual outputs. Leave auto-detect unless you are forcing a specific backend for testing."
-												recommended="Auto-detect"
+												label={m.config_virtual_compositor()}
+												hint={m.config_virtual_compositor_hint()}
+												help={m.config_virtual_compositor_help()}
+												recommended={m.config_compositor_auto_detect()}
 												htmlFor="cfg-compositor"
 											>
-												<FieldSelect
+												<CapabilitySelect
 													id="cfg-compositor"
 													value={draft.audio_video.compositor ?? ""}
-													onChange={(e) =>
+													options={compositorOptions}
+													loading={
+														compositorsQ.isPending && !compositorsQ.data
+													}
+													loadingLabel={m.common_loading()}
+													onChange={(value) =>
 														patch((d) => {
-															d.audio_video.compositor =
-																e.target.value || null;
+															d.audio_video.compositor = value || null;
 														})
 													}
-												>
-													<HelpOption
-														value=""
-														recommended
-														title="Detect the running compositor automatically."
-													>
-														Auto-detect
-													</HelpOption>
-													<HelpOption
-														value="kwin"
-														title="Force KWin virtual-output support (Plasma)."
-													>
-														KWin
-													</HelpOption>
-													<HelpOption
-														value="mutter"
-														title="Force Mutter virtual-output support (GNOME)."
-													>
-														Mutter
-													</HelpOption>
-													<HelpOption
-														value="wlroots"
-														title="Force wlroots / Sway virtual-output support."
-													>
-														wlroots / Sway
-													</HelpOption>
-													<HelpOption
-														value="hyprland"
-														title="Force Hyprland virtual-output support."
-													>
-														Hyprland
-													</HelpOption>
-													<HelpOption
-														value="gamescope"
-														title="Use gamescope as the virtual display / nested session backend."
-													>
-														Gamescope
-													</HelpOption>
-												</FieldSelect>
+												/>
 											</Row>
 											<Row
-												label="Headless compositor"
-												hint="Spawn a private Wayland session when none is live."
-												help="For boxes with no logged-in desktop. Off is right for a normal interactive PC. Auto/labwc/gamescope can spawn a private session on headless hosts."
-												recommended="Off (interactive desktop)"
+												label={m.config_headless()}
+												hint={m.config_headless_hint()}
+												help={m.config_headless_help()}
+												recommended={m.config_headless_recommended()}
 												htmlFor="cfg-headless-compositor"
 											>
-												<FieldSelect
+												<CapabilitySelect
 													id="cfg-headless-compositor"
 													value={
 														draft.audio_video.headless_compositor ?? "off"
 													}
-													onChange={(e) =>
+													options={headlessOptions}
+													loading={headlessQ.isPending && !headlessQ.data}
+													loadingLabel={m.common_loading()}
+													onChange={(value) =>
 														patch((d) => {
 															d.audio_video.headless_compositor =
-																e.target.value === "off"
-																	? null
-																	: e.target.value || null;
+																value === "off" ? null : value || null;
 														})
 													}
-												>
-													<HelpOption
-														value="off"
-														recommended
-														title="Do not spawn a private compositor. Use this when a desktop session is already running."
-													>
-														Off
-													</HelpOption>
-													<HelpOption
-														value="auto"
-														title="Pick a headless compositor automatically when no session is live."
-													>
-														Auto
-													</HelpOption>
-													<HelpOption
-														value="labwc"
-														title="Spawn labwc (wlroots) as a private Wayland session."
-													>
-														labwc (wlroots)
-													</HelpOption>
-													<HelpOption
-														value="krfb"
-														title="Spawn krfb-virtualmonitor for a private virtual head."
-													>
-														krfb-virtualmonitor
-													</HelpOption>
-													<HelpOption
-														value="gamescope"
-														title="Spawn a private gamescope nested session."
-													>
-														Gamescope
-													</HelpOption>
-												</FieldSelect>
+												/>
 											</Row>
 										</FieldGroup>
 
-										<FieldGroup title="Stream preferences">
+										<FieldGroup title={m.config_stream_prefs_group()}>
 											<Row
-												label="Max FPS"
-												hint="Blank = no host-side game cap."
-												help="Caps how fast the game may render through the compositor. It does not reduce the client's negotiated stream rate. Leave blank unless you want to free GPU time."
-												recommended="Blank (no cap)"
+												label={m.config_max_fps()}
+												hint={m.config_max_fps_hint()}
+												help={m.config_max_fps_help()}
+												recommended={m.config_max_fps_recommended()}
 												htmlFor="cfg-max-fps"
 												controlWidth="sm"
 											>
@@ -818,7 +1346,7 @@ export const SectionConfig: FC = () => {
 													min={15}
 													max={480}
 													value={draft.audio_video.max_fps ?? ""}
-													title="Leave blank for no host-side FPS cap."
+													title={m.config_max_fps_title()}
 													onChange={(e) =>
 														patch((d) => {
 															const n = Number(e.target.value);
@@ -830,10 +1358,10 @@ export const SectionConfig: FC = () => {
 												/>
 											</Row>
 											<Row
-												label="PipeWire latency hint"
-												hint="1 to 40 ms, blank = 8 ms."
-												help="Requests a small scheduling quantum from the Linux PipeWire capture node. The compositor or driver may choose a larger value."
-												recommended="8 ms"
+												label={m.config_pipewire_latency()}
+												hint={m.config_pipewire_latency_hint()}
+												help={m.config_pipewire_latency_help()}
+												recommended={m.config_pipewire_latency_recommended()}
 												htmlFor="cfg-pipewire-latency"
 												controlWidth="sm"
 											>
@@ -847,7 +1375,8 @@ export const SectionConfig: FC = () => {
 													onChange={(e) =>
 														patch((d) => {
 															const n = Number(e.target.value);
-															d.audio_video.pipewire_latency_ms = e.target.value
+															d.audio_video.pipewire_latency_ms = e.target
+																.value
 																? n
 																: null;
 														})
@@ -855,10 +1384,10 @@ export const SectionConfig: FC = () => {
 												/>
 											</Row>
 											<Row
-												label="Capture age warning"
-												hint="1 to 500 ms, blank = 50 ms."
-												help="Marks stats samples when the newest source frame is older than this threshold. It is diagnostic only and does not drop frames."
-												recommended="50 ms"
+												label={m.config_capture_age()}
+												hint={m.config_capture_age_hint()}
+												help={m.config_capture_age_help()}
+												recommended={m.config_capture_age_recommended()}
 												htmlFor="cfg-capture-max-age"
 												controlWidth="sm"
 											>
@@ -872,7 +1401,8 @@ export const SectionConfig: FC = () => {
 													onChange={(e) =>
 														patch((d) => {
 															const n = Number(e.target.value);
-															d.audio_video.capture_max_age_ms = e.target.value
+															d.audio_video.capture_max_age_ms = e.target
+																.value
 																? n
 																: null;
 														})
@@ -881,12 +1411,12 @@ export const SectionConfig: FC = () => {
 											</Row>
 										</FieldGroup>
 
-										<FieldGroup title="Audio">
+										<FieldGroup title={m.config_audio_group()}>
 											<ToggleRow
-												label="Audio FEC"
-												hint="Rebuild lost audio instead of clicking."
-												help="RS erasure parity over groups of 5 ms Opus frames. A lost packet is rebuilt from its group's parity on wifi and other lossy links. Adds ~40 ms of buffered audio only when a client supports it. Leave on; off is an escape hatch."
-												recommended="On"
+												label={m.config_audio_fec()}
+												hint={m.config_audio_fec_hint()}
+												help={m.config_audio_fec_help_advanced()}
+												recommended={m.config_on()}
 												checked={draft.audio_video.audio_fec ?? true}
 												onChange={(v) =>
 													patch((d) => {
@@ -895,10 +1425,10 @@ export const SectionConfig: FC = () => {
 												}
 											/>
 											<Row
-												label="Audio gain"
-												hint="0.0 to 4.0, blank = 1.0 (unchanged)."
-												help="Linear gain applied to captured audio before encoding. Raise it for quiet sources, lower it if the stream clips. 0.5 = half, 2.0 = double."
-												recommended="1.0"
+												label={m.config_audio_gain()}
+												hint={m.config_audio_gain_hint()}
+												help={m.config_audio_gain_help()}
+												recommended={m.config_audio_gain_recommended()}
 												htmlFor="cfg-audio-gain"
 												controlWidth="sm"
 											>
@@ -921,46 +1451,49 @@ export const SectionConfig: FC = () => {
 												/>
 											</Row>
 											<Row
-												label="Capture source"
-												hint="How host audio is captured on Linux."
-												help="Stream sink (default) creates a host-owned sink that apps play into directly, immune to hardware-sink changes. Monitor records the default sink's output instead — use it if a specific app won't play into the virtual sink."
-												recommended="Stream sink"
+												label={m.config_audio_capture()}
+												hint={m.config_audio_capture_hint()}
+												help={m.config_audio_capture_help()}
+												recommended={m.config_audio_capture_stream_sink()}
 												htmlFor="cfg-audio-capture"
 												controlWidth="sm"
 											>
 												<FieldSelect
 													id="cfg-audio-capture"
 													className={cn(fieldControlClass, "sm:w-40")}
-													value={draft.audio_video.audio_capture ?? "stream-sink"}
+													value={
+														draft.audio_video.audio_capture ?? "stream-sink"
+													}
 													onChange={(e) =>
 														patch((d) => {
-															d.audio_video.audio_capture = e.target.value || null;
+															d.audio_video.audio_capture =
+																e.target.value || null;
 														})
 													}
 												>
 													<HelpOption
 														value="stream-sink"
 														recommended
-														title="Host-owned sink apps play into directly."
+														title={m.config_audio_capture_stream_sink_help()}
 													>
-														Stream sink
+														{m.config_audio_capture_stream_sink()}
 													</HelpOption>
 													<HelpOption
 														value="monitor"
-														title="Record the default sink's output."
+														title={m.config_audio_capture_monitor_help()}
 													>
-														Monitor
+														{m.config_audio_capture_monitor()}
 													</HelpOption>
 												</FieldSelect>
 											</Row>
 										</FieldGroup>
 
-										<FieldGroup title="Stream preferences">
+										<FieldGroup title={m.config_hdr_audio()}>
 											<ToggleRow
-												label="Prefer 10-bit"
-												hint="Allow HDR / Main10 when the client asks."
-												help="Host policy gate for 10-bit encode. A session still needs client support and a capable GPU. Leave on; turn off only if a client or GPU path misbehaves."
-												recommended="On"
+												label={m.config_ten_bit()}
+												hint={m.config_ten_bit_hint()}
+												help={m.config_ten_bit_help_advanced()}
+												recommended={m.config_on()}
 												checked={draft.audio_video.ten_bit}
 												onChange={(v) =>
 													patch((d) => {
@@ -969,10 +1502,10 @@ export const SectionConfig: FC = () => {
 												}
 											/>
 											<ToggleRow
-												label="Prefer 4:4:4"
-												hint="Allow full-chroma when the client asks."
-												help="Host policy gate for HEVC 4:4:4. Useful for sharp text/UI. Client must opt in; leave on unless encode probes fail."
-												recommended="On"
+												label={m.config_four_four_four()}
+												hint={m.config_four_four_four_hint()}
+												help={m.config_four_four_four_help_advanced()}
+												recommended={m.config_on()}
 												checked={draft.audio_video.four_four_four}
 												onChange={(v) =>
 													patch((d) => {
@@ -981,10 +1514,10 @@ export const SectionConfig: FC = () => {
 												}
 											/>
 											<ToggleRow
-												label="Gamescope HDR"
-												hint="Allow HDR sessions on the gamescope backend."
-												help="Attempts HDR only when slipstream-gamescope and client caps support it. Stock gamescope stays SDR either way. Leave on; set off as an escape hatch."
-												recommended="On"
+												label={m.config_gamescope_hdr()}
+												hint={m.config_gamescope_hdr_hint()}
+												help={m.config_gamescope_hdr_help_advanced()}
+												recommended={m.config_on()}
 												checked={draft.audio_video.gamescope_hdr}
 												onChange={(v) =>
 													patch((d) => {
@@ -993,21 +1526,95 @@ export const SectionConfig: FC = () => {
 												}
 											/>
 										</FieldGroup>
+										<FieldGroup title={m.config_gamescope_hdr()}>
+											<ToggleRow
+												label={m.config_gamescope_splash()}
+												hint={m.config_gamescope_splash_hint()}
+												help={m.config_gamescope_splash_help()}
+												recommended={m.config_on()}
+												checked={draft.audio_video.gamescope_splash}
+												onChange={(v) =>
+													patch((d) => {
+														d.audio_video.gamescope_splash = v;
+													})
+												}
+											/>
+											<Row
+												label={m.config_vdisplay_multiplier()}
+												hint={m.config_vdisplay_multiplier_hint()}
+												help={m.config_vdisplay_multiplier_help()}
+												recommended={m.config_vdisplay_multiplier_1()}
+												htmlFor="cfg-vdisplay-multiplier"
+											>
+												<FieldSelect
+													id="cfg-vdisplay-multiplier"
+													value={String(draft.audio_video.vdisplay_hz_mult)}
+													onChange={(e) =>
+														patch((d) => {
+															d.audio_video.vdisplay_hz_mult = Number(
+																e.target.value,
+															);
+														})
+													}
+												>
+													<HelpOption value="1" recommended>
+														{m.config_vdisplay_multiplier_1()}
+													</HelpOption>
+													<HelpOption value="2">
+														{m.config_vdisplay_multiplier_2()}
+													</HelpOption>
+													<HelpOption value="3">
+														{m.config_vdisplay_multiplier_3()}
+													</HelpOption>
+													<HelpOption value="4">
+														{m.config_vdisplay_multiplier_4()}
+													</HelpOption>
+												</FieldSelect>
+											</Row>
+											{gamescopePathRelevant ? (
+												<Row
+													label={m.config_gamescope_sdr_nits()}
+													hint={m.config_gamescope_sdr_nits_hint()}
+													help={m.config_gamescope_sdr_nits_help()}
+													recommended={m.config_blank_gamescope_default()}
+													htmlFor="cfg-gamescope-sdr-nits"
+													controlWidth="sm"
+												>
+													<Input
+														id="cfg-gamescope-sdr-nits"
+														className={cn(fieldControlClass, "sm:w-32")}
+														type="number"
+														min={1}
+														max={10000}
+														step={1}
+														value={draft.audio_video.gamescope_sdr_nits ?? ""}
+														onChange={(e) =>
+															patch((d) => {
+																d.audio_video.gamescope_sdr_nits = e.target
+																	.value
+																	? Number(e.target.value)
+																	: null;
+															})
+														}
+													/>
+												</Row>
+											) : null}
+										</FieldGroup>
 									</ConfigCard>
 								</TabsContent>
 
 								<TabsContent value="network" className="mt-0 outline-none">
 									<ConfigCard
-										title="Network"
-										description="Tune discovery and packet recovery for this host."
+										title={m.config_network()}
+										description={m.config_network_card_desc()}
 										advanced
 									>
-										<FieldGroup title="Connectivity">
+										<FieldGroup title={m.config_connectivity_group()}>
 											<ToggleRow
-												label="mDNS discovery"
-												hint="Advertise this host on the LAN."
-												help="Publishes the host so Moonlight and Slipstream clients can find it without typing an IP. Turn off only on multicast-dead networks."
-												recommended="On"
+												label={m.config_mdns()}
+												hint={m.config_mdns_hint()}
+												help={m.config_mdns_help()}
+												recommended={m.config_on()}
 												checked={draft.network.mdns}
 												onChange={(v) =>
 													patch((d) => {
@@ -1015,24 +1622,72 @@ export const SectionConfig: FC = () => {
 													})
 												}
 											/>
+											<Row
+												label={m.config_moonlight()}
+												hint={m.config_moonlight_hint()}
+												help={m.config_moonlight_help_readonly_network()}
+											>
+												<div className="flex w-full flex-col items-stretch gap-2 sm:w-56 sm:items-end">
+													<div className="flex items-center gap-2 text-sm">
+														<span
+															aria-hidden
+															className={cn(
+																"size-2 rounded-full",
+																moonlightOn
+																	? "bg-emerald-500"
+																	: "bg-muted-foreground/40",
+															)}
+														/>
+														<span className="text-muted-foreground">
+															{moonlightOn
+																? m.config_moonlight_on()
+																: m.config_moonlight_off()}
+														</span>
+													</div>
+													<Link
+														to="/host"
+														className={cn(
+															buttonVariants({ variant: "outline" }),
+															"w-full justify-center",
+														)}
+													>
+														{m.config_moonlight_open_host()}
+													</Link>
+												</div>
+											</Row>
+											<Row
+												label={m.config_clipboard()}
+												hint={m.config_clipboard_hint()}
+												help={m.config_clipboard_hint()}
+												recommended={m.config_clipboard_off()}
+												htmlFor="cfg-clipboard"
+											>
+												<FieldSelect
+													id="cfg-clipboard"
+													value={draft.clipboard}
+													onChange={(e) =>
+														patch((d) => {
+															d.clipboard =
+																e.target.value as HostConfigFile["clipboard"];
+														})
+													}
+												>
+													<HelpOption value="off" recommended>
+														{m.config_clipboard_off()}
+													</HelpOption>
+													<HelpOption value="text-only">
+														{m.config_clipboard_text_only()}
+													</HelpOption>
+													<HelpOption value="on">
+														{m.config_clipboard_on()}
+													</HelpOption>
+												</FieldSelect>
+											</Row>
 											<ToggleRow
-												label="Moonlight broadcast"
-												hint="Expose the GameStream plane to Moonlight."
-												help="Starts the Moonlight-compatible GameStream services and advertises this host on the LAN after the next host restart. Enable only on a trusted network."
-												recommended="Off"
-												checked={draft.network.gamestream ?? false}
-												onChange={(v) =>
-													patch((d) => {
-														d.network.gamestream = v;
-														if (v) d.network.mdns = true;
-													})
-												}
-											/>
-											<ToggleRow
-												label="Prefer ChaCha20"
-												hint="Better on soft-AES clients (some TVs)."
-												help="Allows ChaCha20-Poly1305 when a soft-AES client asks for it. AES-GCM stays the default for everyone else. Leave on."
-												recommended="On"
+												label={m.config_chacha20()}
+												hint={m.config_chacha20_hint()}
+												help={m.config_chacha20_help()}
+												recommended={m.config_on()}
 												checked={draft.network.chacha20}
 												onChange={(v) =>
 													patch((d) => {
@@ -1041,10 +1696,10 @@ export const SectionConfig: FC = () => {
 												}
 											/>
 											<Row
-												label="FEC %"
-												hint="Native plane packet recovery."
-												help="Forward error correction for the native Slipstream plane. Higher values survive lossy Wi-Fi better but cost bitrate. Leave blank for the host default."
-												recommended="Blank (host default)"
+												label={m.config_fec()}
+												hint={m.config_fec_hint()}
+												help={m.config_fec_help()}
+												recommended={m.config_fec_recommended()}
 												htmlFor="cfg-fec"
 												controlWidth="sm"
 											>
@@ -1055,7 +1710,7 @@ export const SectionConfig: FC = () => {
 													min={0}
 													max={90}
 													value={draft.network.fec_pct ?? ""}
-													title="Leave blank to use the host default FEC percentage."
+													title={m.config_fec_title()}
 													onChange={(e) =>
 														patch((d) => {
 															d.network.fec_pct = e.target.value
@@ -1066,21 +1721,128 @@ export const SectionConfig: FC = () => {
 												/>
 											</Row>
 										</FieldGroup>
+										<FieldGroup title={m.config_stream_profiles()}>
+											<p className="text-sm leading-relaxed text-muted-foreground">
+												{m.config_stream_profiles_hint()}
+											</p>
+											<Row
+												label={m.config_performance_profile()}
+												hint={m.config_performance_profile_hint()}
+												help={m.config_profile_low_latency_help()}
+												recommended={m.config_profile_balanced()}
+												htmlFor="cfg-performance-profile"
+											>
+												<FieldSelect
+													id="cfg-performance-profile"
+													value={draft.performance_profile}
+													onChange={(e) =>
+														patch((d) => {
+															d.performance_profile =
+																e.target.value as HostConfigFile["performance_profile"];
+														})
+													}
+												>
+													<HelpOption
+														value="balanced"
+														recommended
+														title={m.config_profile_balanced_help()}
+													>
+														{m.config_profile_balanced()}
+													</HelpOption>
+													<HelpOption
+														value="low_latency"
+														title={m.config_profile_low_latency_help()}
+													>
+														{m.config_profile_low_latency()}
+													</HelpOption>
+												</FieldSelect>
+											</Row>
+											<Row
+												label={m.config_latency_profile()}
+												hint={m.config_latency_profile_hint()}
+												help={m.config_profile_low_latency_help()}
+												recommended={m.config_profile_balanced()}
+												htmlFor="cfg-latency-profile"
+											>
+												<FieldSelect
+													id="cfg-latency-profile"
+													value={draft.latency_profile}
+													onChange={(e) =>
+														patch((d) => {
+															d.latency_profile =
+																e.target.value as HostConfigFile["latency_profile"];
+														})
+													}
+												>
+													<HelpOption
+														value="balanced"
+														recommended
+														title={m.config_profile_balanced_help()}
+													>
+														{m.config_profile_balanced()}
+													</HelpOption>
+													<HelpOption
+														value="low_latency"
+														title={m.config_profile_low_latency_help()}
+													>
+														{m.config_profile_low_latency()}
+													</HelpOption>
+												</FieldSelect>
+											</Row>
+											<Row
+												label={m.config_network_policy()}
+												hint={m.config_network_policy_hint()}
+												help={m.config_profile_auto_help()}
+												recommended={m.config_profile_auto()}
+												htmlFor="cfg-network-policy"
+											>
+												<FieldSelect
+													id="cfg-network-policy"
+													value={draft.network_policy}
+													onChange={(e) =>
+														patch((d) => {
+															d.network_policy =
+																e.target.value as HostConfigFile["network_policy"];
+														})
+													}
+												>
+													<HelpOption
+														value="auto"
+														recommended
+														title={m.config_profile_auto_help()}
+													>
+														{m.config_profile_auto()}
+													</HelpOption>
+													<HelpOption
+														value="lan"
+														title={m.config_profile_lan_help()}
+													>
+														{m.config_profile_lan()}
+													</HelpOption>
+													<HelpOption
+														value="wan"
+														title={m.config_profile_wan_help()}
+													>
+														{m.config_profile_wan()}
+													</HelpOption>
+												</FieldSelect>
+											</Row>
+										</FieldGroup>
 									</ConfigCard>
 								</TabsContent>
 
 								<TabsContent value="encoders" className="mt-0 outline-none">
 									<ConfigCard
-										title="Encoders / GPU"
-										description="Select the encoding backend and rendering adapter."
+										title={m.config_encoders()}
+										description={m.config_encoders_card_desc()}
 										advanced
 									>
-										<FieldGroup title="Encoder path">
+										<FieldGroup title={m.config_encoder_path_group()}>
 											<Row
-												label="Encoder"
-												hint="Which encode backend to prefer."
-												help="Auto picks from the installed GPU stack. Pin a vendor only when auto lands on the wrong path."
-												recommended="Auto"
+												label={m.config_encoder()}
+												hint={m.config_encoder_hint()}
+												help={m.config_encoder_help()}
+												recommended={m.config_encoder_auto()}
 												htmlFor="cfg-encoder"
 											>
 												<FieldSelect
@@ -1095,55 +1857,55 @@ export const SectionConfig: FC = () => {
 													<HelpOption
 														value="auto"
 														recommended
-														title="Detect the best encoder for this GPU."
+														title={m.config_encoder_auto_title()}
 													>
-														Auto
+														{m.config_encoder_auto()}
 													</HelpOption>
 													<HelpOption
 														value="nvenc"
-														title="NVIDIA NVENC hardware encoder."
+														title={m.config_encoder_nvenc_title()}
 													>
 														NVENC
 													</HelpOption>
 													<HelpOption
 														value="amf"
-														title="AMD AMF hardware encoder."
+														title={m.config_encoder_amf_title()}
 													>
 														AMF
 													</HelpOption>
 													<HelpOption
 														value="qsv"
-														title="Intel Quick Sync Video encoder."
+														title={m.config_encoder_qsv_title()}
 													>
 														QSV
 													</HelpOption>
 													<HelpOption
 														value="vaapi"
-														title="Linux VAAPI encoder path."
+														title={m.config_encoder_vaapi_title()}
 													>
 														VAAPI
 													</HelpOption>
 													<HelpOption
 														value="software"
-														title="CPU encoder. Slow fallback for debugging only."
+														title={m.config_encoder_software_title()}
 													>
-														Software
+														{m.config_encoder_software()}
 													</HelpOption>
 												</FieldSelect>
 											</Row>
 											<Row
-												label="Render adapter"
-												hint="Substring match. Blank = auto."
-												help="Pins the render GPU by matching part of its name, for example NVIDIA or AMD. Leave blank unless this PC has multiple GPUs and auto picks the wrong one."
-												recommended="Blank (auto)"
+												label={m.config_render_adapter()}
+												hint={m.config_render_adapter_hint()}
+												help={m.config_render_adapter_help()}
+												recommended={m.config_render_adapter_recommended()}
 												htmlFor="cfg-render-adapter"
 											>
 												<Input
 													id="cfg-render-adapter"
 													className={fieldControlClass}
 													value={draft.encoders.render_adapter ?? ""}
-													title="Leave blank to auto-select the render adapter."
-													placeholder="e.g. NVIDIA"
+													title={m.config_render_adapter_title()}
+													placeholder={m.config_render_adapter_placeholder()}
 													onChange={(e) =>
 														patch((d) => {
 															d.encoders.render_adapter =
@@ -1153,10 +1915,10 @@ export const SectionConfig: FC = () => {
 												/>
 											</Row>
 											<Row
-												label="Zero-copy"
-												hint="Unset uses the vendor default."
-												help="Keeps frames on the GPU from capture into encode when possible. Vendor default is safest; force On/Off only when debugging a specific stack."
-												recommended="Vendor default"
+												label={m.config_zerocopy()}
+												hint={m.config_zerocopy_hint()}
+												help={m.config_zerocopy_help()}
+												recommended={m.config_zerocopy_vendor_default()}
 												htmlFor="cfg-zerocopy"
 											>
 												<FieldSelect
@@ -1181,21 +1943,21 @@ export const SectionConfig: FC = () => {
 													<HelpOption
 														value=""
 														recommended
-														title="Use the per-vendor default (safest)."
+														title={m.config_zerocopy_vendor_default_title()}
 													>
-														Vendor default
+														{m.config_zerocopy_vendor_default()}
 													</HelpOption>
 													<HelpOption
 														value="1"
-														title="Force zero-copy on for this host."
+														title={m.config_zerocopy_on_title()}
 													>
-														On
+														{m.config_on()}
 													</HelpOption>
 													<HelpOption
 														value="0"
-														title="Force zero-copy off and fall back to a CPU path."
+														title={m.config_zerocopy_off_title()}
 													>
-														Off
+														{m.config_off()}
 													</HelpOption>
 												</FieldSelect>
 											</Row>
@@ -1205,26 +1967,20 @@ export const SectionConfig: FC = () => {
 							</div>
 						</div>
 					</Tabs>
-				</div>
+				)}
+			</div>
 
-				{dirty ? (
-					<div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 p-3 backdrop-blur sm:hidden">
-						<div className="flex items-center justify-between gap-3">
-							<Badge variant="warning" className="shrink-0">
-								{m.display_unsaved()}
-							</Badge>
-							<Button
-								type="button"
-								disabled={save.isPending}
-								onClick={onSave}
-								className="min-w-20"
-							>
-								<SaveIcon className="size-4" aria-hidden="true" />
-								{save.isPending ? m.common_loading() : m.display_save()}
-							</Button>
-						</div>
-					</div>
-				) : null}
+			{dirty ? (
+				<DirtySaveBar
+					unsavedLabel={m.display_unsaved()}
+					saveLabel={m.display_save()}
+					loadingLabel={m.common_loading()}
+					discardLabel={m.config_discard()}
+					pending={save.isPending}
+					onSave={onSave}
+					onDiscard={onDiscard}
+				/>
+			) : null}
 		</Section>
 	);
 };

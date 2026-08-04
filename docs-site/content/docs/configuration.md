@@ -24,6 +24,32 @@ On Windows, where it is loaded by the `SlipstreamHost` service, from an Administ
 slipstream-host service restart
 ```
 
+## Console configuration
+
+The web console's **Configuration** page starts in **Recommended** mode. It covers the host name,
+display source, discovery, Moonlight status, safe HDR and audio policy, automatic encoder selection,
+clipboard sharing, pen input, and named stream profiles. Choose **All settings** for compositor and
+capture backend pins, headless session selection, FPS and PipeWire diagnostics, fixed FEC, render
+adapter matching, zero-copy overrides, and other recovery controls.
+
+The page writes these settings to `host-config.json` and the matching `host.env` values. A save that
+needs a process restart offers **Restart host** or **Later** and warns that active sessions will end.
+Moonlight broadcast has one owner on the **Host** page. The Network area shows its current state and
+links there instead of providing a second editable switch.
+
+The durable options exposed by the page are:
+
+| Console setting | Values | What it controls |
+|---|---|---|
+| Clipboard sharing | Off, Text only, Text and files | Host clipboard policy. The client must also enable clipboard sharing for that host. |
+| Pen and stylus input | On, Off | Whether the host advertises full-fidelity pen input. |
+| Gamescope splash | On, Off | Keeps a bare Gamescope session producing frames while an application starts. |
+| Virtual-display refresh | 1x, 2x, 3x, 4x | Extra compositor refresh for fresher capture. Higher values use more GPU time and do not raise the stream rate. |
+| Gamescope SDR brightness | Blank or 1 to 10000 nits | Maps SDR content inside an HDR Gamescope session. The field appears when the Gamescope HDR path is relevant. |
+| Worker performance | Balanced, Low latency | Scheduling preference for stream workers. Low latency can use more CPU and may need service permissions. |
+| Encoder latency | Balanced, Low latency | Encoder buffering and pipeline preference. |
+| Network policy | Auto, LAN, WAN | Starting transport classification. Auto measures the link; LAN and WAN select a starting class. |
+
 > **You rarely need most of these.** The host **auto-detects** the compositor, input backend, and
 > encoder from your live session, a box that flips between Steam Gaming Mode and a KDE/GNOME desktop
 > is followed automatically. The `SLIPSTREAM_*` knobs below are mostly **optional overrides** for

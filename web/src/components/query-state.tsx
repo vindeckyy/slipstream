@@ -42,7 +42,7 @@ export function QueryState({
 				? "Host API unreachable"
 				: m.common_error();
 		const detail = offline
-			? "Start slipstream-host (management API on :47990) and set SLIPSTREAM_MGMT_TOKEN in web/.env.local, then retry."
+			? m.common_host_unreachable_detail()
 			: null;
 		return (
 			// `role="alert"` so the failure is announced. The loading branch above already has
@@ -52,7 +52,9 @@ export function QueryState({
 				role="alert"
 				className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm"
 			>
-				<p className="font-medium text-destructive">{title}</p>
+				<p className="font-medium text-destructive">
+					{offline ? m.common_host_unreachable() : title}
+				</p>
 				{detail ? (
 					<p className="mt-1 text-muted-foreground">{detail}</p>
 				) : null}

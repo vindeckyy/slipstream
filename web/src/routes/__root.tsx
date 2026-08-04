@@ -11,77 +11,13 @@ import {
 import "@fontsource-variable/geist";
 import { Toaster } from "@unom/ui/toast";
 import { MotionConfig } from "motion/react";
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { adoptStoredLocale, useLocale } from "@/lib/i18n";
+import { themeBootScriptSource, useDarkTheme } from "@/lib/theme";
 import appCss from "@/styles.css?url";
 
-type ThemePreference = "dark" | "light" | "system";
-
-const themeStorageKey = "slipstream-theme";
-const darkThemeMediaQuery = "(prefers-color-scheme: dark)";
-
-// Run before the stylesheet can paint so the selected palette is present on first paint.
-const themeBootScript = `(() => {
-  let stored = null;
-  try {
-    stored = window.localStorage.getItem("${themeStorageKey}");
-  } catch {}
-
-  const preference =
-    stored === "dark" || stored === "light" || stored === "system"
-      ? stored
-      : "system";
-  const dark =
-    preference === "dark" ||
-    (preference === "system" &&
-      (typeof window.matchMedia !== "function" ||
-        window.matchMedia("${darkThemeMediaQuery}").matches));
-
-  document.documentElement.classList.toggle("dark", dark);
-  document.documentElement.style.colorScheme = dark ? "dark" : "light";
-})();`;
-
-function readThemePreference(): ThemePreference {
-	if (typeof window === "undefined") return "system";
-	try {
-		const stored = window.localStorage.getItem(themeStorageKey);
-		if (stored === "dark" || stored === "light" || stored === "system") {
-			return stored;
-		}
-	} catch {
-		// Private browsing and blocked storage should not prevent the app from booting.
-	}
-	return "system";
-}
-
-function resolveDarkTheme(): boolean {
-	if (typeof window === "undefined") return true;
-	const preference = readThemePreference();
-	if (preference === "dark") return true;
-	if (preference === "light") return false;
-	return (
-		typeof window.matchMedia !== "function" ||
-		window.matchMedia(darkThemeMediaQuery).matches
-	);
-}
-
-function subscribeToTheme(onStoreChange: () => void) {
-	if (typeof window === "undefined") return () => {};
-
-	const media = window.matchMedia?.(darkThemeMediaQuery);
-	media?.addEventListener("change", onStoreChange);
-	window.addEventListener("storage", onStoreChange);
-
-	return () => {
-		media?.removeEventListener("change", onStoreChange);
-		window.removeEventListener("storage", onStoreChange);
-	};
-}
-
-function useDarkTheme() {
-	return useSyncExternalStore(subscribeToTheme, resolveDarkTheme, () => true);
-}
+const themeBootScript = themeBootScriptSource();
 
 export interface RouterContext {
 	queryClient: QueryClient;

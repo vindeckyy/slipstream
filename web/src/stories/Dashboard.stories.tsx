@@ -11,6 +11,13 @@ import type { ComponentProps } from "react";
 import { DashboardView } from "@/sections/Dashboard/view";
 import { statusActive, statusGrace, statusIdle } from "./lib/fixtures";
 
+const statusUnpaired = {
+	...statusIdle,
+	paired_clients: 0,
+	native_paired_clients: 0,
+	pin_pending: false,
+};
+
 function DashboardStory(args: ComponentProps<typeof DashboardView>) {
 	const rootRoute = createRootRoute({ component: () => <Outlet /> });
 	const dashboardRoute = createRoute({
@@ -23,8 +30,47 @@ function DashboardStory(args: ComponentProps<typeof DashboardView>) {
 		path: "/sessions",
 		component: () => null,
 	});
+	const hostRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: "/host",
+		component: () => null,
+	});
+	const pairingRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: "/pairing",
+		component: () => null,
+	});
+	const pinRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: "/pin",
+		component: () => null,
+	});
+	const libraryRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: "/library",
+		component: () => null,
+	});
+	const appsRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: "/apps",
+		component: () => null,
+	});
+	const displaysRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: "/displays",
+		component: () => null,
+	});
 	const router = createRouter({
-		routeTree: rootRoute.addChildren([dashboardRoute, sessionsRoute]),
+		routeTree: rootRoute.addChildren([
+			dashboardRoute,
+			sessionsRoute,
+			hostRoute,
+			pairingRoute,
+			pinRoute,
+			libraryRoute,
+			appsRoute,
+			displaysRoute,
+		]),
 		history: createMemoryHistory({ initialEntries: ["/"] }),
 	});
 	return <RouterProvider router={router} />;
@@ -98,4 +144,56 @@ export const Idle: Story = {
 /** A game whose client vanished: the host closes it when the countdown runs out. */
 export const GameWaitingForItsClient: Story = {
 	args: { status: { data: statusGrace, isLoading: false, error: null } },
+};
+
+/** No paired clients yet: the skippable first-run checklist. */
+export const FirstRun: Story = {
+	args: {
+		status: { data: statusUnpaired, isLoading: false, error: null },
+		gettingStarted: {
+			pinPending: false,
+			preflightReady: true,
+			onDismiss: () => {},
+		},
+	},
+};
+
+/** First-run with a Moonlight PIN waiting to be entered. */
+export const FirstRunPendingPin: Story = {
+	args: {
+		status: {
+			data: { ...statusUnpaired, pin_pending: true },
+			isLoading: false,
+			error: null,
+		},
+		gettingStarted: {
+			pinPending: true,
+			preflightReady: true,
+			onDismiss: () => {},
+		},
+	},
+};
+
+/** First-run when host preflight has a blocked check. */
+export const FirstRunPreflightBlocked: Story = {
+	args: {
+		status: { data: statusUnpaired, isLoading: false, error: null },
+		gettingStarted: {
+			pinPending: false,
+			preflightReady: false,
+			onDismiss: () => {},
+		},
+	},
+};
+
+/** First-run when preflight has not loaded or failed: no ready/blocked badge. */
+export const FirstRunPreflightUnknown: Story = {
+	args: {
+		status: { data: statusUnpaired, isLoading: false, error: null },
+		gettingStarted: {
+			pinPending: false,
+			preflightReady: null,
+			onDismiss: () => {},
+		},
+	},
 };

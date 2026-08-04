@@ -87,6 +87,18 @@ slipstream-host service restart
 
 Forgot it? See [Forgot your Password?](/docs/forgot-password).
 
+## First run
+
+After setup, the Dashboard shows a **Getting started** checklist while no client is paired. It keeps
+the common path in order:
+
+1. **Check host readiness** opens Host and its Preflight checks.
+2. **Pair a device** opens Pairing, where you can arm a PIN or approve a pending native client.
+3. **Open the library** takes you to the games available to clients.
+
+The checklist disappears after a client is paired. You can also dismiss it locally from the Dashboard;
+that only changes this browser and does not change host pairing or readiness.
+
 ## Arm pairing
 
 The host **requires PIN pairing** by default (secure on a LAN). To connect the first time, open the
@@ -98,7 +110,13 @@ remove devices later.
 
 ## What's in it
 
-Nine destinations in the sidebar (a **More** tab on a phone holds the last five):
+The sidebar groups destinations by operator job: **Watch**, **Connect**, **Host**, and **Tools**. A
+**More** tab on a phone holds the less frequent destinations, while Dashboard, Library, Host, and
+Pairing stay in the bottom navigation:
+
+**Watch** contains Dashboard, Sessions, Performance, and Logs. **Connect** contains Pairing, Library,
+and Virtual displays. **Host** contains Host and Automation. **Tools** contains Configuration,
+Settings, and Plugins.
 
 - **Dashboard**, live status: whether video and audio are streaming, the active sessions with
   their codec, resolution, frame rate and bitrate, which games are running, and how many clients
@@ -125,7 +143,14 @@ Nine destinations in the sidebar (a **More** tab on a phone holds the last five)
 - **Plugins**, the plugin store's **Browse**, **Installed** and **Sources** tabs plus the plugin
   runner switch; an installed plugin with a UI gets its own entry below. See
   [Plugins](/docs/plugins).
-- **Settings**, the console's language, and **Sign out**.
+- **Configuration**, the recommended settings path plus **All settings** for advanced capture,
+  compositor, encoder, and diagnostic controls.
+- **Settings**, the console's language, dark/light/system theme, and **Sign out**.
+
+Configuration changes are saved to the host's persisted settings and host environment. When a change
+needs a restart, the console says that active sessions will end and offers **Restart host** or
+**Later**. Moonlight broadcast is edited on **Host**; Configuration shows its state and links back
+to that single control.
 
 ### Preflight and host power
 

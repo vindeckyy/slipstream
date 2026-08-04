@@ -1,4 +1,7 @@
-use crate::env::env_on;
+use crate::env::{default_on_gate, env_on};
+
+/// Env key for the 10-bit encode policy gate (must match the key `to_host_env` writes).
+pub const TEN_BIT_ENV: &str = "SLIPSTREAM_10BIT";
 
 /// The opt-in Linux performance profile (latency plan Phase 7). See [`HostConfig::performance_profile`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -301,16 +304,16 @@ impl HostConfig {
             zerocopy: env_on("SLIPSTREAM_ZEROCOPY"),
             // Default ON, explicit-off grammar (mirrors `four_four_four`: the client's HDR setting
             // is the real per-session switch; the encode probe keeps incapable GPUs honest at 8-bit).
-            ten_bit: env_on("SLIPSTREAM_10BIT").unwrap_or(true),
+            ten_bit: default_on_gate(val(TEN_BIT_ENV).as_deref()),
             // Default ON, explicit-off grammar (the client's own 4:4:4 setting — default OFF —
             // is the real switch; see the field doc).
-            four_four_four: env_on("SLIPSTREAM_444").unwrap_or(true),
+            four_four_four: default_on_gate(val("SLIPSTREAM_444").as_deref()),
             // Default ON, explicit-off grammar (the client's VIDEO_CAP_CHACHA20 bit is the real
             // per-session switch; see the field doc).
-            chacha20: env_on("SLIPSTREAM_CHACHA20").unwrap_or(true),
+            chacha20: default_on_gate(val("SLIPSTREAM_CHACHA20").as_deref()),
             perf: flag("SLIPSTREAM_PERF"),
             // Default ON while the interval-stutter field program runs (see the field doc).
-            stall_probes: env_on("SLIPSTREAM_STALL_PROBES").unwrap_or(true),
+            stall_probes: default_on_gate(val("SLIPSTREAM_STALL_PROBES").as_deref()),
             // Defaults to `virtual` — the flagship per-client virtual output. It used to be unset,
             // which fell through to the synthetic test pattern: fine for a dev box that always has
             // a host.env, wrong for a packaged install, whose unit no longer requires that file at
@@ -344,9 +347,9 @@ impl HostConfig {
             }),
             // Default ON, explicit-off grammar: the splash is what makes a fresh bare spawn deliver
             // its first frames at all; `=0` is the A/B + escape hatch.
-            gamescope_splash: env_on("SLIPSTREAM_GAMESCOPE_SPLASH").unwrap_or(true),
+            gamescope_splash: default_on_gate(val("SLIPSTREAM_GAMESCOPE_SPLASH").as_deref()),
             // Default OFF for one canary release (design §4 rollout), then flip the `unwrap_or`.
-            gamescope_hdr: env_on("SLIPSTREAM_GAMESCOPE_HDR").unwrap_or(true),
+            gamescope_hdr: default_on_gate(val("SLIPSTREAM_GAMESCOPE_HDR").as_deref()),
             gamescope_sdr_nits: val("SLIPSTREAM_GAMESCOPE_SDR_NITS")
                 .and_then(|s| s.trim().parse::<u32>().ok())
                 .filter(|n| (1..=10_000).contains(n)),

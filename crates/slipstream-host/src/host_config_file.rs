@@ -20,6 +20,78 @@ fn default_true() -> bool {
     true
 }
 
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClipboardPolicy {
+    #[default]
+    Off,
+    TextOnly,
+    On,
+}
+
+impl ClipboardPolicy {
+    fn env_value(self) -> &'static str {
+        match self {
+            Self::Off => "off",
+            Self::TextOnly => "text-only",
+            Self::On => "on",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PerformanceProfile {
+    #[default]
+    Balanced,
+    LowLatency,
+}
+
+impl PerformanceProfile {
+    fn env_value(self) -> &'static str {
+        match self {
+            Self::Balanced => "off",
+            Self::LowLatency => "low_latency",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LatencyProfile {
+    #[default]
+    Balanced,
+    LowLatency,
+}
+
+impl LatencyProfile {
+    fn env_value(self) -> &'static str {
+        match self {
+            Self::Balanced => "balanced",
+            Self::LowLatency => "low_latency",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum NetworkPolicy {
+    #[default]
+    Auto,
+    Lan,
+    Wan,
+}
+
+impl NetworkPolicy {
+    fn env_value(self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Lan => "lan",
+            Self::Wan => "wan",
+        }
+    }
+}
+
 /// Sunshine-shaped host settings the console can toggle without editing env files by hand.
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct HostConfigFile {
@@ -35,6 +107,18 @@ pub struct HostConfigFile {
     pub network: NetworkConfig,
     #[serde(default)]
     pub encoders: EncoderConfig,
+    /// Host clipboard policy. The client must also enable clipboard sharing for a session.
+    #[serde(default)]
+    pub clipboard: ClipboardPolicy,
+    /// Named worker scheduling profile (`SLIPSTREAM_PERFORMANCE_PROFILE`).
+    #[serde(default)]
+    pub performance_profile: PerformanceProfile,
+    /// Named encoder latency profile (`SLIPSTREAM_LATENCY_PROFILE`).
+    #[serde(default)]
+    pub latency_profile: LatencyProfile,
+    /// Named transport starting policy (`SLIPSTREAM_NETWORK_POLICY`).
+    #[serde(default)]
+    pub network_policy: NetworkPolicy,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
@@ -46,16 +130,30 @@ pub struct GeneralConfig {
     pub perf: bool,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct InputConfig {
     /// Gamepad backend preference (`SLIPSTREAM_GAMEPAD`).
     pub gamepad: Option<String>,
-    /// Gamescope: grab cursor into the nested session.
+    /// Advertise full-fidelity pen/stylus input (`SLIPSTREAM_PEN`). Default on.
     #[serde(default = "default_true")]
+    pub pen: bool,
+    /// Gamescope: grab cursor into the nested session.
+    /// Default off (matches runtime `SLIPSTREAM_GAMESCOPE_GRAB_CURSOR`).
+    #[serde(default)]
     pub gamescope_grab_cursor: bool,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
+impl Default for InputConfig {
+    fn default() -> Self {
+        Self {
+            gamepad: None,
+            pen: true,
+            gamescope_grab_cursor: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct AudioVideoConfig {
     /// `virtual` | `portal` (`SLIPSTREAM_VIDEO_SOURCE`).
     pub video_source: Option<String>,
@@ -70,14 +168,14 @@ pub struct AudioVideoConfig {
     pub headless_compositor: Option<String>,
     /// Cap encode FPS (`SLIPSTREAM_MAX_FPS`).
     pub max_fps: Option<u32>,
-    /// Prefer 10-bit encode when the client asks (`SLIPSTREAM_TEN_BIT`).
-    #[serde(default)]
+    /// Prefer 10-bit encode when the client asks (`SLIPSTREAM_10BIT`). Default on.
+    #[serde(default = "default_true")]
     pub ten_bit: bool,
-    /// Prefer 4:4:4 when supported (`SLIPSTREAM_444`).
-    #[serde(default)]
+    /// Prefer 4:4:4 when supported (`SLIPSTREAM_444`). Default on.
+    #[serde(default = "default_true")]
     pub four_four_four: bool,
-    /// Gamescope HDR.
-    #[serde(default)]
+    /// Gamescope HDR. Default on.
+    #[serde(default = "default_true")]
     pub gamescope_hdr: bool,
     /// Requested PipeWire video-node latency in milliseconds. This is a scheduling hint, not a
     /// guarantee from the compositor.
@@ -102,12 +200,46 @@ pub struct AudioVideoConfig {
     /// host-owned sink apps play into) or `monitor` (record the default sink).
     #[serde(default)]
     pub audio_capture: Option<String>,
+    /// Keep a bare Gamescope session painting during application startup.
+    /// Default on because a blank Gamescope session produces no capture buffers.
+    #[serde(default = "default_true")]
+    pub gamescope_splash: bool,
+    /// Virtual-display refresh multiplier (`SLIPSTREAM_VDISPLAY_HZ_MULT`), from 1x to 4x.
+    #[serde(default = "one")]
+    pub vdisplay_hz_mult: u32,
+    /// SDR luminance inside an HDR Gamescope session (`SLIPSTREAM_GAMESCOPE_SDR_NITS`).
+    #[serde(default)]
+    #[schema(minimum = 1, maximum = 10000)]
+    pub gamescope_sdr_nits: Option<u32>,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
+impl Default for AudioVideoConfig {
+    fn default() -> Self {
+        Self {
+            video_source: None,
+            capture_method: None,
+            compositor: None,
+            headless_compositor: None,
+            max_fps: None,
+            ten_bit: true,
+            four_four_four: true,
+            gamescope_hdr: true,
+            pipewire_latency_ms: None,
+            capture_max_age_ms: None,
+            audio_fec: true,
+            audio_gain: None,
+            audio_capture: None,
+            gamescope_splash: true,
+            vdisplay_hz_mult: 1,
+            gamescope_sdr_nits: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct NetworkConfig {
-    /// Prefer ChaCha20-Poly1305 for soft-AES clients (`SLIPSTREAM_CHACHA20`).
-    #[serde(default)]
+    /// Prefer ChaCha20-Poly1305 for soft-AES clients (`SLIPSTREAM_CHACHA20`). Default on.
+    #[serde(default = "default_true")]
     pub chacha20: bool,
     /// Run and advertise the GameStream/Moonlight compatibility plane on the next host start.
     #[serde(default)]
@@ -117,6 +249,17 @@ pub struct NetworkConfig {
     pub mdns: bool,
     /// FEC percentage for the native plane (`SLIPSTREAM_FEC_PCT`), when set.
     pub fec_pct: Option<u32>,
+}
+
+impl Default for NetworkConfig {
+    fn default() -> Self {
+        Self {
+            chacha20: true,
+            gamestream: None,
+            mdns: true,
+            fec_pct: None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
@@ -149,16 +292,14 @@ impl Default for HostConfigFile {
         Self {
             version: 1,
             general: GeneralConfig::default(),
-            input: InputConfig {
-                gamescope_grab_cursor: true,
-                ..Default::default()
-            },
+            input: InputConfig::default(),
             audio_video: AudioVideoConfig::default(),
-            network: NetworkConfig {
-                mdns: true,
-                ..Default::default()
-            },
+            network: NetworkConfig::default(),
             encoders: EncoderConfig::default(),
+            clipboard: ClipboardPolicy::default(),
+            performance_profile: PerformanceProfile::default(),
+            latency_profile: LatencyProfile::default(),
+            network_policy: NetworkPolicy::default(),
         }
     }
 }
@@ -239,6 +380,14 @@ impl HostConfigFile {
                 errors.push("audio_video.capture_max_age_ms must be between 1 and 500".into());
             }
         }
+        if !(1..=4).contains(&self.audio_video.vdisplay_hz_mult) {
+            errors.push("audio_video.vdisplay_hz_mult must be between 1 and 4".into());
+        }
+        if let Some(value) = self.audio_video.gamescope_sdr_nits {
+            if !(1..=10_000).contains(&value) {
+                errors.push("audio_video.gamescope_sdr_nits must be between 1 and 10000".into());
+            }
+        }
         if let Some(value) = self.audio_video.audio_gain {
             if !(0.0..=4.0).contains(&value) || !value.is_finite() {
                 errors.push("audio_video.audio_gain must be between 0 and 4".into());
@@ -291,6 +440,10 @@ impl HostConfigFile {
         if let Some(value) = self.audio_video.capture_max_age_ms {
             self.audio_video.capture_max_age_ms = Some(value.clamp(1, 500));
         }
+        self.audio_video.vdisplay_hz_mult = self.audio_video.vdisplay_hz_mult.clamp(1, 4);
+        if let Some(value) = self.audio_video.gamescope_sdr_nits {
+            self.audio_video.gamescope_sdr_nits = Some(value.clamp(1, 10_000));
+        }
         if let Some(pct) = self.network.fec_pct {
             self.network.fec_pct = Some(pct.min(90));
         }
@@ -325,6 +478,7 @@ impl HostConfigFile {
                 set(&mut out, "SLIPSTREAM_GAMEPAD", gp.trim());
             }
         }
+        set_bool(&mut out, "SLIPSTREAM_PEN", self.input.pen);
         set_bool(
             &mut out,
             "SLIPSTREAM_GAMESCOPE_GRAB_CURSOR",
@@ -356,7 +510,7 @@ impl HostConfigFile {
         if let Some(fps) = self.audio_video.max_fps {
             set(&mut out, "SLIPSTREAM_MAX_FPS", &fps.to_string());
         }
-        set_bool(&mut out, "SLIPSTREAM_TEN_BIT", self.audio_video.ten_bit);
+        set_bool(&mut out, "SLIPSTREAM_10BIT", self.audio_video.ten_bit);
         set_bool(&mut out, "SLIPSTREAM_444", self.audio_video.four_four_four);
         set_bool(
             &mut out,
@@ -392,6 +546,23 @@ impl HostConfigFile {
                 }
             }
         }
+        set_bool(
+            &mut out,
+            "SLIPSTREAM_GAMESCOPE_SPLASH",
+            self.audio_video.gamescope_splash,
+        );
+        set(
+            &mut out,
+            "SLIPSTREAM_VDISPLAY_HZ_MULT",
+            &self.audio_video.vdisplay_hz_mult.to_string(),
+        );
+        if let Some(value) = self.audio_video.gamescope_sdr_nits {
+            set(
+                &mut out,
+                "SLIPSTREAM_GAMESCOPE_SDR_NITS",
+                &value.to_string(),
+            );
+        }
         set_bool(&mut out, "SLIPSTREAM_CHACHA20", self.network.chacha20);
         if let Some(gamestream) = self.network.gamestream {
             set_bool(&mut out, "SLIPSTREAM_GAMESTREAM", gamestream);
@@ -411,6 +582,22 @@ impl HostConfigFile {
             Some(false) => set(&mut out, "SLIPSTREAM_ZEROCOPY", "0"),
             None => {}
         }
+        set(&mut out, "SLIPSTREAM_CLIPBOARD", self.clipboard.env_value());
+        set(
+            &mut out,
+            "SLIPSTREAM_PERFORMANCE_PROFILE",
+            self.performance_profile.env_value(),
+        );
+        set(
+            &mut out,
+            "SLIPSTREAM_LATENCY_PROFILE",
+            self.latency_profile.env_value(),
+        );
+        set(
+            &mut out,
+            "SLIPSTREAM_NETWORK_POLICY",
+            self.network_policy.env_value(),
+        );
         out
     }
 }
@@ -459,7 +646,28 @@ impl HostConfigStore {
         &self.env_path
     }
 
-    pub fn set(&self, settings: HostConfigFile) -> Result<()> {
+    pub fn set(&self, mut settings: HostConfigFile) -> Result<()> {
+        // GameStream ownership lives on the Host page. Preserve the current value when a
+        // configuration draft from another route is saved.
+        settings.network.gamestream = self
+            .cur
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+            .and_then(|current| current.network.gamestream);
+        self.persist(settings)
+    }
+
+    pub fn set_moonlight(&self, enabled: bool) -> Result<()> {
+        let mut settings = self.get();
+        settings.network.gamestream = Some(enabled);
+        if enabled {
+            settings.network.mdns = true;
+        }
+        self.persist(settings)
+    }
+
+    fn persist(&self, settings: HostConfigFile) -> Result<()> {
         let errors = settings.validate();
         if !errors.is_empty() {
             anyhow::bail!("invalid host configuration: {}", errors.join("; "));
@@ -513,6 +721,128 @@ mod tests {
         assert!(env.contains("SLIPSTREAM_ZEROCOPY=0"));
         assert!(env.contains("SLIPSTREAM_GAMESTREAM=1"));
         assert!(env.contains("SLIPSTREAM_FEC_PCT=30"));
+        assert!(env.contains("SLIPSTREAM_CLIPBOARD=off"));
+        assert!(env.contains("SLIPSTREAM_PEN=1"));
+        assert!(env.contains("SLIPSTREAM_GAMESCOPE_SPLASH=1"));
+        assert!(env.contains("SLIPSTREAM_VDISPLAY_HZ_MULT=1"));
+        assert!(env.contains("SLIPSTREAM_PERFORMANCE_PROFILE=off"));
+        assert!(env.contains("SLIPSTREAM_LATENCY_PROFILE=balanced"));
+        assert!(env.contains("SLIPSTREAM_NETWORK_POLICY=auto"));
+    }
+
+    #[test]
+    fn durable_options_round_trip_through_json_and_host_env() {
+        let mut cfg = HostConfigFile::default();
+        cfg.input.pen = false;
+        cfg.audio_video.gamescope_splash = false;
+        cfg.audio_video.vdisplay_hz_mult = 4;
+        cfg.audio_video.gamescope_sdr_nits = Some(275);
+        cfg.clipboard = ClipboardPolicy::TextOnly;
+        cfg.performance_profile = PerformanceProfile::LowLatency;
+        cfg.latency_profile = LatencyProfile::LowLatency;
+        cfg.network_policy = NetworkPolicy::Wan;
+
+        let json = serde_json::to_string(&cfg).unwrap();
+        let decoded: HostConfigFile = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, cfg);
+
+        let env = cfg.to_host_env();
+        assert!(env.contains("SLIPSTREAM_PEN=0"));
+        assert!(env.contains("SLIPSTREAM_GAMESCOPE_SPLASH=0"));
+        assert!(env.contains("SLIPSTREAM_VDISPLAY_HZ_MULT=4"));
+        assert!(env.contains("SLIPSTREAM_GAMESCOPE_SDR_NITS=275"));
+        assert!(env.contains("SLIPSTREAM_CLIPBOARD=text-only"));
+        assert!(env.contains("SLIPSTREAM_PERFORMANCE_PROFILE=low_latency"));
+        assert!(env.contains("SLIPSTREAM_LATENCY_PROFILE=low_latency"));
+        assert!(env.contains("SLIPSTREAM_NETWORK_POLICY=wan"));
+    }
+
+    #[test]
+    fn host_env_writes_slipstream_10bit_not_ten_bit() {
+        let mut cfg = HostConfigFile::default();
+        cfg.audio_video.ten_bit = true;
+        let env = cfg.to_host_env();
+        assert!(
+            env.contains("SLIPSTREAM_10BIT=1"),
+            "runtime reads SLIPSTREAM_10BIT; got:\n{env}"
+        );
+        assert!(
+            !env.contains("SLIPSTREAM_TEN_BIT="),
+            "stale TEN_BIT key must not be written; got:\n{env}"
+        );
+
+        cfg.audio_video.ten_bit = false;
+        let env = cfg.to_host_env();
+        assert!(
+            env.contains("SLIPSTREAM_10BIT=0"),
+            "explicit off must write 0; got:\n{env}"
+        );
+        assert!(
+            !env.contains("SLIPSTREAM_TEN_BIT="),
+            "stale TEN_BIT key must not be written; got:\n{env}"
+        );
+    }
+
+    #[test]
+    fn default_host_config_matches_runtime_policy_gates() {
+        let cfg = HostConfigFile::default();
+        // Runtime HostConfig defaults (ss-host-config): 10-bit / 4:4:4 / ChaCha20 /
+        // Gamescope HDR on; Gamescope cursor grab off; audio FEC + mDNS on.
+        assert!(cfg.audio_video.ten_bit);
+        assert!(cfg.audio_video.four_four_four);
+        assert!(cfg.audio_video.gamescope_hdr);
+        assert!(cfg.audio_video.audio_fec);
+        assert!(cfg.network.chacha20);
+        assert!(cfg.network.mdns);
+        assert!(!cfg.input.gamescope_grab_cursor);
+        assert!(cfg.input.pen);
+        assert!(cfg.audio_video.gamescope_splash);
+        assert_eq!(cfg.audio_video.vdisplay_hz_mult, 1);
+        assert_eq!(cfg.clipboard, ClipboardPolicy::Off);
+        assert_eq!(cfg.performance_profile, PerformanceProfile::Balanced);
+        assert_eq!(cfg.latency_profile, LatencyProfile::Balanced);
+        assert_eq!(cfg.network_policy, NetworkPolicy::Auto);
+    }
+
+    #[test]
+    fn omitted_json_fields_keep_aligned_defaults() {
+        let cfg: HostConfigFile = serde_json::from_str(r#"{"version":1}"#).unwrap();
+        assert!(cfg.audio_video.ten_bit);
+        assert!(cfg.audio_video.four_four_four);
+        assert!(cfg.audio_video.gamescope_hdr);
+        assert!(cfg.audio_video.audio_fec);
+        assert!(cfg.network.chacha20);
+        assert!(cfg.network.mdns);
+        assert!(!cfg.input.gamescope_grab_cursor);
+    }
+
+    #[test]
+    fn explicit_json_values_override_serde_defaults() {
+        let cfg: HostConfigFile = serde_json::from_str(
+            r#"{
+                "version": 1,
+				"input": { "pen": false, "gamescope_grab_cursor": true },
+                "audio_video": {
+                    "ten_bit": false,
+                    "four_four_four": false,
+                    "gamescope_hdr": false,
+                    "audio_fec": false
+                },
+                "network": {
+                    "chacha20": false,
+                    "mdns": false
+                }
+            }"#,
+        )
+        .unwrap();
+        assert!(!cfg.audio_video.ten_bit);
+        assert!(!cfg.audio_video.four_four_four);
+        assert!(!cfg.audio_video.gamescope_hdr);
+        assert!(!cfg.audio_video.audio_fec);
+        assert!(!cfg.network.chacha20);
+        assert!(!cfg.network.mdns);
+        assert!(cfg.input.gamescope_grab_cursor);
+        assert!(!cfg.input.pen);
     }
 
     #[test]

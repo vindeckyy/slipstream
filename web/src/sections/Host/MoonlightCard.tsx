@@ -5,7 +5,8 @@ import { useState, type FC } from "react";
 import {
 	getHostConfig,
 	hostConfigQueryKey,
-	setHostConfig,
+	restartHost,
+	setMoonlightBroadcast,
 	type HostConfigState,
 } from "@/api/host-config";
 import { getGetHostInfoQueryKey } from "@/api/gen/host/host";
@@ -23,18 +24,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
-async function restartHost(): Promise<void> {
-	const response = await fetch("/api/v1/host/restart", {
-		method: "POST",
-		credentials: "same-origin",
-	});
-	if (response.status === 202) return;
-	const body = (await response.json().catch(() => null)) as {
-		error?: string;
-	} | null;
-	throw new Error(body?.error || `Host restart failed (HTTP ${response.status})`);
-}
-
 export const MoonlightCard: FC<{ host: HostInfo }> = ({ host }) => {
 	const queryClient = useQueryClient();
 	const config = useQuery({
@@ -45,11 +34,7 @@ export const MoonlightCard: FC<{ host: HostInfo }> = ({ host }) => {
 	const [requested, setRequested] = useState<boolean | null>(null);
 	const toggle = useMutation({
 		mutationFn: async (enabled: boolean) => {
-			if (!config.data) throw new Error("Host configuration is still loading.");
-			const settings = structuredClone(config.data.settings);
-			settings.network.gamestream = enabled;
-			if (enabled) settings.network.mdns = true;
-			const state = await setHostConfig(settings);
+			const state = await setMoonlightBroadcast(enabled);
 			await restartHost();
 			return { state, enabled };
 		},

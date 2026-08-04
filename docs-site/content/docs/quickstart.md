@@ -86,6 +86,10 @@ pairing is done there.
 - **SteamOS:** the install script already started the console and printed its URL when it finished.
   Choose the login password when the setup screen appears.
 
+The console password protects this browser console. It is separate from client pairing, which happens
+after you sign in. On the Dashboard, follow **Getting started** to check host readiness, pair a
+device, then open the library. You can dismiss that checklist if you already know the setup path.
+
 The certificate is the host's own self-signed one, so your browser warns once, trust it and
 continue. Full details: [The Web Console](/docs/web-console).
 

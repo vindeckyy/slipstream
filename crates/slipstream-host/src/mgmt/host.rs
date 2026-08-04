@@ -674,6 +674,12 @@ pub(crate) struct HostConfigState {
     env_path: String,
 }
 
+#[derive(Deserialize, ToSchema)]
+pub(crate) struct MoonlightBroadcastRequest {
+    /// Whether to run and advertise the GameStream/Moonlight compatibility plane.
+    enabled: bool,
+}
+
 fn host_config_state() -> HostConfigState {
     let store = crate::host_config_file::store();
     HostConfigState {
@@ -736,6 +742,38 @@ pub(crate) async fn set_host_config(
         );
     }
     tracing::info!("management API: host configuration updated");
+    Json(host_config_state()).into_response()
+}
+
+/// Set the Moonlight broadcast switch
+///
+/// This is the only write path for the GameStream/Moonlight compatibility plane. The general
+/// configuration form preserves the current value when it saves a draft.
+#[utoipa::path(
+    put,
+    path = "/host/moonlight",
+    tag = "host",
+    operation_id = "setMoonlightBroadcast",
+    request_body = MoonlightBroadcastRequest,
+    responses(
+        (status = OK, description = "Moonlight broadcast setting stored", body = HostConfigState),
+        (status = INTERNAL_SERVER_ERROR, description = "Could not persist", body = ApiError),
+        (status = UNAUTHORIZED, description = "Missing or invalid bearer token", body = ApiError),
+    )
+)]
+pub(crate) async fn set_moonlight_broadcast(
+    ApiJson(request): ApiJson<MoonlightBroadcastRequest>,
+) -> Response {
+    if let Err(e) = crate::host_config_file::store().set_moonlight(request.enabled) {
+        return api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("persist Moonlight broadcast setting: {e:#}"),
+        );
+    }
+    tracing::info!(
+        enabled = request.enabled,
+        "management API: Moonlight broadcast setting updated"
+    );
     Json(host_config_state()).into_response()
 }
 

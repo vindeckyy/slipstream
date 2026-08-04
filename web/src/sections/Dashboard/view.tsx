@@ -29,6 +29,7 @@ import type { Loadable } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages";
 import { ActivityCard } from "./Activity";
+import { GettingStartedCard } from "./GettingStarted";
 import { RunningGames } from "./RunningGames";
 
 export const DashboardView: FC<{
@@ -42,7 +43,23 @@ export const DashboardView: FC<{
 	isEndingGame: boolean;
 	/** Optional event data keeps the view easy to compose with deterministic stories. */
 	activity?: ActivityEntry[];
-}> = ({ status, library, onEndGame, isEndingGame, activity }) => {
+	/**
+	 * First-run checklist. Pass `null`/omit to hide. Stories drive every state
+	 * without touching localStorage.
+	 */
+	gettingStarted?: {
+		pinPending: boolean;
+		preflightReady?: boolean | null;
+		onDismiss: () => void;
+	} | null;
+}> = ({
+	status,
+	library,
+	onEndGame,
+	isEndingGame,
+	activity,
+	gettingStarted,
+}) => {
 	const s = status.data;
 	return (
 		<Section maxWidth={false}>
@@ -67,6 +84,14 @@ export const DashboardView: FC<{
 						</div>
 					}
 				/>
+
+				{gettingStarted ? (
+					<GettingStartedCard
+						pinPending={gettingStarted.pinPending}
+						preflightReady={gettingStarted.preflightReady}
+						onDismiss={gettingStarted.onDismiss}
+					/>
+				) : null}
 
 				<QueryState
 					isLoading={status.isLoading}
