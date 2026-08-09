@@ -16,7 +16,7 @@ ss-client-core = { path = "../ss-client-core" }
 
 # Skia on the presenter's VkDevice (`vulkan`); `textlayout` = skparagraph/harfbuzz for
 # the typography the console library needs (~15 MB stripped).
-skia-safe = { version = "0.87", features = ["vulkan", "textlayout"] }
+skia-safe = { version = "0.99", features = ["vulkan", "textlayout"] }
 ash = { version = "0.38", features = ["loaded"] }
 
 anyhow = "1"
