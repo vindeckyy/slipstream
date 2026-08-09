@@ -169,7 +169,7 @@ rusqlite = { version = "0.40", features = ["bundled"] }
 xkbcommon = "0.8"
 # libei (EI sender) for the portable input path on KWin/GNOME (RemoteDesktop portal).
 # The `tokio` feature wires reis's event stream into tokio's reactor.
-reis = { version = "0.6.1", features = ["tokio"] }
+reis = { version = "0.7.1", features = ["tokio"] }
 # `StreamExt::next` on reis's tokio event stream in the libei worker loop.
 futures-util = "0.3"
 # Zero-copy capture (plan §9): EGL imports the PipeWire dmabuf, CUDA maps it, NVENC encodes
