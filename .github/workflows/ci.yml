@@ -25,7 +25,10 @@ jobs:
       - name: Install native dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential clang libclang-dev pkg-config cmake             libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libavfilter-dev             libavdevice-dev libpipewire-0.3-dev libopus-dev libwayland-dev libxkbcommon-dev             libgl-dev libegl-dev libgbm-dev libvulkan-dev
+          sudo apt-get install -y build-essential clang libclang-dev pkg-config cmake libdrm-dev \
+            libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libavfilter-dev \
+            libavdevice-dev libpipewire-0.3-dev libopus-dev libwayland-dev libxkbcommon-dev \
+            libgl-dev libegl-dev libgbm-dev libvulkan-dev
 
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master, pinned
         with:
