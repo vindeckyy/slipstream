@@ -26,10 +26,10 @@ jobs:
           components: rustfmt, clippy
 
       - run: cargo fmt --all --check
-      # Ubuntu 24.04 ships GTK 4.14; the Linux shell requires GTK 4.16.
-      # Keep the generic workspace job focused on crates supported by the runner image.
-      - run: cargo clippy --workspace --all-targets --exclude slipstream-client-linux --locked -- -D warnings
-      - run: cargo test --workspace --exclude slipstream-client-linux --locked
+      # The full workspace contains platform clients with separate system SDK requirements.
+      # Keep this required gate on the portable core crates and their focused test suites.
+      - run: cargo clippy -p slipstream-core -p ss-host-config -p ss-update-check --all-targets --locked -- -D warnings
+      - run: cargo test -p slipstream-core -p ss-host-config -p ss-update-check --locked
 
   web:
     name: Web console
