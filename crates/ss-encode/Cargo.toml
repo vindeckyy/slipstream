@@ -26,7 +26,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Software H.264 (openh264, BSD-2) is the GPU-less encode path.
 openh264 = "0.9"
 # libavcodec (NVENC libav + VAAPI backends). `ffmpeg-sys-next` auto-detects the FFmpeg version.
-ffmpeg-next = "8"
+ffmpeg-next = "9"
 libc = "0.2"
 # Vulkan bindings for the raw Vulkan-Video encode + PyroWave compute backends (feature-gated below;
 # the dep stays unconditional to mirror the host's Linux target — unused-but-declared is harmless).

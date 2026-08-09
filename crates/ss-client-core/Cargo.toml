@@ -16,7 +16,7 @@ ss-ffvk = { path = "../ss-ffvk" }
 async-channel = "2"
 
 # Video decode (same FFmpeg pin as the host) and Opus for the audio planes.
-ffmpeg-next = "8"
+ffmpeg-next = "9"
 opus = "0.3"
 
 mdns-sd = "0.20"
