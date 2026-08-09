@@ -48,7 +48,7 @@
   <url type="bugtracker">https://github.com/vindeckyy/slipstream/issues</url>
   <url type="vcs-browser">https://github.com/vindeckyy/slipstream</url>
 
-  <developer>
+  <developer id="io.slipstream">
     <name>Slipstream</name>
   </developer>
 

@@ -48,7 +48,7 @@ jobs:
       - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
       - name: Install Android SDK components
         run: |
-          sdkmanager "platform-tools" "platforms;android-37" "build-tools;37.0.0" \
+          sdkmanager "platform-tools" "platforms;android-37.0" "build-tools;37.0.0" \
             "ndk;30.0.14904198" "cmake;3.22.1"
 
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master, pinned

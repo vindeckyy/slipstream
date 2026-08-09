@@ -54,7 +54,7 @@ kit/              :kit - NativeBridge · native mDNS discovery · Gamepad · Key
 
 ## Build & run
 
-**Prerequisites:** Android SDK + **NDK r30** (`30.0.14904198`), `platforms;android-37`,
+**Prerequisites:** Android SDK + **NDK r30** (`30.0.14904198`), `platforms;android-37.0`,
 `build-tools;37.0.0`, **`cmake;3.22.1`** (builds libopus); **JDK 21** (AGP 9.3 runs on JDK 17-21, not
 a newer default); Rust with `rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android` and
 `cargo install cargo-ndk`. Toolchain is pinned (AGP 9.3.1 · Gradle 9.5.0 · Kotlin 2.3.21 · Compose BOM

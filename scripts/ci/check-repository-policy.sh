@@ -11,10 +11,15 @@ fail() {
 }
 
 tracked_text() {
-  git grep -I -n -i -E "$1" -- ':!docs/releases/**' ':!THIRD-PARTY-NOTICES.txt' 2>/dev/null || true
+  git grep -I -n -i -E "$1" -- \
+    ':!docs/releases/**' \
+    ':!THIRD-PARTY-NOTICES.txt' \
+    ':!scripts/ci/check-repository-policy.sh' 2>/dev/null || true
 }
 
-if tracked_text 'punktfunk|testflight|ko-?fi|reddit\.com' | grep -q .; then
+stale_references="$(tracked_text 'punktfunk|testflight|ko-?fi|reddit\.com')"
+if [[ -n "$stale_references" ]]; then
+  printf '%s\n' "$stale_references" >&2
   fail "stale product or third-party references remain in tracked text"
 fi
 
