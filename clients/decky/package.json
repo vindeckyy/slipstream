@@ -36,6 +36,11 @@
     "typescript": "^5.6.2"
   },
   "pnpm": {
+    "overrides": {
+      "fast-uri": "3.1.5",
+      "brace-expansion@1": "1.1.16",
+      "brace-expansion@2": "2.1.2"
+    },
     "peerDependencyRules": {
       "ignoreMissing": [
         "react",

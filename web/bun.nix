@@ -2091,9 +2091,9 @@
     url = "https://registry.npmjs.org/fast-glob/-/fast-glob-3.3.3.tgz";
     hash = "sha512-7MptL8U0cqcFdzIzwOTHoilX9x5BrNqye7Z/LuC7kCMRio1EMSyqRK3BEAUD7sXRq4iT4AzTVuZdhgQ2TCvYLg==";
   };
-  "fast-uri@3.1.4" = fetchurl {
-    url = "https://registry.npmjs.org/fast-uri/-/fast-uri-3.1.4.tgz";
-    hash = "sha512-8JnbkQ4juDyvYs4mgFGQqg4yCYtFDtUtmp2QIQq11ZZe5CFQ5wcqm1rqDgAh/QdMySuBnPzMUiJUNZG5N/AiQw==";
+  "fast-uri@3.1.5" = fetchurl {
+    url = "https://registry.npmjs.org/fast-uri/-/fast-uri-3.1.5.tgz";
+    hash = "sha512-gHwA1O9LDIcKunMKhObS/HimwtehO1nPUECKAu5TpKgaO19fcWEl4bliWe1jWxVFvIXztJjjQ4L8XQ1EU9f7Jw==";
   };
   "fastq@1.20.1" = fetchurl {
     url = "https://registry.npmjs.org/fastq/-/fastq-1.20.1.tgz";
