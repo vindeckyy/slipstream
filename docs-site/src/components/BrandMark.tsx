@@ -7,7 +7,7 @@ export default function BrandMark({ className }: { className?: string }) {
       src={sitePath('/slipstream-mark.png')}
       alt="Slipstream"
       title="Slipstream"
-      className={className}
+      className={`block object-contain ${className ?? ''}`}
       draggable={false}
     />
   )

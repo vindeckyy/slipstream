@@ -1,14 +1,13 @@
-import { sitePath } from '@/lib/paths'
-
-/** Full Slipstream lockup from the product logo. */
+/** Full Slipstream wordmark. */
 export default function Wordmark({ className = '' }: { className?: string }) {
   return (
-    <img
-      src={sitePath('/slipstream-logo.png')}
-      alt="Slipstream"
+    <span
+      role="img"
+      aria-label="Slipstream"
       title="Slipstream"
-      className={`block w-auto ${className}`}
-      draggable={false}
-    />
+      className={`inline-block whitespace-nowrap font-sans font-bold italic leading-none tracking-[-0.06em] text-[#69cdf4] ${className}`}
+    >
+      Slipstream
+    </span>
   )
 }

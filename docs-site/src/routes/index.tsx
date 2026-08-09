@@ -107,7 +107,7 @@ function Home() {
             <div className="mb-10 flex items-center gap-4 motion-safe:animate-[ss-rise_700ms_ease-out]">
               <BrandMark className="size-14 rounded-2xl shadow-[0_12px_40px_rgba(8,145,178,0.32)]" />
               <div>
-                <Wordmark className="h-8 md:h-9" />
+                <Wordmark className="text-2xl md:text-3xl" />
                 <p className="mt-2 text-xs font-semibold uppercase tracking-[0.2em] text-fd-muted-foreground">
                   Documentation
                 </p>

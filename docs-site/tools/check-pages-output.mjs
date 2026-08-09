@@ -38,6 +38,7 @@ for (const path of htmlFiles) {
   const html = readFileSync(path, 'utf8')
   if (html.includes('/_serverFn')) failures.push(path + ': contains server function runtime')
   if (html.includes('/api/search')) failures.push(path + ': contains runtime search endpoint')
+  if (html.includes('/slipstream/slipstream/')) failures.push(path + ': contains a duplicated Pages base path')
   if (html.includes('href="/openapi.json"')) failures.push(path + ': contains root-relative OpenAPI link')
   if (html.includes('href="/favicon.svg"')) failures.push(path + ': contains root-relative favicon link')
 }

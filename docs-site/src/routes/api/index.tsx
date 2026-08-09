@@ -207,7 +207,7 @@ function ApiReference() {
             className="flex items-center gap-2 no-underline"
           >
             <BrandMark className="size-6" />
-            <Wordmark className="h-4" />
+            <Wordmark className="text-sm" />
           </Link>
           <span className="ml-2 hidden text-sm text-fd-muted-foreground sm:inline">
             API reference

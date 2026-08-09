@@ -23,7 +23,7 @@ export default function Footer() {
             <BrandMark className="size-9 rounded-xl" />
             <div>
               <div className="flex items-center gap-2.5">
-                <Wordmark className="h-4" />
+                <Wordmark className="text-sm" />
                 <span className="border-l border-fd-border pl-2.5 text-xs font-medium text-fd-muted-foreground">
                   Docs
                 </span>
