@@ -74,7 +74,7 @@ jobs:
           (cd release && sha256sum -- *) > "release/slipstream-${version}-SHA256SUMS"
 
       - name: Generate SBOM
-        uses: anchore/sbom-action@d94f46e13c6c62f59525ac9a1e147a99dc0b9bf5 # v0.17.0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           path: .
           format: cyclonedx-json
