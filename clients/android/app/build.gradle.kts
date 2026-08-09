@@ -145,8 +145,8 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest") // the ComponentActivity test host
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.16.1")
-    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.64.0")
-    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.64.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.70.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.70.0")
 }
 
 // Record (write) the screenshots when the unit tests run. These tests exist to GENERATE marketing
