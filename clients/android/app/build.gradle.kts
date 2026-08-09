@@ -110,12 +110,12 @@ kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_21) } }
 dependencies {
     implementation(project(":kit"))
 
-    val composeBom = platform("androidx.compose:compose-bom:2026.05.01")
+    val composeBom = platform("androidx.compose:compose-bom:2026.06.01")
     implementation(composeBom)
 
     implementation("androidx.core:core-ktx:1.19.0")
     implementation("androidx.activity:activity-compose:1.13.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
 
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -131,7 +131,7 @@ dependencies {
 
     // Real backdrop blur for the floating console legends (RenderEffect on API 31+, a translucent
     // scrim below). The gamepad UI's frosted pills sample + blur whatever scrolls behind them.
-    implementation("dev.chrisbanes.haze:haze:1.6.0")
+    implementation("dev.chrisbanes.haze:haze:1.7.2")
 
     // Android TV components (we target phone + TV) land in the TV-UI milestone:
     //   implementation("androidx.tv:tv-material:1.1.0")
@@ -145,8 +145,8 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest") // the ComponentActivity test host
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.16.1")
-    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.64.0")
-    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.64.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.70.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.70.0")
 }
 
 // Record (write) the screenshots when the unit tests run. These tests exist to GENERATE marketing
