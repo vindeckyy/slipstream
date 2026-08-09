@@ -259,7 +259,7 @@ A few knobs are read by the native **clients**, not the host:
 The client requests a bitrate; the host encodes to it. There's no host-side bitrate knob. To find a
 good value:
 
-- **Native clients (iPhone, Android, Steam Deck):** use the built-in **speed test** where the
+- **Native clients (Android, Steam Deck):** use the built-in **speed test** where the
   client offers it (from a host's menu). It measures your link, suggests a bitrate, and applies it.
 - **Moonlight:** set the bitrate in Moonlight's settings. Start moderate and raise it.
 

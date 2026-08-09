@@ -8,7 +8,7 @@ new **canary** build for that platform (fast iteration, possibly broken), each w
 rebuilds from the paths its artifact is built from, so a docs-only push publishes nothing, and two
 channels can sit on different commits. A `vX.Y.Z` git tag cuts a **stable** release:
 every platform is built at that one version, published to the stable channels, and all the
-artifacts (`.deb`, `.rpm`, `.apk`/`.aab`, `.ipa`, Decky zip, and related packages) are attached to a
+artifacts (`.deb`, `.rpm`, `.apk`/`.aab`, Decky zip, and related packages) are attached to a
 single [GitHub Release](https://github.com/vindeckyy/slipstream/releases) when CI is wired for that.
 
 The two tracks are **separate repos / tracks per platform**, never a shared version line, so a
@@ -36,7 +36,6 @@ your own feeds, keep canary and stable separate:
 | **pacman** (Arch host) | rebuild from `main` / your canary repo | rebuild from a `v*` tag / your stable repo |
 | **Decky** (Steam Deck) | Decky install-from-URL of a canary zip you publish | stable zip / release asset |
 | **Android** | Play **Internal testing** + sideload a canary APK | Play **closed (alpha)** + release APK |
-| **iPhone** | **TestFlight** | TestFlight (promote when ready) |
 
 > GitHub Releases are the stable-only public artifact page when assets are attached. OS-package
 > canary feeds are something you host yourself, they are not on the releases page.
@@ -109,8 +108,6 @@ strictly-numeric version is required).
 
 CI uploads stable to **testing** tracks only, it never auto-publishes to the public stores:
 
-- **iPhone**, the build lands in **TestFlight**. Promote to the App Store from App Store Connect
-  when ready.
 - **Android**, the build lands in Play's **closed (alpha)** track. Promote alpha -> production in
   the Play Console when ready.
 

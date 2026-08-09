@@ -77,7 +77,7 @@ systemd user unit, which you enable once, see [The Web Console](/docs/web-consol
 
 Then, on the client:
 
-- **[Native clients](/docs/clients) (iPhone, Android, Steam Deck):** select the host (or use
+- **[Native clients](/docs/clients) (Android, Steam Deck):** select the host (or use
   *Pair with PIN...* from its menu) and enter the PIN the host displays.
 - **[Steam Deck](/docs/steam-deck) (the Decky plugin):** open Slipstream from the Quick Access menu
   and pick the host, an unpaired one's button reads **Pair & Stream**. Enter the PIN on the

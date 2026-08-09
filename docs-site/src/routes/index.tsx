@@ -12,7 +12,7 @@ const journeys = [
     eyebrow: 'Play',
     title: 'Stream from Linux to the screens you use.',
     description:
-      'Run the host on Linux and connect from iPhone, Android, Steam Deck, or a Moonlight client when you enable GameStream. Launch games from the library or settle into a desktop session.',
+      'Run the host on Linux and connect from Android, Steam Deck, or a Moonlight client when you enable GameStream. Launch games from the library or settle into a desktop session.',
     href: 'play',
     cta: 'Open the Play guide',
     secondary: [
@@ -46,7 +46,7 @@ const steps = [
   {
     number: '02',
     title: 'Install and pair a client',
-    description: 'iPhone, Android, Steam Deck, or Moonlight when you enable GameStream.',
+    description: 'Android, Steam Deck, or Moonlight when you enable GameStream.',
     slug: 'pairing',
   },
   {
@@ -148,7 +148,7 @@ function Home() {
             </div>
 
             <p className="mt-6 text-sm text-fd-muted-foreground motion-safe:animate-[ss-rise_1.05s_ease-out]">
-              iPhone, Android, and Steam Deck clients · Optional Moonlight compatibility through GameStream ·
+              Android and Steam Deck clients · Optional Moonlight compatibility through GameStream ·
               No Slipstream account or relay service
             </p>
           </div>

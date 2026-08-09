@@ -1,6 +1,6 @@
 ---
 title: Install a Client
-description: Install the Slipstream client for iPhone, Android, or Steam Deck, or use Moonlight.
+description: Install the Slipstream client for Android or Steam Deck, or use Moonlight.
 ---
 
 This page is the **install path for each named client**. For what each client *is* and which to
@@ -13,43 +13,33 @@ Already installed? Skip to [Keeping a client up to date](#keeping-a-client-up-to
 [Removing a client](#removing-a-client).
 
 > The links below are the **stable** channel (moves on `vX.Y.Z` releases). For the latest `main`
-> build, use the **canary** channel, TestFlight / Play Internal, or the `canary/` download URLs. See
+> build, use the **canary** channel, Play Internal, or the `canary/` download URLs. See
 > [Release Channels](/docs/channels).
 
 ## Pick your device
 
 | Device | Install |
 |--------|---------|
-| **iPhone** | [TestFlight beta](#iphone) |
 | **Android / Android TV** | [Play test track, or sideload the APK](#android) |
 | **Steam Deck** | [Decky plugin](/docs/steam-deck) for Gaming Mode, or [Flatpak in Desktop Mode](#steam-deck) |
 | Anything else (browser, old phone, TV) | [Moonlight](/docs/moonlight) |
 
-## iPhone
-
-The iPhone app is in **TestFlight** beta. Install Apple's
-[TestFlight](https://apps.apple.com/app/testflight/id899247664) app, then join:
-
-**[Join the Slipstream beta on TestFlight ->](https://testflight.apple.com/join/Qr7uSemk)**
-
-Open the app, and your hosts appear automatically under *On this network*.
-
 ## Android
 
 The Android client (phone + Android TV) is on Google Play as a **test track**, **closed testing**
-for stable releases, **internal testing** for canary builds. Access is invite-only. Use a signed APK
-from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when available, or build from
-`clients/android/`.
+for stable releases, **internal testing** for canary builds. Access is invite-only. You can
+[download the Android APK](https://github.com/vindeckyy/slipstream/releases/download/android-preview/slipstream-android.apk)
+or build from `clients/android/`.
 
 If you already have tester access, install it from Google Play, then open the app and pick your host:
 
 **[Get Slipstream on Google Play ->](https://play.google.com/store/apps/details?id=io.slipstream)**
 _(only resolves once your account is on the tester list)_
 
-**Prefer not to wait for an invite?** Sideload a signed APK from
-[GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached, or build from
-`clients/android/`. Release downloads include a `.sha256` file; verify it before copying the APK to
-the tablet, then allow installs from your browser or file manager the first time.
+**Prefer not to wait for an invite?** Sideload the
+[Android APK](https://github.com/vindeckyy/slipstream/releases/download/android-preview/slipstream-android.apk)
+or build from `clients/android/`. Download the matching `.sha256` file and verify it before copying
+the APK to the tablet, then allow installs from your browser or file manager the first time.
 
 ```sh
 sha256sum -c slipstream-android-<version>.apk.sha256
@@ -105,7 +95,6 @@ but keeping them close is the least surprising. (Updating the **host** is its ow
 
 | Client | How it updates |
 |---|---|
-| **iPhone** | TestFlight updates it |
 | **Android** | Google Play updates it; if you sideloaded, download the APK again and install over it |
 | **Steam Deck (Decky)** | the panel's **Update** button, see [Steam Deck -> Updating](/docs/steam-deck#updating) |
 | **Steam Deck (Flatpak alone)** | `flatpak update --user io.slipstream`, **without `sudo`** |

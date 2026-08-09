@@ -17,7 +17,7 @@ their own.
 Jump to what you installed:
 
 - Linux host, [apt](#ubuntu-apt) · [dnf](#fedora-dnf) · [rpm-ostree layer](#fedora-atomic--bazzite-rpm-ostree-layer) · [Bazzite sysext](#bazzite--fedora-atomic-systemd-sysext) · [pacman](#arch--cachyos-pacman) · [SteamOS on-device build](#steamos--steam-deck-host-on-device-build) · [NixOS](#nixos)
-- [Clients](#clients), iPhone, Android, Steam Deck
+- [Clients](#clients), Android, Steam Deck
 - [Plugins and the script runner](#plugins-and-the-script-runner)
 
 ## Linux hosts
@@ -197,11 +197,6 @@ the module never managed, stays regardless.
 
 Removing a client does **not** tell the host to forget it. Unpair the device from the host's
 [web console](/docs/web-console) (Pairing -> unpair) if you want its pairing gone as well.
-
-### iPhone
-
-Delete the app the usual way. To leave the beta entirely, open **TestFlight**, select Slipstream, and
-stop testing, that removes the app and its data with it.
 
 ### Android / Android TV
 

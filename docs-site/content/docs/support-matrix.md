@@ -48,7 +48,7 @@ capability worked yesterday and not today, restart the host before believing the
 
 ## Host platform
 
-Slipstream hosts on **Linux only**. iPhone, Android and Steam Deck are client platforms. There is
+Slipstream hosts on **Linux only**. Android and Steam Deck are client platforms. There is
 no configuration that turns a phone or Deck into a host.
 
 ### Display and capture
@@ -200,7 +200,7 @@ newer on AMD, Arc and newer on Intel).
    deliberately if that is what you want.
 
 **4:4:4 across the whole project:** only HEVC and PyroWave can carry it, only NVENC and PyroWave can
-produce it, and only the iPhone client asks for it. GameStream sessions are always 4:2:0.
+produce it when a native client requests it. GameStream sessions are always 4:2:0.
 
 ### How the host picks a backend
 
@@ -239,30 +239,23 @@ CPU path for the rest of its life.
 
 ## Client decode
 
-Product clients are **iPhone**, **Android**, and **Steam Deck**. **Moonlight** works as a catch-all
+Product clients are **Android** and **Steam Deck**. **Moonlight** works as a catch-all
 over the GameStream plane. Other Moonlight-compatible clients are fine on that plane; their decode
 details live in those apps.
 
 | Client | Decode path (in order) | Codecs | 10-bit / HDR | 4:4:4 |
 |---|---|---|---|---|
-| iPhone | VideoToolbox only | H.264, HEVC, AV1 ¹ | ⚠️ ² | ⚠️ ³ |
-| Android · Android TV | MediaCodec only ⁴ | H.264, HEVC, AV1 ⁵ | ⚠️ ² | ❌ |
-| Steam Deck (via Decky) | Vulkan Video -> VAAPI -> software ⁶ | probed ⁷ | ✅ | ❌ |
-| Moonlight | your Moonlight app's | negotiated | ⚠️ ⁸ | ❌ |
-| LG webOS (`ss-webos`) | ❓ | ❓ | ❓ | ❓ ⁹ |
+| Android · Android TV | MediaCodec only ¹ | H.264, HEVC, AV1 ² | ⚠️ ³ | ❌ |
+| Steam Deck (via Decky) | Vulkan Video -> VAAPI -> software ⁴ | probed ⁵ | ✅ | ❌ |
+| Moonlight | your Moonlight app's | negotiated | ⚠️ ⁶ | ❌ |
+| LG webOS (`ss-webos`) | ❓ | ❓ | ❓ | ❓ ⁷ |
 
-1. AV1 only where `VTIsHardwareDecodeSupported` says yes (A17 Pro-class iPhones). VideoToolbox has
-   no software AV1 decoder, so it is never advertised as a guess. PyroWave is decoded by a
-   hand-written Metal kernel on A13-class and newer, and only when you pick it.
-2. Runtime-probed against the actual display: EDR headroom on iPhone, HDR capabilities on Android.
-   On an SDR panel the client advertises no HDR at all so the host sends a correct 8-bit picture
-   instead of PQ your screen would mangle.
-3. The only client that asks for 4:4:4, opt-in, and gated on a real hardware-decode probe (both
-   8-bit and 10-bit when HDR is also on). In practice it only ever resolves against an NVIDIA host.
-4. Chosen by name from a ranked device list that prefers hardware, real SoC vendors and low-latency
+1. Chosen by name from a ranked device list that prefers hardware, real SoC vendors and low-latency
    decoders, and blocks the known-bad software ones. There is no software rung.
-5. H.264 and HEVC are assumed universal on Android hardware; AV1 is probed.
-6. The Decky plugin does not decode anything; it launches the Linux session binary, so the decode
+2. H.264 and HEVC are assumed universal on Android hardware; AV1 is probed.
+3. Runtime-probed against the actual display. On an SDR panel the client advertises no HDR at all
+   so the host sends a correct 8-bit picture instead of PQ your screen would mangle.
+4. The Decky plugin does not decode anything; it launches the Linux session binary, so the decode
    path is identical to that binary, including the Mesa `RADV_PERFTEST=video_decode` opt-in the
    session binary sets before any Vulkan call (without it RADV exposes no decode queue and the Deck
    silently falls back to VAAPI, which fringes chroma on that GPU). What differs on the Deck is the
@@ -273,87 +266,75 @@ details live in those apps.
    silent fallback. Mid-session demotion is laddered, and each rung needs both three consecutive
    decode errors *and* a full second of them: Vulkan Video first demotes to VAAPI, and only that
    backend demotes to software.
-7. Enumerated from FFmpeg at startup, plus PyroWave when the GPU passes its compute probe.
-8. Whether HDR is offered is decided by the host and layered into what Moonlight is told, so an
+5. Enumerated from FFmpeg at startup, plus PyroWave when the GPU passes its compute probe.
+6. Whether HDR is offered is decided by the host and layered into what Moonlight is told, so an
    HDR toggle only appears in Moonlight when the host could really do it. See
    [Moonlight](/docs/moonlight).
-9. `ss-webos` is a community client in a separate repository. Nothing in this codebase can
+7. `ss-webos` is a community client in a separate repository. Nothing in this codebase can
    establish its capabilities, so it is honestly blank rather than optimistically filled in.
 
-**Multi-slice frames** are not advertised by iPhone or Android, because some TV-box decoders wedge
+**Multi-slice frames** are not advertised by Android, because some TV-box decoders wedge
 the whole device on them, so those sessions always receive single-slice frames. The Steam Deck
 session binary can advertise them. This is decoder truth, not a tuning knob.
 
 ## Clients and features
 
 **Steam Deck** streams through the Decky plugin, which launches the shared Linux session binary.
-**iPhone** is the Apple app on iOS. **Android** is one app, with Android TV being the same
-app in leanback mode. **Moonlight** uses the GameStream plane.
+**Android** is one app, with Android TV being the same app in leanback mode. **Moonlight** uses the
+GameStream plane.
 
 ### Before you connect
 
 | Client | Profiles | `slipstream://` links | Game library | Speed test | Wake-on-LAN | Updates itself |
 |---|---|---|---|---|---|---|
-| iPhone | ✅ | ✅ | ✅ ¹ | ✅ | ✅ | ❌ ² |
 | Android · Android TV | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ ² |
-| Steam Deck (Decky) | ❌ ³ | ❌ | ✅ ⁴ | ❌ | ✅ | ✅ ⁵ |
-| Moonlight | ❌ ⁶ | ❌ ⁶ | ✅ ⁷ | ❓ ⁸ | ❓ ⁸ | ❓ ⁸ |
+| Steam Deck (Decky) | ❌ ¹ | ❌ | ✅ ² | ❌ | ✅ ³ |
+| Moonlight | ❌ ⁴ | ❌ ⁴ | ✅ ⁵ | ❓ ⁶ | ❓ ⁶ | ❓ ⁶ |
 
-1. On by default on iPhone.
-2. Updates arrive through the store or installer you got the app from.
-3. The plugin writes flat values into the shared client settings; it has no profile surface. The
+1. The plugin writes flat values into the shared client settings; it has no profile surface. The
    client it launches still honours whatever profile that settings file names.
-4. Including pinned one-tap "Stream *game*" rows in the Quick Access Menu, which follow a host
+2. Including pinned one-tap "Stream *game*" rows in the Quick Access Menu, which follow a host
    across IP changes. Not subject to a desktop opt-in.
-5. Both the plugin itself and, where the install kind allows it, the client it launches.
-6. [Profiles and links](/docs/profiles-and-links) are Slipstream-app concepts and do not exist on
+3. Both the plugin itself and, where the install kind allows it, the client it launches.
+4. [Profiles and links](/docs/profiles-and-links) are Slipstream-app concepts and do not exist on
    the GameStream plane.
-7. Moonlight sees the host's titles as ordinary GameStream apps.
-8. These live in whichever Moonlight app you use, not in this project. The host does publish the
+5. Moonlight sees the host's titles as ordinary GameStream apps.
+6. These live in whichever Moonlight app you use, not in this project. The host does publish the
    information a Wake-on-LAN-capable client needs. See [Wake-on-LAN](/docs/wake-on-lan).
 
 ### Input while you stream
 
 | Client | Gamepads | Rumble | Gyro · touchpad · triggers | Pen | Touch modes | Mouse modes |
 |---|---|---|---|---|---|---|
-| iPhone | ✅ ¹ | ✅ | ✅ ² | ✅ ³ | ✅ | ⚠️ ⁴ |
-| Android · Android TV | ✅ ¹ | ⚠️ ⁵ | ⚠️ ⁶ | ✅ ⁷ | ✅ ⁸ | ✅ |
-| Steam Deck (Decky) | ✅ ¹ | ✅ | ✅ ⁹ | ❌ | ⚠️ ¹⁰ | ⚠️ ¹¹ |
-| Moonlight | ✅ | ✅ | ❌ ¹² | ⚠️ ¹³ | ⚠️ ¹⁴ |, |
+| Android · Android TV | ✅ ¹ | ⚠️ ² | ⚠️ ³ | ✅ ⁴ | ✅ ⁵ | ✅ |
+| Steam Deck (Decky) | ✅ ¹ | ✅ | ✅ ⁶ | ❌ | ⚠️ ⁷ | ⚠️ ⁸ |
+| Moonlight | ✅ | ✅ | ❌ ⁹ | ⚠️ ¹⁰ | ⚠️ ¹¹ |, |
 
 1. Multiple controllers, each on its own stable slot, arriving and leaving independently. The pad
-   **type** the host emulates is picked per pad. iPhone offers five presets; Android and Decky
-   offer six including Steam Deck.
-2. DualSense and DualShock 4 touchpad and motion are forwarded, and the host's adaptive-trigger and
-   lightbar effects are replayed on a real DualSense. On iPhone, rich capture is gated to the
-   DualSense/DualShock 4 family, so other pads there really do get rumble only.
-3. Apple Pencil, with pressure, tilt, azimuth and hover. Needs a host that can inject pen, see
-   [Input](/docs/input). Barrel roll is not something Apple Pencil reports.
-4. Pointer capture may need a full-screen
-   frontmost window; in Stage Manager, Slide Over or on iPhone it degrades to absolute pointing.
-   It is not a setting you can force.
-5. Uses the controller's own vibration motor where the phone kernel exposes it; many do not. There
+   **type** the host emulates is picked per pad. Android and Decky offer six presets including
+   Steam Deck.
+2. Uses the controller's own vibration motor where the phone kernel exposes it; many do not. There
    is an opt-in setting that **also** plays player 1's rumble on the phone's own motor, for clip-on
-   pads with no motors of their own; the iPhone has the same toggle (Taptic Engine).
-6. Only when the pad is claimed over **USB** (on by default). Over Bluetooth, Android's normal
+   pads with no motors of their own.
+3. Only when the pad is claimed over **USB** (on by default). Over Bluetooth, Android's normal
    controller path carries no motion or touchpad, and adaptive-trigger effects are parsed and
    dropped because Android has no public API for them.
-7. Full stylus support including eraser, both barrel buttons and hover. Android exposes no barrel
+4. Full stylus support including eraser, both barrel buttons and hover. Android exposes no barrel
    roll.
-8. Not applicable on Android TV, no touchscreen.
-9. DualSense/DualShock 4 touchpad and motion, plus any controller SDL exposes a gyro on (including
+5. Not applicable on Android TV, no touchscreen.
+6. DualSense/DualShock 4 touchpad and motion, plus any controller SDL exposes a gyro on (including
    the Deck's own pad). The Deck's trackpads ride the same touchpad surface.
-10. All three touch modes exist in the shared session binary and the picker is there. Only
+7. All three touch modes exist in the shared session binary and the picker is there. Only
     meaningful on a touchscreen.
-11. The desktop (absolute) mouse model is unavailable against a **gamescope** host, which grants
+8. The desktop (absolute) mouse model is unavailable against a **gamescope** host, which grants
     relative input only. The switch chord silently does nothing there; the session stays captured.
-12. Slipstream's GameStream server decodes only the classic multi-controller event and Sunshine's
-    `CONTROLLER_ARRIVAL`; the extension packets that would carry pad motion, touchpad contacts and
-    trigger effects are not implemented, so none of it reaches the host on this plane.
-13. The host understands Moonlight's pen and touch extensions and feeds them through the same
-    injection path, so Moonlight on a tablet with a stylus really does draw. Whether your Moonlight
-    app sends them is up to that app.
-14. Forwarded, but pressure and contact area are dropped on the way in.
+9. Slipstream's GameStream server decodes only the classic multi-controller event and Sunshine's
+   `CONTROLLER_ARRIVAL`; the extension packets that would carry pad motion, touchpad contacts and
+   trigger effects are not implemented, so none of it reaches the host on this plane.
+10. The host understands Moonlight's pen and touch extensions and feeds them through the same
+   injection path, so Moonlight on a tablet with a stylus really does draw. Whether your Moonlight
+   app sends them is up to that app.
+11. Forwarded, but pressure and contact area are dropped on the way in.
 
 Slipstream keyboard chords, and what each host backend can and cannot inject (including committed
 text from an IME), are covered in [Input](/docs/input).
@@ -362,32 +343,26 @@ text from an IME), are covered in [Input](/docs/input).
 
 | Client | HDR | 4:4:4 | Surround 5.1 / 7.1 | Microphone | Clipboard | Stats overlay |
 |---|---|---|---|---|---|---|
-| iPhone | ⚠️ ¹ | ⚠️ ² | ✅ ³ | ✅ | ❌ ⁴ | ✅ |
-| Android · Android TV | ⚠️ ¹ | ❌ | ✅ ³ | ✅ | ⚠️ ⁵ | ✅ |
-| Steam Deck (Decky) | ✅ ⁶ | ❌ ⁷ | ✅ ³ | ✅ | ❌ ⁸ | ✅ |
-| Moonlight | ⚠️ ⁹ | ❌ | ✅ ³ | ❌ | ❌ | ❓ ¹⁰ |
+| Android · Android TV | ⚠️ ¹ | ❌ | ✅ ² | ✅ | ⚠️ ³ | ✅ |
+| Steam Deck (Decky) | ✅ ⁴ | ❌ ⁵ | ✅ ² | ✅ | ❌ ⁶ | ✅ |
+| Moonlight | ⚠️ ⁷ | ❌ | ✅ ² | ❌ | ❌ | ❓ ⁸ |
 
 1. Runtime-probed against your actual display, see note 2 under [Client decode](#client-decode).
-2. Opt-in, hardware-probed, and for **HEVC** it only ever resolves against an NVIDIA host. VAAPI
-   declines 4:4:4 outright. The **PyroWave** codec is the exception: it does its own full-chroma
-   colour conversion, so 4:4:4 needs no encoder probe and resolves on any vendor. See
-   [Client settings](/docs/client-settings).
-3. Requested by the client and **resolved by the host**: it clamps to what it can actually capture
+2. Requested by the client and **resolved by the host**: it clamps to what it can actually capture
    (2, 6 or 8 channels) and tells you the real answer before the first frame.
-4. The clipboard bridge is not available on iPhone.
-5. Text only, by design. Unlike every other client, Android's per-host **Shared clipboard** switch
+3. Text only, by design. Android's per-host **Shared clipboard** switch
    starts **on** (other clients default it off). Nothing crosses until the host also enables its
    clipboard, but the client-side consent is pre-granted.
-6. Advertised whenever the HDR setting is on, which it is by default. No display probe: the Deck
+4. Advertised whenever the HDR setting is on, which it is by default. No display probe: the Deck
    asks, and the host decides. Presented on a real HDR10 surface where gamescope offers one, and
    tone-mapped in-shader otherwise. Software-decoded frames never take the HDR surface.
-7. The session settings still show a **Full chroma (4:4:4)** switch, and it is a per-profile field,
+5. The session settings still show a **Full chroma (4:4:4)** switch, and it is a per-profile field,
    but the session binary never advertises the 4:4:4 capability, so the switch has no effect today
    and the stream stays 4:2:0.
-8. There is a "Share clipboard" switch, but the Linux side of the bridge is a stub; nothing is
+6. There is a "Share clipboard" switch, but the Linux side of the bridge is a stub; nothing is
    ever offered or applied. Treat the clipboard as unavailable on Steam Deck until this lands.
-9. Decided entirely by the host and layered into what Moonlight is offered.
-10. Moonlight has its own overlay; [stats](/docs/stats) here describes Slipstream's.
+7. Decided entirely by the host and layered into what Moonlight is offered.
+8. Moonlight has its own overlay; [stats](/docs/stats) here describes Slipstream's.
 
 **File transfer through the clipboard does not exist yet** on any client. The wire format and the
 host-side policy for it are in place, but no client offers files, so a copied file never crosses.
@@ -400,7 +375,7 @@ These are negotiated, and either side can be the reason it did not happen:
 - **Shared clipboard**, off on the host until an operator enables it, and unavailable on a Linux
   host without the clipboard protocol (a gamescope session, for instance). The per-host "Share
   clipboard" switch is edited before you connect, so it is never greyed out; on Android and the
-  iPhone add-host sheet it stays settable against a host that will refuse, and just does nothing.
+  Android add-host sheet it stays settable against a host that will refuse, and just does nothing.
 - **Pen input**, the host advertises it only if it can really inject: a usable `/dev/uinput` on
   Linux. Without it, clients fold pen into touch.
 - **Committed text (IME)**, only the sway/wlroots backend can type arbitrary text. On KDE, GNOME
@@ -420,7 +395,6 @@ capability.
 | **Protocol core**, `slipstream-core`, the C ABI, FEC and crypto | Stable. Both the wire format and the embeddable C surface are versioned contracts (see below) and are changed reluctantly. |
 | **Linux host** | The product host surface. What differs is not the host but the desktop under it: each compositor gets its own capture, virtual-display and input backend, and they are not equally capable. |
 | **GameStream / Moonlight plane** | Works, and whether it is on depends on how you installed. Every Linux package (deb, RPM, Arch, the Bazzite sysext) and the SteamOS installer ship the unit as `serve --gamestream`, so GameStream is **on** there; NixOS defaults it on too. A bare `slipstream-host serve` is off. It pairs over plain HTTP with weaker legacy encryption, trusted LAN only, and worth turning off if you don't use Moonlight (see [Security](/docs/security#gamestream--moonlight-compatibility-is-the-weak-crypto-path)). It is a compatibility surface, so Slipstream-only features (profiles, links, clipboard, microphone) are not on it. |
-| **iPhone client** | Distributed as a **TestFlight beta**. Feature-complete apart from the platform gaps named above (no clipboard on iPhone). |
 | **Android client** (phone · TV) | Distributed on Play's **closed (alpha)** track for releases, Internal testing for canary, plus a sideloadable APK. The same app in leanback mode is the TV client. |
 | **Decky plugin** (Steam Deck) | Ships through install-from-URL rather than the Decky store, and keeps itself and the client it launches up to date. It launches the Linux session binary rather than streaming itself, and has no settings surface of its own beyond the flat values it writes into the shared client settings. |
 | **Web console** | The full management surface: dashboard and sessions, pairing, library, displays, plugins and the plugin store, logs, stats, settings, and host updates. It cannot yet run a speed test or set a bitrate; the client apps can. |
@@ -446,7 +420,7 @@ on](#things-both-ends-have-to-agree-on).
 ## Where it has been run
 
 Day-to-day development and validation happen on Linux hosts across the KWin, Mutter, gamescope and
-wlroots backends, on NVIDIA and AMD GPUs, with the iPhone, Android and Steam Deck clients, plus
+wlroots backends, on NVIDIA and AMD GPUs, with the Android and Steam Deck clients, plus
 stock Moonlight over the GameStream path. HDR on gamescope is verified end to end on Bazzite and on
 SteamOS.
 

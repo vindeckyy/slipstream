@@ -7,7 +7,7 @@ Slipstream speaks the **GameStream** protocol, so [Moonlight](https://moonlight-
 to it like it would to any GameStream host, no slipstream-specific app needed. It's a great option for
 a browser, a smart TV, or any device without a named Slipstream client.
 
-> Prefer a **named Slipstream client** when one exists for your device - **iPhone**, **Android**, or
+> Prefer a **named Slipstream client** when one exists for your device - **Android** or
 > **Steam Deck**. See [Clients](/docs/clients) before reaching for Moonlight.
 
 ## Feature delta vs native
@@ -18,7 +18,7 @@ exists for your device - especially for [Play](/docs/play) on a lossy link and f
 
 | Topic | **Native Slipstream client** | **Moonlight (GameStream)** |
 |---|---|---|
-| Availability | iPhone, Android, Steam Deck ([Clients](/docs/clients)) | Any Moonlight build (TVs, browsers, odd platforms) |
+| Availability | Android, Steam Deck ([Clients](/docs/clients)) | Any Moonlight build (TVs, browsers, odd platforms) |
 | Host flag | Always on (`slipstream/1`) | Opt-in `--gamestream` (often on for Linux packages) |
 | Discovery | `_slipstream._udp` mDNS | `_nvstream._tcp` mDNS |
 | Pairing PIN | Host shows PIN -> type into client | Client shows PIN -> type into [web console](/docs/web-console) |

@@ -106,8 +106,8 @@ VPN patterns live on [Network & VPN](/docs/network-and-vpn).
 
 ### 4. Decode and present
 
-The client hardware-decodes the stream (VideoToolbox on iPhone, MediaCodec on Android, Vulkan Video /
-VAAPI on Steam Deck) and presents it fullscreen or in a window. Input travels the other way: mouse,
+The client hardware-decodes the stream (MediaCodec on Android, Vulkan Video / VAAPI on Steam Deck)
+and presents it fullscreen or in a window. Input travels the other way: mouse,
 keyboard, touch, pen, and controllers are injected into the host session. See [Clients](/docs/clients)
 and [Mouse, touch and pen](/docs/input).
 
@@ -123,7 +123,7 @@ Slipstream speaks two protocols over the same host:
   [Moonlight](/docs/moonlight) client connects with no special software. This is the most compatible way in.
 - **slipstream/1 (native)**, a purpose-built protocol with a QUIC control channel and a UDP data
   channel hardened with forward error correction and encryption. It's lower-latency and more resilient
-  on imperfect networks, and it's what the [native clients](/docs/clients) (iPhone, Android, Steam Deck)
+  on imperfect networks, and it's what the [native clients](/docs/clients) (Android, Steam Deck)
   use.
 
 The native `slipstream/1` plane runs by default (the secure default); add `--gamestream` and both planes
@@ -133,7 +133,7 @@ serve from a single host process. Moonlight clients use GameStream; the native c
 
 | Situation | Prefer |
 |---|---|
-| Native app available (iPhone, Android, Steam Deck) | **slipstream/1** |
+| Native app available (Android, Steam Deck) | **slipstream/1** |
 | Couch / TV / device with only Moonlight | **GameStream** (`--gamestream`) |
 | Office client over VPN, security-sensitive host | **Native only**; turn GameStream off if you do not need Moonlight |
 | Maximum compatibility on a trusted home LAN | Both planes on the same host |

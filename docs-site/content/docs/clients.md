@@ -1,14 +1,13 @@
 ---
 title: Clients
-description: Connect from iPhone, Android, Steam Deck, or Moonlight.
+description: Connect from Android, Steam Deck, or Moonlight.
 ---
 
 ## Named apps
 
 | Client | Install | Protocol |
 |--------|---------|----------|
-| **iPhone** | [TestFlight](https://testflight.apple.com/join/Qr7uSemk) | `slipstream/1` |
-| **Android / Android TV** | Invite-only Play test track or APK from [Releases](https://github.com/vindeckyy/slipstream/releases) | `slipstream/1` |
+| **Android / Android TV** | Invite-only Play test track or [download the Android APK](https://github.com/vindeckyy/slipstream/releases/download/android-preview/slipstream-android.apk) | `slipstream/1` |
 | **Steam Deck** | Decky plugin + Flatpak `slipstream-client` | `slipstream/1` |
 
 Native apps discover hosts on the LAN, pair with a PIN, reconnect on a pinned identity, and can

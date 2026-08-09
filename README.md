@@ -16,7 +16,7 @@ Slipstream turns a Linux machine into a private streaming host. Pair a client on
 virtual display at the client's resolution and refresh rate over a trusted LAN or private VPN.
 
 The host captures the compositor output, encodes it, sends it over the selected transport, and the
-client decodes and presents it. Native clients are available for iPhone, Android, and Steam Deck.
+client decodes and presents it. Native clients are currently available for Android and Steam Deck.
 Moonlight clients are supported through the optional GameStream compatibility path.
 
 ## What you get
@@ -55,7 +55,7 @@ the browser receives a session cookie, never the token.
 
 ## Connect a client
 
-1. Install a client for iPhone, Android, or Steam Deck.
+1. Install a client for Android or Steam Deck.
 2. Put the client and host on the same LAN or on a private VPN.
 3. Pair with the one-time PIN shown by the host.
 4. Choose Play or Work settings for the session.

@@ -113,5 +113,5 @@ the one checked against the code.
 ## A client
 
 You also need something to stream *to*, see [Connect a Client](/docs/clients). There are native
-Slipstream clients for **iPhone**, **Android**, and **Steam Deck**, and any Moonlight client works
+Slipstream clients for **Android** and **Steam Deck**, and any Moonlight client works
 too. All of them can discover the host on your network automatically.

@@ -8,7 +8,7 @@ import { sitePath } from '@/lib/paths'
 import appCss from '@/styles/app.css?url'
 
 const siteDescription =
-  'Private, low-latency desktop and game streaming from a Linux host to iPhone, Android, Steam Deck, and compatible Moonlight clients.'
+  'Private, low-latency desktop and game streaming from a Linux host to Android, Steam Deck, and compatible Moonlight clients.'
 
 export const Route = createRootRoute({
   head: () => ({
