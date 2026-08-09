@@ -1,33 +1,33 @@
 """
-slipstream Decky plugin — backend.
+slipstream Decky plugin  -  backend.
 
 The Gaming-Mode UI (``src/index.tsx``) calls these methods over the Decky bridge. The actual
-STREAM is NOT launched here — it is launched by the frontend through Steam
+STREAM is NOT launched here  -  it is launched by the frontend through Steam
 (SteamClient.Apps.RunGame on a hidden non-Steam shortcut that points at ``bin/slipstreamrun.sh``),
 because gamescope only focuses/fullscreens windows in the process tree Steam launched via
 ``reaper``. A flatpak spawned from this backend would be invisible/unfocused (gamescope#484).
 The backend's jobs are the things Steam can't do:
 
-* **discover()** — browse the LAN over mDNS (``avahi-browse``) for ``_slipstream._udp`` hosts.
-* **pair(host, port, pin, name)** — run the SPAKE2 PIN ceremony headlessly via the flatpak
+* **discover()**  -  browse the LAN over mDNS (``avahi-browse``) for ``_slipstream._udp`` hosts.
+* **pair(host, port, pin, name)**  -  run the SPAKE2 PIN ceremony headlessly via the flatpak
   client's ``--pair`` mode, capturing the result. Pairing uses the SAME flatpak (so the same
   identity store the stream uses), so once paired the stream connects silently.
-* **library(host, mgmt_port, fp)** — fetch a paired host's game library headlessly via the
+* **library(host, mgmt_port, fp)**  -  fetch a paired host's game library headlessly via the
   flatpak client's ``--library`` mode (mTLS with the client's own identity; TSV on stdout),
   so the picker UI can offer games to pin.
-* **get_pins() / set_pins()** — the pinned-games store (``decky-pinned.json`` next to the
+* **get_pins() / set_pins()**  -  the pinned-games store (``decky-pinned.json`` next to the
   client's config, so pins survive plugin reinstalls), annotated with live pairing state.
-* **runner_info()** — the absolute path to the launch wrapper + the flatpak app id, handed to
+* **runner_info()**  -  the absolute path to the launch wrapper + the flatpak app id, handed to
   the frontend so it can create/point the Steam shortcut.
-* **get_settings() / set_settings()** — read/write the flatpak client's stream settings JSON
+* **get_settings() / set_settings()**  -  read/write the flatpak client's stream settings JSON
   (resolution / bitrate / gamepad), so the Deck UI configures the stream the client reads.
-* **kill_stream()** — force-stop a wedged stream (``flatpak kill``).
-* **check_update()** — report pending updates for BOTH the plugin and the client. The plugin's
+* **kill_stream()**  -  force-stop a wedged stream (``flatpak kill``).
+* **check_update()**  -  report pending updates for BOTH the plugin and the client. The plugin's
   comes from the registry's per-channel ``manifest.json`` (the frontend then drives Decky's own
-  install RPC to apply it); the client's depends on how it was installed — a flatpak is compared
+  install RPC to apply it); the client's depends on how it was installed  -  a flatpak is compared
   by OSTree commit here, anything else is asked of the client itself
   (``slipstream-client --check-update``, which verifies a signed manifest).
-* **update_client()** — apply the client update by whichever route that install supports:
+* **update_client()**  -  apply the client update by whichever route that install supports:
   ``flatpak update --user``, ``slipstream-client --apply-update`` (the packaged root helper), or
   a refusal carrying the command to run by hand.
 
@@ -55,7 +55,7 @@ SERVICE_TYPE = "_slipstream._udp"
 
 # The flatpak client persists identity / known-hosts / settings under HOME/.config/slipstream.
 # The sandbox HOME resolves to the REAL user home (== DECKY_USER_HOME), NOT the per-app
-# ~/.var/app/<APP_ID> dir — verified on-device (`flatpak run … sh -c 'echo $HOME'` prints
+# ~/.var/app/<APP_ID> dir  -  verified on-device (`flatpak run ... sh -c 'echo $HOME'` prints
 # /home/deck, and the manifest's `--filesystem=~/.config/slipstream` grants exactly that path;
 # we also pass HOME=DECKY_USER_HOME into `flatpak run`, see _flatpak_env). Pointing here is what
 # lets plugin settings actually reach the client AND lets us read the client's known-hosts to
@@ -89,7 +89,7 @@ def _runner_path() -> str:
 
 
 def _pins_path() -> Path:
-    """The pinned-games store — plugin-owned, but deliberately in the CLIENT's config dir
+    """The pinned-games store  -  plugin-owned, but deliberately in the CLIENT's config dir
     (like everything else we persist): the plugins dir is root-owned and wiped on
     reinstall, while ``~/.config/slipstream`` survives both."""
     return _client_config_dir() / "decky-pinned.json"
@@ -118,7 +118,7 @@ def _controller_template_src() -> Path:
 
 def _chown_like_parent(path: Path) -> None:
     """The Decky backend runs as root, so files it CREATES in the deck-owned Steam tree land
-    root-owned — which would stop Steam (running as the user) from rewriting them. Match the
+    root-owned  -  which would stop Steam (running as the user) from rewriting them. Match the
     parent dir's owner so Steam retains write access. Best-effort."""
     try:
         st = path.parent.stat()
@@ -145,7 +145,7 @@ def _upsert_configset_entry(text: str, key: str, source_type: str, source_val: s
 
     lower = text.lower()
     needle = f'"{key.lower()}"'
-    # Find the key token that begins a top-level entry (its own line), then its "{ … }" block.
+    # Find the key token that begins a top-level entry (its own line), then its "{ ... }" block.
     search_from = 0
     while True:
         idx = lower.find(needle, search_from)
@@ -175,7 +175,7 @@ def _upsert_configset_entry(text: str, key: str, source_type: str, source_val: s
             end += 1
         return text[:line_start] + block + text[end:]
 
-    # Not present — insert before the last closing brace (the controller_config block's end).
+    # Not present  -  insert before the last closing brace (the controller_config block's end).
     last_close = text.rstrip().rfind("}")
     if last_close == -1:
         return text.rstrip() + "\n" + block
@@ -184,7 +184,7 @@ def _upsert_configset_entry(text: str, key: str, source_type: str, source_val: s
 
 def _parse_library_tsv(stdout: str) -> list[dict]:
     """Parse the flatpak client's ``--library`` output: one ``id\\tstore\\ttitle`` line per
-    game plus a trailing ``N game(s)`` count line (no tabs — it self-skips here). A title
+    game plus a trailing ``N game(s)`` count line (no tabs  -  it self-skips here). A title
     may itself contain tabs, so split at most twice."""
     games: list[dict] = []
     for line in stdout.splitlines():
@@ -197,7 +197,7 @@ def _parse_library_tsv(stdout: str) -> list[dict]:
 def _classify_library_error(stderr: str) -> str:
     """Map the client's ``library: <LibraryError Display>`` stderr line to a stable error
     code for the UI. Substring-matched against the Display strings in
-    ``crates/ss-client-core/src/library.rs`` — a wording change degrades to ``client-error``
+    ``crates/ss-client-core/src/library.rs``  -  a wording change degrades to ``client-error``
     (generic copy), never a crash."""
     s = stderr.lower()
     if "didn't recognize this device" in s:
@@ -221,7 +221,7 @@ def _classify_library_error(stderr: str) -> str:
 # can't offer updates. Instead the backend polls a tiny per-channel ``manifest.json`` the
 # CI publishes next to the zip, compares it to the installed version, and the frontend
 # offers a one-tap update that drives Decky's own (root, privileged) install RPC. The
-# channel + manifest URL are baked into ``update.json`` by CI (.github/workflows/decky.yml);
+# channel + manifest URL are baked into ``update.json`` by CI (GitHub Actions);
 # a dev/sideload build has no ``update.json`` and update checks are simply disabled.
 _UPDATE_TTL_S = 1800.0  # cache a successful check for 30 min (the QAM remounts often)
 _update_cache: dict = {"at": 0.0, "data": None}
@@ -236,7 +236,7 @@ def _update_config() -> dict:
 
 
 def _installed_version() -> str:
-    """The version Decky itself reports for this plugin — it reads ``package.json`` (NOT
+    """The version Decky itself reports for this plugin  -  it reads ``package.json`` (NOT
     plugin.json), so the CI stamps the build version there."""
     try:
         pkg = json.loads((Path(decky.DECKY_PLUGIN_DIR) / "package.json").read_text())
@@ -264,9 +264,9 @@ def _semver_tuple(v: str) -> tuple[int, int, int]:
 
 
 # Decky Loader ships its own embedded (PyInstaller) Python whose compiled-in OpenSSL default
-# verify paths don't exist on SteamOS — ``ssl.create_default_context()`` then trusts NOTHING
+# verify paths don't exist on SteamOS  -  ``ssl.create_default_context()`` then trusts NOTHING
 # and every HTTPS fetch dies with CERTIFICATE_VERIFY_FAILED (seen live on the Deck). Fix: find
-# a real CA bundle on disk and load it explicitly. Verification is NEVER disabled — if no
+# a real CA bundle on disk and load it explicitly. Verification is NEVER disabled  -  if no
 # bundle exists the fetch just fails, and check_update() is non-fatal by design.
 _CA_BUNDLES = (
     "/etc/ssl/certs/ca-certificates.crt",  # SteamOS / Arch / Debian / Ubuntu
@@ -306,7 +306,7 @@ def _build_ssl_context() -> ssl.SSLContext:
             return ctx
 
     decky.logger.warning(
-        "no CA bundle found — HTTPS update checks will fail certificate verification"
+        "no CA bundle found  -  HTTPS update checks will fail certificate verification"
     )
     return ctx
 
@@ -338,7 +338,7 @@ def _flatpak() -> str | None:
 #
 # The flatpak is the Deck's usual client, but it is not the only one: a sysext, a .deb/.rpm, an
 # AUR build, a nix profile and a hand-built binary all install a NATIVE `slipstream-client`, and
-# on those the plugin used to be dead in the water — every headless call went through
+# on those the plugin used to be dead in the water  -  every headless call went through
 # `flatpak run io.slipstream` and simply failed. Both kinds keep identity, known-hosts and
 # settings in the same ~/.config/slipstream (the flatpak's sandbox HOME resolves to the real
 # home), so nothing else in this file has to care which one answered.
@@ -367,7 +367,7 @@ def _native_client() -> str | None:
 
 
 def _flatpak_installed() -> bool:
-    """True when the flatpak APP is actually installed — not merely that `flatpak` exists.
+    """True when the flatpak APP is actually installed  -  not merely that `flatpak` exists.
 
     Checked by the app's own exported directory rather than by shelling out to `flatpak info`,
     because this is on the path of every headless call and a subprocess per call would be absurd.
@@ -383,7 +383,7 @@ def _client_argv() -> list[str] | None:
     """The argv PREFIX that runs the client headlessly, or None when no client is installed.
 
     Flatpak wins when it is installed: it is the tested Deck path, so an existing install keeps
-    behaving exactly as it did. A native binary is the fallback — and on a machine with no
+    behaving exactly as it did. A native binary is the fallback  -  and on a machine with no
     flatpak client, the thing that makes the plugin work at all. `PF_DECKY_CLIENT=native|flatpak`
     forces one when a machine has both.
     """
@@ -403,7 +403,7 @@ def _client_is_flatpak() -> bool:
 
     Not the same question as "is the flatpak installed": `PF_DECKY_CLIENT=native` forces the
     native binary on a box that has both, and the update check has to describe the client the
-    launcher will really run — otherwise a Deck with both would be offered a flatpak update for
+    launcher will really run  -  otherwise a Deck with both would be offered a flatpak update for
     a client it never starts.
     """
     prefix = _client_argv()
@@ -413,7 +413,7 @@ def _client_is_flatpak() -> bool:
 def _flatpak_env() -> dict:
     """Environment for a headless client run from the backend (no display needed for pairing).
     Reconstruct the user-session bits flatpak wants; the backend may not inherit them. Harmless
-    if some are already set — and correct for a NATIVE client too, which needs the same HOME and
+    if some are already set  -  and correct for a NATIVE client too, which needs the same HOME and
     the same LD_LIBRARY_PATH repair below."""
     env = dict(os.environ)
     # Decky Loader is a PyInstaller binary: it prepends its bundled libs (an older libssl) to
@@ -443,7 +443,7 @@ def _flatpak_env() -> dict:
 async def _flatpak_capture(args: list[str], timeout: float = 20.0) -> tuple[int, str]:
     """Run ``flatpak <args>`` with the user-session env, merging stderr into stdout. Returns
     ``(returncode, output)``; ``(-1, "")`` if the binary is missing or the call errors/times out.
-    Best-effort by design — every caller here treats a failure as "no update / can't tell"."""
+    Best-effort by design  -  every caller here treats a failure as "no update / can't tell"."""
     flatpak = _flatpak()
     if not flatpak:
         return -1, ""
@@ -512,7 +512,7 @@ async def _run_client(client_args: list[str], timeout: float = 20.0) -> tuple[in
 
 
 # The QAM panel and the full page each mount their own hosts view, and Gaming Mode remounts the
-# QAM often — every mount calls list_hosts, which spawns a flatpak cold-start plus a reachability
+# QAM often  -  every mount calls list_hosts, which spawns a flatpak cold-start plus a reachability
 # probe. Cache the last result briefly so back-to-back opens reuse it instead of re-probing; any
 # mutation (add/edit/forget/reset/pair) invalidates it so a change shows up immediately.
 _HOSTS_TTL_S = 12.0
@@ -524,7 +524,7 @@ def _invalidate_hosts_cache() -> None:
 
 
 def _read_known_hosts() -> list[dict]:
-    """The saved-hosts store read straight off disk — the fallback for a client too old to have
+    """The saved-hosts store read straight off disk  -  the fallback for a client too old to have
     ``--list-hosts``. Same file the desktop client owns; `online` is left ``None`` (unknown)
     because a direct read has no reachability signal."""
     try:
@@ -552,7 +552,7 @@ def _read_known_hosts() -> list[dict]:
 def _mutation_result(rc: int, err: str, op: str) -> dict:
     """Map a headless host-store mutation's exit status to a UI-stable result. ``rc == -1`` means
     the flatpak call never ran (missing/timed out); a nonzero rc from a client that PREDATES the
-    mode falls through to GTK init and fails headless — classified ``client-outdated`` so the UI
+    mode falls through to GTK init and fails headless  -  classified ``client-outdated`` so the UI
     can prompt an update instead of showing a cryptic error."""
     if rc == 0:
         return {"ok": True}
@@ -578,7 +578,7 @@ def _field_from(text: str, name: str) -> str:
 async def _client_update_state() -> dict:
     """Is a newer commit of the flatpak client available in the remote it tracks? The client is a
     **per-user** install (so ``sudo flatpak update``, which is system-scope, never touches it), and
-    it versions independently of this plugin — so we compare the installed commit against the
+    it versions independently of this plugin  -  so we compare the installed commit against the
     remote's here and let the QAM offer a user-scope update. Best-effort; all-``False`` on any error
     (not installed, no flatpak, offline).
 
@@ -596,7 +596,7 @@ async def _client_update_state() -> dict:
         return state
     rc, rinfo = await _flatpak_capture(["remote-info", "--user", origin, APP_ID], timeout=25.0)
     if rc != 0:
-        return state  # remote unreachable — treat as "up to date", retry next check
+        return state  # remote unreachable  -  treat as "up to date", retry next check
     state["remote"] = _field_from(rinfo, "Commit")
     state["available"] = bool(
         state["installed"] and state["remote"] and state["installed"] != state["remote"]
@@ -609,16 +609,16 @@ async def _client_update_state() -> dict:
 # A .deb/.rpm/pacman/sysext/nix client is not something this plugin can reason about on its own:
 # working out whether a newer build exists means fetching a per-channel manifest and verifying
 # its Ed25519 signature, and Decky's embedded Python has no crypto library to do that with (nor
-# should the trust rule live in two languages). So the CLIENT answers both questions —
+# should the trust rule live in two languages). So the CLIENT answers both questions  -
 # `--check-update --json` says what is available and who could install it, `--apply-update`
-# drives the packaged root helper — and this backend is a UI over those, exactly as it already
+# drives the packaged root helper  -  and this backend is a UI over those, exactly as it already
 # is for `--pair` / `--library` / `--list-hosts`.
 #
 # Shape of `--check-update --json` (ss_client_core::update::Status):
 #   {kind, channel, current, latest, update_available, apply, applier, command,
 #    opt_in_hint?, notes_url, error?}
 # `applier` is what this file routes on: "flatpak" (we run flatpak), "helper" (the client runs
-# the root helper), "none" (show `command` — nothing here can install it).
+# the root helper), "none" (show `command`  -  nothing here can install it).
 
 
 async def _native_update_state() -> dict:
@@ -628,7 +628,7 @@ async def _native_update_state() -> dict:
     tell", never as "up to date"."""
     rc, out, err = await _run_client(["--check-update", "--json"], timeout=30.0)
     # The JSON is authoritative whenever there IS JSON, whatever the exit code: the client
-    # exits 0 up-to-date, 10 update-available, and 1 when the check failed — but in that last
+    # exits 0 up-to-date, 10 update-available, and 1 when the check failed  -  but in that last
     # case it STILL prints a status carrying `error` plus the install kind and the command for
     # this box, which is exactly what the UI needs to explain itself. Reading only the exit
     # code would throw all of that away and report a bare "couldn't check".
@@ -642,7 +642,7 @@ async def _native_update_state() -> dict:
     if rc == -1:
         return {}
     # A client predating `--check-update` ignores the flag and falls through to GTK init, which
-    # fails headless — the same signature the other headless modes classify.
+    # fails headless  -  the same signature the other headless modes classify.
     code = _classify_library_error(err)
     decky.logger.info("native check-update unavailable (rc=%s, %s)", rc, code)
     return {"error": code} if code == "client-outdated" else {}
@@ -700,7 +700,7 @@ def _parse_avahi_browse(stdout: str) -> list[dict]:
         try:
             mgmt = int(props.get("mgmt", ""))
         except ValueError:
-            mgmt = 0  # not advertised (standalone slipstream1-host) — callers default 47990
+            mgmt = 0  # not advertised (standalone slipstream1-host)  -  callers default 47990
 
         entry = {
             "name": name,
@@ -750,7 +750,7 @@ class Plugin:
             decky.logger.debug("avahi-browse stderr: %s", stderr.decode(errors="replace"))
         hosts = _parse_avahi_browse(stdout.decode(errors="replace"))
         # Mark which hosts THIS device has already paired (by cert fingerprint), so the UI can
-        # show "Stream" instead of "Pair" — the mDNS `pair` field is the host's policy, not our
+        # show "Stream" instead of "Pair"  -  the mDNS `pair` field is the host's policy, not our
         # per-device pairing state.
         paired = _paired_fingerprints()
         for h in hosts:
@@ -799,7 +799,7 @@ class Plugin:
                 if tok.startswith("fp="):
                     fp = tok[3:]
             decky.logger.info("paired %s:%s", host, port)
-            _invalidate_hosts_cache()  # the store gained a paired entry — reflect it next list
+            _invalidate_hosts_cache()  # the store gained a paired entry  -  reflect it next list
             return {"ok": True, "fp": fp}
         decky.logger.warning("pairing failed (rc=%s): %s", proc.returncode, err.strip() or out.strip())
         # Surface the client's own one-line reason (wrong PIN / not armed) to the UI.
@@ -811,7 +811,7 @@ class Plugin:
         ``--wake`` mode, so a sleeping host is up by the time the stream ``--connect`` runs.
 
         The MAC comes from the flatpak client's OWN known-hosts store (learned from the host's
-        mDNS ``mac`` TXT while it was online) — no MAC handling here — so this is a no-op if none
+        mDNS ``mac`` TXT while it was online)  -  no MAC handling here  -  so this is a no-op if none
         has been learned yet. Fire it just before launching a stream; it's fast and best-effort.
         Returns ``{ok, error?}`` (``ok: False`` when no MAC is known / flatpak missing).
         """
@@ -842,7 +842,7 @@ class Plugin:
 
     async def library(self, host: str, mgmt_port: int = 0, fp: str = "") -> dict:
         """Fetch a paired host's game library via the flatpak client's headless
-        ``--library`` mode (the client's own mTLS identity + pinned-fingerprint transport —
+        ``--library`` mode (the client's own mTLS identity + pinned-fingerprint transport  -
         no trust logic reimplemented here). ``fp`` is passed through whenever the caller
         knows the host's cert fingerprint so an IP change can never degrade the pin to a
         TOFU accept. Returns ``{ok, games: [{id, store, title}]}`` or
@@ -861,7 +861,7 @@ class Plugin:
         try:
             # Separate pipes (unlike _flatpak_capture): the TSV comes on stdout, the
             # client's one-line error reason on stderr. Cold flatpak start on a Deck can
-            # take seconds — generous timeout, spinner in the UI.
+            # take seconds  -  generous timeout, spinner in the UI.
             proc = await asyncio.create_subprocess_exec(
                 *argv,
                 stdout=asyncio.subprocess.PIPE,
@@ -892,7 +892,7 @@ class Plugin:
 
     async def get_pins(self) -> dict:
         """The pinned games, each annotated with the LIVE ``paired`` state of its host (by
-        cert fingerprint — an unpaired-since host renders "pairing required" in the QAM)."""
+        cert fingerprint  -  an unpaired-since host renders "pairing required" in the QAM)."""
         try:
             data = json.loads(_pins_path().read_text())
         except (OSError, json.JSONDecodeError):
@@ -909,9 +909,9 @@ class Plugin:
         return {"pins": out}
 
     async def set_pins(self, pins: list) -> dict:
-        """Persist the pinned-games list (the frontend sends the whole list — add, remove,
+        """Persist the pinned-games list (the frontend sends the whole list  -  add, remove,
         and address-refresh all funnel through here). Validated + deduped on
-        ``(host_fp, game_id)``; written atomically (tmp + rename) — pins are long-lived
+        ``(host_fp, game_id)``; written atomically (tmp + rename)  -  pins are long-lived
         user data."""
         clean: list[dict] = []
         seen: set[tuple[str, str]] = set()
@@ -953,7 +953,7 @@ class Plugin:
         """The Steam-shortcut artwork shipped with the plugin (committed under ``assets/``):
         base64 PNGs (grid/gridwide/hero/logo) for SetCustomArtworkForApp plus the icon's
         absolute path for SetShortcutIcon (which wants a file, not bytes). Missing files are
-        simply omitted — artwork is cosmetic and must never block a launch."""
+        simply omitted  -  artwork is cosmetic and must never block a launch."""
         art: dict = {}
         base = Path(decky.DECKY_PLUGIN_DIR) / "assets"
         for key, fname in (
@@ -973,7 +973,7 @@ class Plugin:
     async def apply_controller_config(self, name: str = "Slipstream") -> dict:
         """Install our Steam Input layout (native touchscreen `ts_n` + gamepad passthrough) and
         point the shortcut(s) at it, so the Deck touchscreen reaches the client as native touch
-        with zero manual controller setup. Best-effort + idempotent — a controller tweak must
+        with zero manual controller setup. Best-effort + idempotent  -  a controller tweak must
         never block a launch, so failures are reported, not raised. Both shortcuts share the same
         name → the same lowercase configset key, so one entry per account covers both."""
         src = _controller_template_src()
@@ -1008,7 +1008,7 @@ class Plugin:
                             _chown_like_parent(bak)
                     existed = f.exists()
                     f.write_text(new, encoding="utf-8")
-                    if not existed:  # a freshly-created file is root-owned — hand it to the user
+                    if not existed:  # a freshly-created file is root-owned  -  hand it to the user
                         _chown_like_parent(f)
                 applied.append(f"configset:{d.parent.name}")
             except OSError as e:
@@ -1021,7 +1021,7 @@ class Plugin:
     async def runner_info(self) -> dict:
         """The wrapper-script path + flatpak app id the frontend needs to create the Steam
         shortcut. The shortcut invokes the script through ``/bin/sh`` (see steam.ts), so no
-        exec bit is needed — Decky's zip extraction drops it, and the root-owned plugins dir
+        exec bit is needed  -  Decky's zip extraction drops it, and the root-owned plugins dir
         means this unprivileged backend couldn't chmod it back on anyway.
 
         ``client_bin`` is set only when the resolved client is a NATIVE install; the frontend
@@ -1040,7 +1040,7 @@ class Plugin:
         }
 
     async def get_settings(self) -> dict:
-        """Read the flatpak client's stream settings (resolution/bitrate/gamepad…)."""
+        """Read the flatpak client's stream settings (resolution/bitrate/gamepad...)."""
         try:
             return json.loads(_settings_path().read_text())
         except (OSError, json.JSONDecodeError):
@@ -1065,7 +1065,7 @@ class Plugin:
     # ---- Shared known-hosts store (the SAME file the desktop client reads/writes) ----
 
     async def list_hosts(self, probe: bool = True) -> dict:
-        """The saved-hosts store as a list — the SAME ``client-known-hosts.json`` the desktop
+        """The saved-hosts store as a list  -  the SAME ``client-known-hosts.json`` the desktop
         client owns, so a host added/renamed/paired in either surface shows in both. With
         ``probe`` each host carries a live ``online`` bool from a mDNS-INDEPENDENT reachability
         probe (a Tailscale/VPN host is no longer shown offline just because it doesn't advertise);
@@ -1096,7 +1096,7 @@ class Plugin:
                 _classify_library_error(err),
             )
         if result is None:
-            # Fallback: read the store off disk (old client / no --list-hosts) — no reachability.
+            # Fallback: read the store off disk (old client / no --list-hosts)  -  no reachability.
             result = {"ok": True, "hosts": _read_known_hosts(), "probed": False, "fallback": True}
         cache.update(at=now, probed=bool(probe), data=result)
         return result
@@ -1117,7 +1117,7 @@ class Plugin:
     async def edit_host(
         self, selector: str, name: str = "", addr: str = "", port: int = 0
     ) -> dict:
-        """Edit a saved host — rename and/or re-point its address. ``selector`` is the host's
+        """Edit a saved host  -  rename and/or re-point its address. ``selector`` is the host's
         cert fingerprint (survives IP changes) or its current ``addr[:port]``. Empty fields are
         left untouched. Returns ``{ok, error?, detail?}``."""
         args = ["--set-host", selector]
@@ -1132,7 +1132,7 @@ class Plugin:
         return _mutation_result(rc, err, "set-host")
 
     async def forget_host(self, selector: str) -> dict:
-        """Remove a saved host (by fingerprint or ``addr[:port]``) — drops the pinned
+        """Remove a saved host (by fingerprint or ``addr[:port]``)  -  drops the pinned
         fingerprint, so a later connect must re-pair/trust. Idempotent."""
         rc, _out, err = await _run_client(["--forget-host", selector], timeout=20.0)
         _invalidate_hosts_cache()
@@ -1168,7 +1168,7 @@ class Plugin:
         return {"ok": True}
 
     async def probe_host(self, target: str) -> dict:
-        """Reachability of one ``host[:port]`` via the client's mDNS-independent QUIC probe —
+        """Reachability of one ``host[:port]`` via the client's mDNS-independent QUIC probe  -
         for a "test this address" check. ``{ok: True, online: bool}`` when determined, else
         ``{ok: False, error}`` (flatpak missing / client too old)."""
         rc, _out, err = await _run_client(["--reachable", target.strip()], timeout=8.0)
@@ -1182,7 +1182,7 @@ class Plugin:
         }
 
     async def kill_stream(self) -> dict:
-        """Force-stop a wedged stream client — ``flatpak kill`` for the sandboxed one, a plain
+        """Force-stop a wedged stream client  -  ``flatpak kill`` for the sandboxed one, a plain
         SIGTERM by name for a native install (which has no flatpak instance to kill)."""
         prefix = _client_argv()
         if not prefix:
@@ -1206,7 +1206,7 @@ class Plugin:
         return {"ok": True}
 
     async def _update_native_client(self) -> dict:
-        """The non-flatpak leg of :meth:`update_client` — drive the client's own
+        """The non-flatpak leg of :meth:`update_client`  -  drive the client's own
         ``--apply-update``, which starts the packaged root helper.
 
         The timeout is generous because a package-manager run on a stale box is slow; the
@@ -1215,12 +1215,12 @@ class Plugin:
         """
         state = await _native_update_state()
         if not state:
-            # No client answered at all (none installed, or one too old for the mode) — say
+            # No client answered at all (none installed, or one too old for the mode)  -  say
             # that, rather than "this install updates by hand", which would be a guess.
             return {"ok": False, "updated": False, "error": "client-unavailable"}
         applier = state.get("applier")
         if applier != "helper":
-            # Nothing here can install it — hand back the command the client computed, so the
+            # Nothing here can install it  -  hand back the command the client computed, so the
             # UI shows one true line instead of guessing per install kind.
             return {
                 "ok": False,
@@ -1256,13 +1256,13 @@ class Plugin:
     async def update_client(self) -> dict:
         """Update the **client**, by whichever route this box's install actually supports.
 
-        * **flatpak** — ``flatpak update --user`` in the USER installation, the scope a Steam
+        * **flatpak**  -  ``flatpak update --user`` in the USER installation, the scope a Steam
           Deck install lives in and which ``sudo flatpak update`` (system-scope) never reaches.
         * **native, one-tap capable** (.deb / .rpm / pacman with the packaged root helper and
-          the operator's group opt-in) — ``slipstream-client --apply-update``, which starts the
+          the operator's group opt-in)  -  ``slipstream-client --apply-update``, which starts the
           fixed, parameterless ``slipstream-client-update.service`` through polkit. This backend
           passes nothing to it; the helper derives everything from root-owned state.
-        * **anything else** (sysext, nix, a source build, no opt-in) — refused with the exact
+        * **anything else** (sysext, nix, a source build, no opt-in)  -  refused with the exact
           command to run, which the UI shows. `check_update` reports the same, so the UI knows
           not to offer a button in the first place.
 
@@ -1291,7 +1291,7 @@ class Plugin:
 
         The plugin updates via Decky's install RPC (the per-channel ``manifest.json`` the CI
         publishes); the **client** updates via ``flatpak update --user`` (a per-user install, so
-        ``sudo flatpak update`` — system-scope — never touches it) and versions independently, so
+        ``sudo flatpak update``  -  system-scope  -  never touches it) and versions independently, so
         it's checked here too and applied through :meth:`update_client`. Non-fatal: any failure
         leaves the respective ``*_update_available`` ``False``.
         """
@@ -1307,7 +1307,7 @@ class Plugin:
             "client_update_available": False,
             "client_current": "",
             "client_latest": "",
-            # How the client got here (`flatpak`, `apt`, `dnf`, `sysext`, `nix`, `source`, …),
+            # How the client got here (`flatpak`, `apt`, `dnf`, `sysext`, `nix`, `source`, ...),
             # who could install an update (`flatpak` | `helper` | `none`), and the one line that
             # does it by hand. Empty on a flatpak-only box that never reaches the native path.
             "client_install": "",
@@ -1321,7 +1321,7 @@ class Plugin:
         if not force and cached and (now - _update_cache["at"]) < _UPDATE_TTL_S:
             return cached
 
-        # Client update — checked ALWAYS, even on a dev/sideloaded plugin build. Which check
+        # Client update  -  checked ALWAYS, even on a dev/sideloaded plugin build. Which check
         # runs depends on how the client was installed: the flatpak compares OSTree commits
         # (exact for a per-user flatpak), everything else asks the client itself, which
         # verifies the signed per-channel manifest. See _client_update_state / _native_update_state.
@@ -1344,7 +1344,7 @@ class Plugin:
                 result["client_command"] = str(nu.get("command", ""))
                 result["client_opt_in"] = str(nu.get("opt_in_hint", "") or "")
                 if nu.get("error"):
-                    # "Couldn't tell" — never rendered as up to date; the UI shows the reason.
+                    # "Couldn't tell"  -  never rendered as up to date; the UI shows the reason.
                     result["client_error"] = str(nu["error"])
         except Exception:  # noqa: BLE001
             decky.logger.warning("client update check failed", exc_info=True)
@@ -1362,7 +1362,7 @@ class Plugin:
         except Exception as exc:  # noqa: BLE001
             decky.logger.warning("plugin update check failed: %s", exc)
             result["error"] = "fetch-failed"
-            return result  # transient — don't cache, retry next open
+            return result  # transient  -  don't cache, retry next open
 
         latest = str(manifest.get("version", current))
         result["latest"] = latest

@@ -1,40 +1,33 @@
 /// <reference types="vite/client" />
 import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router'
-import { createServerFn } from '@tanstack/react-start'
-import * as React from 'react'
 import { RootProvider } from 'fumadocs-ui/provider/tanstack'
+import * as React from 'react'
 import '@fontsource-variable/geist'
 import Footer from '@/components/Footer'
-import { type Footer as FooterData, findFooter } from '@/lib/cms'
+import { sitePath } from '@/lib/paths'
 import appCss from '@/styles/app.css?url'
 
-// The footer is global and shared with the marketing site (one CMS global).
-// Fetch it once at the root, server-side, falling back to null so a CMS hiccup
-// never breaks the page.
-const getFooter = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<FooterData | null> => {
-    try {
-      return await findFooter()
-    } catch {
-      return null
-    }
-  },
-)
+const siteDescription =
+  'Private, low-latency desktop and game streaming from a Linux host to iPhone, Android, Steam Deck, and compatible Moonlight clients.'
 
 export const Route = createRootRoute({
-  loader: async (): Promise<{ footer: FooterData | null }> => ({
-    footer: await getFooter(),
-  }),
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { name: 'color-scheme', content: 'dark light' },
       { title: 'Slipstream documentation' },
+      { name: 'description', content: siteDescription },
+      { property: 'og:title', content: 'Slipstream documentation' },
+      { property: 'og:description', content: siteDescription },
+      { property: 'og:type', content: 'website' },
+      { property: 'og:url', content: 'https://vindeckyy.github.io/slipstream/' },
+      { property: 'og:image', content: 'https://vindeckyy.github.io/slipstream/slipstream-logo.png' },
+      { name: 'twitter:card', content: 'summary' },
     ],
     links: [
       { rel: 'stylesheet', href: appCss },
-      { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+      { rel: 'icon', type: 'image/svg+xml', href: sitePath('/favicon.svg') },
     ],
   }),
   component: RootComponent,
@@ -54,16 +47,17 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body className="flex flex-col min-h-screen">
+      <body className="flex min-h-screen flex-col">
         <RootProvider
           search={{
+            options: { type: 'static', api: sitePath('/search-index.json') },
             links: [
-              ['Quick Start', '/docs/quickstart'],
-              ['Play', '/docs/play'],
-              ['Desktop at work', '/docs/desktop-at-work'],
-              ['Install the host', '/docs/install'],
-              ['Troubleshooting', '/docs/troubleshooting'],
-              ['API reference', '/api'],
+              ['Quick Start', sitePath('/docs/quickstart')],
+              ['Play', sitePath('/docs/play')],
+              ['Desktop at work', sitePath('/docs/desktop-at-work')],
+              ['Install the host', sitePath('/docs/install')],
+              ['Troubleshooting', sitePath('/docs/troubleshooting')],
+              ['API reference', sitePath('/api')],
             ],
           }}
         >

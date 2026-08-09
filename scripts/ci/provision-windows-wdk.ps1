@@ -3,13 +3,13 @@
 # can build there. See design/windows-host-rewrite.md (M0).
 #
 # The runner already has the base Windows SDK 10.0.26100 (um/ headers) + MSVC + LLVM + Rust, but NOT the
-# WDK — no km/ + wdf/ + um/iddcx headers, no inf2cat/stampinf/devgen. wdk-sys's bindgen needs those.
+# WDK  -  no km/ + wdf/ + um/iddcx headers, no inf2cat/stampinf/devgen. wdk-sys's bindgen needs those.
 # Idempotent: skips the WDK install if the km/wdf headers are already present, and cargo-wdk if already
-# installed. Safe to run repeatedly. Runs non-interactively (/q /norestart) — never auto-reboots.
+# installed. Safe to run repeatedly. Runs non-interactively (/q /norestart)  -  never auto-reboots.
 #
 # Invoked by scripts/ci/ensure-windows-toolchain.ps1, the shared self-provision step every Windows
 # CI workflow runs at job start (windows-drivers.yml, windows.yml, windows-msix.yml,
-# windows-host.yml), on top of the generic runner vindeckyy/slipstream provisions (windows-runner/) and
+# the Windows build workflow, on top of a generic runner provisioned by the operator and
 # provision-windows-slipstream-extras.ps1's FFmpeg/Inno Setup/ARM64-target layer. Run as the
 # runner's account (SYSTEM) with admin rights.
 [CmdletBinding()]
@@ -25,17 +25,17 @@ function info($m) { Write-Host "[provision-wdk] $m" }
 
 $kitRoot  = 'C:\Program Files (x86)\Windows Kits\10'
 $iddcxInc = Join-Path $kitRoot "Include\$SdkVersion\um\iddcx"   # iddcx ships ONLY with the WDK -> reliable "installed" signal
-$kmDir    = Join-Path $kitRoot "Include\$SdkVersion\km"          # kernel-mode SDK headers (ntddk/wdm) — also WDK-only
+$kmDir    = Join-Path $kitRoot "Include\$SdkVersion\km"          # kernel-mode SDK headers (ntddk/wdm)  -  also WDK-only
 
 # ---- 1. WDK ---- (iddcx presence is the reliable "WDK installed" signal)
 if (Test-Path $iddcxInc) {
-  info "WDK already present (iddcx headers at $iddcxInc) — skipping install."
+  info "WDK already present (iddcx headers at $iddcxInc)  -  skipping install."
 } else {
   $tmp = Join-Path $env:TEMP 'wdksetup.exe'
   info "Downloading WDK bootstrapper -> $tmp"
   Invoke-WebRequest -Uri $WdkSetupUrl -OutFile $tmp -UseBasicParsing
   info ("downloaded {0:N1} MB" -f ((Get-Item $tmp).Length / 1MB))
-  info "Installing WDK silently (/q /norestart) — this can take several minutes..."
+  info "Installing WDK silently (/q /norestart)  -  this can take several minutes..."
   $p = Start-Process -FilePath $tmp -ArgumentList '/q','/norestart' -Wait -PassThru
   info "wdksetup exit code = $($p.ExitCode)"
   if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) {
@@ -85,7 +85,7 @@ $defClang = 'C:\Program Files\LLVM\bin\libclang.dll'
 found 'default libclang'      ($(if (Test-Path $defClang) { $defClang } else { 'MISSING (clang not on the runner?)' }))
 
 # Block only on the genuinely build-essential pieces (headers + iddcx + cargo-wdk).
-# inf2cat arch quirks are non-fatal — cargo-wdk locates the WDK tools itself.
+# inf2cat arch quirks are non-fatal  -  cargo-wdk locates the WDK tools itself.
 $essential = ($null -ne $umdfHdr) -and (Test-Path $kmDir) -and ($iddcxVers -ne '') -and ($cw -match 'wdk')
 if (-not $essential) { throw "provisioning incomplete: need wdf.h + km headers + iddcx + cargo-wdk (see above)" }
 info "WDK + cargo-wdk provisioned OK. Driver builds use Version_Number=$SdkVersion + the runner-default clang (bindgen 0.72)."

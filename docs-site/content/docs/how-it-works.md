@@ -224,10 +224,7 @@ policy decides whether a second client gets its own screen, joins, steals, or is
 [Multiple devices](/docs/configuration#multiple-devices-at-once) and
 [Virtual displays](/docs/virtual-displays).
 
-What is **not** shipping yet: one client opening **multiple host monitors as separate windows**.
-Several clients can each become a monitor of one desktop; a single device showing several host heads
-as multi-window remote desktop is still on the [roadmap](/docs/roadmap). Webcam / camera uplink for
-video calls on the host is likewise not a finished product story.
+One client cannot open several host monitors as separate windows in one session. Several clients can each become a monitor of one desktop. Webcam and camera uplink for video calls on the host are not available.
 
 ## Two common shapes of use
 

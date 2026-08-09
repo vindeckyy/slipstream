@@ -41,7 +41,9 @@ pub fn grow_socket_buffers(socket: &UdpSocket) {
 /// bounded between 256 KiB and 4 MiB — the opposite of the 32 MiB balanced queue, which lets a
 /// WAN burst hide behind the socket.
 pub fn low_latency_send_target(frame_bytes: usize) -> usize {
-    frame_bytes.saturating_mul(2).clamp(256 * 1024, 4 * 1024 * 1024)
+    frame_bytes
+        .saturating_mul(2)
+        .clamp(256 * 1024, 4 * 1024 * 1024)
 }
 
 /// Apply a send-buffer target and report the granted `SO_SNDBUF` (post kernel clamping). The

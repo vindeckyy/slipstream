@@ -1,0 +1,1 @@
+export const ease = { quint: (duration = 0.7) => ({ out: { duration, ease: [0.23, 1, 0.32, 1] as const }, in: { duration, ease: [0.76, 0, 0.24, 1] as const }, inOut: { duration, ease: [0.87, 0, 0.13, 1] as const } }) };

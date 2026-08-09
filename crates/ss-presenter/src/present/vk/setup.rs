@@ -667,10 +667,7 @@ pub fn present_wait_capabilities() -> PresentWaitInfo {
 
 /// Present-wait support on one physical device: both extensions listed and both features
 /// enabled, plus the driver name.
-fn present_wait_on_device(
-    instance: &ash::Instance,
-    pdev: vk::PhysicalDevice,
-) -> (bool, String) {
+fn present_wait_on_device(instance: &ash::Instance, pdev: vk::PhysicalDevice) -> (bool, String) {
     // SAFETY: per the Vulkan contract above - a read-only query on the live instance/device,
     // filling locals returned by value.
     let props = unsafe { instance.get_physical_device_properties(pdev) };
@@ -684,10 +681,7 @@ fn present_wait_on_device(
         Ok(e) => e,
         Err(_) => return (false, driver),
     };
-    let has = |name: &std::ffi::CStr| {
-        exts.iter()
-            .any(|e| e.extension_name_as_c_str() == Ok(name))
-    };
+    let has = |name: &std::ffi::CStr| exts.iter().any(|e| e.extension_name_as_c_str() == Ok(name));
     if !(has(ash::khr::present_id::NAME) && has(ash::khr::present_wait::NAME)) {
         return (false, driver);
     }

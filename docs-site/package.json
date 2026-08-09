@@ -2,23 +2,22 @@
   "name": "slipstream-docs",
   "private": true,
   "type": "module",
-  "description": "slipstream documentation site — Fumadocs on TanStack Start (Vite + Nitro/bun)",
+  "description": "Slipstream documentation site - Fumadocs on TanStack Start",
   "scripts": {
     "dev": "vite dev --port 3001",
-    "prebuild": "node tools/sync-openapi.mjs",
+    "prebuild": "bun tools/sync-openapi.mjs",
     "build": "vite build",
     "check:links": "bun tools/check-doc-links.mjs",
     "start": "bun run .output/server/index.mjs",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "build:pages": "PAGES_BASE_PATH=/slipstream/ vite build && bun tools/check-pages-output.mjs",
+    "check:pages": "bun tools/check-pages-output.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
     "@scalar/api-reference-react": "^0.9.60",
     "@tanstack/react-router": "^1.170.18",
     "@tanstack/react-start": "^1.168.34",
-    "@unom/app-ui": "^0.1.0",
-    "@unom/style": "^0.4.4",
-    "@unom/ui": "^0.8.16",
     "fumadocs-core": "^16.14.0",
     "fumadocs-ui": "^16.14.0",
     "react": "^19.2.8",

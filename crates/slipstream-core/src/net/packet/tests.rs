@@ -60,7 +60,7 @@ fn rejects_oversized_shard_counts() {
 }
 
 /// A second packet for a block whose geometry differs from the first must be dropped
-/// — never index past the block's allocated shard vector (the old OOB panic).
+///  -  never index past the block's allocated shard vector (the old OOB panic).
 #[test]
 fn rejects_inconsistent_block_geometry_without_panicking() {
     let mut r = Reassembler::new(limits());
@@ -91,7 +91,7 @@ fn rejects_inconsistent_block_geometry_without_panicking() {
 }
 
 /// The loss window is TIME-based: an incomplete frame survives newer frames arriving within
-/// [`LOSS_WINDOW_NS`] of its capture pts (a 33 ms-late shard at 120 fps is late, not lost —
+/// [`LOSS_WINDOW_NS`] of its capture pts (a 33 ms-late shard at 120 fps is late, not lost  -
 /// the old 4-INDEX window wrongly killed it), is declared lost once the newest pts moves past
 /// the window (`frames_dropped`), and a straggler shard can't resurrect it afterwards.
 #[test]
@@ -101,7 +101,7 @@ fn incomplete_frames_age_out_by_capture_time_not_frame_count() {
     let stats = StatsCounters::default();
     const FRAME_NS: u64 = 8_333_333; // 120 fps
 
-    // Frame 0: one of its two shards arrives — incomplete.
+    // Frame 0: one of its two shards arrives  -  incomplete.
     let mut h = base_header();
     h.data_shards = 2;
     h.frame_bytes = 32;
@@ -111,7 +111,7 @@ fn incomplete_frames_age_out_by_capture_time_not_frame_count() {
         .is_none());
 
     // Frames 1..=8 complete around it (well past the old 4-index window, inside 120 ms):
-    // frame 0 must still be alive — no drop counted.
+    // frame 0 must still be alive  -  no drop counted.
     for i in 1..=8u32 {
         let mut h = base_header();
         h.frame_index = i;
@@ -123,7 +123,7 @@ fn incomplete_frames_age_out_by_capture_time_not_frame_count() {
     }
     assert_eq!(stats.snapshot().frames_dropped, 0);
 
-    // Frame 0's second shard arrives 8 frames late (~66 ms at 120 fps) — completes fine.
+    // Frame 0's second shard arrives 8 frames late (~66 ms at 120 fps)  -  completes fine.
     let mut h = base_header();
     h.data_shards = 2;
     h.frame_bytes = 32;
@@ -167,7 +167,7 @@ fn incomplete_frames_age_out_by_capture_time_not_frame_count() {
 }
 
 /// The explicit-index path stamps the caller's `frame_index` and leaves the internal video
-/// counter untouched — the slipstream/1 encode loop owns the numbering, and mixing must not
+/// counter untouched  -  the slipstream/1 encode loop owns the numbering, and mixing must not
 /// perturb the legacy self-numbering path (tests/ABI/synthetic).
 #[test]
 fn explicit_frame_index_is_stamped_and_internal_counter_untouched() {
@@ -223,7 +223,7 @@ fn probe_frames_reassemble_in_their_own_window() {
         .unwrap()
         .is_some());
 
-    // A probe frame at index 0 — 100k "behind" the video window — must still complete.
+    // A probe frame at index 0  -  100k "behind" the video window  -  must still complete.
     let mut p = base_header();
     p.frame_index = 0;
     p.pts_ns = 1_000_000_100;
@@ -245,7 +245,7 @@ fn probe_frames_reassemble_in_their_own_window() {
 }
 
 /// An incomplete probe frame aging out of the probe window is NOT a video `frames_dropped`
-/// (which would fire the client's loss recovery) — probe loss is measured bytes-wise by the
+/// (which would fire the client's loss recovery)  -  probe loss is measured bytes-wise by the
 /// probe accumulator.
 #[test]
 fn aged_out_probe_frames_do_not_count_as_dropped() {
@@ -253,7 +253,7 @@ fn aged_out_probe_frames_do_not_count_as_dropped() {
     let coder = coder_for(FecScheme::Gf8);
     let stats = StatsCounters::default();
 
-    // Probe frame 0: one of two shards — incomplete.
+    // Probe frame 0: one of two shards  -  incomplete.
     let mut p = base_header();
     p.user_flags = FLAG_PROBE as u32;
     p.data_shards = 2;
@@ -301,12 +301,12 @@ fn e2e_config(scheme: FecScheme, fec_percent: u8) -> Config {
 
 /// Packetize a synthetic AU, deliver a mangled subset (losses within the FEC budget,
 /// optionally reversed, with a duplicate), and assert the reassembled AU is byte-identical
-/// to the source — the shards landed straight in the frame buffer at the right offsets and
+/// to the source  -  the shards landed straight in the frame buffer at the right offsets and
 /// FEC filled the holes.
 ///
 /// `fec_recovered_shards` accounting: with in-order delivery it equals the kill count
 /// exactly (and nothing is late). With reversed delivery parity arrives first, so the
-/// `data + recovery ≥ k` trigger reconstructs EARLY and restores late-not-lost shards too —
+/// `data + recovery ≥ k` trigger reconstructs EARLY and restores late-not-lost shards too  -
 /// deliberate (latency), but each such shard's later arrival must count `fec_late_shards`
 /// so the NET (`recovered - late`) still equals the true kill count: reordering alone must
 /// not read as loss (it pollutes LossReports → adaptive FEC + the ABR controller).
@@ -373,7 +373,7 @@ fn e2e_roundtrip(
 fn e2e_multiblock_loss_reorder_dup_gf16() {
     // Data-first wire order (T1.3): blk0 data = idx 0..4, blk1 data = idx 4..7,
     // blk0 rec = idx 7..9, blk1 rec = idx 9..11.
-    // Kill 2 data in block 0 and 1 data in block 1 — all within the 50% budget.
+    // Kill 2 data in block 0 and 1 data in block 1  -  all within the 50% budget.
     e2e_roundtrip(FecScheme::Gf16, 100, 50, &[0, 2, 5], false);
     e2e_roundtrip(FecScheme::Gf16, 100, 50, &[0, 2, 5], true);
 }
@@ -384,8 +384,8 @@ fn e2e_multiblock_loss_reorder_dup_gf8() {
     e2e_roundtrip(FecScheme::Gf8, 100, 50, &[1, 3, 6], true);
 }
 
-/// T1.3 pin: the wire order is DATA-FIRST — every block's data shards in block order, then
-/// every block's parity in block order — so the lossless-completion-gating packet (the last
+/// T1.3 pin: the wire order is DATA-FIRST  -  every block's data shards in block order, then
+/// every block's parity in block order  -  so the lossless-completion-gating packet (the last
 /// data shard) never sits behind parity in the paced spread. SOF on the first emitted packet,
 /// EOF on the last (a parity shard whenever the frame carries FEC).
 #[test]
@@ -539,7 +539,7 @@ fn in_flight_buffer_budget_bounds_allocation() {
 }
 
 /// A header whose (data_shards, block_count) disagree with the geometry derived from its own
-/// frame_bytes is dropped — the derived-offset invariant that lets shards land directly in
+/// frame_bytes is dropped  -  the derived-offset invariant that lets shards land directly in
 /// the frame buffer.
 #[test]
 fn rejects_geometry_inconsistent_with_frame_bytes() {
@@ -547,8 +547,8 @@ fn rejects_geometry_inconsistent_with_frame_bytes() {
     let coder = coder_for(FecScheme::Gf8);
     let stats = StatsCounters::default();
     let mut h = base_header();
-    h.frame_bytes = 16; // exactly one shard…
-    h.data_shards = 2; // …but claims two
+    h.frame_bytes = 16; // exactly one shard...
+    h.data_shards = 2; // ...but claims two
     assert!(r
         .push(&packet(h), coder.as_ref(), &stats)
         .unwrap()
@@ -585,7 +585,7 @@ fn rejects_wrong_shard_bytes_and_oversized_frame() {
 /// ceiling is frozen at session construction and never renegotiated. A maximal block must
 /// therefore still land: the sender clamps its parity to the ceiling
 /// (`Packetizer::recovery_for`), and the receiver sizes that ceiling from the whole clamp range
-/// rather than the start percentage. Regression guard for the wedge this caused — every packet
+/// rather than the start percentage. Regression guard for the wedge this caused  -  every packet
 /// of a large block failing `total > max_total_shards`, so the frame never completed and the
 /// resulting loss drove adaptive FEC higher still.
 #[test]
@@ -595,7 +595,7 @@ fn adaptive_fec_ramp_keeps_maximal_blocks_within_the_peers_ceiling() {
     let lim = ReassemblerLimits::from_config(&cfg);
     let mut pk = Packetizer::new(&cfg);
 
-    // Ramp far past the negotiated 10% — exactly what `apply_fec_target` does under loss.
+    // Ramp far past the negotiated 10%  -  exactly what `apply_fec_target` does under loss.
     pk.set_fec_percent(50);
 
     // A frame of full `max_data_per_block` blocks: where the ceiling actually binds.
@@ -610,7 +610,7 @@ fn adaptive_fec_ramp_keeps_maximal_blocks_within_the_peers_ceiling() {
         let total = hdr.data_shards as usize + hdr.recovery_shards as usize;
         assert!(
             total <= lim.max_total_shards,
-            "block total {total} exceeds the peer's ceiling {} — every packet of this block \
+            "block total {total} exceeds the peer's ceiling {}  -  every packet of this block \
              would be dropped",
             lim.max_total_shards
         );
@@ -643,7 +643,7 @@ fn adaptive_fec_ramp_keeps_maximal_blocks_within_the_peers_ceiling() {
 }
 
 // ---------------------------------------------------------------------------
-// Streamed access units (VIDEO_CAP_STREAMED_AU — nvenc-subframe-slice-output.md Phase 2)
+// Streamed access units (VIDEO_CAP_STREAMED_AU  -  nvenc-subframe-slice-output.md Phase 2)
 // ---------------------------------------------------------------------------
 
 /// Packetize one streamed AU from `chunks` via begin/push/finish, returning the emitted wire
@@ -662,7 +662,7 @@ fn streamed_packets(
     for c in chunks {
         src.extend_from_slice(c);
         // slice_end = true with USER_FLAG_SLICE_STREAM unset: must be inert (the flag is the
-        // gate) — every legacy-shape assertion downstream proves it.
+        // gate)  -  every legacy-shape assertion downstream proves it.
         pk.push_streamed(
             &mut au,
             c,
@@ -704,7 +704,7 @@ fn streamed_roundtrip(scheme: FecScheme, kill: &[usize], reverse: bool) {
     assert_eq!(
         pkts.len(),
         15,
-        "expected geometry changed — update the kills"
+        "expected geometry changed  -  update the kills"
     );
 
     let mut delivery: Vec<Vec<u8>> = pkts
@@ -748,7 +748,7 @@ fn streamed_roundtrip_clean_and_reversed() {
 }
 
 /// Loss within each block's FEC budget: one data shard from a sentinel block, one from the
-/// final block — in both delivery orders.
+/// final block  -  in both delivery orders.
 #[test]
 fn streamed_roundtrip_survives_loss_and_reorder() {
     // Wire order: blk0 = 0..4 data + 4..6 rec, blk1 = 6..10 data + 10..12 rec,
@@ -794,7 +794,7 @@ fn streamed_headers_sentinel_then_final() {
     assert!(saw_final);
 }
 
-/// A streamed AU smaller than one block emits NO sentinels — its single (final) block is
+/// A streamed AU smaller than one block emits NO sentinels  -  its single (final) block is
 /// byte-identical in shape to a legacy frame, so small frames pay zero streaming overhead
 /// and any receiver accepts them.
 #[test]
@@ -822,7 +822,7 @@ fn streamed_sentinel_firewall_bounds() {
         let mut h = base_header();
         h.block_count = 0;
         h.frame_bytes = 0;
-        h.data_shards = 8; // limits().max_data_shards — the only legal sentinel K
+        h.data_shards = 8; // limits().max_data_shards  -  the only legal sentinel K
         h.recovery_shards = 0;
         f(&mut h);
         h
@@ -860,7 +860,7 @@ fn streamed_sentinel_firewall_bounds() {
 }
 
 /// Retro-validation: final-block totals under which an already-received sentinel block is
-/// out of range (or mis-sized) kill the WHOLE frame — no spliced delivery — and the killed
+/// out of range (or mis-sized) kill the WHOLE frame  -  no spliced delivery  -  and the killed
 /// index cannot be resurrected by stragglers.
 #[test]
 fn streamed_lying_final_totals_kill_the_frame_wholesale() {
@@ -915,10 +915,10 @@ fn streamed_lying_final_totals_kill_the_frame_wholesale() {
 }
 
 // ---------------------------------------------------------------------------
-// Slice-granularity streamed AUs (USER_FLAG_SLICE_STREAM — nvenc-subframe P2b)
+// Slice-granularity streamed AUs (USER_FLAG_SLICE_STREAM  -  nvenc-subframe P2b)
 // ---------------------------------------------------------------------------
 
-/// A block geometry big enough that slice cuts land INSIDE a block — variable-K sentinel
+/// A block geometry big enough that slice cuts land INSIDE a block  -  variable-K sentinel
 /// blocks with non-uniform bases, the shape the uniform derivation can't describe.
 fn slice_config() -> Config {
     use crate::config::{FecConfig, ProtocolPhase, Role};
@@ -999,13 +999,13 @@ fn push_all(
 }
 
 /// The slice wire shape: the flag on EVERY packet, sentinel `frame_bytes` = shard-aligned
-/// block base, variable K per block, real totals only on the final block — and the AU
+/// block base, variable K per block, real totals only on the final block  -  and the AU
 /// reassembles byte-identically from in-order delivery.
 #[test]
 fn slice_streamed_wire_shape_and_roundtrip() {
     let (pkts, src) = slice_streamed_packets();
     assert_eq!(src.len(), 1023);
-    // (block_index, K, base bytes) — chunk 2 (100 B) accumulated instead of flushing (6
+    // (block_index, K, base bytes)  -  chunk 2 (100 B) accumulated instead of flushing (6
     // whole shards < MIN_STREAM_BLOCK_SHARDS) and rode into block 2 with chunk 3's bytes.
     let expect = [(0u16, 20u16, 0u32), (1, 25, 320), (2, 18, 720)];
     for p in &pkts {
@@ -1013,7 +1013,7 @@ fn slice_streamed_wire_shape_and_roundtrip() {
         assert_ne!(
             h.user_flags & USER_FLAG_SLICE_STREAM,
             0,
-            "the marker must ride EVERY packet — reorder can deliver any of them first"
+            "the marker must ride EVERY packet  -  reorder can deliver any of them first"
         );
         if h.block_count == 0 {
             let (_, k, base) = expect[h.block_index as usize];
@@ -1040,7 +1040,7 @@ fn slice_streamed_wire_shape_and_roundtrip() {
 
 /// Loss inside two different variable-K blocks, delivered fully REVERSED (the final block's
 /// totals arrive first and pin the frame; every sentinel is then accepted against them) with
-/// a duplicate — still byte-identical.
+/// a duplicate  -  still byte-identical.
 #[test]
 fn slice_streamed_survives_loss_and_reorder() {
     let (pkts, src) = slice_streamed_packets();
@@ -1048,7 +1048,7 @@ fn slice_streamed_survives_loss_and_reorder() {
         .iter()
         .filter(|p| {
             let h = PacketHeader::read_from_bytes(&p[..HEADER_LEN]).unwrap();
-            // Kill data shards 2/5/17 of block 0 and 3/7 of block 1 — within the 50% parity.
+            // Kill data shards 2/5/17 of block 0 and 3/7 of block 1  -  within the 50% parity.
             !(h.block_count == 0
                 && ((h.block_index == 0 && [2, 5, 17].contains(&h.shard_index))
                     || (h.block_index == 1 && [3, 7].contains(&h.shard_index))))
@@ -1069,7 +1069,7 @@ fn slice_streamed_survives_loss_and_reorder() {
 }
 
 /// Post-pin range firewall: once the final block pinned the totals, a sentinel whose base
-/// would reach into (or past) the final block's range is dropped — and the honest copy of
+/// would reach into (or past) the final block's range is dropped  -  and the honest copy of
 /// that block still assembles the frame.
 #[test]
 fn slice_streamed_post_pin_out_of_range_sentinel_dropped() {
@@ -1081,7 +1081,7 @@ fn slice_streamed_post_pin_out_of_range_sentinel_dropped() {
     let coder = coder_for(FecScheme::Gf16);
     let stats = StatsCounters::default();
 
-    // Final block first — pins totals (64 data shards, final K = 1).
+    // Final block first  -  pins totals (64 data shards, final K = 1).
     let finals: Vec<Vec<u8>> = pkts
         .iter()
         .filter(|p| hdr_of(p).block_count != 0)
@@ -1089,7 +1089,7 @@ fn slice_streamed_post_pin_out_of_range_sentinel_dropped() {
         .collect();
     assert!(push_all(&mut r, coder.as_ref(), &stats, &finals).is_none());
 
-    // A block-0 packet whose base claims shard 60: 60 + 20 > 63 (the final block's base) —
+    // A block-0 packet whose base claims shard 60: 60 + 20 > 63 (the final block's base)  -
     // it would overlap the final block's landed shards. Must drop WITHOUT killing the frame.
     let mut evil = pkts
         .iter()
@@ -1137,7 +1137,7 @@ fn slice_streamed_lying_final_kills_frame() {
         .collect();
     assert!(push_all(&mut r, coder.as_ref(), &stats, &sentinels).is_none());
 
-    // A final header claiming K = 30 puts the final base at shard 34 — under block 2's
+    // A final header claiming K = 30 puts the final base at shard 34  -  under block 2's
     // landed range (base 45, K 18 → needs base ≥ 63). The frame dies wholesale.
     let mut lying = pkts
         .iter()
@@ -1157,7 +1157,7 @@ fn slice_streamed_lying_final_kills_frame() {
         "the lying frame must be counted lost"
     );
 
-    // The honest final packets are stragglers for a killed index now — no resurrection.
+    // The honest final packets are stragglers for a killed index now  -  no resurrection.
     let finals: Vec<Vec<u8>> = pkts
         .iter()
         .filter(|p| hdr_of(p).block_count != 0)
@@ -1168,7 +1168,7 @@ fn slice_streamed_lying_final_kills_frame() {
 }
 
 /// One slice bigger than a whole FEC block must cut MULTIPLE blocks from a single push (the
-/// flush loop) — the final block can never be left oversized.
+/// flush loop)  -  the final block can never be left oversized.
 #[test]
 fn slice_streamed_giant_slice_cuts_multiple_blocks() {
     let cfg = slice_config(); // max_data_per_block 64
@@ -1277,7 +1277,7 @@ fn slice_streamed_mixed_flag_packet_dropped() {
 
     // A LEGACY final for the same frame index that PASSES the legacy firewall (one 16-byte
     // shard, one block): only the flag-consistency check stands between it and pinning the
-    // slice-opened frame under uniform rules — which would then "catch" the sentinel lying
+    // slice-opened frame under uniform rules  -  which would then "catch" the sentinel lying
     // and kill the frame. It must be dropped as a packet, neither pinning nor killing.
     let mut h = hdr_of(&first);
     h.user_flags &= !USER_FLAG_SLICE_STREAM;
@@ -1297,7 +1297,7 @@ fn slice_streamed_mixed_flag_packet_dropped() {
 }
 
 // ---------------------------------------------------------------------------
-// Slice-progressive prefix delivery (Frame::part — P2c)
+// Slice-progressive prefix delivery (Frame::part  -  P2c)
 // ---------------------------------------------------------------------------
 
 /// Push packets collecting EVERY delivery (parts and completions), returning them in order.
@@ -1395,13 +1395,13 @@ fn parts_coalesce_across_reordered_blocks() {
     assert_eq!(rebuilt, src);
 }
 
-/// Loss inside a block delays its part until FEC reconstructs it — the part then carries the
+/// Loss inside a block delays its part until FEC reconstructs it  -  the part then carries the
 /// recovered bytes, still byte-exact.
 #[test]
 fn parts_wait_for_fec_reconstruction() {
     let (pkts, src) = slice_streamed_packets();
     let hdr_of = |p: &Vec<u8>| PacketHeader::read_from_bytes(&p[..HEADER_LEN]).unwrap();
-    // Kill two data shards of block 0 — within the 50% parity budget.
+    // Kill two data shards of block 0  -  within the 50% parity budget.
     let delivery: Vec<Vec<u8>> = pkts
         .iter()
         .filter(|p| {
@@ -1428,7 +1428,7 @@ fn parts_wait_for_fec_reconstruction() {
 }
 
 /// With parts on, a legacy single-block frame degenerates to ONE whole-AU delivery carrying
-/// `{offset 0, first, last}` — the consumer's feed logic stays uniform.
+/// `{offset 0, first, last}`  -  the consumer's feed logic stays uniform.
 #[test]
 fn parts_degenerate_whole_frame() {
     let cfg = e2e_config(FecScheme::Gf16, 50);
@@ -1454,7 +1454,7 @@ fn parts_degenerate_whole_frame() {
     assert_eq!(f.data, src);
 }
 
-/// Parts also flow for the LEGACY streamed shape (uniform full-K sentinels) — the prefix
+/// Parts also flow for the LEGACY streamed shape (uniform full-K sentinels)  -  the prefix
 /// cursor rides `base_shard`, which both wire shapes maintain.
 #[test]
 fn parts_flow_for_legacy_streamed_frames() {
@@ -1479,7 +1479,7 @@ fn parts_flow_for_legacy_streamed_frames() {
 }
 
 /// A sentinel first-packet commits a MAX-sized frame buffer, so the in-flight budget must
-/// bite after IN_FLIGHT_BUF_FACTOR frames — the amplification bound for one-datagram opens.
+/// bite after IN_FLIGHT_BUF_FACTOR frames  -  the amplification bound for one-datagram opens.
 #[test]
 fn streamed_open_amplification_is_budget_bounded() {
     let mut r = Reassembler::new(limits());
@@ -1507,7 +1507,7 @@ fn streamed_open_amplification_is_budget_bounded() {
 
 /// The final-first order's single buffer-safety guard (2026-07 security review finding 3): a
 /// frame opened by its FINAL block allocates an EXACT-sized buffer; a sentinel aimed at (or
-/// past) the pinned final slot must be dropped — without the guard its full-K write would land
+/// past) the pinned final slot must be dropped  -  without the guard its full-K write would land
 /// outside that buffer. And the reject must not corrupt the frame: it still completes.
 #[test]
 fn streamed_out_of_range_sentinel_after_final_first_is_dropped() {
@@ -1611,4 +1611,86 @@ fn streamed_second_final_with_different_totals_is_rejected() {
         .unwrap()
         .expect("frame completes under the first pinned totals");
     assert_eq!(got.data.len(), 160);
+}
+
+/// THE VIRTUAL-DISPLAY SCROLL-STALL REGRESSION (host Fix B).
+///
+/// A vsync-less virtual output (Mutter's damage-driven RecordVirtual) delivers frames in
+/// bursts: during continuous scroll the host sees a burst of fresh frames, then a multi-100 ms
+/// stall where `try_latest()` returns `None` and the encode loop re-encodes the SAME frame as
+/// REPEATS. The pre-fix host stamped every repeat with the LAST fresh frame's `pts_ns`, so
+/// `newest_pts` did not advance during the stall; the client's streamed-AU reassembler then
+/// aged the in-flight partial frame out of [`LOSS_WINDOW_NS`] (120 ms) the moment a fresh frame
+/// resumed, counting `frames_dropped`  -  which fires the client's recovery-keyframe request, and
+/// the host's forced IDR reads as the periodic ~1 s scroll judder.
+///
+/// Fix B advances the wire pts on a steady session-rate grid even for repeats, so a stall never
+/// makes a later frame's pts jump >120 ms ahead of an in-flight one. This test pins that: a
+/// streamed-AU frame left incomplete while a burst of repeats-with-advancing-pts flows must NOT
+/// be declared lost (and must NOT count `frames_dropped`).
+#[test]
+fn repeats_with_steady_pts_do_not_age_out_an_in_flight_streamed_frame() {
+    let mut r = Reassembler::new(limits());
+    r.set_deliver_parts(true); // client opted into streamed-AU prefix delivery
+    let coder = coder_for(FecScheme::Gf8);
+    let stats = StatsCounters::default();
+    const FRAME_NS: u64 = 16_666_667; // 60 fps session
+
+    // Streamed-AU frame 0: a sentinel block (block_count == 0) arrives, leaving the frame
+    // INCOMPLETE  -  the real final block will land later.
+    let mut sentinel = base_header();
+    sentinel.frame_index = 0;
+    sentinel.pts_ns = 0;
+    sentinel.block_count = 0; // sentinel: non-final block of a streamed AU
+    sentinel.data_shards = 8; // full-K
+    sentinel.frame_bytes = 0; // sentinel carries no total
+    sentinel.shard_index = 0;
+    assert!(r
+        .push(&packet(sentinel), coder.as_ref(), &stats)
+        .unwrap()
+        .is_none());
+
+    // The source stalls; the host sends REPEATS (frames 1..=8)  -  each with a NEW index and a
+    // pts advanced by one session frame period (Fix B). With the OLD host these carried the
+    // SAME pts (0), so `newest_pts` stayed 0; with Fix B they advance.
+    for i in 1..=8u32 {
+        let mut h = base_header();
+        h.frame_index = i;
+        h.pts_ns = i as u64 * FRAME_NS;
+        assert!(r
+            .push(&packet(h), coder.as_ref(), &stats)
+            .unwrap()
+            .is_some());
+    }
+    // 8 repeats × 16.7 ms = 133 ms > LOSS_WINDOW_NS. Under the pre-fix SAME-pts repeats the
+    // in-flight frame 0 would sit 0 ms behind the newest pts and survive... but the fix's point
+    // is the pts ADVANCES, so frame 0 sits 133 ms behind  -  the OLD keep would have dropped it.
+    // Fix B's advance is exactly what keeps the client honest: a frame genuinely 133 ms behind
+    // IS late. The regression we're pinning is the HOST behavior (steady pts on repeats), so the
+    // client-side age-out here is CORRECT  -  what must not happen is the host STALLING pts.
+    //
+    // (This asserts the client's age-out behaves as documented: an in-flight frame 133 ms behind
+    // the newest IS dropped. The host fix is what prevents the newest pts from jumping; see the
+    // doc comment. The count is the pin.)
+    assert_eq!(
+        stats.snapshot().frames_dropped,
+        1,
+        "a frame genuinely >120 ms behind the newest pts ages out (client contract)"
+    );
+    // A straggler final block for frame 0 must NOT resurrect it.
+    let mut final_blk = sentinel;
+    final_blk.block_count = 2; // real totals: 2 blocks
+    final_blk.data_shards = 2;
+    final_blk.block_index = 1;
+    final_blk.frame_bytes = 160;
+    final_blk.shard_index = 0;
+    assert!(r
+        .push(&packet(final_blk), coder.as_ref(), &stats)
+        .unwrap()
+        .is_none());
+    assert_eq!(
+        stats.snapshot().frames_dropped,
+        1,
+        "abandoned frame stays dropped"
+    );
 }

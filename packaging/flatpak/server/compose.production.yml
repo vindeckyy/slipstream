@@ -1,8 +1,4 @@
-# Static file server for the slipstream Flatpak OSTree repo, on github-actions (the DMZ services VM).
-# Caddy on github-pages-1 terminates TLS for flatpak.slipstream.unom.io and reverse_proxies
-# to 192.168.50.50:3230 (port must be in vindeckyy/slipstream caddy_target_ports). This inner Caddy just
-# serves the bind-mounted ./site tree (repo/ + the .flatpakrepo/.flatpakref + index.html) over
-# plain HTTP. CI rsyncs into ./site and runs `docker compose up -d` (idempotent).
+# Optional static Flatpak repository server. Place a TLS proxy in front for remote clients.
 services:
   flatpak:
     image: caddy:2-alpine

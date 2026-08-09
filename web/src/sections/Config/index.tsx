@@ -786,7 +786,7 @@ export const SectionConfig: FC = () => {
 												className={cn(
 													"size-2 rounded-full",
 													moonlightOn
-														? "bg-emerald-500"
+														? "bg-success"
 														: "bg-muted-foreground/40",
 												)}
 											/>
@@ -1634,7 +1634,7 @@ export const SectionConfig: FC = () => {
 															className={cn(
 																"size-2 rounded-full",
 																moonlightOn
-																	? "bg-emerald-500"
+																	? "bg-success"
 																	: "bg-muted-foreground/40",
 															)}
 														/>

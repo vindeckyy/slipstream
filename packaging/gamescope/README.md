@@ -125,8 +125,8 @@ must not be decided twice.
 
 | Channel | Built by | Notes |
 |---|---|---|
-| Bazzite / Fedora Atomic | `.github/workflows/rpm.yml` → `build-sysext.sh --gamescope` | Inside the matching Fedora container, per major - the binary is soname-coupled to its base exactly like the RPM |
-| Arch / SteamOS | `.github/workflows/arch.yml` → `makepkg` on `./PKGBUILD` | Its own pkgbase in the same pacman repo; `pacman -S slipstream-gamescope` |
+| Bazzite / Fedora Atomic | `GitHub Actions` → `build-sysext.sh --gamescope` | Inside the matching Fedora container, per major - the binary is soname-coupled to its base exactly like the RPM |
+| Arch / SteamOS | `GitHub Actions` → `makepkg` on `./PKGBUILD` | Its own pkgbase in the same pacman repo; `pacman -S slipstream-gamescope` |
 | NixOS | `packaging/nix/gamescope.nix` (an `overrideAttrs` on nixpkgs' gamescope) | The one path that does NOT call the script - nixpkgs already solves the submodules, and a nix closure names every library it links |
 | Anything else | the script, by hand | See *Building* above |
 

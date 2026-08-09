@@ -1,14 +1,3 @@
-// The console's Tabs ARE @unom/ui's radix tabs, adapted to this app's tokens.
-//
-// @unom/ui styles inactive triggers `text-secondary` and the active one
-// `data-[state=active]:text-main`. Those tokens come from @unom/ui's own palette;
-// in the console's theme `text-secondary` lands on (near) the tab strip's own
-// background, so every inactive tab renders as an invisible gap — the tab bar
-// looks like a single lonely label with dead space beside it. Caught in a
-// browser pass, not by types: the markup and the a11y roles are entirely correct.
-//
-// Surface treatment here follows M3 tonal containers: muted track, selected
-// chip on the raised surface, clear hover/focus without restyling every call site.
 import {
 	Tabs as TabsBase,
 	TabsContent as TabsContentBase,

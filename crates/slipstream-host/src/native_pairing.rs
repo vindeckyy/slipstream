@@ -1,18 +1,18 @@
-//! Shared native (`slipstream/1`) pairing state — the on-demand arming PIN (with expiry) plus the
+//! Shared native (`slipstream/1`) pairing state  -  the on-demand arming PIN (with expiry) plus the
 //! persistent paired-clients store and the delegated-approval queue. One [`NativePairing`] handle is
 //! shared by the slipstream/1 QUIC accept loop ([`crate::native`]) and the management API
 //! ([`crate::mgmt`]), so an operator can **arm pairing and read the PIN from the web console**
 //! instead of the service log.
 //!
 //! The PIN direction is inherent to the SPAKE2 ceremony: the *host* mints the PIN and the *client*
-//! enters it (the client needs it to build its first message). So the UI **displays** the PIN —
-//! armed on demand for a short window — rather than accepting one.
+//! enters it (the client needs it to build its first message). So the UI **displays** the PIN  -
+//! armed on demand for a short window  -  rather than accepting one.
 //!
 //! This is a thin facade (plan §W5); the three concerns each own their state in a submodule:
-//! - `arming` — the on-demand PIN window (`ArmState`),
-//! - `store` — the persistent trust store (`TrustStore`),
-//! - `approval` — the pending-knock queue + delegated approval (`ApprovalQueue`),
-//! - `sanitize` — the untrusted-device-name scrubber.
+//! - `arming`  -  the on-demand PIN window (`ArmState`),
+//! - `store`  -  the persistent trust store (`TrustStore`),
+//! - `approval`  -  the pending-knock queue + delegated approval (`ApprovalQueue`),
+//! - `sanitize`  -  the untrusted-device-name scrubber.
 //!
 //! Admitting a device is the one cross-cutting flow: pinning the fingerprint lives in `store` and
 //! clearing the pending knock lives in `approval`, so [`NativePairing::add`] drives both in order
@@ -33,7 +33,7 @@ pub use approval::{PairingDecision, PendingRequest};
 pub use arming::PinAttempt;
 pub use store::PairedClient;
 
-/// Re-exported for the stream marker's quoting (its `imp` is `cfg(unix)` — gate alike, or the
+/// Re-exported for the stream marker's quoting (its `imp` is `cfg(unix)`  -  gate alike, or the
 /// Windows build trips `-D unused-imports`).
 #[cfg(unix)]
 pub(crate) use sanitize::is_spoofy_char;
@@ -63,7 +63,7 @@ pub struct NativePairingStatus {
 impl NativePairing {
     /// Load the trust store. `store_path = None` uses the default config path. If `arm_at_start`
     /// (the CLI `--allow-pairing`/`--require-pairing` flags), arm immediately with `fixed_pin`
-    /// (or a fresh random PIN) and **no expiry** — back-compat with the headless CLI flow.
+    /// (or a fresh random PIN) and **no expiry**  -  back-compat with the headless CLI flow.
     pub fn load_with(
         store_path: Option<PathBuf>,
         fixed_pin: Option<String>,
@@ -80,7 +80,7 @@ impl NativePairing {
 
     /// Arm pairing with a fresh random PIN, valid for `ttl`, **unbound** (any well-formed attempt
     /// consumes it). Returns the PIN to display. Prefer [`Self::arm_for`] with a specific device
-    /// fingerprint on untrusted LANs — an unbound window is burnable by any peer (#9).
+    /// fingerprint on untrusted LANs  -  an unbound window is burnable by any peer (#9).
     pub fn arm(&self, ttl: Duration) -> String {
         self.arm.arm_for(ttl, None)
     }
@@ -131,7 +131,7 @@ impl NativePairing {
     /// Record a successful pairing (re-pairing the same fingerprint just updates the name). The name
     /// is sanitized (untrusted); a persist failure rolls the in-memory store back. Pins the
     /// fingerprint in the store FIRST, then clears any pending knock for it and wakes parked waiters
-    /// — an order [`Self::wait_for_decision`] relies on (a woken waiter must observe the fully
+    ///  -  an order [`Self::wait_for_decision`] relies on (a woken waiter must observe the fully
     /// settled state: paired = true, no longer pending).
     pub fn add(&self, name: &str, fp_hex: &str) -> Result<()> {
         self.store.add(name, fp_hex)?;
@@ -159,13 +159,13 @@ impl NativePairing {
         self.store.remove(fp_hex)
     }
 
-    // -- Delegated approval (roadmap §8b-1) ---------------------------------
+    // -- Delegated approval (delegated approval path) ---------------------------------
 
     /// Record an unpaired device's knock for delegated approval. Re-knocks from the same fingerprint
-    /// refresh the existing entry in place (same id) and bump its knock generation — the returned
+    /// refresh the existing entry in place (same id) and bump its knock generation  -  the returned
     /// generation is what [`Self::wait_for_decision`] admits. See [`approval::ApprovalQueue::note_pending`].
     pub fn note_pending(&self, name: &str, fp_hex: &str, src_ip: Option<IpAddr>) -> u32 {
-        // Only a NEW fingerprint emits `pairing.pending` — a re-knock refreshes the existing
+        // Only a NEW fingerprint emits `pairing.pending`  -  a re-knock refreshes the existing
         // entry in place, and a client auto-retrying while parked must not spam the operator's
         // notification hook once per retry.
         let was_pending = self.approval.pending_contains(fp_hex);
@@ -195,7 +195,7 @@ impl NativePairing {
     /// Approve a pending knock: pair its fingerprint (under `name_override` if the operator labeled
     /// it, else the knock's own name) and drop it from the queue. `Ok(None)` = no such (or expired)
     /// id. Reads (does NOT pre-remove) the entry, then [`Self::add`] pins the fingerprint and clears
-    /// the pending entry — an order a parked waiter relies on (see [`Self::wait_for_decision`]).
+    /// the pending entry  -  an order a parked waiter relies on (see [`Self::wait_for_decision`]).
     pub fn approve_pending(
         &self,
         id: u32,
@@ -214,7 +214,7 @@ impl NativePairing {
     }
 
     /// Deny (drop) a pending knock. Returns whether one was removed. The device's next knock
-    /// re-creates an entry — deny is "not now", not a blocklist.
+    /// re-creates an entry  -  deny is "not now", not a blocklist.
     pub fn deny_pending(&self, id: u32) -> bool {
         // Read the entry first so the lifecycle event can carry the device's identity.
         let entry = self.approval.read_entry(id);
@@ -502,7 +502,7 @@ mod tests {
         assert_eq!(waiter2.await.unwrap(), PairingDecision::Approved);
 
         // A stale-generation waiter polling only after the approval (entry cleared, fingerprint
-        // paired) must NOT read as a second Approved — the admitted marker resolves the tie.
+        // paired) must NOT read as a second Approved  -  the admitted marker resolves the tie.
         let d = np
             .wait_for_decision("ee01", seq1, Duration::from_millis(80))
             .await;
@@ -521,7 +521,7 @@ mod tests {
         let pin = np.arm(Duration::from_secs(60));
         assert!(matches!(np.pin_for_attempt("aa11"), PinAttempt::Pin(x) if x == pin));
         assert!(matches!(np.pin_for_attempt("bb22"), PinAttempt::Pin(_)));
-        // Bound to AA11: only that fp (case-insensitive) gets the PIN; another fp is BoundToOther —
+        // Bound to AA11: only that fp (case-insensitive) gets the PIN; another fp is BoundToOther  -
         // the caller rejects it WITHOUT consuming the window.
         let pin = np.arm_for(Duration::from_secs(60), Some("AA11".into()));
         assert!(matches!(np.pin_for_attempt("aa11"), PinAttempt::Pin(x) if x == pin));
@@ -535,7 +535,7 @@ mod tests {
     }
 
     /// #13: one source IP can't exceed the per-IP cap, and a parked (held-open) genuine knock is
-    /// never evicted by a flood — even one that fills the global cap from many distinct IPs.
+    /// never evicted by a flood  -  even one that fills the global cap from many distinct IPs.
     #[test]
     fn pending_per_ip_cap_and_parked_protection() {
         let p = temp();

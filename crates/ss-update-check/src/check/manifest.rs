@@ -11,13 +11,13 @@
 //! product-specific, and a consumer that doesn't need one simply ignores it.
 //!
 //! Rules, all fail-closed (the sysext 303 lesson encoded):
-//! 1. **Signature before parse** — over the exact fetched bytes, then strict JSON. An HTML
+//! 1. **Signature before parse**  -  over the exact fetched bytes, then strict JSON. An HTML
 //!    error page, a redirect stub, or a truncated body dies before any field is read.
-//! 2. **Channel binding** — the document names its channel and it must match the one we
+//! 2. **Channel binding**  -  the document names its channel and it must match the one we
 //!    asked for, so a validly-signed canary manifest replayed onto the stable URL is refused.
-//! 3. **Monotonic serial** — the publish-time serial can never go backwards for a channel
+//! 3. **Monotonic serial**  -  the publish-time serial can never go backwards for a channel
 //!    (the anti-downgrade/anti-replay floor, persisted by the consumer).
-//! 4. **Pinned notes origin** — the release-notes link a UI renders must live on our forge,
+//! 4. **Pinned notes origin**  -  the release-notes link a UI renders must live on our forge,
 //!    so a signed-but-wrong document can't send the operator to a lookalike page.
 
 use crate::sig::{verify_signature, PublicKey};
@@ -37,7 +37,7 @@ const NOTES_ORIGIN: &str = "https://github.com/vindeckyy/";
 /// The signed update manifest, as served (and signed) per channel.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Manifest {
-    /// Document schema — must equal [`SCHEMA`].
+    /// Document schema  -  must equal [`SCHEMA`].
     pub schema: u32,
     /// The channel this document was published for (`stable` | `canary`). Bound-checked
     /// against the channel we fetched, see module docs rule 2.
@@ -57,7 +57,7 @@ pub struct Manifest {
     /// strings differ (`~ciN`, `0.ciN`, a padded pkgrel, `M.m.run`).
     #[serde(default)]
     pub ci_run: Option<u64>,
-    /// The Windows installer leg (design §6) — consumed by the host's Windows apply path and
+    /// The Windows installer leg (design §6)  -  consumed by the host's Windows apply path and
     /// ignored everywhere else.
     #[serde(default)]
     pub windows_host: Option<WindowsHostAsset>,
@@ -66,7 +66,7 @@ pub struct Manifest {
 /// Where the Windows host installer for [`Manifest::version`] lives and how to verify it.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct WindowsHostAsset {
-    /// Immutable per-version download URL — never a mutable `latest/` alias, so the hash
+    /// Immutable per-version download URL  -  never a mutable `latest/` alias, so the hash
     /// below can't race an alias re-upload.
     pub url: String,
     /// SHA-256 (hex) of the installer bytes.
@@ -82,7 +82,7 @@ pub struct WindowsHostAsset {
 }
 
 /// Verify `sig_text` over the exact `bytes` against `keys`, then strictly parse and validate
-/// the document for `expected_channel`. The only constructor — there is no unsigned path.
+/// the document for `expected_channel`. The only constructor  -  there is no unsigned path.
 pub fn verify_and_parse(
     bytes: &[u8],
     sig_text: &str,
@@ -158,7 +158,7 @@ mod tests {
     }
 
     /// End-to-end: sign with a fresh ring keypair, verify with the matching pinned-key
-    /// string — the format contract with the CI signer (raw 64-byte sig, base64; raw
+    /// string  -  the format contract with the CI signer (raw 64-byte sig, base64; raw
     /// 32-byte key, `ed25519:<base64>`).
     #[test]
     fn signed_roundtrip_and_tamper() {
@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn html_error_page_is_not_a_manifest() {
-        // The GitHub 303 stub that poisoned the sysext feed — must die in strict parse.
+        // A redirect response body must die in strict parse.
         let html = b"<a href=\"https://objects.example/x\">See Other</a>.";
         assert!(parse_verified(html, "stable").is_err());
     }

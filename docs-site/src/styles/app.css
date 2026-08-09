@@ -2,12 +2,6 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 
-/* Pull Fumadocs UI's own classes and @unom/ui's compiled components into
-   the Tailwind 4 scan so their utilities aren't purged. @unom/ui is the shared
-   design-token system the slipstream marketing site also builds on. */
-@source '../../node_modules/fumadocs-ui/dist/**/*.js';
-@source '../../node_modules/@unom/ui/dist/**/*.{js,mjs}';
-@source '../../node_modules/@unom/app-ui/dist/**/*.{js,mjs}';
 
 /* Slipstream observatory theme: cyan signals on cool slate surfaces. */
 :root {

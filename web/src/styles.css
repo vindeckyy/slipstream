@@ -4,33 +4,28 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Pull @unom/ui's compiled component classes (bg-neutral,
-   rounded-card, p-padding-card, ring-accent, h-input-height, material...) into the
-   Tailwind 4 scan so their utilities aren't purged. */
-@source "../node_modules/@unom/ui/dist/**/*.{js,mjs}";
 
-/* Slipstream console: a broadcast control room fused with a creator-hardware desk instrument.
-   Gunmetal chassis ground, bone/putty keycap surfaces, the ASCII blocky mark as a silkscreened
-   label. Cyan is reserved for the ON AIR signal, safety orange for the one action that matters,
-   amber for the always-on instrument status. See DESIGN.md. */
+@source "../vendor/unom-ui/src*.{js,ts,tsx}";
+
+
 :root {
 	color-scheme: light;
 	--radius: 0.5rem;
 
-	/* Brand - ON AIR cyan (the live signal, never decoration). */
+
 	--ss-brand: #0891b2;
 	--ss-brand-light: #0e7490;
 	--ss-highlight: #67e8f9;
 
-	/* The one safety-orange action per surface. */
+
 	--ss-action: #ea580c;
 	--ss-action-light: #c2410c;
 
-	/* Always-on instrument status (amber). */
+
 	--ss-status: #b45309;
 	--ss-status-light: #d97706;
 
-	/* Surfaces - bone / putty keycaps on a cool chalk chassis (light). */
+
 	--background: #e9e6df;
 	--foreground: #1a1c20;
 	--card: #f4f1ea;
@@ -43,7 +38,7 @@
 	--secondary-foreground: #1a1c20;
 	--accent: var(--ss-brand);
 	--accent-foreground: #ffffff;
-	/* ~3:1 against white for UI chrome (WCAG 1.4.11). */
+
 	--border: #8a8f98;
 	--input: #8a8f98;
 	--ring: var(--ss-brand);
@@ -52,8 +47,7 @@
 	--focus-ring-width: 2px;
 	--focus-ring-offset-size: 2px;
 
-	/* Surface roles keep canvas, panels, wells, and overlays distinct without
-	   introducing a separate palette for every component. */
+
 	--surface-canvas: var(--background);
 	--surface-panel: var(--card);
 	--surface-overlay: var(--popover);
@@ -69,14 +63,13 @@
 	--outline-subtle: color-mix(in oklab, var(--border) 55%, transparent);
 	--outline-strong: color-mix(in oklab, var(--border) 85%, var(--foreground));
 
-	/* Primary = the ON AIR cyan (buttons, active nav, default badges). */
+
 	--primary: var(--ss-brand);
 	--primary-foreground: #ffffff;
 
 	--success: oklch(0.54 0.14 160);
 	--success-foreground: #ffffff;
-	/* Amber - "needs your attention but nothing is broken" (unsaved edits), the badge
-	   counterpart of the inline amber warning text. */
+
 	--warning: var(--ss-status);
 	--warning-foreground: #17120a;
 	--info: oklch(0.54 0.14 230);
@@ -92,16 +85,15 @@
 		var(--card)
 	);
 
-	/* ── @unom/ui semantic token contract (its components read these names). ──
-     These are indirections - they follow the raw tokens above per-theme. */
+
 	--main: var(--foreground);
 	--brand: var(--ss-brand);
 	--brand-light: var(--ss-brand-light);
 	--highlight: var(--ss-highlight);
-	--neutral: var(--card); /* @unom card default surface (bg-neutral) */
+	--neutral: var(--card);
 	--neutral-accent: var(
 		--secondary
-	); /* accent / nested surface (bg-neutral-accent) */
+	);
 	--neutral-highlight: var(--border);
 	--error: var(--destructive);
 
@@ -110,7 +102,7 @@
 	--font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
 		"Liberation Mono", "Courier New", monospace;
 
-	/* Type scale - operator hierarchy (page title -> section -> body -> meta). */
+
 	--text-page: 1.5rem;
 	--text-section: 1.125rem;
 	--text-body: 0.875rem;
@@ -120,36 +112,35 @@
 	--tracking-display: -0.02em;
 	--tracking-body: -0.011em;
 
-	/* @unom/ui radius/spacing contract (pill buttons, rounded cards, tall inputs). */
+
 	--radius-card-min: 0.375rem;
 }
 
-/* Dark / gunmetal chassis. Overrides only the raw values - the indirection tokens
-   in :root resolve to these automatically. */
+
 .dark {
 	color-scheme: dark;
 
-	/* surface / canvas - the chassis */
+
 	--background: #0d1117;
 	--foreground: #e6e1d8;
 
-	/* surface-container - keycaps */
+
 	--card: #161b22;
 	--card-foreground: #e6e1d8;
 
-	/* surface-container-high (menus, dialogs) */
+
 	--popover: #1c232c;
 	--popover-foreground: #e6e1d8;
 
-	/* surface-container-low (wells, chips) */
+
 	--muted: #12181f;
 	--muted-foreground: #8b949e;
 
-	/* surface-container-highest (selected / nested accent) */
+
 	--secondary: #1e2630;
 	--secondary-foreground: #e6e1d8;
 
-	/* Outline ~3:1 against card for operator borders + inputs. */
+
 	--border: #4a5560;
 	--input: #4a5560;
 	--ring: var(--ss-brand-light);
@@ -172,10 +163,9 @@
 	--destructive-foreground: #0d1117;
 }
 
-/* Map the palette to Tailwind colour/util tokens - both the shadcn vocabulary
-   and @unom/ui's, resolved to one set of values. */
+
 @theme inline {
-	/* Density-tuned radii: Material medium, not balloon cards. */
+
 	--radius-sm: calc(var(--radius) - 2px);
 	--radius-md: var(--radius);
 	--radius-lg: calc(var(--radius) + 2px);
@@ -185,7 +175,7 @@
 	--radius-card: calc(var(--radius) * 1.5);
 	--radius-main: calc(var(--radius) * 1.5);
 
-	/* Cloud-console control density. */
+
 	--spacing-input-height: 2.5rem;
 	--spacing-control-xs: 1.75rem;
 	--spacing-control-sm: 2rem;
@@ -201,7 +191,7 @@
 	--font-display: var(--font-display);
 	--font-mono: var(--font-mono);
 
-	/* shadcn-style colour tokens. */
+
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	--color-card: var(--card);
@@ -244,7 +234,7 @@
 	--color-outline-subtle: var(--outline-subtle);
 	--color-outline-strong: var(--outline-strong);
 
-	/* @unom/ui colour tokens. */
+
 	--color-main: var(--main);
 	--color-brand: var(--brand);
 	--color-brand-light: var(--brand-light);
@@ -255,8 +245,7 @@
 	--color-error: var(--error);
 }
 
-/* Accordion / collapsible keyframes @unom/ui's interactive surfaces animate to.
-   Durations stay short so motion supports hierarchy instead of decorating it. */
+
 @theme {
 	--animate-accordion-down: accordion-down var(--duration-emphasized)
 		var(--ease-emphasized);
@@ -267,7 +256,7 @@
 	--animate-collapsible-up: collapsible-up var(--duration-emphasized)
 		var(--ease-emphasized);
 
-	/* The ON AIR lamp: a slow cyan pulse while streaming (broadcast desk). */
+
 	--animate-onair: onair-pulse 2.2s ease-in-out infinite;
 
 	@keyframes onair-pulse {
@@ -333,8 +322,7 @@
 
 	body {
 		background-color: var(--surface-canvas);
-		/* Instrument atmosphere: a low amber status glow at the top (the always-on desk
-		   lamp), not a cyan wash. The chassis grain keeps the ground from reading flat. */
+
 		background-image:
 			radial-gradient(
 				ellipse 110% 60% at 50% -20%,
@@ -397,7 +385,7 @@
 		color: var(--muted-foreground);
 	}
 
-	/* Focus: offset ring, never a zero-offset colored halo. */
+
 	:focus-visible {
 		outline: var(--focus-ring-width) solid var(--focus-ring);
 		outline-offset: var(--focus-ring-offset-size);
@@ -408,7 +396,7 @@
 		color: var(--foreground);
 	}
 
-	/* Thin scrollbars that match tonal chrome. */
+
 	* {
 		scrollbar-width: thin;
 		scrollbar-color: color-mix(in oklab, var(--border) 80%, transparent)

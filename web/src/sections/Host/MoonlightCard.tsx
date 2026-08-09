@@ -104,7 +104,7 @@ export const MoonlightCard: FC<{ host: HostInfo }> = ({ host }) => {
 						aria-hidden
 						className={cn(
 							"size-2 rounded-full",
-							host.gamestream ? "bg-emerald-500" : "bg-muted-foreground/40",
+							host.gamestream ? "bg-success" : "bg-muted-foreground/40",
 						)}
 					/>
 					<span className="text-muted-foreground">{statusText}</span>

@@ -2,13 +2,6 @@ import { AnimatedCard } from "@unom/ui/card";
 import type { ComponentProps } from "react";
 import * as React from "react";
 import { cn } from "@/lib/utils";
-
-// The console's Card IS @unom/ui's animated card — tonal surface (`bg-neutral` /
-// `--card`) with on-mount motion + material gloss (via UnomProviders). We keep
-// the composed shadcn-style sub-component API (Header/Title/Description/Content/
-// Footer own their own padding), so the card defaults to `padding={false}` to
-// avoid doubling it. Surface elevation is M3-style: hairline border + soft
-// tonal shadow instead of a heavy brand ring.
 type CardProps = ComponentProps<typeof AnimatedCard>;
 
 const Card = ({
@@ -78,16 +71,7 @@ const CardDescription = React.forwardRef<
 ));
 CardDescription.displayName = "CardDescription";
 
-/**
- * Card body. Pass `flush` for content that should meet the card's edges — a full-bleed table, most
- * commonly — instead of trying to cancel the padding from the outside.
- *
- * `className="p-0"` does NOT work for that: tailwind-merge only resolves conflicts *within the same
- * variant*, so `p-0` cancels `p-4` but leaves `sm:p-6` standing, and the padding silently returns at
- * ≥640px. Every call site that tried it ended up with a doubled inset once a `CardHeader` (which
- * brings its own `sm:p-6`) was nested inside — visible as one card whose title sits 24px further in
- * than its neighbours'.
- */
+
 const CardContent = React.forwardRef<
 	HTMLDivElement,
 	React.HTMLAttributes<HTMLDivElement> & { flush?: boolean }

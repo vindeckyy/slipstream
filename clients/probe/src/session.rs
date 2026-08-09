@@ -981,7 +981,8 @@ pub(crate) async fn session(args: Args) -> Result<()> {
                     // capture→received: the frame's own reassembly-completion stamp in the
                     // host clock (received_ns + offset) minus the host's capture pts. offset
                     // is 0 same-host / old host.
-                    let lat = (frame.received_ns as i128 + clock_offset as i128 - frame.pts_ns as i128)
+                    let lat = (frame.received_ns as i128 + clock_offset as i128
+                        - frame.pts_ns as i128)
                         .max(0) as u64;
                     if lat > 0 && lat < 10_000_000_000 {
                         latencies_us.push(lat / 1000);

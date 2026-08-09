@@ -1,6 +1,6 @@
-// Build src/data.json — the payload the Worker serves — from published winget manifests.
+// Build src/data.json  -  the payload the Worker serves  -  from published winget manifests.
 //
-// Source of truth is the GitHub RELEASES (override via SLIPSTREAM_RELEASE_API / SLIPSTREAM_RELEASE_REPO for a
+// Source of truth is GitHub release assets (override via SLIPSTREAM_RELEASE_API / SLIPSTREAM_RELEASE_REPO for a
 // mirror), not local files: windows-host.yml attaches the manifest trio to each stable tag, so
 // walking releases yields every version the source should offer. That matters because winget
 // resolves `--version` and `upgrade` against the version LIST; a source that only knows the
@@ -13,7 +13,7 @@
 //   node build-data.mjs --local ../           # from a local manifest dir (dev, single version)
 //   node build-data.mjs --out src/data.json
 //
-// The `yaml` dep is a BUILD-time dependency only — the Worker ships data.json, never a parser.
+// The `yaml` dep is a BUILD-time dependency only  -  the Worker ships data.json, never a parser.
 import { readFileSync, writeFileSync, readdirSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,7 +24,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const API = process.env.SLIPSTREAM_RELEASE_API ?? "https://api.github.com";
 const REPO = process.env.SLIPSTREAM_RELEASE_REPO ?? "vindeckyy/slipstream";
 const PACKAGE_ID = "vindeckyy.SlipstreamHost";
-const SOURCE_IDENTIFIER = process.env.SLIPSTREAM_SOURCE_ID ?? "unom.slipstream";
+const SOURCE_IDENTIFIER = process.env.SLIPSTREAM_SOURCE_ID ?? "vindeckyy.slipstream";
 // The API contract this source implements. Advertised via /information so a future client can
 // negotiate; bump only alongside a real change to the response shapes.
 const SERVER_SUPPORTED_VERSIONS = ["1.1.0"];
@@ -70,7 +70,7 @@ async function fetchText(url) {
 }
 
 async function versionsFromReleases() {
-  // GitHub uses per_page; GitHub accepts limit. Prefer per_page for the GitHub default.
+  // GitHub uses per_page; GitHub uses per_page for the default API endpoint.
   const q = API.includes('api.github.com') ? 'per_page=100' : 'limit=100';
   const releases = await fetchJson(`${API}/repos/${REPO}/releases?${q}`);
   const out = [];
@@ -81,7 +81,7 @@ async function versionsFromReleases() {
       assets.find((a) => a.name === `${PACKAGE_ID}${suffix}`)?.browser_download_url;
     const installerUrl = find(".installer.yaml");
     const localeUrl = find(".locale.en-US.yaml");
-    // Releases from before winget support shipped have no manifests — skip, don't fail.
+    // Releases from before winget support shipped have no manifests  -  skip, don't fail.
     if (!installerUrl || !localeUrl) continue;
     const [installer, locale] = await Promise.all([
       fetchText(installerUrl).then(parseYaml),

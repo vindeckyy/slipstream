@@ -453,7 +453,7 @@ SteamOS.
 Cross-machine latency figures are trustworthy because a wall-clock handshake removes the clock
 offset between the two machines before anything is measured, so a capture-to-receipt number is valid
 across the LAN rather than only on one box. (The remaining term, receipt to actually on screen, is
-what the [roadmap](/docs/roadmap)'s glass-to-glass work is about.) See
+what the current measurements do not cover is the final display-present step. See
 [Understanding the stats overlay](/docs/stats).
 
 ## What is not verified
@@ -479,4 +479,4 @@ whose caveat *is* "nobody has run this on real hardware". A wrong ✅ is worse t
   deliberate decision rather than a gap.
 
 Where this page and another page disagree, this one is the one that was checked against the code.
-For what is planned rather than shipped, see the [Roadmap](/docs/roadmap).
+The unverified cases are listed below.

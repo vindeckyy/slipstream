@@ -141,9 +141,7 @@ impl AudioFecReassembler {
                     group_id,
                     parity_count,
                     base_seq: pkt.seq,
-                    packets: (0..crate::fec::AUDIO_GROUP_LEN)
-                        .map(|_| None)
-                        .collect(),
+                    packets: (0..crate::fec::AUDIO_GROUP_LEN).map(|_| None).collect(),
                     parity: Vec::new(),
                 });
                 self.groups.len() - 1
@@ -186,12 +184,7 @@ impl AudioFecReassembler {
             return;
         }
         let shards: Vec<(usize, Vec<u8>)> = (0..count)
-            .map(|i| {
-                (
-                    i,
-                    shards[i * shard_len..(i + 1) * shard_len].to_vec(),
-                )
-            })
+            .map(|i| (i, shards[i * shard_len..(i + 1) * shard_len].to_vec()))
             .collect();
         let g = &mut self.groups[idx];
         g.parity_count = g.parity_count.max(count as u8);
@@ -413,7 +406,9 @@ mod tests {
                 data: payloads[p].clone(),
             })
             .collect();
-        let parity = crate::fec::generate_parity(crate::fec::audio_coder().as_ref(), &full_group, 1).unwrap();
+        let parity =
+            crate::fec::generate_parity(crate::fec::audio_coder().as_ref(), &full_group, 1)
+                .unwrap();
         r.push(&parity_dgram(gid, 1, &parity.concat()));
 
         // All 8 packets emitted, in order; the rebuilt one matches the original payload.
@@ -447,7 +442,9 @@ mod tests {
             got.push(p);
         }
         assert_eq!(got.len(), crate::fec::AUDIO_GROUP_LEN);
-        assert_eq!(got.iter().map(|p| p.seq).collect::<Vec<_>>(),
-            (base..base + crate::fec::AUDIO_GROUP_LEN as u32).collect::<Vec<_>>());
+        assert_eq!(
+            got.iter().map(|p| p.seq).collect::<Vec<_>>(),
+            (base..base + crate::fec::AUDIO_GROUP_LEN as u32).collect::<Vec<_>>()
+        );
     }
 }

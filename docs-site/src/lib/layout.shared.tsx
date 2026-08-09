@@ -1,6 +1,7 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared'
 import BrandMark from '@/components/BrandMark'
 import Wordmark from '@/components/Wordmark'
+import { sitePath } from '@/lib/paths'
 
 // Shared chrome for the docs and home layouts. Primary links answer the jobs
 // people arrive with; community and source stay secondary.
@@ -19,12 +20,12 @@ export function baseOptions(): BaseLayoutProps {
     },
     githubUrl: 'https://github.com/vindeckyy/slipstream',
     links: [
-      { text: 'Quick Start', url: '/docs/quickstart' },
-      { text: 'Play', url: '/docs/play' },
-      { text: 'Work', url: '/docs/desktop-at-work' },
-      { text: 'Install', url: '/docs/install' },
-      { text: 'Clients', url: '/docs/clients' },
-      { text: 'API', url: '/api' },
+      { text: 'Quick Start', url: sitePath('/docs/quickstart') },
+      { text: 'Play', url: sitePath('/docs/play') },
+      { text: 'Work', url: sitePath('/docs/desktop-at-work') },
+      { text: 'Install', url: sitePath('/docs/install') },
+      { text: 'Clients', url: sitePath('/docs/clients') },
+      { text: 'API', url: sitePath('/api') },
       {
         type: 'menu',
         text: 'Community',

@@ -1,11 +1,11 @@
-# CI builder for the Rust workspace — Ubuntu 26.04 to match the dev/host boxes
-# (FFmpeg 8 / libavcodec 62, PipeWire 1.6). Used by .github/workflows/ci.yml as the job
-# container; rebuilt+pushed by .github/workflows/docker.yml.
+# CI builder for the Rust workspace  -  Ubuntu 26.04 to match the dev/host boxes
+# (FFmpeg 8 / libavcodec 62, PipeWire 1.6). Used by GitHub Actions as the job
+# container; rebuilt+pushed by GitHub Actions
 #
 #   docker build -f ci/rust-ci.Dockerfile -t slipstream-rust-ci ci
 #
 # The workspace links real system libs at build time:
-# FFmpeg, PipeWire, Opus, GL/EGL/GBM — and libcuda, which has no real driver here; the
+# FFmpeg, PipeWire, Opus, GL/EGL/GBM  -  and libcuda, which has no real driver here; the
 # zerocopy path only needs the symbols at link time, so a driver userspace package plus a
 # libcuda.so -> libcuda.so.1 symlink stands in for it (CI never executes the CUDA path).
 FROM ubuntu:26.04
@@ -26,7 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libvulkan-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# bun — builds the slipstream-web console in deb.yml (which runs the web build in THIS image).
+# bun  -  builds the slipstream-web console in deb.yml (which runs the web build in THIS image).
 # ci.yml's web/docs jobs use the oven/bun image instead, so this is only for the deb job.
 RUN curl -fsSL https://bun.sh/install | bash \
     && install -m0755 /root/.bun/bin/bun /usr/local/bin/bun \
@@ -52,7 +52,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
     && rustc --version && cargo clippy --version && cargo fmt --version
 
 # Shared compile cache: jobs set RUSTC_WRAPPER=sccache (backend = RustFS S3 on the LAN,
-# see .github/workflows — the env lives there so dev use of this image stays uncached).
+# see GitHub Actions  -  the env lives there so dev use of this image stays uncached).
 # musl build: one static binary serves the Ubuntu and Fedora images alike.
 ARG SCCACHE_VERSION=0.10.0
 RUN curl -fsSL "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" \

@@ -150,8 +150,8 @@ pub(crate) fn apply_low_latency_rc(
     video.set_bit_rate(bitrate_bps as usize);
     video.set_max_bit_rate(bitrate_bps as usize);
     video.set_max_b_frames(0);
-    let vbv_bits = ((bitrate_bps as f64 / fps.max(1) as f64) * vbv_frames)
-        .clamp(1.0, i32::MAX as f64);
+    let vbv_bits =
+        ((bitrate_bps as f64 / fps.max(1) as f64) * vbv_frames).clamp(1.0, i32::MAX as f64);
     // SAFETY: `video` wraps a freshly-allocated `AVCodecContext` we hold by value and have not opened
     // yet; `as_mut_ptr()` returns that non-null, aligned, exclusively-owned context. Writing the plain
     // `rc_buffer_size` int before `open_with` is the supported way to set a field ffmpeg-next exposes

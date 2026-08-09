@@ -815,8 +815,8 @@ use stream_data::stream_body;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use stream_data::{spawn_sender, PacketBatch, WireBatch};
     use slipstream_core::latency::{FrameTimings, LatencyArtifact};
+    use stream_data::{spawn_sender, PacketBatch, WireBatch};
 
     fn entry(title: &str, cmd: Option<&str>) -> super::super::apps::AppEntry {
         super::super::apps::AppEntry {

@@ -8,6 +8,7 @@ import { ApiReferenceReact } from '@scalar/api-reference-react'
 import scalarCss from '@scalar/api-reference-react/style.css?url'
 import BrandMark from '@/components/BrandMark'
 import Wordmark from '@/components/Wordmark'
+import { sitePath } from '@/lib/paths'
 
 export const Route = createFileRoute('/api/')({
   component: ApiReference,
@@ -181,7 +182,7 @@ function ApiReference() {
   // `updateConfiguration` effect fires and Scalar swaps the body mode class.
   const configuration = useMemo(
     () => ({
-      url: '/openapi.json',
+      url: sitePath('/openapi.json'),
       darkMode: isDark,
       hideDarkModeToggle: true,
       agent: { disabled: true },
@@ -224,7 +225,7 @@ function ApiReference() {
             Docs
           </Link>
           <a
-            href="/openapi.json"
+            href={sitePath("/openapi.json")}
             className="text-fd-muted-foreground transition-colors hover:text-fd-foreground"
           >
             OpenAPI JSON

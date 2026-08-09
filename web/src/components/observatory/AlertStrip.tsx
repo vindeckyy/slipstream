@@ -13,11 +13,10 @@ const VARIANT_ICON: Record<AlertVariant, ReactNode> = {
 };
 
 const VARIANT_CLASS: Record<AlertVariant, string> = {
-	info: "border-sky-500/30 bg-sky-500/5 text-sky-800 dark:text-sky-200",
-	success:
-		"border-emerald-500/30 bg-emerald-500/5 text-emerald-800 dark:text-emerald-200",
-	warning: "border-warning/40 bg-warning/5 text-foreground",
-	error: "border-destructive/40 bg-destructive/5 text-destructive",
+	info: "border-info/30 bg-info-subtle text-info",
+	success: "border-success/30 bg-success-subtle text-success",
+	warning: "border-warning/40 bg-warning-subtle text-warning",
+	error: "border-destructive/40 bg-destructive-subtle text-destructive",
 };
 
 export interface AlertStripProps
@@ -34,7 +33,7 @@ export interface AlertStripProps
 	dismissLabel?: string;
 }
 
-/** A compact, dismissible message surface for operator attention and recovery actions. */
+
 export function AlertStrip({
 	title,
 	children,

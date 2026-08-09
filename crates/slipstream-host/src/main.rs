@@ -108,10 +108,10 @@ mod power {
 // platform with neither (macOS, which has no launch path either) the module is an empty shell.
 mod procscan;
 mod send_pacing;
-mod transport_state;
 #[cfg(target_os = "windows")]
 #[path = "windows/service.rs"]
 mod service;
+mod transport_state;
 mod session_plan {
     pub(crate) use crate::session::plan::*;
 }
@@ -123,8 +123,8 @@ mod host_config_file;
 mod session_status {
     pub(crate) use crate::session::status::*;
 }
-mod sleep_inhibit;
 mod host_cursor;
+mod sleep_inhibit;
 mod spike;
 mod stats_recorder;
 // Start/stop/status for the per-user tray — the recovery path it has never had of its own.

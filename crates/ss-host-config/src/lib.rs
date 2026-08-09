@@ -38,9 +38,7 @@ mod env;
 
 use std::sync::OnceLock;
 
-pub use config::{
-    HostConfig, LatencyProfile, NetworkPolicy, PerformanceProfile, TEN_BIT_ENV,
-};
+pub use config::{HostConfig, LatencyProfile, NetworkPolicy, PerformanceProfile, TEN_BIT_ENV};
 pub use env::{default_on_gate, env_on, parse_env_on};
 
 /// The process-wide host configuration, parsed once on first access.
@@ -87,7 +85,10 @@ mod tests {
             PerformanceProfile::parse("Low_Latency"),
             PerformanceProfile::LowLatency
         );
-        assert_eq!(PerformanceProfile::parse(" low_latency "), PerformanceProfile::LowLatency);
+        assert_eq!(
+            PerformanceProfile::parse(" low_latency "),
+            PerformanceProfile::LowLatency
+        );
         for v in ["", "off", "balanced", "warp"] {
             assert_eq!(PerformanceProfile::parse(v), PerformanceProfile::Off);
         }

@@ -237,10 +237,8 @@ The shell exports `PF_FFVK_VULKAN_INCLUDE` (Vulkan headers for ss-ffvk bindgen) 
   runs on every `bun install` (web's `postinstall`; the SDK's `prepare`, since sdk/ is the
   *published* `@slipstream/host` package and a `postinstall` would then fire on consumers' installs).
   Regenerate by hand with `cd web && bunx bun2nix -o bun.nix` if a lockfile is ever edited directly.
-  The `@unom` scope needs a registry mapping (see `web/.npmrc`): those package names stay
-  `@unom/ui` / `@unom/style` / `@unom/app-ui`. Point `.npmrc` at whatever private/local npm
-  registry you use for that scope.
-
+The @unom package names remain stable for compatibility. The web console uses the vendored
+packages under web/vendor/, so a fresh checkout does not need access to an internal registry.
   > ⚠ **`bun.nix` has no schema stability across bun2nix versions.** The flake input is pinned
   > (`github:nix-community/bun2nix?ref=2.1.2`) and the npm devDependency is pinned to the *same*
   > exact version in `web/package.json` + `sdk/package.json`. Move both together, then rerun

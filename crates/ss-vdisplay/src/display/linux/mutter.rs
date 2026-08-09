@@ -1,5 +1,5 @@
 //! GNOME/Mutter virtual-display backend via Mutter's *direct* D-Bus APIs (the same path
-//! gnome-remote-desktop uses for headless sessions — not the xdg portal, which needs an
+//! gnome-remote-desktop uses for headless sessions  -  not the xdg portal, which needs an
 //! interactive grant):
 //!
 //! 1. `org.gnome.Mutter.RemoteDesktop.CreateSession()` → a remote-desktop session (read its
@@ -9,8 +9,8 @@
 //!    monitor** and returns a Stream object.
 //! 4. `RemoteDesktop.Session.Start()` → the Stream signals `PipeWireStreamAdded(node_id)`.
 //!
-//! The virtual monitor's *size* follows the PipeWire format negotiation — Mutter adapts it to
-//! what the consumer asks for — so the client's exact WxH is plumbed into our consumer's format
+//! The virtual monitor's *size* follows the PipeWire format negotiation  -  Mutter adapts it to
+//! what the consumer asks for  -  so the client's exact WxH is plumbed into our consumer's format
 //! pod as the preferred size ([`VirtualOutput::preferred_mode`]) rather than passed here.
 //! Sessions die with the D-Bus connection, so a keepalive thread owns it (RAII teardown).
 //!
@@ -21,7 +21,7 @@
 //! **Per-client scaling** (`identity` policy §5.4): GNOME persists per-monitor scale to
 //! `monitors.xml` keyed by connector+vendor+product+**serial**, but Mutter mints a fresh serial
 //! (`0x%.6x`, a per-shell counter) for every `RecordVirtual` monitor and the API offers no way to
-//! pass a stable identity — so GNOME's own persistence can never rematch our virtual output. The
+//! pass a stable identity  -  so GNOME's own persistence can never rematch our virtual output. The
 //! host persists the scale instead ([`identity::ScaleMap`](crate::identity), keyed per
 //! client / per the policy): reapplied at connect via the mode's `preferred-scale` plus the
 //! topology `ApplyMonitorsConfig`, and the user's mid-session changes are polled from
@@ -42,16 +42,16 @@ use zbus::zvariant::{OwnedObjectPath, OwnedValue, Value};
 const BUS_RD: &str = "org.gnome.Mutter.RemoteDesktop";
 const BUS_SC: &str = "org.gnome.Mutter.ScreenCast";
 const BUS_DC: &str = "org.gnome.Mutter.DisplayConfig";
-/// `ApplyMonitorsConfig` method: 1 = temporary (auto-reverts on the next monitor change —
-/// e.g. when our virtual output is torn down — so we never persist a layout to monitors.xml).
+/// `ApplyMonitorsConfig` method: 1 = temporary (auto-reverts on the next monitor change  -
+/// e.g. when our virtual output is torn down  -  so we never persist a layout to monitors.xml).
 const APPLY_TEMPORARY: u32 = 1;
 
 /// Mutter cursor mode: ship the pointer as `SPA_META_Cursor` metadata instead of burning it into
 /// the frames. The capturer always negotiates the meta (ss-capture `meta_param`) and the encoder
-/// blend composites it for sessions where the client does not draw the cursor itself — while a
+/// blend composites it for sessions where the client does not draw the cursor itself  -  while a
 /// cursor-forwarding session strips the overlay and sends shape/state over the cursor channel.
 /// This is the mode for EVERY session whose host plans a composite or forward (`set_hw_cursor`
-/// on), channel or not: Mutter's embedded painting is a fiction on a virtual stream — since
+/// on), channel or not: Mutter's embedded painting is a fiction on a virtual stream  -  since
 /// Mutter 48 (commit `7ff5334a`, hw-cursor inhibition removed) the software cursor overlay is
 /// suppressed STAGE-GLOBALLY whenever any physical head realizes a hardware cursor, so
 /// dmabuf-recorded frames blit the view without a pointer, and cursor-only motion schedules no
@@ -59,7 +59,7 @@ const APPLY_TEMPORARY: u32 = 1;
 /// frozen frame counter; metadata positions kept flowing in the same setup.
 const CURSOR_METADATA: u32 = 2;
 /// `cursor-mode` embedded (mutter enum 1): Mutter composites the pointer into frames itself.
-/// Kept only as the can't-blend fallback (`set_hw_cursor` off — the resolved encode backend
+/// Kept only as the can't-blend fallback (`set_hw_cursor` off  -  the resolved encode backend
 /// cannot composite a metadata cursor, so metadata would strand the pointer in meta nothing
 /// draws). Know its limits (above): on a virtual stream it paints only into the MemFd/SHM
 /// record path (`FORCE_CURSORS`) and only refreshes on unrelated damage.
@@ -70,17 +70,17 @@ const CURSOR_EMBEDDED: u32 = 1;
 /// *concurrent* rebuilds have segfaulted gnome-shell on-glass twice now: the teardown-side race is
 /// documented at the teardown below, and on 2026-07-10 three simultaneous session setups (three
 /// `RecordVirtual` calls within ~200 µs plus an `ApplyMonitorsConfig`) crashed the shell inside
-/// `meta_monitor_manager_rebuild` — dropping the box to the GDM greeter until a DM restart. One
+/// `meta_monitor_manager_rebuild`  -  dropping the box to the GDM greeter until a DM restart. One
 /// mutation at a time also keeps [`wait_virtual_connector`] sound: with two virtual outputs
 /// appearing at once, "the connector absent from MY pre-snapshot" can name a sibling's monitor.
 /// Each session runs on its own dedicated thread (see [`session_thread`]), so blocking on a std
-/// mutex — including across the awaits of its single-threaded setup future — is safe.
+/// mutex  -  including across the awaits of its single-threaded setup future  -  is safe.
 static TOPOLOGY_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// The Mutter virtual-display driver. Each [`create`](VirtualDisplay::create) spins up a
 /// keepalive thread owning the D-Bus sessions behind the virtual monitor.
 pub struct MutterDisplay {
-    /// Whether this display is the FIRST of its group (§6.1) — set by the registry before `create`.
+    /// Whether this display is the FIRST of its group (§6.1)  -  set by the registry before `create`.
     /// A later sibling **extends** into the already-exclusive desktop instead of re-applying the
     /// sole-monitor config (which would disable the first session's virtual). Defaults true (a lone
     /// session establishes topology as before).
@@ -88,12 +88,12 @@ pub struct MutterDisplay {
     /// Out-of-band cursor request (`set_hw_cursor`): metadata cursor-mode at creation; off =
     /// embedded (see [`CURSOR_EMBEDDED`]).
     hw_cursor: bool,
-    /// The connecting client's cert fingerprint (set before [`create`](VirtualDisplay::create)) —
+    /// The connecting client's cert fingerprint (set before [`create`](VirtualDisplay::create))  -
     /// keys the per-client persisted **scale** (GNOME can't persist it itself: Mutter mints a fresh
     /// EDID serial per `RecordVirtual` monitor, so `monitors.xml` never rematches; see
     /// [`identity::ScaleMap`](crate::identity)).
     client_fp: Option<[u8; 32]>,
-    /// The identity slot the last `create` resolved — reported to the registry via
+    /// The identity slot the last `create` resolved  -  reported to the registry via
     /// [`last_identity_slot`](VirtualDisplay::last_identity_slot) to key the group arrangement +
     /// `/display/state` slot, like the KWin backend.
     last_slot: Option<u32>,
@@ -120,16 +120,50 @@ impl MutterDisplay {
 ///
 /// This is the *fallback* answer only: [`crate::available`] treats a running `gnome-shell` (the
 /// `/proc` scan) as the authority, because this var belongs to the session and a host launched
-/// outside it — `systemd --user`, a TTY, ssh — never inherited it. Deliberately still just the ONE
+/// outside it  -  `systemd --user`, a TTY, ssh  -  never inherited it. Deliberately still just the ONE
 /// var: `XDG_CURRENT_DESKTOP` is the one [`crate::apply_session_env`] owns end to end (it writes it
 /// per connect and *scrubs* it when nothing is live), so sniffing `DESKTOP_SESSION` /
-/// `XDG_SESSION_DESKTOP` alongside would resurrect the bug that scrub exists to prevent — a stale
+/// `XDG_SESSION_DESKTOP` alongside would resurrect the bug that scrub exists to prevent  -  a stale
 /// `gnome` there after a gnome-shell crash reports Mutter usable and routes the next client into a
 /// dead session (45 s create timeouts instead of a crisp handshake error).
 pub fn is_available() -> bool {
     std::env::var("XDG_CURRENT_DESKTOP")
         .map(|d| d.to_ascii_uppercase().contains("GNOME"))
         .unwrap_or(false)
+}
+
+/// Major version from `org.gnome.Shell.ShellVersion` (`"46.0"` → 46), or `None` if unavailable.
+///
+/// RecordVirtual's `modes` / `refresh-rate` / `preferred-scale` parsing (`create_mode_infos`) landed
+/// in **Mutter 50**. ScreenCast's own `Version` property stays 4 across 46 - 50, so it cannot probe
+/// this. Used to avoid advertising a high `preferred_mode` that PipeWire then turns into a high-Hz
+/// virtual CRTC while damage stays ~50 fps.
+///
+/// Call only from a thread that is **not** already driving a Tokio runtime (the Mutter session
+/// thread probes this before `rt.block_on`). Nesting `block_on` panics.
+fn shell_major() -> Option<u32> {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .ok()?;
+    rt.block_on(async {
+        let conn = zbus::Connection::session().await.ok()?;
+        let proxy = zbus::Proxy::new(
+            &conn,
+            "org.gnome.Shell",
+            "/org/gnome/Shell",
+            "org.gnome.Shell",
+        )
+        .await
+        .ok()?;
+        let ver: String = proxy.get_property("ShellVersion").await.ok()?;
+        ver.split('.').next()?.parse().ok()
+    })
+}
+
+/// Whether RecordVirtual honours the `modes` dict (`refresh-rate`, `preferred-scale`). Mutter 50+.
+fn record_virtual_modes_supported(major: Option<u32>) -> bool {
+    major.is_some_and(|m| m >= 50)
 }
 
 impl VirtualDisplay for MutterDisplay {
@@ -163,7 +197,7 @@ impl VirtualDisplay for MutterDisplay {
 
     fn create(&mut self, mode: Mode) -> Result<VirtualOutput> {
         // Identity (§5.4): resolve the client's stable slot per the `identity` policy (Linux
-        // defaults to Shared when unconfigured, like KWin) — it keys the registry's group
+        // defaults to Shared when unconfigured, like KWin)  -  it keys the registry's group
         // arrangement/state. Mutter can't carry the slot into the monitor's EDID (RecordVirtual
         // owns the identity), so the per-client scaling that policy promises is host-persisted
         // instead: the session thread reapplies the remembered scale and records the user's
@@ -183,7 +217,7 @@ impl VirtualDisplay for MutterDisplay {
             tracing::info!(scale, "mutter: reapplying the client's saved display scale");
         }
         let (setup_tx, setup_rx) =
-            std::sync::mpsc::channel::<Result<(u32, crate::monitor_hold::Hold), String>>();
+            std::sync::mpsc::channel::<Result<(u32, crate::monitor_hold::Hold, u32), String>>();
         let stop = Arc::new(AtomicBool::new(false));
         let stop_thread = stop.clone();
         let first_in_group = self.first_in_group;
@@ -203,7 +237,7 @@ impl VirtualDisplay for MutterDisplay {
             })
             .context("spawn Mutter virtual-output thread")?;
 
-        // Built BEFORE the wait so EVERY error arm below sets the flag on its way out — a thread
+        // Built BEFORE the wait so EVERY error arm below sets the flag on its way out  -  a thread
         // that finishes after we gave up then parks for at most one 200 ms tick. `report_node` is
         // the primary defence (it stops the session outright); this is the belt-and-braces half,
         // and it also covers a thread that is somewhere else entirely when the timeout fires.
@@ -212,7 +246,7 @@ impl VirtualDisplay for MutterDisplay {
         // 45 s (was 20 s): setups now queue on TOPOLOGY_LOCK, so a session behind a slow sibling
         // (whose guard spans up to a ~10 s stream wait + 6 s connector wait + the apply) must
         // outwait it plus its own handshake before this fires.
-        let (node_id, hold) = match setup_rx.recv_timeout(Duration::from_secs(45)) {
+        let (node_id, hold, achieved_hz) = match setup_rx.recv_timeout(Duration::from_secs(45)) {
             Ok(Ok(v)) => v,
             Ok(Err(e)) => bail!("Mutter virtual monitor failed: {e}"),
             Err(_) => bail!("timed out creating the Mutter virtual monitor"),
@@ -224,17 +258,22 @@ impl VirtualDisplay for MutterDisplay {
             node_id,
             w = mode.width,
             h = mode.height,
+            requested_hz = mode.refresh_hz,
+            achieved_hz,
             "Mutter virtual monitor ready"
         );
+        // Pace / encode off what DisplayConfig actually selected  -  claiming the client's request
+        // when Mutter stayed at ~60 Hz (no RecordVirtual `modes` refresh on Shell 46, or a
+        // rejected pin) made `pacing_hz` overdrive the encode loop with phantom repeats.
         Ok(VirtualOutput::owned(
             node_id,
-            Some((mode.width, mode.height, mode.refresh_hz)),
+            Some((mode.width, mode.height, achieved_hz)),
             Box::new(guard),
         ))
     }
 }
 
-/// Dropping this ends the keepalive thread, closing the D-Bus connection — Mutter then tears
+/// Dropping this ends the keepalive thread, closing the D-Bus connection  -  Mutter then tears
 /// the remote-desktop + screencast sessions (and the virtual monitor) down.
 struct StopGuard(Arc<AtomicBool>);
 
@@ -248,15 +287,15 @@ impl Drop for StopGuard {
 /// node id, then hold the connection until stopped. `first_in_group` gates the topology change (a
 /// non-first sibling extends into the group's already-exclusive desktop instead of re-clobbering it).
 /// `scale_key`/`remembered_scale` carry the per-client persisted scale: reapplied at connect,
-/// and the user's in-session changes are recorded back under the key (GNOME itself can't — see
+/// and the user's in-session changes are recorded back under the key (GNOME itself can't  -  see
 /// [`identity::ScaleMap`](crate::identity)).
 // TOPOLOGY_LOCK is deliberately held across the awaits of the setup/teardown sequences: each
 // session owns this dedicated OS thread and its own single-future runtime, so the guard never
-// blocks a shared executor — it blocks exactly the sibling session threads, which is the point
+// blocks a shared executor  -  it blocks exactly the sibling session threads, which is the point
 // (see TOPOLOGY_LOCK).
 #[allow(clippy::await_holding_lock)]
 fn session_thread(
-    setup_tx: Sender<Result<(u32, crate::monitor_hold::Hold), String>>,
+    setup_tx: Sender<Result<(u32, crate::monitor_hold::Hold, u32), String>>,
     stop: Arc<AtomicBool>,
     mode: Mode,
     first_in_group: bool,
@@ -264,6 +303,10 @@ fn session_thread(
     scale_key: String,
     remembered_scale: Option<f64>,
 ) {
+    // Probe ShellVersion BEFORE entering the session runtime  -  `shell_major` builds its own
+    // runtime, and nesting `block_on` inside this thread's later `rt.block_on` panics.
+    let shell_major = shell_major();
+    let modes_ok = record_virtual_modes_supported(shell_major);
     let rt = match tokio::runtime::Builder::new_multi_thread()
         .worker_threads(1)
         .enable_all()
@@ -276,7 +319,7 @@ fn session_thread(
         }
     };
     rt.block_on(async move {
-        // The whole setup — pre-snapshot → RecordVirtual → ApplyMonitorsConfig — is one
+        // The whole setup  -  pre-snapshot → RecordVirtual → ApplyMonitorsConfig  -  is one
         // read-modify-write on Mutter's monitor state; hold TOPOLOGY_LOCK across it so concurrent
         // sessions can't interleave rebuilds (gnome-shell SIGSEGV) or poison each other's
         // connector diffs. Released before the keepalive park below.
@@ -284,12 +327,12 @@ fn session_thread(
         // Display-management topology (Stage 2): the console policy's level, resolved to a concrete
         // value. `Extend` leaves the virtual output an extension (no config change); `Primary` makes
         // it the primary monitor but keeps the physicals as secondaries; `Exclusive` makes it the
-        // SOLE output (physicals disabled). `Auto` never reaches here — it's resolved upstream.
+        // SOLE output (physicals disabled). `Auto` never reaches here  -  it's resolved upstream.
         use crate::policy::Topology;
         let topo = crate::effective_topology();
         let topo_policy = matches!(topo, Topology::Primary | Topology::Exclusive);
         // Group-aware (§6.1): only the FIRST display of the group establishes the topology. A later
-        // sibling extends into the already-exclusive desktop — re-applying the sole-monitor config would
+        // sibling extends into the already-exclusive desktop  -  re-applying the sole-monitor config would
         // disable the first session's virtual output (Mutter connectors are un-nameable, so we can't
         // build a config that keeps all group virtuals; skipping is the safe choice). *Concurrent
         // Mutter exclusive is on-glass-validation-pending; the APPLY_TEMPORARY revert when the FIRST
@@ -297,12 +340,12 @@ fn session_thread(
         let want_config = first_in_group && topo_policy;
         if topo_policy && !first_in_group {
             tracing::info!(
-                "mutter: joining an existing display group — extending (the first session owns the \
+                "mutter: joining an existing display group  -  extending (the first session owns the \
                  exclusive/primary topology)"
             );
         }
         let exclusive = matches!(topo, Topology::Exclusive);
-        // Snapshot the monitor layout BEFORE the virtual output exists — it's how we tell the new
+        // Snapshot the monitor layout BEFORE the virtual output exists  -  it's how we tell the new
         // connector apart, both for the topology apply and for tracking the scale the user sets on
         // it. Taken unconditionally now (scale tracking wants it even when we won't touch the
         // topology); failure just degrades to no-topology + no-scale-persistence, as before.
@@ -320,14 +363,14 @@ fn session_thread(
             }
         };
 
-        let session = match connect(mode, hw_cursor, remembered_scale).await {
+        let session = match connect(mode, hw_cursor, remembered_scale, modes_ok).await {
             Ok(s) => s,
             Err(e) => {
                 let _ = setup_tx.send(Err(format!("{e:#}")));
                 return;
             }
         };
-        // DDC must run while physical panels are still active — before Exclusive drops them.
+        // DDC must run while physical panels are still active  -  before Exclusive drops them.
         if want_config && exclusive {
             crate::monitor_hold::arm_before_topology(true);
         }
@@ -335,21 +378,21 @@ fn session_thread(
         // listening any more. Hold is completed after the topology apply below.
         let mut hold = crate::monitor_hold::Hold::default();
         // Everything below this line mutates the operator's desktop topology on behalf of a session
-        // that, past this point, would have no way to undo it — so check the opener is still waiting
+        // that, past this point, would have no way to undo it  -  so check the opener is still waiting
         // before Exclusive work (same belt-and-braces as report_node).
         if stop.load(Ordering::Relaxed) {
             tracing::warn!(
-                "mutter: the opener gave up as the handshake completed — stopping without touching \
+                "mutter: the opener gave up as the handshake completed  -  stopping without touching \
                  the desktop topology"
             );
             let _ = session.rd_session.call_method("Stop", &()).await;
             return;
         }
 
-        // Identify the virtual connector (present now, absent in the pre-snapshot), then — when this
-        // session owns the topology — make it the PRIMARY monitor so the GNOME shell + new windows
+        // Identify the virtual connector (present now, absent in the pre-snapshot), then  -  when this
+        // session owns the topology  -  make it the PRIMARY monitor so the GNOME shell + new windows
         // land on the surface we stream. Without this, on a host that also has a physical monitor
-        // attached, the virtual output is an empty extended desktop — you stream only the wallpaper.
+        // attached, the virtual output is an empty extended desktop  -  you stream only the wallpaper.
         // Best-effort: any failure just logs and streaming continues unchanged.
         let mut tracked: Option<(zbus::Proxy<'static>, CurrentState, String)> = None;
         if let Some((dc, pre)) = dc_pre {
@@ -374,7 +417,7 @@ fn session_thread(
                             ),
                             Err(e) => tracing::warn!(
                                 error = %format!("{e:#}"),
-                                "mutter: could not set the virtual output primary; streaming continues — the desktop may render on the physical monitor"
+                                "mutter: could not set the virtual output primary; streaming continues  -  the desktop may render on the physical monitor"
                             ),
                         }
                     }
@@ -392,10 +435,56 @@ fn session_thread(
             crate::monitor_hold::arm_after_topology(&mut hold, exclusive);
         }
 
-        if setup_tx.send(Ok((session.node_id, hold))).is_err() {
+        // Read back the virtual head's *current* refresh (KWin does the same). On Mutter < 50 the
+        // RecordVirtual `modes` pin does not exist, so always clamp to ≤60 even if DisplayConfig
+        // echoes a high PipeWire-seeded rate. On 50+, trust the read-back (fallback conservative).
+        let mut achieved_hz = conservative_mutter_hz(mode.refresh_hz);
+        if modes_ok {
+            if let Some((dc, _pre, vconn)) = tracked.as_ref() {
+                match get_state(dc).await {
+                    Ok(post) => {
+                        achieved_hz = achieved_refresh_hz(&post, vconn, mode.refresh_hz);
+                        if achieved_hz != mode.refresh_hz {
+                            tracing::info!(
+                                requested_hz = mode.refresh_hz,
+                                achieved_hz,
+                                connector = %vconn,
+                                "mutter: virtual output refresh read back below the client request  -  \
+                                 pacing will follow the achieved rate"
+                            );
+                        }
+                    }
+                    Err(e) => tracing::warn!(
+                        error = %format!("{e:#}"),
+                        requested_hz = mode.refresh_hz,
+                        assumed_hz = achieved_hz,
+                        "mutter: could not read back virtual refresh  -  assuming a conservative rate"
+                    ),
+                }
+            } else if mode.refresh_hz > 60 {
+                tracing::warn!(
+                    requested_hz = mode.refresh_hz,
+                    assumed_hz = achieved_hz,
+                    "mutter: virtual connector unidentified  -  assuming a conservative refresh for pacing"
+                );
+            }
+        } else if mode.refresh_hz > 60 {
+            tracing::info!(
+                requested_hz = mode.refresh_hz,
+                achieved_hz,
+                shell_major = ?shell_major,
+                "mutter: Shell < 50  -  RecordVirtual cannot pin refresh; pacing at ≤60 Hz so PipeWire \
+                 does not seed a high-Hz CRTC over a ~50 fps damage source"
+            );
+        }
+
+        if setup_tx
+            .send(Ok((session.node_id, hold, achieved_hz)))
+            .is_err()
+        {
             tracing::warn!(
                 node_id = session.node_id,
-                "mutter: the virtual-output opener gave up before the handshake finished — stopping the \
+                "mutter: the virtual-output opener gave up before the handshake finished  -  stopping the \
                  session instead of parking on it (a parked session keeps the monitor, and its topology, alive)"
             );
             let _ = session.rd_session.call_method("Stop", &()).await;
@@ -403,7 +492,7 @@ fn session_thread(
         }
         if stop.load(Ordering::Relaxed) {
             tracing::warn!(
-                "mutter: the opener gave up as the handshake completed — stopping without parking"
+                "mutter: the opener gave up as the handshake completed  -  stopping without parking"
             );
             let _ = session.rd_session.call_method("Stop", &()).await;
             return;
@@ -413,7 +502,7 @@ fn session_thread(
 
         // Park, keeping `session` (and its zbus connection) alive until told to stop. Every ~5 s,
         // read the virtual output's logical-monitor scale and persist a change the user made (GNOME
-        // Settings mid-stream) under the client's key — polled rather than teardown-only so a host
+        // Settings mid-stream) under the client's key  -  polled rather than teardown-only so a host
         // crash/redeploy doesn't lose it.
         let mut known = remembered_scale.unwrap_or(1.0);
         let mut ticks: u32 = 0;
@@ -434,13 +523,13 @@ fn session_thread(
         // Tear down: STOP the screencast so Mutter removes the virtual output. We deliberately do NOT
         // re-assert the physical layout with our own ApplyMonitorsConfig. Issuing a monitor reconfig
         // while the just-removed high-refresh virtual output is still tearing down SIGSEGVs gnome-shell
-        // on Mutter 50 + NVIDIA — observed live on home-worker-3: the teardown ApplyMonitorsConfig
+        // on Mutter 50 + NVIDIA  -  observed live on home-worker-3: the teardown ApplyMonitorsConfig
         // returned "recipient disconnected from message bus" because the shell crashed mid-call, after
         // which GDM's crash-loop guard dropped to the greeter and wedged EVERY subsequent reconnect.
         // make_virtual_primary applied an APPLY_TEMPORARY config; Mutter reverts that on its own once
-        // the virtual output disappears and our DisplayConfig connection (in `tracked`) closes — so we
+        // the virtual output disappears and our DisplayConfig connection (in `tracked`) closes  -  so we
         // just drop it here and let the revert happen Mutter-side, never touching the layout ourselves.
-        // The Stop (+ the revert it triggers) is a topology mutation too — take TOPOLOGY_LOCK so a
+        // The Stop (+ the revert it triggers) is a topology mutation too  -  take TOPOLOGY_LOCK so a
         // sibling's teardown or setup can't interleave with the rebuild it causes.
         let _topology_guard = TOPOLOGY_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let _ = session.rd_session.call_method("Stop", &()).await;
@@ -448,12 +537,12 @@ fn session_thread(
     });
 }
 
-/// Record an **existing** monitor by connector — the monitor-mirror path
+/// Record an **existing** monitor by connector  -  the monitor-mirror path
 /// (`design/per-monitor-portal-capture.md` L2). Returns the PipeWire node id and the keepalive
 /// whose drop stops the recording.
 ///
 /// Same private ScreenCast API as the virtual path, one call different: `RecordMonitor` instead of
-/// `RecordVirtual`. So it inherits what makes that path work headlessly — Mutter's *direct* D-Bus
+/// `RecordVirtual`. So it inherits what makes that path work headlessly  -  Mutter's *direct* D-Bus
 /// API needs no interactive approval, unlike the xdg portal a background service could never answer.
 ///
 /// Deliberately **not** under [`TOPOLOGY_LOCK`]: that lock serializes operations which add/remove a
@@ -487,7 +576,7 @@ pub(crate) fn stream_existing_output(
     })
 }
 
-/// Stops the mirror thread — and with it the recording — when the capturer drops it.
+/// Stops the mirror thread  -  and with it the recording  -  when the capturer drops it.
 struct MirrorStop(Arc<AtomicBool>);
 
 impl Drop for MirrorStop {
@@ -530,7 +619,7 @@ fn mirror_thread(
             tokio::time::sleep(Duration::from_millis(200)).await;
         }
         // Stop the cast. Nothing else to undo: no virtual output was added, so there is no monitor
-        // removal for Mutter to rebuild around — the SIGSEGV-adjacent teardown ordering the virtual
+        // removal for Mutter to rebuild around  -  the SIGSEGV-adjacent teardown ordering the virtual
         // path has to observe simply doesn't arise here.
         let _ = session.rd_session.call_method("Stop", &()).await;
     });
@@ -566,11 +655,11 @@ async fn connect_monitor(connector: &str, hw_cursor: bool) -> Result<MutterSessi
     Ok(session)
 }
 
-/// Steps 1–2 of the handshake (module docs), shared by the virtual (`RecordVirtual`) and the mirror
+/// Steps 1 - 2 of the handshake (module docs), shared by the virtual (`RecordVirtual`) and the mirror
 /// (`RecordMonitor`) paths: session bus → RemoteDesktop session → ScreenCast session anchored to it.
 ///
 /// Hands back the *connection* alongside the two proxies because the connection IS the sessions'
-/// lifetime — drop it and Mutter tears them down, which is the whole RAII teardown model here.
+/// lifetime  -  drop it and Mutter tears them down, which is the whole RAII teardown model here.
 async fn open_rd_sc() -> Result<(zbus::Connection, zbus::Proxy<'static>, zbus::Proxy<'static>)> {
     let conn = zbus::Connection::session()
         .await
@@ -677,13 +766,13 @@ async fn start_and_await_node(
 
 /// Hand the node id back to the opener ([`MutterDisplay::create`] / [`stream_existing_output`]).
 ///
-/// A failed send means the opener ALREADY GAVE UP — its `recv_timeout` fired — so nothing will ever
+/// A failed send means the opener ALREADY GAVE UP  -  its `recv_timeout` fired  -  so nothing will ever
 /// drop this session's keepalive. The thread must unwind here rather than run on and park forever
 /// holding the D-Bus connection that *is* the monitor's lifetime. Returns `false` for "stop now".
 ///
 /// The other three portal/D-Bus backends have always done this (`kwin.rs`, `hyprland.rs`,
 /// `wlroots.rs` all `?` on the send); Mutter discarded it with `let _ =`, which on a timed-out
-/// create left an orphan thread that went on to apply a SOLE-monitor topology — every physical head
+/// create left an orphan thread that went on to apply a SOLE-monitor topology  -  every physical head
 /// dark, reverted only when the virtual monitor disappears, which the parked thread prevented.
 async fn report_node(setup_tx: &Sender<Result<u32, String>>, session: &MutterSession) -> bool {
     if setup_tx.send(Ok(session.node_id)).is_ok() {
@@ -691,7 +780,7 @@ async fn report_node(setup_tx: &Sender<Result<u32, String>>, session: &MutterSes
     }
     tracing::warn!(
         node_id = session.node_id,
-        "mutter: the virtual-output opener gave up before the handshake finished — stopping the \
+        "mutter: the virtual-output opener gave up before the handshake finished  -  stopping the \
          session instead of parking on it (a parked session keeps the monitor, and its topology, alive)"
     );
     let _ = session.rd_session.call_method("Stop", &()).await;
@@ -708,24 +797,29 @@ struct MutterSession {
 
 /// Run the four-step handshake (see module docs). `preferred_scale` is the client's remembered
 /// desktop scale, passed as the virtual mode's `preferred-scale` so Mutter creates the monitor
-/// already scaled (Mutter ≥ 48; older Mutter ignores unknown mode keys) — this covers the
+/// already scaled (Mutter ≥ 50; older Mutter ignores unknown mode keys)  -  this covers the
 /// `extend` topology, where we never issue our own ApplyMonitorsConfig.
 async fn connect(
     mode: Mode,
     hw_cursor: bool,
     preferred_scale: Option<f64>,
+    modes_ok: bool,
 ) -> Result<MutterSession> {
-    // 1–2. RemoteDesktop session (the anchor; also the future input path) + the ScreenCast session
+    // 1 - 2. RemoteDesktop session (the anchor; also the future input path) + the ScreenCast session
     // anchored to it.
     let (conn, rd_session, sc_session) = open_rd_sc().await?;
 
     // 3. The virtual monitor. For >60 Hz we pin the client's exact WxH@Hz via RecordVirtual's
-    // "modes" (explicit size + refresh-rate; Mutter ≥ 47) — validated at 5120×1440@240 on Mutter 50
-    // + NVIDIA. At ≤60 Hz we let Mutter derive the refresh from the PipeWire framerate (its 60 Hz
+    // "modes" (explicit size + refresh-rate; Mutter ≥ 50  -  validated at 5120×1440@240 on Mutter 50
+    // + NVIDIA). At ≤60 Hz we let Mutter derive the refresh from the PipeWire framerate (its 60 Hz
     // default is already correct), so the custom-mode path only runs when it buys something.
     // (A high-refresh virtual CRTC used to SIGSEGV gnome-shell on teardown, which is why this was
     // once gated behind SLIPSTREAM_MUTTER_VIRTUAL_REFRESH; the stop-screencast-before-any-monitor-
-    // reconfig teardown below fixed the crash, so pinning the client's refresh is now the default.)
+    // reconfig teardown below fixed the crash, so pinning the client's refresh is now the default
+    // on Mutter that can honour it.)
+    //
+    // Pre-50 Shells ignore `modes` refresh keys; do not send a high refresh-rate (and do not let
+    // `preferred_mode` claim one) or PipeWire seeds a high-Hz CRTC while damage stays ~50 fps.
     let mut rec: HashMap<&str, Value> = HashMap::new();
     rec.insert(
         "cursor-mode",
@@ -735,11 +829,11 @@ async fn connect(
             CURSOR_EMBEDDED
         }),
     );
-    if mode.refresh_hz > 60 || preferred_scale.is_some() {
+    // Pre-50: leave RecordVirtual at cursor-mode only. Size/refresh come from PipeWire's
+    // preferred_mode (clamped in create). Mutter 50+: pin WxH@Hz / preferred-scale via modes.
+    if modes_ok && (mode.refresh_hz > 60 || preferred_scale.is_some()) {
         let mut vmode: HashMap<&str, Value> = HashMap::new();
         vmode.insert("size", Value::from((mode.width, mode.height)));
-        // Only pin the refresh when it buys something (see above) — a remembered scale alone
-        // rides Mutter's 60 Hz default, exactly like the no-modes path did.
         if mode.refresh_hz > 60 {
             vmode.insert("refresh-rate", Value::from(mode.refresh_hz as f64));
         }
@@ -763,7 +857,7 @@ async fn connect(
 //
 // `RecordVirtual` adds the virtual monitor as an *extended* desktop. On a headless host that's the
 // only display, so the shell + windows live there. But when a physical monitor is attached, GNOME
-// keeps it primary and the virtual output is an empty extension — the stream shows only the
+// keeps it primary and the virtual output is an empty extension  -  the stream shows only the
 // wallpaper. We fix that by promoting the virtual output to primary (physical kept on, secondary)
 // via `org.gnome.Mutter.DisplayConfig.ApplyMonitorsConfig`, and restore on teardown.
 // ---------------------------------------------------------------------------------------------
@@ -803,7 +897,7 @@ type ApplyMon = (String, String, HashMap<String, Value<'static>>); // connector,
 type ApplyLogical = (i32, i32, f64, u32, bool, Vec<ApplyMon>);
 
 /// A DisplayConfig proxy on its own session-bus connection (owned, so it stays alive for the
-/// session — independent of the RemoteDesktop/ScreenCast connection).
+/// session  -  independent of the RemoteDesktop/ScreenCast connection).
 async fn display_config() -> Result<zbus::Proxy<'static>> {
     let conn = zbus::Connection::session()
         .await
@@ -844,6 +938,24 @@ fn current_mode_full(state: &CurrentState, connector: &str) -> Option<(String, i
     Some((pick.0.clone(), pick.1, pick.2, pick.3))
 }
 
+/// Hz the stream should pace at when DisplayConfig read-back is unavailable.
+///
+/// High client rates are only honest after a successful RecordVirtual `modes` pin (Mutter new
+/// enough). Without a read-back, never claim above 60  -  over-pacing floods the encode loop with
+/// repeated frames and scroll motion looks like jumps.
+fn conservative_mutter_hz(requested: u32) -> u32 {
+    requested.min(60).max(1)
+}
+
+/// Round DisplayConfig's current refresh for `connector` into an integer Hz for `preferred_mode`.
+/// Falls back to [`conservative_mutter_hz`] when the connector has no readable mode yet.
+fn achieved_refresh_hz(state: &CurrentState, connector: &str, requested: u32) -> u32 {
+    match current_mode_full(state, connector) {
+        Some((_, _, _, hz)) if hz.is_finite() && hz > 0.0 => hz.round().max(1.0) as u32,
+        _ => conservative_mutter_hz(requested),
+    }
+}
+
 /// As [`current_mode_full`] but dropping the refresh (callers that only place by width).
 fn current_mode(state: &CurrentState, connector: &str) -> Option<(String, i32, i32)> {
     current_mode_full(state, connector).map(|(id, w, h, _)| (id, w, h))
@@ -855,7 +967,7 @@ fn current_mode(state: &CurrentState, connector: &str) -> Option<(String, i32, i
 /// (`(id, w, h, refresh, is_current, is_preferred)`), return the `(mode_id, width)` to re-apply.
 ///
 /// Mutter re-derives its layout when the `RecordVirtual` output appears and can silently drop a
-/// 120 Hz panel to its EDID-preferred 60 Hz — so the post-virtual `is-current` is *already* 60 Hz.
+/// 120 Hz panel to its EDID-preferred 60 Hz  -  so the post-virtual `is-current` is *already* 60 Hz.
 /// We therefore prefer the PRE mode (its real refresh), resolved to a mode id valid at apply time;
 /// only when the physical genuinely no longer offers that mode do we fall back to the post-virtual
 /// current (never inventing a mode id `ApplyMonitorsConfig` would reject).
@@ -885,11 +997,11 @@ fn pick_keep_mode(
     {
         return Some((m.0.clone(), m.1));
     }
-    // The physical genuinely no longer offers that mode — use whatever is valid now.
+    // The physical genuinely no longer offers that mode  -  use whatever is valid now.
     state_current()
 }
 
-/// The `(mode_id, width)` a kept physical should be RE-APPLIED at — its PRE-connect mode preserved
+/// The `(mode_id, width)` a kept physical should be RE-APPLIED at  -  its PRE-connect mode preserved
 /// across Mutter's virtual-output layout re-derive. See [`pick_keep_mode`].
 fn physical_keep_mode(
     pre: &CurrentState,
@@ -932,8 +1044,8 @@ async fn wait_virtual_connector(
     let deadline = Instant::now() + Duration::from_secs(6);
     loop {
         let state = get_state(dc).await?;
-        // Everything absent from the pre-snapshot. Normally exactly one — TOPOLOGY_LOCK keeps a
-        // SIBLING session out of this window — but a physical hotplug is not ours to serialise, and
+        // Everything absent from the pre-snapshot. Normally exactly one  -  TOPOLOGY_LOCK keeps a
+        // SIBLING session out of this window  -  but a physical hotplug is not ours to serialise, and
         // this window is wide (a ~10 s stream wait plus up to 6 s of polling). Plugging a monitor in
         // during it used to hijack the identity outright, so the session's topology apply and its
         // scale persistence would then be aimed at the operator's new panel.
@@ -950,7 +1062,7 @@ async fn wait_virtual_connector(
                     chosen = pick.map(|m| m.0 .0.as_str()),
                     want = format!("{}x{}", mode.width, mode.height),
                     "mutter: more than one connector appeared while waiting for the virtual monitor \
-                     (a physical hotplug?) — picking the one advertising the client's mode"
+                     (a physical hotplug?)  -  picking the one advertising the client's mode"
                 );
             }
             pick.map(|m| m.0 .0.clone())
@@ -969,7 +1081,7 @@ async fn wait_virtual_connector(
 ///
 /// Disambiguate on what we actually asked Mutter for: the virtual monitor advertises the client's
 /// exact WxH (`make_virtual_primary` matches the same pair to pick its mode). Falling back to "the
-/// first new connector" keeps the old behaviour wherever that does not single one out — an older
+/// first new connector" keeps the old behaviour wherever that does not single one out  -  an older
 /// Mutter whose `RecordVirtual` mode list omits the size, or the ordinary case of exactly one.
 ///
 /// Split out of the polling loop so the choice is testable without a session bus.
@@ -984,8 +1096,8 @@ fn pick_virtual<'a>(fresh: &[&'a MonitorInfo], mode: Mode) -> Option<&'a Monitor
         .copied()
 }
 
-/// Make the virtual output the primary output — SOLE (`exclusive`: physicals disabled for the
-/// session) or with the physicals kept as secondaries — so the cursor, windows, and keyboard focus
+/// Make the virtual output the primary output  -  SOLE (`exclusive`: physicals disabled for the
+/// session) or with the physicals kept as secondaries  -  so the cursor, windows, and keyboard focus
 /// stay on the streamed surface. Applied at the client's `remembered_scale` (validated against the
 /// mode's supported scales; 1.0 when none is remembered) so a saved DPI setting survives the
 /// reconnect. Reverted by Mutter on teardown (APPLY_TEMPORARY).
@@ -998,14 +1110,16 @@ async fn make_virtual_primary(
     exclusive: bool,
     remembered_scale: Option<f64>,
 ) -> Result<()> {
-    // Prefer the mode matching the client's WxH; fall back to whatever is current.
+    // Prefer the mode matching the client's WxH at the closest refresh; fall back to current.
     let vmode = state
         .1
         .iter()
         .find(|m| m.0 .0 == vconn)
         .and_then(|m| {
+            let want_hz = mode.refresh_hz as f64;
             m.1.iter()
-                .find(|md| md.1 == mode.width as i32 && md.2 == mode.height as i32)
+                .filter(|md| md.1 == mode.width as i32 && md.2 == mode.height as i32)
+                .min_by(|a, b| (a.3 - want_hz).abs().total_cmp(&(b.3 - want_hz).abs()))
                 .map(|md| md.0.clone())
         })
         .or_else(|| current_mode(state, vconn).map(|(id, _, _)| id));
@@ -1013,12 +1127,12 @@ async fn make_virtual_primary(
         bail!("virtual monitor {vconn} has no usable mode yet");
     };
     // The scale to apply. Mutter (≥ its `preferred-scale` support) already derived the virtual's
-    // logical monitor at the remembered scale we passed to RecordVirtual, PRE-VALIDATED — preserve
+    // logical monitor at the remembered scale we passed to RecordVirtual, PRE-VALIDATED  -  preserve
     // that instead of forcing a value (forcing 1.0 here was the original scale-clobber bug). On an
-    // older Mutter the derived scale stays 1.0 while a scale is remembered — try the remembered
+    // older Mutter the derived scale stays 1.0 while a scale is remembered  -  try the remembered
     // value snapped to an integral logical size (Mutter's fractional-scaling validity rule;
     // GetCurrentState reports NO supported-scales for virtual monitors to snap to), and retry at
-    // the derived scale if the whole apply is rejected (an invalid scale fails the entire config —
+    // the derived scale if the whole apply is rejected (an invalid scale fails the entire config  -
     // losing the primary switch over scaling would be worse).
     let derived = logical_scale(state, vconn)
         .filter(|s| s.is_finite() && *s > 0.0)
@@ -1056,7 +1170,7 @@ async fn make_virtual_primary(
                     scale,
                     derived,
                     error = %format!("{e:#}"),
-                    "mutter: ApplyMonitorsConfig at the remembered scale failed — retrying at the derived scale"
+                    "mutter: ApplyMonitorsConfig at the remembered scale failed  -  retrying at the derived scale"
                 );
                 scale = derived;
             }
@@ -1067,7 +1181,7 @@ async fn make_virtual_primary(
     }
 }
 
-/// Snap `want` to the nearest scale that gives the mode an **integral logical size** — Mutter only
+/// Snap `want` to the nearest scale that gives the mode an **integral logical size**  -  Mutter only
 /// accepts fractional scales where both `width/scale` and `height/scale` are integers, and its
 /// GetCurrentState reports no `supported-scales` for virtual monitors to snap to. Searches the few
 /// logical widths around the target for one that keeps the aspect exact; falls back to `want`
@@ -1096,7 +1210,7 @@ fn logical_scale(state: &CurrentState, connector: &str) -> Option<f64> {
 
 /// Every head Mutter reports, for [`crate::monitors::list`].
 ///
-/// A pure `GetCurrentState` read on its own short-lived connection + runtime — no session, no
+/// A pure `GetCurrentState` read on its own short-lived connection + runtime  -  no session, no
 /// `ApplyMonitorsConfig`, so it never touches the topology and never contends [`TOPOLOGY_LOCK`].
 /// Geometry comes from the **logical** monitors (`state.2`), which is the coordinate space that
 /// matters (see `crate::monitors`); a monitor absent from every logical monitor is disabled, and is
@@ -1134,7 +1248,7 @@ pub(crate) fn list_monitors() -> Result<Vec<crate::monitors::PhysicalMonitor>> {
                 scale: logical.map(|l| l.2).filter(|s| *s > 0.0).unwrap_or(1.0),
                 primary: logical.map(|l| l.4).unwrap_or(false),
                 enabled: logical.is_some(),
-                // Mutter names a `RecordVirtual` monitor indistinguishably from a physical one —
+                // Mutter names a `RecordVirtual` monitor indistinguishably from a physical one  -
                 // no prefix to key on, and the connector is minted per session. See the field doc.
                 managed: false,
             }
@@ -1167,10 +1281,10 @@ async fn persist_scale_change(dc: &zbus::Proxy<'_>, vconn: &str, scale_key: &str
     }
 }
 
-/// **Exclusive** — the virtual output as the SOLE, primary monitor: physical outputs are omitted, so
+/// **Exclusive**  -  the virtual output as the SOLE, primary monitor: physical outputs are omitted, so
 /// Mutter disables them for the session. This confines the cursor, windows, and keyboard focus to the
 /// streamed surface; keeping the physical enabled as a *secondary* monitor instead lets relative
-/// pointer motion and window focus wander onto it (invisible to the client — the cursor seems to
+/// pointer motion and window focus wander onto it (invisible to the client  -  the cursor seems to
 /// vanish). The physical layout is restored on teardown.
 fn build_exclusive_config(vconn: &str, vmode: &str, scale: f64) -> Vec<ApplyLogical> {
     vec![(
@@ -1183,7 +1297,7 @@ fn build_exclusive_config(vconn: &str, vmode: &str, scale: f64) -> Vec<ApplyLogi
     )]
 }
 
-/// **Primary** — the virtual output primary at `(0, 0)`, with every currently-active physical
+/// **Primary**  -  the virtual output primary at `(0, 0)`, with every currently-active physical
 /// monitor KEPT as a secondary (laid left-to-right past the virtual, each at its **pre-connect**
 /// mode). So the shell + new windows land on the streamed surface, but the operator's physical
 /// screen stays on **at its real refresh**. On a headless host (no physicals) this is identical to
@@ -1192,9 +1306,9 @@ fn build_exclusive_config(vconn: &str, vmode: &str, scale: f64) -> Vec<ApplyLogi
 /// `pre` is the snapshot taken *before* the virtual output existed (physical still at its true
 /// refresh); `state` is the post-virtual state. We read each physical's mode from `pre` because
 /// Mutter can knock a 120 Hz panel down to 60 Hz when it re-derives the layout for the virtual
-/// monitor — reading `state` would cement that 60 Hz (`physical_keep_mode`).
+/// monitor  -  reading `state` would cement that 60 Hz (`physical_keep_mode`).
 ///
-/// *Physical-keep is unvalidated on-glass* — the lab boxes are headless (no attached display to keep
+/// *Physical-keep is unvalidated on-glass*  -  the lab boxes are headless (no attached display to keep
 /// on); the layout math is conservative (append to the right) but wants a display-attached box.
 fn build_primary_keeping_physicals(
     pre: &CurrentState,
@@ -1213,7 +1327,7 @@ fn build_primary_keeping_physicals(
         vec![(vconn.to_string(), vmode.to_string(), HashMap::new())],
     )];
     // Append each physical (non-virtual) connector that has a usable mode, to the right of the
-    // virtual output, as a non-primary secondary — at its PRE-connect mode (real refresh preserved).
+    // virtual output, as a non-primary secondary  -  at its PRE-connect mode (real refresh preserved).
     // Offsets are in the layout's coordinate space: LOGICAL pixels by default on Wayland (the
     // virtual's footprint is width/scale), physical pixels only under layout-mode 2.
     let physical_layout = matches!(
@@ -1248,7 +1362,10 @@ fn build_primary_keeping_physicals(
 
 #[cfg(test)]
 mod tests {
-    use super::{pick_keep_mode, pick_virtual, snap_integral_scale, HashMap, Mode, MonitorInfo};
+    use super::{
+        conservative_mutter_hz, pick_keep_mode, pick_virtual, snap_integral_scale, HashMap, Mode,
+        MonitorInfo,
+    };
 
     // (id, w, h, refresh, is_current, is_preferred)
     fn m(
@@ -1280,7 +1397,7 @@ mod tests {
     #[test]
     fn keep_mode_rekeyed_id_matches_by_geometry_and_refresh() {
         // The pre id is no longer offered (Mutter re-keyed the mode list), but a 120 Hz mode of the
-        // same geometry exists — match it so the real refresh survives.
+        // same geometry exists  -  match it so the real refresh survives.
         let pre = Some(("old-120".to_string(), 2560, 1440, 120.0));
         let state = vec![
             m("new-120", 2560, 1440, 119.998, false, false),
@@ -1295,7 +1412,7 @@ mod tests {
     #[test]
     fn keep_mode_falls_back_to_state_current_when_pre_mode_gone() {
         // The physical genuinely no longer offers its pre mode (e.g. cable renegotiated to a lower
-        // max) — never invent an id; use the post-virtual current.
+        // max)  -  never invent an id; use the post-virtual current.
         let pre = Some(("gone-165".to_string(), 3440, 1440, 165.0));
         let state = vec![
             m("s-100", 3440, 1440, 100.0, true, false),
@@ -1311,7 +1428,7 @@ mod tests {
     fn snap_integral_scale_keeps_valid_scales_and_snaps_odd_ones() {
         // Already-integral scales survive exactly: 1920/1.5 = 1280, 1080/1.5 = 720.
         assert_eq!(snap_integral_scale(1.5, 1920, 1080), 1.5);
-        // The GNOME fractional 1.6666… on 3840x2400 (logical 2304x1440) survives.
+        // The GNOME fractional 1.6666... on 3840x2400 (logical 2304x1440) survives.
         let s = snap_integral_scale(1.666_666_6, 3840, 2400);
         assert!((s - 3840.0 / 2304.0).abs() < 1e-9, "got {s}");
         // A scale with no integral logical size nearby snaps to the closest one that has it:
@@ -1321,6 +1438,15 @@ mod tests {
         // Junk input degrades to 1.0.
         assert_eq!(snap_integral_scale(f64::NAN, 1920, 1080), 1.0);
         assert_eq!(snap_integral_scale(-2.0, 1920, 1080), 1.0);
+    }
+
+    #[test]
+    fn conservative_mutter_hz_never_claims_high_refresh_without_readback() {
+        assert_eq!(conservative_mutter_hz(240), 60);
+        assert_eq!(conservative_mutter_hz(120), 60);
+        assert_eq!(conservative_mutter_hz(60), 60);
+        assert_eq!(conservative_mutter_hz(30), 30);
+        assert_eq!(conservative_mutter_hz(0), 1);
     }
 
     #[test]
@@ -1387,7 +1513,7 @@ mod tests {
     }
 
     /// A physical hotplug lands in the same window (TOPOLOGY_LOCK only keeps SIBLING sessions out).
-    /// The client's exact mode is what tells the two apart — without it the hotplugged panel used to
+    /// The client's exact mode is what tells the two apart  -  without it the hotplugged panel used to
     /// win whenever it sorted first, and the session's topology apply and scale persistence were
     /// then aimed at the operator's monitor.
     #[test]
@@ -1401,7 +1527,7 @@ mod tests {
         );
     }
 
-    /// Ambiguous — nothing advertises the client's size. Falling back to the first keeps the old
+    /// Ambiguous  -  nothing advertises the client's size. Falling back to the first keeps the old
     /// behaviour rather than failing the session; the caller logs a warning when it happens.
     #[test]
     fn with_no_mode_match_the_first_still_wins() {
@@ -1418,7 +1544,7 @@ mod tests {
         assert!(pick_virtual(&[], M).is_none());
     }
 
-    /// Live GNOME round trip — the on-glass lever for this backend, same convention as the Windows
+    /// Live GNOME round trip  -  the on-glass lever for this backend, same convention as the Windows
     /// backend's `live_create_drop`. Exercises the real four-step handshake end to end: create the
     /// virtual monitor, hold it, then drop the keepalive and let the RAII teardown revert it.
     ///
@@ -1429,7 +1555,7 @@ mod tests {
     /// ```
     /// **Set that variable** unless you mean to exercise the exclusive topology: without it the
     /// default resolves to `Exclusive`, which disables the box's physical heads for the duration
-    /// (they come back on teardown — that is what this test also proves, but on a box you are
+    /// (they come back on teardown  -  that is what this test also proves, but on a box you are
     /// sitting at, do it deliberately).
     #[test]
     #[ignore = "needs a live gnome-shell on the session bus; run with --ignored"]
@@ -1451,16 +1577,18 @@ mod tests {
             started.elapsed()
         );
         assert!(out.node_id > 0, "a real PipeWire node id");
-        assert_eq!(
-            out.preferred_mode,
-            Some((mode.width, mode.height, mode.refresh_hz))
-        );
+        let pref = out.preferred_mode.expect("preferred_mode set");
+        assert_eq!((pref.0, pref.1), (mode.width, mode.height));
+        // Achieved Hz is read back from DisplayConfig (may be below the request on older Mutter).
+        assert!(pref.2 >= 1, "achieved refresh must be positive");
 
         std::thread::sleep(std::time::Duration::from_secs(3));
         drop(out);
         // The keepalive's Drop only SIGNALS the thread; give it more than one 200 ms tick to run
         // the Stop + topology revert before the harness exits and takes the process with it.
         std::thread::sleep(std::time::Duration::from_secs(2));
-        println!("dropped — gnome-shell should have removed the monitor and reverted the topology");
+        println!(
+            "dropped  -  gnome-shell should have removed the monitor and reverted the topology"
+        );
     }
 }

@@ -1,71 +1,34 @@
 ---
 title: Introduction
-description: Low-latency desktop and game streaming from a Linux host to iPhone, Android, and Steam Deck.
+description: Low-latency desktop and game streaming from a Linux host.
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card'
 
-**Slipstream** streams your desktop or games from a **Linux host** to your other devices - an
-iPhone, an Android phone or TV, a Steam Deck - at low latency and at **each device's own resolution
-and refresh rate**. Install the host, connect a client, and you're streaming.
+**Slipstream** streams your desktop or games from a **Linux host** to another device at that
+device's own resolution and refresh rate.
 
-People use it two ways:
+**Clients:** iPhone, Android (phone and TV), Steam Deck. Any [Moonlight](https://moonlight-stream.org/)
+client works when you enable GameStream.
 
-- **Play** - stream games from a powerful Linux box to the couch, a Steam Deck, or a phone, with a
-  self-filling game library and Moonlight compatibility when you want it.
-- **Work** - use your real home or workstation desktop from another network over a LAN or VPN, with
-  absolute mouse, clipboard, and Workstation / Hot-desk display presets.
+**Model:** private LAN or VPN. No accounts, no cloud relay. Pair once with a PIN, then reconnect on
+a pinned identity.
 
-What that means in practice:
-
-- **Your device's exact mode.** The host spins up a virtual display sized to the client that's
-  connecting, 1080p60 to one device, 1440p120 to another, at the same time. No letterboxing, no
-  scaling, no juggling your real monitors.
-- **Low latency, GPU end to end.** Frames go straight from the compositor to the GPU encoder,
-  NVENC on NVIDIA, Vulkan Video or VAAPI on AMD and Intel, with no CPU copies on the paths where
-  that's been validated (the
-  [support matrix](/docs/support-matrix#zero-copy-capture-to-encode) says which), and over a
-  transport tuned for responsiveness rather than throughput.
-- **Works with the apps you already have.** Slipstream also speaks the GameStream protocol, so with
-  `--gamestream` any **Moonlight** client connects, alongside a faster **native protocol** with
-  dedicated apps for **iPhone, Android, and Steam Deck**.
-- **Secure by default.** Hosts require a one-time PIN pairing; after that, devices reconnect on a
-  pinned identity. No accounts, no cloud.
-
-## Pick your path
-
-**New here? Start with the [Quick Start](/docs/quickstart)**, it takes you from nothing to a
-stream and links out to the detail as you need it. The rest of these are for when you want depth.
+## Start here
 
 <Cards>
-  <Card title="Quick Start" href="/docs/quickstart" description="From nothing to streaming: set up a Linux host and connect your first client." />
-  <Card title="Play" href="/docs/play" description="Couch and LAN game streaming: Capture mouse, library, HDR, controllers, and display presets." />
-  <Card title="Desktop at work" href="/docs/desktop-at-work" description="Reach your real desktop over VPN: mouse, clipboard, presets, and recommended settings." />
-  <Card title="Network & VPN" href="/docs/network-and-vpn" description="Trusted LAN model, Tailscale and WireGuard, discovery, ports, and firewalls." />
-  <Card title="Picture quality" href="/docs/picture-quality" description="Bitrate, codecs, chroma, soft text, HDR trade-offs, and when PyroWave belongs." />
-  <Card title="How It Works" href="/docs/how-it-works" description="Virtual displays, the capture path, native vs GameStream, pairing, and latency for games vs desk work." />
-  <Card title="Support Matrix" href="/docs/support-matrix" description="What works where, every host desktop, GPU and client app, each cell read out of the code that decides it." />
-  <Card title="Install the Host" href="/docs/install" description="Add the repo and install the package: Ubuntu, Fedora, Arch, Bazzite, SteamOS, or NixOS." />
-  <Card title="Connect a Client" href="/docs/clients" description="Stream with the native app for iPhone, Android, or Steam Deck, or any Moonlight client." />
-  <Card title="Your Game Library" href="/docs/game-library" description="The host finds your installed games by itself, browse a paired host and launch a title straight into the stream." />
-  <Card title="API Reference" href="/api" description="Interactive OpenAPI reference for the host's management REST API, status, devices, pairing, library." />
+  <Card title="Quick start" href="/docs/quickstart" description="Host install, console password, pair, stream." />
+  <Card title="Install" href="/docs/install" description="Packages for Ubuntu, Fedora, Arch, Bazzite, SteamOS, NixOS." />
+  <Card title="Clients" href="/docs/clients" description="iPhone, Android, Steam Deck, and Moonlight." />
+  <Card title="Troubleshooting" href="/docs/troubleshooting" description="Discovery, black screen, input, VPN." />
+  <Card title="Support matrix" href="/docs/support-matrix" description="What works on which compositor, GPU, and client." />
+  <Card title="API" href="/api" description="Host management OpenAPI reference." />
 </Cards>
 
 ## What you need
 
-- A **Linux host** with an NVIDIA, AMD, or Intel GPU (there's a software encoder to fall back on
-  without one), running one of the [supported setups](/docs/requirements): **Ubuntu**, **Fedora**,
-  **Arch**, **Bazzite**, or **SteamOS**. What each combination can actually do, codecs, HDR, 4:4:4,
-  cursor, input, is in the [Support matrix](/docs/support-matrix).
-- A **client device** to stream to: native apps for **iPhone**, **Android** (phone and Android TV),
-  and **Steam Deck**, plus any device that runs **Moonlight**.
-- Both on the **same network** (LAN or VPN). Slipstream is designed for a trusted local network -
-  including the path from an office device back to a home desktop over a VPN.
+- A **Linux** machine with an NVIDIA, AMD, or Intel GPU (software encode is available as a fallback).
+- A client: **iPhone**, **Android**, **Steam Deck**, or **Moonlight**.
+- The same **LAN or VPN**. Do not expose host ports on the public internet.
 
-Ready? Head to the [Quick Start](/docs/quickstart).
-
-## Community
-
-Questions, help, or want to try the **Android beta**? Join the
-[**Discord**](https://discord.gg/kaPNvzMuGU), request a tester invite there, or
-[**r/Slipstream**](https://www.reddit.com/r/Slipstream/) on Reddit.
+Community: [Discord](https://discord.gg/kaPNvzMuGU) · [r/Slipstream](https://www.reddit.com/r/Slipstream/)

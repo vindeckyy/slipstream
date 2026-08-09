@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# slipstream-sysext — install/update the slipstream host on Bazzite / Fedora Atomic as a
+# slipstream-sysext  -  install/update the slipstream host on Bazzite / Fedora Atomic as a
 # systemd-sysext, the no-layering path (rpm-ostree layering is a last resort per the Bazzite
 # docs: it slows every update and can block upgrades; a sysext never enters an rpm-ostree
 # transaction, needs no reboot, and is trivially removable).
@@ -16,15 +16,15 @@
 #   sudo slipstream-sysext update | status | remove
 #
 # Feed: set SLIPSTREAM_SYSEXT_REGISTRY to the base URL of your sysext feed (one feed per
-# Fedora major x channel under that base: …/f43/, f43-canary, f44, …), each a SHA256SUMS +
+# Fedora major x channel under that base: .../f43/, f43-canary, f44, ...), each a SHA256SUMS +
 # SHA256SUMS.asc + versioned .raw files. There is no baked-in public default; private setups
 # typically point this at a generic package registry or a GitHub Releases-mirrored path.
-# Published historically by .github/workflows/rpm.yml from the same RPMs the (legacy) layering
+# Published historically by GitHub Actions from the same RPMs the (legacy) layering
 # path uses. The image pins ID=fedora + VERSION_ID, so after a major OS rebase the old image is
 # refused (not merged broken) and `slipstream-sysext update` re-resolves against the new release.
 #
-# Trust: SHA256SUMS carries a detached OpenPGP signature (SHA256SUMS.asc) from packages@unom.io —
-# the same key that signs our RPMs — and this script verifies it before believing a word of the
+# Trust: SHA256SUMS carries a detached OpenPGP signature (SHA256SUMS.asc) from the embedded release signing key  -
+# the same key that signs our RPMs  -  and this script verifies it before believing a word of the
 # manifest. The checksums alone could never have done that: they live on the same registry as the
 # images they describe, so anything able to replace an image could replace its checksum too. The
 # public key is baked in below rather than fetched, because a key fetched from the thing you are
@@ -44,8 +44,8 @@ MARKER=/usr/lib/extension-release.d/extension-release.slipstream
 ETC_SRC=/usr/share/slipstream/etc
 PF_TMP="$(mktemp -d)"; trap 'rm -rf "$PF_TMP"' EXIT
 
-# The feed's signing key: slipstream packages <packages@unom.io>, AF245C506F4E4763. Identical to
-# packaging/rpm/RPM-GPG-KEY-slipstream — ONE key signs both the RPMs and this feed, so rotating it
+# The feed's signing key: slipstream packages <the embedded release signing key>, the configured signing key. Identical to
+# packaging/rpm/RPM-GPG-KEY-slipstream  -  ONE key signs both the RPMs and this feed, so rotating it
 # means updating both copies (the rotation runbook in packaging/rpm/README.md says so, and
 # publish-sysext-feed.sh refuses to sign if the two ever disagree).
 FEED_KEY='-----BEGIN PGP PUBLIC KEY BLOCK-----
@@ -77,10 +77,10 @@ feed_url() {
 
 # verify_manifest SUMS SIG -> 0 iff SIG is a good detached signature over SUMS by FEED_KEY.
 #   A throwaway keyring holding exactly our one key, so "good signature" and "signed by us" are the
-#   same statement — any other signer comes back NO_PUBKEY, and gpg exits non-zero.
+#   same statement  -  any other signer comes back NO_PUBKEY, and gpg exits non-zero.
 #   Spelled out with plain `if`s rather than `cond && action`: under `set -e` a failing test at the
 #   end of an && list is a trap that only bites on the path nobody exercises (here: a corrupt
-#   FEED_KEY), and this function must never abort the script — its whole job is to return a verdict.
+#   FEED_KEY), and this function must never abort the script  -  its whole job is to return a verdict.
 verify_manifest() {
   local home rc=1
   home="$(mktemp -d)"; chmod 700 "$home"
@@ -100,23 +100,23 @@ fetch_manifest() {
   sums="$PF_TMP/SHA256SUMS"; sig="$PF_TMP/SHA256SUMS.asc"
   curl -fsSL -o "$sums" "$feed/SHA256SUMS" || { echo "cannot reach the feed $feed" >&2; return 1; }
   if [ "${SLIPSTREAM_SYSEXT_ALLOW_UNSIGNED:-0}" = 1 ]; then
-    echo "!! SLIPSTREAM_SYSEXT_ALLOW_UNSIGNED=1 — the feed manifest is NOT being verified." >&2
+    echo "!! SLIPSTREAM_SYSEXT_ALLOW_UNSIGNED=1  -  the feed manifest is NOT being verified." >&2
     return 0
   fi
-  # curl's own "404"/"could not open file" is noise here — a missing signature is an expected
+  # curl's own "404"/"could not open file" is noise here  -  a missing signature is an expected
   # state with a much better explanation below, so swallow it and say the useful thing instead.
   if ! curl -fsSL -o "$sig" "$feed/SHA256SUMS.asc" 2>/dev/null; then
-    echo "!! the feed $feed has no SHA256SUMS.asc — refusing to install from an unsigned feed." >&2
+    echo "!! the feed $feed has no SHA256SUMS.asc  -  refusing to install from an unsigned feed." >&2
     echo "!! (a feed published before signing existed; it is sealed on the next publish. To install" >&2
     echo "!!  from it anyway, knowing the images are unauthenticated: SLIPSTREAM_SYSEXT_ALLOW_UNSIGNED=1)" >&2
     return 1
   fi
   if ! command -v gpg >/dev/null 2>&1; then
-    echo "!! gpg not found — cannot verify the feed signature. Install gnupg2." >&2
+    echo "!! gpg not found  -  cannot verify the feed signature. Install gnupg2." >&2
     return 1
   fi
   if ! verify_manifest "$sums" "$sig"; then
-    echo "!! the feed's SHA256SUMS is NOT signed by packages@unom.io (AF245C506F4E4763)." >&2
+    echo "!! the feed's SHA256SUMS does not match the embedded release signing key." >&2
     echo "!! Someone has tampered with the feed, or the signing key was rotated and this script is" >&2
     echo "!! older than the rotation. Do not install; re-download slipstream-sysext.sh and retry." >&2
     return 1
@@ -125,7 +125,7 @@ fetch_manifest() {
 }
 
 # latest -> "VERSION FILENAME SHA256" for the newest image in the VERIFIED manifest (version sort).
-#   Call fetch_manifest first — reading $PF_TMP/SHA256SUMS directly is what keeps the signature
+#   Call fetch_manifest first  -  reading $PF_TMP/SHA256SUMS directly is what keeps the signature
 #   check off the subshell path, where an `exit` would have vanished into a command substitution.
 latest() {
   awk '$2 ~ /^slipstream-.*-x86-64\.raw$/ { v=$2; sub(/^slipstream-/,"",v); sub(/-x86-64\.raw$/,"",v); print v, $2, $1 }' \
@@ -143,12 +143,12 @@ merged() { [ -f "$MARKER" ]; }
 
 post_merge() {
   if ! merged; then
-    echo "!! image installed but NOT merged — 'systemd-sysext status' / 'journalctl -u systemd-sysext'" >&2
+    echo "!! image installed but NOT merged  -  'systemd-sysext status' / 'journalctl -u systemd-sysext'" >&2
     echo "!! (an OS release the image doesn't match? 'slipstream-sysext update' fetches the right one)" >&2
     return 1
   fi
   # What the RPM scriptlets would have done: pick up the uinput/uhid rule + the UDP buffer
-  # sysctl now, no reboot (both also auto-apply at boot once merged — the files live in /usr/lib).
+  # sysctl now, no reboot (both also auto-apply at boot once merged  -  the files live in /usr/lib).
   udevadm control --reload 2>/dev/null || :
   udevadm trigger --subsystem-match=misc 2>/dev/null || :
   for f in /usr/lib/sysctl.d/99-slipstream-net.conf /usr/lib/sysctl.d/99-slipstream-client-net.conf; do
@@ -156,7 +156,7 @@ post_merge() {
   done
   # vhci-hcd: the usbip transport that makes the virtual Steam Deck pad a real USB device Steam
   # Input adopts. Without it the pad falls back to plain UHID hid-steam, which Steam Input won't
-  # promote (Interface: -1) — so on a host in Game Mode the controller never appears and you can't
+  # promote (Interface: -1)  -  so on a host in Game Mode the controller never appears and you can't
   # navigate. Two things must be true at boot: the module loaded, and the vhci `attach`/`detach`
   # sysfs files opened to the `input` group (the host runs unprivileged and can't modprobe/chown).
   #
@@ -171,7 +171,7 @@ post_merge() {
   install -Dm0644 /usr/lib/udev/rules.d/60-slipstream.rules /etc/udev/rules.d/60-slipstream.rules 2>/dev/null || :
   udevadm control --reload 2>/dev/null || :
   # The (empty) opt-in group for web-console-triggered updates (the sysext ships the ss-update
-  # helper + unit + polkit rule in its /usr; the group can't ride an image) — nobody is auto-added.
+  # helper + unit + polkit rule in its /usr; the group can't ride an image)  -  nobody is auto-added.
   getent group slipstream-update >/dev/null 2>&1 || groupadd --system slipstream-update 2>/dev/null || :
   modprobe vhci-hcd 2>/dev/null || :
   # Re-fire the vhci rule against the (possibly already-present) controller so attach/detach pick up
@@ -200,11 +200,11 @@ do_install() {
     cp -f "$2" "$tmp"
   else
     ver="$1"
-    echo "downloading slipstream $ver ($(channel), fedora $(os_version_id))…"
+    echo "downloading slipstream $ver ($(channel), fedora $(os_version_id))..."
     curl -fL --progress-bar -o "$tmp" "$(feed_url)/$2"
     echo "$3  $tmp" | sha256sum -c --quiet
   fi
-  mv -f "$tmp" "$IMG"          # marker inside is extension-release.slipstream — name must match
+  mv -f "$tmp" "$IMG"          # marker inside is extension-release.slipstream  -  name must match
   echo "$ver" > "$SIDECAR"
   systemctl enable --now systemd-sysext.service >/dev/null 2>&1 || :
   systemd-sysext refresh
@@ -264,7 +264,7 @@ cmd_update() {
   [ -n "$l" ] || { echo "no image in the feed $(feed_url)" >&2; exit 1; }
   ver="${l%% *}"
   if [ "$ver" = "$cur" ] && merged; then
-    echo "already on $cur (channel $(channel)) — nothing to do."
+    echo "already on $cur (channel $(channel))  -  nothing to do."
     return
   fi
   echo "updating: ${cur:-<none>} -> $ver"
@@ -286,7 +286,7 @@ cmd_status() {
   else
     echo "latest:     (unavailable)"
   fi
-  # Unconditionally — fetch_manifest also warns on SUCCESS (ALLOW_UNSIGNED), and a status command
+  # Unconditionally  -  fetch_manifest also warns on SUCCESS (ALLOW_UNSIGNED), and a status command
   # that hides "this feed is not being verified" is worse than one that prints nothing at all.
   [ -s "$PF_TMP/status.err" ] && sed 's/^/            /' "$PF_TMP/status.err" >&2
   return 0
@@ -294,7 +294,7 @@ cmd_status() {
 
 cmd_remove() {
   need_root
-  # /etc cleanup needs the /usr payload for the unmodified-compare — do it BEFORE unmerging.
+  # /etc cleanup needs the /usr payload for the unmodified-compare  -  do it BEFORE unmerging.
   if merged; then
     if cmp -s "$ETC_SRC/gamescope-session-plus/sessions.d/steam" \
               /etc/gamescope-session-plus/sessions.d/steam 2>/dev/null; then

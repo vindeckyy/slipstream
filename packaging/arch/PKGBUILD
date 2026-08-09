@@ -8,18 +8,18 @@
 # Two build modes:
 #   - AUR / standalone:  makepkg in this dir (fetches the git tag below).
 #   - In-tree / CI:       PF_SRCDIR=$(git rev-parse --show-toplevel) makepkg --holdver
-#                         (builds the working tree instead of the tagged source — see build()).
+#                         (builds the working tree instead of the tagged source  -  see build()).
 #
-# Host encode: NVENC on NVIDIA (nvidia-utils), VAAPI on AMD/Intel (mesa) — SLIPSTREAM_ENCODER=auto
+# Host encode: NVENC on NVIDIA (nvidia-utils), VAAPI on AMD/Intel (mesa)  -  SLIPSTREAM_ENCODER=auto
 # picks per GPU. The CLIENT decodes via VAAPI (AMD/Intel, incl. the Deck) with a software
 # fallback, so it works everywhere. See README.md.
 pkgbase=slipstream
 # slipstream-web (the browser console) and slipstream-scripting (the plugin/script runner) are OPT-IN:
 # both need `bun` (AUR-only as bun-bin on stock Arch/SteamOS), so a default makepkg builds only
-# host+client with no JS tooling — mirroring the RPM spec's `%bcond_with web` / `%bcond_with
+# host+client with no JS tooling  -  mirroring the RPM spec's `%bcond_with web` / `%bcond_with
 # scripting` (off by default). Set PF_WITH_WEB=1 / PF_WITH_SCRIPTING=1 to also build them (each
 # appends its pkgname + bun to makedepends below).
-# aarch64 (Arch Linux ARM) is CLIENT-ONLY — see the `arch` note below. Dropping the host from
+# aarch64 (Arch Linux ARM) is CLIENT-ONLY  -  see the `arch` note below. Dropping the host from
 # `pkgname` (rather than giving package_slipstream-host a per-package arch) is what keeps makepkg
 # from entering the host's build/package path at all, and mirrors how PF_WITH_WEB extends this
 # array further down.
@@ -28,12 +28,12 @@ if [ "${CARCH:-x86_64}" = 'aarch64' ]; then
 else
   pkgname=('slipstream-host' 'slipstream-client')
 fi
-# CI (.github/workflows/arch.yml) drives the version: stable tags -> X.Y.Z-1, main pushes ->
+# CI (GitHub Actions) drives the version: stable tags -> X.Y.Z-1, main pushes ->
 # X.Y.Z-0.<run#> in the separate slipstream-canary repo (mirrors the RPM's 0.ciN release; pkgrel
 # allows only digits+dots, so the run number carries the monotonic ordering).
 pkgver="${PF_PKGVER:-0.7.0}"
 pkgrel="${PF_PKGREL:-1}"
-# The CLIENT builds and runs on aarch64 (Arch Linux ARM); the HOST does not — its encode stack is
+# The CLIENT builds and runs on aarch64 (Arch Linux ARM); the HOST does not  -  its encode stack is
 # NVENC/QSV/AMF, all x86. On aarch64 the split below drops slipstream-host from `pkgname`, so
 # makepkg builds only the client and never tries to compile the host crate.
 arch=('x86_64' 'aarch64')
@@ -62,7 +62,7 @@ if [ "${PF_WITH_SCRIPTING:-0}" = 1 ]; then
   makedepends+=('bun')
 fi
 
-# AUR source (a tagged release). For an in-tree CI build, set PF_SRCDIR to the repo root —
+# AUR source (a tagged release). For an in-tree CI build, set PF_SRCDIR to the repo root  -
 # build() uses it instead AND the fetch is skipped entirely (a canary pkgver has no tag to
 # clone, and CI already has the checkout).
 if [ -z "${PF_SRCDIR:-}" ]; then
@@ -83,27 +83,27 @@ build() {
   # NVIDIA builder. On a GPU-less builder symlink the CUDA stub into the link path first (same
   # caveat the RPM documents): ln -s "$(find / -name libcuda.so -path '*stubs*'|head -1)" /usr/lib/
   # slipstream-client-session is the Vulkan/Skia streamer the shell (slipstream-client) execs for
-  # a connect — both binaries must ship or streaming from the desktop client breaks.
+  # a connect  -  both binaries must ship or streaming from the desktop client breaks.
   # `--features slipstream-host/nvenc` compiles in the direct-SDK NVENC path (real RFI + recovery
   # anchor on Linux NVIDIA; design/linux-direct-nvenc.md). AMD/Intel-SAFE: the NVENC/CUDA entry
-  # points are dlopen'd at RUNTIME (libloading), never link-imported — `objdump -p` shows the same
+  # points are dlopen'd at RUNTIME (libloading), never link-imported  -  `objdump -p` shows the same
   # DT_NEEDED as a plain build (no libcuda/libnvidia-encode), so the binary starts fine driver-less
   # and only touches NVIDIA on a CUDA capture frame (default on NVIDIA; SLIPSTREAM_NVENC_DIRECT=0
-  # opts back to libav). AMD/Intel never reach it — the `cuda` gate leaves them on VAAPI.
+  # opts back to libav). AMD/Intel never reach it  -  the `cuda` gate leaves them on VAAPI.
   # `slipstream-host/vulkan-encode` is the AMD/Intel twin: a raw VK_KHR_video_encode_h265 backend with
   # real RFI (clean P-frame recovery anchor via DPB reference slots; design/linux-vulkan-video-encode.md).
   # Pure Rust `ash` (no new lib, no link-time deps); default on for HEVC (SLIPSTREAM_VULKAN_ENCODE=0
   # opts back to libav VAAPI), and a failed open falls back to VAAPI so unsupported devices are safe.
   if [ "$CARCH" = 'aarch64' ]; then
     # Client-only: no host crate, so none of the encode features below apply. ss-update still
-    # builds — the client package ships its own copy for `--apply-update`.
+    # builds  -  the client package ships its own copy for `--apply-update`.
     cargo build --release --locked -p slipstream-client-linux -p slipstream-client-session \
       -p slipstream-cli -p ss-update
   else
   cargo build --release --locked --features slipstream-host/nvenc,slipstream-host/vulkan-encode \
     -p slipstream-host -p slipstream-client-linux -p slipstream-client-session -p slipstream-cli \
     -p ss-update
-  # The status tray in its OWN cargo invocation — load-bearing, not tidiness. Cargo unifies features
+  # The status tray in its OWN cargo invocation  -  load-bearing, not tidiness. Cargo unifies features
   # across everything in one build, so co-building the tray with the host pulls the host's
   # ashpd -> zbus/tokio onto the tray's shared zbus; the tray (ksni async-io + blocking, no tokio
   # runtime by design) then panics at startup ("there is no reactor running, must be called from the
@@ -121,15 +121,15 @@ build() {
     ( cd sdk && bun install --frozen-lockfile --ignore-scripts && \
       bun build src/runner-cli.ts --target=bun --outfile="$srcdir/runner-cli.js" )
     grep -q 'attempt=' "$srcdir/runner-cli.js" \
-      || { echo "ERROR: runner bundle missing the dynamic plugin import — wrong build" >&2; exit 1; }
+      || { echo "ERROR: runner bundle missing the dynamic plugin import  -  wrong build" >&2; exit 1; }
   fi
 }
 
 package_slipstream-host() {
   pkgdesc="Low-latency desktop/game streaming HOST (Moonlight-compatible + slipstream/1)"
-  # NVENC + GPU EGL/CUDA come from the NVIDIA driver (nvidia-utils) — kept an optdepend, never a
+  # NVENC + GPU EGL/CUDA come from the NVIDIA driver (nvidia-utils)  -  kept an optdepend, never a
   # hard dep, exactly as the RPM (__requires_exclude libcuda) and deb (shlibdeps filter) do.
-  # The host captures the sink monitor through NATIVE PipeWire (audio/linux.rs) — it never
+  # The host captures the sink monitor through NATIVE PipeWire (audio/linux.rs)  -  it never
   # opens a Pulse socket itself, so pipewire-pulse is an OPTdepend, not a depend: it exists
   # for the GAMES, which commonly emit through the PulseAudio API. Hard-depending on it made
   # the package uninstallable next to real `pulseaudio`, which serves those games just as well.
@@ -137,8 +137,8 @@ package_slipstream-host() {
            'mesa' 'libglvnd' 'libxkbcommon' 'wayland')
   optdepends=('pipewire-pulse: PulseAudio-API audio from games/apps (real `pulseaudio` also works)'
               'nvidia-utils: NVENC hardware encode + GPU EGL/CUDA zero-copy (REQUIRED to encode on NVIDIA)'
-              'gamescope: per-session nested compositor backend (no desktop login needed) — needs >=3.16.22'
-              'slipstream-gamescope: HDR (10-bit BT.2020 PQ) streaming on the gamescope backend — attempted by default when installed'
+              'gamescope: per-session nested compositor backend (no desktop login needed)  -  needs >=3.16.22'
+              'slipstream-gamescope: HDR (10-bit BT.2020 PQ) streaming on the gamescope backend  -  attempted by default when installed'
               'kwin: stream a KDE Plasma desktop (kwin VirtualDisplay backend)'
               'mutter: stream a GNOME desktop (Mutter RecordVirtual backend)'
               'sway: stream a wlroots desktop (Sway VirtualDisplay backend)'
@@ -147,7 +147,7 @@ package_slipstream-host() {
               'slipstream-web: browser management console (device pairing + status)'
               'slipstream-scripting: plugin/script runner for host automation (bun)')
   install=slipstream-host.install
-  # User-editable config: the headless game-mode drop-in (see below) — don't clobber local edits.
+  # User-editable config: the headless game-mode drop-in (see below)  -  don't clobber local edits.
   backup=('etc/gamescope-session-plus/sessions.d/steam')
   local R; R="$(_repo)"; local T="$srcdir/target/release"
 
@@ -155,7 +155,7 @@ package_slipstream-host() {
   # /dev/uinput + /dev/uhid -> input group (virtual gamepads + DualSense UHID)
   install -Dm0644 "$R/scripts/60-slipstream.rules"     "$pkgdir/usr/lib/udev/rules.d/60-slipstream.rules"
   # Managed gamescope takeover on DM-autologin boxes: root helper + polkit action so the host can
-  # stop/restore the display manager for the stream. Arch has no /usr/libexec — install under
+  # stop/restore the display manager for the stream. Arch has no /usr/libexec  -  install under
   # /usr/lib/slipstream and rewrite the policy's exec.path annotation to match (the host probes both).
   install -Dm0755 "$R/scripts/ss-dm-helper"           "$pkgdir/usr/lib/slipstream/ss-dm-helper"
   install -Dm0644 "$R/scripts/io.slipstream.dm-helper.policy" \
@@ -173,7 +173,7 @@ package_slipstream-host() {
     "$pkgdir/usr/lib/systemd/system/slipstream-update.service"
   install -Dm0644 "$R/packaging/linux/49-slipstream-update.rules" \
     "$pkgdir/usr/share/polkit-1/rules.d/49-slipstream-update.rules"
-  # vhci-hcd autoload — usbip transport for the virtual Steam Deck pad (Steam only adopts USB pads)
+  # vhci-hcd autoload  -  usbip transport for the virtual Steam Deck pad (Steam only adopts USB pads)
   install -Dm0644 "$R/scripts/slipstream-modules.conf" "$pkgdir/usr/lib/modules-load.d/slipstream.conf"
   # 32 MB UDP socket buffers (send-side headroom at high bitrate)
   install -Dm0644 "$R/scripts/99-slipstream-net.conf"  "$pkgdir/usr/lib/sysctl.d/99-slipstream-net.conf"
@@ -183,7 +183,7 @@ package_slipstream-host() {
     "$pkgdir/usr/lib/systemd/user/slipstream-host.service"
   # Optional drop-in for a DESKTOP-LOGIN host: binds the host to graphical-session.target so a
   # Plasma/GNOME restart restarts it instead of leaving it on a dead compositor connection. Shipped
-  # under /usr/share (NOT as an active drop-in) because it is wrong for the appliance route — the
+  # under /usr/share (NOT as an active drop-in) because it is wrong for the appliance route  -  the
   # operator copies it into ~/.config/systemd/user/slipstream-host.service.d/ when they want it.
   install -Dm0644 "$R/scripts/slipstream-host-desktop-session.conf" \
     "$pkgdir/usr/share/slipstream/slipstream-host-desktop-session.conf"
@@ -227,8 +227,8 @@ package_slipstream-host() {
   install -Dm0644 "$R/packaging/bazzite/gamescope-headless-session" \
     "$pkgdir/etc/gamescope-session-plus/sessions.d/steam"
   install -Dm0644 "$R/api/openapi.json"                 "$pkgdir/usr/share/slipstream/openapi.json"
-  # Firewall openers — NOT auto-enabled (an Arch package never touches the admin's running firewall).
-  # Stock Arch ships no firewall; CachyOS ships ufw; some spins (EndeavourOS) enable firewalld — so we
+  # Firewall openers  -  NOT auto-enabled (an Arch package never touches the admin's running firewall).
+  # Stock Arch ships no firewall; CachyOS ships ufw; some spins (EndeavourOS) enable firewalld  -  so we
   # install BOTH a ufw application profile and firewalld service definitions, and the one for whatever
   # firewall you actually run is a one-liner. See README.md → Firewall.
   #   ufw:       sudo ufw allow slipstream-native            (or slipstream-gamestream)
@@ -239,7 +239,7 @@ package_slipstream-host() {
     "$pkgdir/usr/lib/firewalld/services/slipstream-gamestream.xml"
   install -Dm0644 "$R/packaging/linux/slipstream-native.xml" \
     "$pkgdir/usr/lib/firewalld/services/slipstream-native.xml"
-  # Web console opener (TCP 47992) — only meaningful with the optional slipstream-web package; opened
+  # Web console opener (TCP 47992)  -  only meaningful with the optional slipstream-web package; opened
   # deliberately (see README.md → Firewall). ufw's equivalent is the slipstream-web profile above.
   install -Dm0644 "$R/packaging/linux/slipstream-web.xml" \
     "$pkgdir/usr/lib/firewalld/services/slipstream-web.xml"
@@ -249,13 +249,13 @@ package_slipstream-host() {
 }
 
 package_slipstream-client() {
-  pkgdesc="Low-latency desktop/game streaming CLIENT — native GTK4/libadwaita Linux app"
+  pkgdesc="Low-latency desktop/game streaming CLIENT  -  native GTK4/libadwaita Linux app"
   # The GTK4/libadwaita shell + its Vulkan session streamer: SDL3 gamepads, FFmpeg (VAAPI +
   # Vulkan Video) decode, PipeWire audio/mic. vulkan-icd-loader: the session binary loads
   # libvulkan at runtime (ash) for its ash/Skia presenter.
   # NOT pipewire-pulse: the client speaks NATIVE PipeWire (audio.rs drives libpipewire-0.3
   # directly for both playback and the mic uplink) and never opens a Pulse socket, so the
-  # compat shim buys it nothing — while `pipewire-pulse` CONFLICTS with `pulseaudio`, which
+  # compat shim buys it nothing  -  while `pipewire-pulse` CONFLICTS with `pulseaudio`, which
   # made the package uninstallable for anyone keeping real PulseAudio. Matches the .deb
   # (Recommends) and the RPM (Recommends, "degrade gracefully without it").
   depends=('gtk4' 'libadwaita' 'sdl3' 'ffmpeg' 'pipewire' 'wireplumber'
@@ -285,7 +285,7 @@ package_slipstream-client() {
   install -Dm0644 "$R/scripts/99-slipstream-client-net.conf" \
     "$pkgdir/usr/lib/sysctl.d/99-slipstream-client-net.conf"
   # One-tap client updates (`slipstream-client --apply-update`, which is what the Decky plugin
-  # runs): the same root helper the host package ships, under the CLIENT's own paths — a
+  # runs): the same root helper the host package ships, under the CLIENT's own paths  -  a
   # client-only box (a Deck) has no host package, and two packages owning one path is a hard
   # pacman conflict. Same no-libexec relocation as the host's copy, with the unit's ExecStart
   # rewritten to match. On pacman the helper additionally requires the explicit
@@ -299,7 +299,7 @@ package_slipstream-client() {
     "$pkgdir/usr/share/polkit-1/rules.d/49-slipstream-client-update.rules"
   # Install-kind + channel marker for the CLIENT, read by `slipstream-client --check-update`
   # (planning: host-update-from-web-console.md §4.1). Its own directory, matching the RPM (where
-  # the host subpackage's %{_datadir}/slipstream/* glob would otherwise co-own a sibling file) —
+  # the host subpackage's %{_datadir}/slipstream/* glob would otherwise co-own a sibling file)  -
   # one path per product across every format, so the detector has one answer to remember.
   local _pf_client_channel=stable
   [[ $pkgrel == 0.* ]] && _pf_client_channel=canary
@@ -310,7 +310,7 @@ package_slipstream-client() {
 }
 
 package_slipstream-web() {
-  pkgdesc="slipstream management web console (Nitro SSR on bun, HTTPS/HTTP-1.1 over TLS) — pairing + status in the browser"
+  pkgdesc="slipstream management web console (Nitro SSR on bun, HTTPS/HTTP-1.1 over TLS)  -  pairing + status in the browser"
   # bun is the runtime (Bun.serve), and it's a native binary we vendor, so this package is
   # arch-specific (not 'any'). Auto-wired to the host's mgmt token + identity cert via the systemd
   # --user units; enable with `systemctl --user enable --now slipstream-web`. No nodejs/bun dependency.
@@ -337,7 +337,7 @@ package_slipstream-web() {
 }
 
 package_slipstream-scripting() {
-  pkgdesc="slipstream plugin/script runner (Effect SDK on bun) — supervises host automation scripts + slipstream-plugin-* packages"
+  pkgdesc="slipstream plugin/script runner (Effect SDK on bun)  -  supervises host automation scripts + slipstream-plugin-* packages"
   # bun is the runtime (it import()s the operator's .ts plugins), a vendored native binary, so this
   # package is arch-specific (not 'any'). OPT-IN: the systemd --user unit ships disabled (the runner
   # is inert until you add scripts/plugins). No nodejs/bun dependency.
@@ -351,7 +351,7 @@ package_slipstream-scripting() {
   printf '%s\n' '#!/bin/sh' 'exec /usr/lib/slipstream-scripting/bun /usr/share/slipstream-scripting/runner-cli.js "$@"' \
     > "$pkgdir/usr/bin/slipstream-scripting"
   chmod 0755 "$pkgdir/usr/bin/slipstream-scripting"
-  # systemd USER unit — installed but NOT auto-enabled (opt-in). Enable once you have automation:
+  # systemd USER unit  -  installed but NOT auto-enabled (opt-in). Enable once you have automation:
   #   systemctl --user enable --now slipstream-scripting
   install -Dm0644 "$R/scripts/slipstream-scripting.service" "$pkgdir/usr/lib/systemd/user/slipstream-scripting.service"
   install -Dm0644 "$R/LICENSE-MIT"    "$pkgdir/usr/share/licenses/slipstream-scripting/LICENSE-MIT"

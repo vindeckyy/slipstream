@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
-# Publish a slipstream sysext image into its feed on the GitHub generic package registry —
-# called by .github/workflows/rpm.yml after the RPM publish. A feed is one fixed URL
-# (…/slipstream-sysext/<feed>/) holding versioned .raw files plus a SHA256SUMS manifest and its
+# Publish a slipstream sysext image into its feed on the a package registry  -
+# called by GitHub Actions after the RPM publish. A feed is one fixed URL
+# (.../slipstream-sysext/<feed>/) holding versioned .raw files plus a SHA256SUMS manifest and its
 # detached OpenPGP signature SHA256SUMS.asc; slipstream-sysext(8) on the boxes verifies that
 # signature, then uses the manifest to find + check the newest image (the layout is also exactly
 # what systemd-sysupdate's url-file source expects, so a .transfer feed can be added later
 # without re-publishing anything).
 #
-# Signing uses RPM_GPG_PRIVATE_KEY — the SAME packages@unom.io key that signs the RPMs, so boxes
+# Signing uses RPM_GPG_PRIVATE_KEY  -  the SAME the release signing key key that signs the RPMs, so boxes
 # have one key to trust and we have one key to rotate. Without checksums-plus-signature the feed
 # was self-certifying: SHA256SUMS sits on the same registry as the images it describes, so whoever
 # could swap an image could swap its checksum in the same breath.
 #
-# Usage: TOKEN=… [KEEP=6] bash publish-sysext-feed.sh <feed> <image.raw>
-#        TOKEN=… bash publish-sysext-feed.sh --seal <feed>
+# Usage: TOKEN=... [KEEP=6] bash publish-sysext-feed.sh <feed> <image.raw>
+#        TOKEN=... bash publish-sysext-feed.sh --seal <feed>
 #   <feed>   e.g. f43, f43-canary, f44 (Fedora major x channel)
 #   KEEP     newest images to keep in the feed; 0/unset-for-stable = keep all
 #   --seal   re-sign a feed's EXISTING manifest without publishing an image. For feeds published
 #            before signing existed, and after a key rotation. Idempotent. Also re-publishes the
 #            manifest if normalizing it changed anything, because the signature has to cover the
 #            bytes a client downloads.
-# Env: REGISTRY (required; your package-registry host, no public default), OWNER (unom),
-#      TOKEN (write:package PAT), CURL_USER (login name),
+# Env: REGISTRY (required; your package-registry host, no public default), OWNER (package owner),
+#      TOKEN (write:package PAT), CURL_USER (registry login name),
 #      RPM_GPG_PRIVATE_KEY (armored private key; absent => unsigned, fatal on a v* tag)
 # Docs: https://github.com/vindeckyy/slipstream
 set -euo pipefail
@@ -35,9 +35,9 @@ else
   [ -f "$RAW" ] || { echo "no such image: $RAW" >&2; exit 1; }
 fi
 REGISTRY="${REGISTRY:?set REGISTRY to your package-registry host}"
-OWNER="${OWNER:-unom}"
+OWNER="${OWNER:?set OWNER to the package owner}"
 KEEP="${KEEP:-0}"
-AUTH=(--user "${CURL_USER:-enricobuehler}:${TOKEN:?TOKEN (write:package PAT) required}")
+AUTH=(--user "${CURL_USER:-$OWNER}:${TOKEN:?TOKEN (write:package PAT) required}")
 BASE="https://$REGISTRY/api/packages/$OWNER/generic/slipstream-sysext/$FEED"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -50,10 +50,10 @@ FETCHED="$WORK/SHA256SUMS.fetched"   # exactly what the registry served, before 
 # $FETCHED. Returns non-zero iff the feed has no manifest at all.
 #
 # -L is not optional here. The registry answers a file GET with a 303 See Other pointing at
-# presigned object storage, and `curl -f` does NOT treat a 3xx as an error — so without -L the call
-# "succeeds" and hands back the redirect's HTML body ('<a href="…">See Other</a>.'). Both callers
+# presigned object storage, and `curl -f` does NOT treat a 3xx as an error  -  so without -L the call
+# "succeeds" and hands back the redirect's HTML body ('<a href="...">See Other</a>.'). Both callers
 # then took that page for the manifest: every publish prepended a stale redirect page and dropped
-# every prior image line, and --seal signed a page whose presigned URL expired 300 seconds later —
+# every prior image line, and --seal signed a page whose presigned URL expired 300 seconds later  -
 # a signature over bytes that exist nowhere. Clients fetch WITH -L, so they checked the real
 # manifest against that signature and refused the feed, which from a Bazzite box is indistinguishable
 # from someone having tampered with it.
@@ -67,7 +67,7 @@ read_manifest() {
   grep -E '^[0-9a-f]{64}  [^ ]+$' "$FETCHED" > "$SUMS" || :
 }
 
-# sign_manifest — detached-sign $SUMS into $SIG with RPM_GPG_PRIVATE_KEY. Prints nothing and
+# sign_manifest  -  detached-sign $SUMS into $SIG with RPM_GPG_PRIVATE_KEY. Prints nothing and
 # returns 1 if no key is available; the caller decides whether that is survivable.
 sign_manifest() {
   [ -n "${RPM_GPG_PRIVATE_KEY:-}" ] || return 1
@@ -82,7 +82,7 @@ sign_manifest() {
   # the failure would only surface on someone's Bazzite box. Compare fingerprints here instead: the
   # baked-in public key in slipstream-sysext.sh must be the key we are about to sign with.
   # The armor block is a shell single-quoted literal in that script, so the range's first and last
-  # lines carry the `FEED_KEY='` prefix and the closing quote — strip them or gpg sees no armor at
+  # lines carry the `FEED_KEY='` prefix and the closing quote  -  strip them or gpg sees no armor at
   # all and hands back an empty fingerprint, which would look like a mismatch on every publish.
   baked="$(sed -n '/BEGIN PGP PUBLIC KEY BLOCK/,/END PGP PUBLIC KEY BLOCK/p' "$HERE/slipstream-sysext.sh" \
            | sed "s/^FEED_KEY='//; s/'\$//" \
@@ -99,12 +99,12 @@ sign_manifest() {
   echo "signed SHA256SUMS with $keyid"
 }
 
-# require_signature — on a v* tag an unsigned feed is a hard stop, exactly like sign-rpms.sh:
+# require_signature  -  on a v* tag an unsigned feed is a hard stop, exactly like sign-rpms.sh:
 # clients refuse unsigned feeds, so publishing one would strand every box on the stable channel.
 require_signature() {
   case "${GITHUB_REF:-}" in
     refs/tags/v*)
-      echo "release build (${GITHUB_REF}) but the sysext feed could not be signed — aborting." >&2
+      echo "release build (${GITHUB_REF}) but the sysext feed could not be signed  -  aborting." >&2
       exit 1 ;;
   esac
   # Deliberately mode-neutral wording: in --seal mode nothing is published at all, and a log line
@@ -114,11 +114,11 @@ require_signature() {
 
 # --seal: re-sign whatever manifest the feed already has, no image, no pruning.
 if [ "$SEAL" = 1 ]; then
-  read_manifest || { echo "no SHA256SUMS at $BASE — nothing to seal" >&2; exit 1; }
+  read_manifest || { echo "no SHA256SUMS at $BASE  -  nothing to seal" >&2; exit 1; }
   # An empty result means the manifest was ALL junk. Signing that would hand clients a feed that
   # verifies and offers no images, which reads as "up to date" to `slipstream-sysext update`.
   if [ ! -s "$SUMS" ]; then
-    echo "$BASE/SHA256SUMS lists no images — refusing to seal it (feed needs a republish)" >&2
+    echo "$BASE/SHA256SUMS lists no images  -  refusing to seal it (feed needs a republish)" >&2
     exit 1
   fi
   if ! sign_manifest; then
@@ -126,7 +126,7 @@ if [ "$SEAL" = 1 ]; then
     exit 0
   fi
   # The signature must cover the bytes a client actually downloads, so a manifest that normalizing
-  # changed gets re-published with it — otherwise the .asc would describe a file the registry does
+  # changed gets re-published with it  -  otherwise the .asc would describe a file the registry does
   # not have, which is the very failure this is repairing. Manifest first, signature second, and
   # neither when the stored copy was already clean.
   if ! cmp -s "$SUMS" "$FETCHED"; then
@@ -150,7 +150,7 @@ if read_manifest; then
   # history, and that went unnoticed precisely because nothing ever reported the carry-over.
   echo "carrying forward $(grep -c '' <"$SUMS") image(s) from the existing manifest"
 else
-  echo "no manifest at $BASE yet — starting a new feed"
+  echo "no manifest at $BASE yet  -  starting a new feed"
 fi
 printf '%s  %s\n' "$SHA" "$FNAME" >> "$SUMS"
 
@@ -163,13 +163,13 @@ if [ "$KEEP" -gt 0 ]; then
   done
 fi
 
-# Sign the finished manifest BEFORE anything is uploaded — a signing failure on a release must
+# Sign the finished manifest BEFORE anything is uploaded  -  a signing failure on a release must
 # abort while the live feed is still whole, not halfway through being replaced.
 sign_manifest || require_signature
 
 # Upload order keeps consumers consistent: image first, then the manifest referencing it, then its
 # signature, then prune deletions (already absent from the manifest). A client that catches the
-# window between the manifest and its signature sees an unsigned feed and refuses — it does not see
+# window between the manifest and its signature sees an unsigned feed and refuses  -  it does not see
 # a manifest vouched for by a stale signature, which is why the .asc goes last and never first.
 # Delete-before-put makes workflow re-runs idempotent (the registry 409s on duplicate filenames;
 # first-publish 404s are fine).

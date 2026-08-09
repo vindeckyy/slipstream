@@ -54,7 +54,7 @@ takes effect:
 | **Ubuntu**, **Fedora**, **Arch**, and most others | `sudo usermod -aG input "$USER"` |
 | **Bazzite** | `ujust add-user-to-input-group` (do **not** use `usermod`; the base is immutable and the group is managed by a recipe) |
 
-The shared [After installing](/docs/install#after-installing) checklist names this as step 1 for
+The shared [After installing](/docs/install#after-install) checklist names this as step 1 for
 every Linux package. Distro pages repeat it in their own voice:
 [Ubuntu](/docs/ubuntu), [Fedora](/docs/fedora), [Arch](/docs/arch), [Bazzite](/docs/bazzite).
 

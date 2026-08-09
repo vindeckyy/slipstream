@@ -1,19 +1,19 @@
-# slipstream Windows client — MSIX packaging
+# slipstream Windows client  -  MSIX packaging
 
 The Windows client ships as **signed MSIX** packages so Windows boxes get a real package (Start
 tile, clean install/uninstall) instead of a loose exe. CI builds + publishes them from
-[`.github/workflows/windows-msix.yml`](../../../.github/workflows/windows-msix.yml) to GitHub's
+[`.github/workflows/release.yml`](../../../.github/workflows/release.yml) to GitHub's
 local build / [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached, on every `main` push that
-touches the client (canary) and on `vX.Y.Z` release tags (stable) — see
+touches the client (canary) and on `vX.Y.Z` release tags (stable)  -  see
 [Release Channels](../../../docs-site/content/docs/channels.md).
 
 **Two architectures, one x64 runner.** Both `x64` and `arm64` packages are produced off the single
-x64 Windows runner — `x86_64-pc-windows-msvc` builds natively, `aarch64-pc-windows-msvc` is
+x64 Windows runner  -  `x86_64-pc-windows-msvc` builds natively, `aarch64-pc-windows-msvc` is
 cross-compiled (the x64 MSVC toolset ships the ARM64 cross compiler; the matrix points `FFMPEG_DIR`
 at the runner's ARM64 FFmpeg tree, `C:\Users\Public\ffmpeg-arm64`). Artifacts are arch-suffixed
 (`..._x64.msix` / `..._arm64.msix`, each with its matching `.cer`); `pack-msix.ps1 -Arch x64|arm64`
 stamps the manifest `ProcessorArchitecture` and names the output. See
-[`windows.yml`](../../../.github/workflows/windows.yml) for the cross-build rationale.
+[`windows.yml`](../../../.github/workflows/release.yml) for the cross-build rationale.
 
 ## What's in the package
 
@@ -22,7 +22,7 @@ stamps the manifest `ProcessorArchitecture` and names the output. See
 | File | Source |
 |---|---|
 | `slipstream-client.exe` | the release build (the WinUI shell) |
-| `slipstream-session.exe` | the release build — the Vulkan session client the shell spawns for every stream (sibling resolution, `src/spawn.rs`). Skia links statically; `vulkan-1.dll` is a GPU-driver component, never bundled. ARM64 builds it `--no-default-features` (no Skia console UI) until rust-skia ships aarch64-pc-windows-msvc prebuilts |
+| `slipstream-session.exe` | the release build  -  the Vulkan session client the shell spawns for every stream (sibling resolution, `src/spawn.rs`). Skia links statically; `vulkan-1.dll` is a GPU-driver component, never bundled. ARM64 builds it `--no-default-features` (no Skia console UI) until rust-skia ships aarch64-pc-windows-msvc prebuilts |
 | `Microsoft.WindowsAppRuntime.Bootstrap.dll`, `resources.pri` | staged by the client's `build.rs` via `windows-reactor-setup::as_framework_dependent()` |
 | `SDL3.dll` | auto-staged by the `sdl3` crate |
 | `avcodec/avformat/avutil/swscale/swresample/...-*.dll` | `FFMPEG_DIR\bin` |
@@ -48,22 +48,22 @@ MSIX requires a strictly 4-part numeric version. The workflow computes:
 
 ## Signing & install
 
-CI signs every build with a **stable self-signed code-signing cert** (`CN=unom`, SHA-1
+CI signs every build with a **stable self-signed code-signing cert** (`CN=Slipstream`, SHA-1
 `CD1EFDEEEC9743AFC38F56C5AF30C5A3009BE941`, valid to 2036). Its public half is checked in as
 [`slipstream-codesign.cer`](slipstream-codesign.cer); the private `.pfx` + password live in the
 `MSIX_CERT_PFX_B64` / `MSIX_CERT_PASSWORD` Actions secrets. Because it's the *same* cert every build,
-trusting it is **one-time, per machine** — once imported, every future build and in-place upgrade is
+trusting it is **one-time, per machine**  -  once imported, every future build and in-place upgrade is
 trusted with no further prompt:
 
 ```powershell
 # once per machine (elevated): trust the publisher
 Import-Certificate -FilePath .\slipstream-codesign.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
-# then install the package for your CPU (and re-run for each upgrade — no re-trust needed)
+# then install the package for your CPU (and re-run for each upgrade  -  no re-trust needed)
 Add-AppxPackage -Path .\slipstream-client-windows_<ver>_x64.msix     # Intel/AMD
 Add-AppxPackage -Path .\slipstream-client-windows_<ver>_arm64.msix   # ARM64 (Snapdragon, etc.)
 ```
 
-The matching `.cer` is also published next to each `.msix` in the registry, so it's always at hand.
+The matching `.cer` is also published next to each `.msix` in the GitHub Release, so it's always at hand.
 
 The MSIX declares a dependency on the Windows App SDK 2.x runtime; install
 [the App SDK runtime](https://aka.ms/windowsappsdk) if `Add-AppxPackage` reports a missing
@@ -72,7 +72,7 @@ The MSIX declares a dependency on the Windows App SDK 2.x runtime; install
 `pack-msix.ps1` signing precedence: it uses the **`MSIX_CERT_PFX_B64` / `MSIX_CERT_PASSWORD`** secrets
 when present (the stable cert above), else generates an *ephemeral* self-signed cert (forks / local
 builds without the secrets). Either way it exports the signing cert's public `.cer` for the import.
-**To move to a publicly-trusted (no-import) cert** — Azure Artifact Signing or a public OV cert —
+**To move to a publicly-trusted (no-import) cert**  -  Azure Artifact Signing or a public OV cert  -
 replace the two secrets with the new `.pfx`; the cert's subject DN must equal the manifest
 `Publisher`, so pass a matching `-Publisher` (it's stamped into the package `Identity`, and changing
 it changes the package identity → a one-time reinstall).

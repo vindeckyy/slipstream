@@ -233,8 +233,7 @@ pub fn now_ns() -> u64 {
 /// entirely when the artifact is off — with it unset, the only added hot-path cost is the two
 /// send-stamp clock reads in the pacing loop.
 pub fn latency_artifact_enabled() -> bool {
-    std::env::var("SLIPSTREAM_LATENCY_ARTIFACT")
-        .is_ok_and(|p| !p.is_empty())
+    std::env::var("SLIPSTREAM_LATENCY_ARTIFACT").is_ok_and(|p| !p.is_empty())
 }
 
 /// Count the FEC/parity packets among sealed wire packets: a packet is parity when its
@@ -353,11 +352,16 @@ mod tests {
         // One line, one JSON object, no trailing junk.
         let line = out.trim_end_matches('\n');
         assert!(!line.contains('\n'), "one record per line: {out:?}");
-        assert!(line.starts_with('{') && line.ends_with('}'), "object shape: {line}");
+        assert!(
+            line.starts_with('{') && line.ends_with('}'),
+            "object shape: {line}"
+        );
         // Every key present, in order.
         let mut pos = 0;
         for k in FRAME_KEYS {
-            let at = line[pos..].find(k).unwrap_or_else(|| panic!("missing {k} in {line}"));
+            let at = line[pos..]
+                .find(k)
+                .unwrap_or_else(|| panic!("missing {k} in {line}"));
             pos += at + k.len();
         }
         // Field values round-trip; unset fields emit 0/false (the 0-semantics contract).
@@ -379,7 +383,10 @@ mod tests {
         ] {
             let at = line.find(k).unwrap();
             let rest = &line[at + k.len()..];
-            let val: String = rest.chars().take_while(|c| *c != ',' && *c != '}').collect();
+            let val: String = rest
+                .chars()
+                .take_while(|c| *c != ',' && *c != '}')
+                .collect();
             assert_eq!(val, want, "{k} in {line}");
         }
         for (k, v) in [
@@ -450,7 +457,8 @@ mod tests {
         let mut a = LatencyArtifact::open(&path).unwrap();
         a.write_header("pipewire-portal", "hevc", "loopback-client", 3840, 2160, 60)
             .unwrap();
-        a.write_frame(&FrameTimings::new("pipewire-portal")).unwrap();
+        a.write_frame(&FrameTimings::new("pipewire-portal"))
+            .unwrap();
         drop(a);
         let out = read_all(&path);
         let _ = std::fs::remove_file(&path);
@@ -475,10 +483,7 @@ mod tests {
         unsafe {
             std::env::remove_var("SLIPSTREAM_LATENCY_ARTIFACT");
         }
-        assert!(
-            LatencyArtifact::from_env().is_none(),
-            "unset → disabled"
-        );
+        assert!(LatencyArtifact::from_env().is_none(), "unset → disabled");
         let out = read_all(&path);
         let _ = std::fs::remove_file(&path);
         assert!(out.starts_with("{\"kind\":\"host_frame\""));

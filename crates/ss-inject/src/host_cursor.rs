@@ -68,9 +68,7 @@ mod linux {
             if on_wayland {
                 match ThemeHide::try_acquire() {
                     Ok(t) => {
-                        tracing::info!(
-                            "host cursor hide: GNOME invisible cursor theme (Wayland)"
-                        );
+                        tracing::info!("host cursor hide: GNOME invisible cursor theme (Wayland)");
                         return Some(Self::Theme(t));
                     }
                     Err(e) => {
@@ -103,8 +101,7 @@ mod linux {
         fn try_acquire() -> Option<Self> {
             // Wayland-native sessions often still expose Xwayland on DISPLAY - try it, but do not
             // treat failure as fatal (ThemeHide is the Wayland path).
-            let (conn, screen_num) =
-                x11rb::rust_connection::RustConnection::connect(None).ok()?;
+            let (conn, screen_num) = x11rb::rust_connection::RustConnection::connect(None).ok()?;
             use x11rb::connection::Connection;
             use x11rb::protocol::xfixes::ConnectionExt as _;
             let screen = &conn.setup().roots.get(screen_num)?;
@@ -213,9 +210,7 @@ mod linux {
         let data = std::env::var_os("XDG_DATA_HOME")
             .filter(|s| !s.is_empty())
             .map(PathBuf::from)
-            .or_else(|| {
-                std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share"))
-            })
+            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))
             .unwrap_or_else(|| PathBuf::from(".local/share"));
         roots.push(data.join("icons"));
         roots
@@ -375,10 +370,7 @@ mod linux {
 
         #[test]
         fn blank_xcursor_is_multi_size_and_transparent() {
-            let dir = std::env::temp_dir().join(format!(
-                "ss-cursor-blank-{}",
-                std::process::id()
-            ));
+            let dir = std::env::temp_dir().join(format!("ss-cursor-blank-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&dir);
             std::fs::create_dir_all(&dir).unwrap();
             let path = dir.join("left_ptr");
@@ -402,10 +394,7 @@ mod linux {
 
         #[test]
         fn ensure_invisible_theme_rewrites_leftover_in_icons_root() {
-            let home = std::env::temp_dir().join(format!(
-                "ss-cursor-home-{}",
-                std::process::id()
-            ));
+            let home = std::env::temp_dir().join(format!("ss-cursor-home-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&home);
             std::fs::create_dir_all(home.join(".icons")).unwrap();
             std::fs::create_dir_all(home.join(".local/share")).unwrap();
@@ -515,14 +504,19 @@ mod live_smoke {
         )
         .map(|m| m.len())
         .unwrap_or(0);
-        assert!(len < 40_000, "blank left_ptr should be rewritten, got {len}");
+        assert!(
+            len < 40_000,
+            "blank left_ptr should be rewritten, got {len}"
+        );
     }
 
     fn dirs_next_or_home() -> std::path::PathBuf {
         std::env::var_os("XDG_DATA_HOME")
             .filter(|s| !s.is_empty())
             .map(std::path::PathBuf::from)
-            .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".local/share")))
+            .or_else(|| {
+                std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".local/share"))
+            })
             .unwrap_or_else(|| std::path::PathBuf::from(".local/share"))
     }
 }

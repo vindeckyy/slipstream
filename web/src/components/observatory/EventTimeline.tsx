@@ -17,18 +17,18 @@ import type {
 
 const TONE_DOT: Record<TimelineTone, string> = {
 	neutral: "bg-muted-foreground/60",
-	info: "bg-sky-500",
-	success: "bg-emerald-500",
-	warning: "bg-amber-500",
-	danger: "bg-red-500",
+	info: "bg-info",
+	success: "bg-success",
+	warning: "bg-warning",
+	danger: "bg-destructive",
 };
 
 const TONE_RING: Record<TimelineTone, string> = {
 	neutral: "border-muted-foreground/30 bg-muted/40",
-	info: "border-sky-500/30 bg-sky-500/5",
-	success: "border-emerald-500/30 bg-emerald-500/5",
-	warning: "border-amber-500/30 bg-amber-500/5",
-	danger: "border-red-500/30 bg-red-500/5",
+	info: "border-info/30 bg-info/5",
+	success: "border-success/30 bg-success/5",
+	warning: "border-warning/30 bg-warning/5",
+	danger: "border-destructive/30 bg-destructive/5",
 };
 
 export interface EventTimelineProps<Event extends TimelineEvent = TimelineEvent>

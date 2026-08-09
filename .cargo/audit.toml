@@ -1,12 +1,12 @@
-# cargo-audit configuration — consumed by `.github/workflows/audit.yml` (`cargo audit`).
+# cargo-audit configuration  -  consumed by `GitHub Actions` (`cargo audit`).
 #
 # Silence only advisories that are KNOWN-UNFIXABLE and either not applicable to how we use the crate
-# or an accepted, documented risk. Keep this list TIGHT and justify every entry — an ignore here
+# or an accepted, documented risk. Keep this list TIGHT and justify every entry  -  an ignore here
 # means the audit job stops flagging it, so the reasoning must hold up.
 #
 # NOTE: `cargo audit` (no `--deny warnings`) fails only on *vulnerabilities*, not on the
 # `unmaintained` warnings (audiopus_sys via opus, paste via utoipa-axum). Both are transitive, at
-# their latest published version with no successor, so there's nothing to bump — left visible on
+# their latest published version with no successor, so there's nothing to bump  -  left visible on
 # purpose so we keep getting the maintenance signal; they do not fail CI. (rustls-pemfile was dropped
 # 2026-06-29 by removing axum-server's unused tls-rustls feature + moving our own PEM parsing to
 # rustls-pki-types; memmap2's unsoundness was fixed by the 0.9.11 bump.)
@@ -14,17 +14,17 @@
 [advisories]
 ignore = [
     # rsa "Marvin Attack" (RUSTSEC-2023-0071): a timing side-channel in the rsa crate's variable-time
-    # modular exponentiation of the SECRET exponent. IMPORTANT — this affects the RSA private-key op in
+    # modular exponentiation of the SECRET exponent. IMPORTANT  -  this affects the RSA private-key op in
     # general, INCLUDING signing (m^d mod n), which the host DOES perform (gamestream/pairing.rs
     # `signing_key.sign(&serversecret)`). It is NOT, as an earlier version of this note wrongly claimed,
-    # limited to decryption — so "the vulnerable path isn't exercised" is false; signing exercises it.
+    # limited to decryption  -  so "the vulnerable path isn't exercised" is false; signing exercises it.
     # We accept it because the attack is not practically reachable here, NOT because the path is unused:
     #   * No RSA decryption / PKCS#1v1.5 padding oracle exists anywhere (every `decrypt` in the tree is
     #     AES/AES-GCM), so the classic Bleichenbacher/Marvin chosen-ciphertext oracle is absent.
-    #   * The only signed message (`serversecret`) is HOST-generated random, never attacker-chosen — so
+    #   * The only signed message (`serversecret`) is HOST-generated random, never attacker-chosen  -  so
     #     there's no adaptive chosen-input probing (the lever remote RSA-timing key recovery needs); and
     #     signing is gated behind the operator-entered pairing PIN, ONE signature per ceremony (a
-    #     repeated phase-3 is rejected — gamestream/pairing.rs — to deny a passive timing-sample harvester).
+    #     repeated phase-3 is rejected  -  gamestream/pairing.rs  -  to deny a passive timing-sample harvester).
     #   * GameStream is OFF by default (bare `serve` is native-only); the secure native QUIC plane uses
     #     rustls' constant-time backend, NOT the rsa crate. RSA is touched only on the opt-in,
     #     trusted-LAN GameStream/Moonlight pairing handshake. Moonlight mandates RSA-2048, so the

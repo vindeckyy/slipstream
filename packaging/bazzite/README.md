@@ -25,7 +25,7 @@ There are three paths on Bazzite, driven by different files in `packaging/`:
 
 | Path | Driven by | What it does | Best for |
 |---|---|---|---|
-| **A - systemd-sysext** ✅ recommended | `packaging/bazzite/slipstream-sysext.sh` + `build-sysext.sh` (published by `.github/workflows/rpm.yml`) | Overlays the host onto `/usr` as a system extension - no layering, no reboot, one-command updates | Everyone; the default |
+| **A - systemd-sysext** ✅ recommended | `packaging/bazzite/slipstream-sysext.sh` + `build-sysext.sh` (published by `GitHub Actions`) | Overlays the host onto `/usr` as a system extension - no layering, no reboot, one-command updates | Everyone; the default |
 | **B - bootc / OCI image** | `packaging/bootc/Containerfile` | Bakes slipstream into a `FROM bazzite-nvidia` image once; you `bootc switch` any number of hosts onto it | Fleets, reproducible appliances, no per-host drift |
 | **C - rpm-ostree layering** (legacy) | `packaging/rpm/` + a local RPM | Layers the `slipstream` RPM onto your deployment with `rpm-ostree install` | Only if you specifically want the RPM database to own the files |
 
@@ -99,7 +99,7 @@ sudo bootc switch ghcr.io/<you>/bazzite-slipstream && systemctl reboot
 ```
 
 > ⚠️ Path B needs an RPM feed (or local packages) that includes `slipstream` + `slipstream-web`.
-> Build those with `packaging/rpm/` (CI: `.github/workflows/rpm.yml` when publishing is wired).
+> Build those with `packaging/rpm/` (CI: `GitHub Actions` when publishing is wired).
 > Prefer `gpgcheck=1` as in `packaging/rpm/README.md`.
 
 ### Path C - rpm-ostree layering (legacy)

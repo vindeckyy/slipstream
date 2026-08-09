@@ -69,7 +69,7 @@ plain double-click upgrade path:
 
 ## Release flow
 
-`.github/workflows/windows-host.yml` runs on stable `v*` tags only, **after** the installer is
+`GitHub Actions` runs on stable `v*` tags only, **after** the installer is
 attached to the GitHub release - winget validates the URL and hash, so a manifest must never be
 published ahead of its artifact:
 
@@ -94,23 +94,11 @@ Note the host needs a real GPU and installs drivers, so a Sandbox run exercises 
 
 ## Publishing
 
-Through **our own REST source** on github-actions - see [`server/`](server/README.md). It sits alongside the
-docs (3220) and flatpak (3230) services, behind the same edge Caddy; `windows-host.yml` rebuilds and
-ships its catalogue on every stable tag, so releasing is one pipeline with no manual step.
+The checked-in manifests are ready for validation and for a future submission to winget-pkgs. A self-hosted REST source can also serve the catalogue from the server directory, provided it is deployed behind HTTPS and supplied with release data.
 
-```powershell
-# winget source add -n slipstream https://<your-winget-host> -t Microsoft.Rest   # elevated, once
+~~~powershell
+winget install --manifest packaging\winget
 winget install vindeckyy.SlipstreamHost
-```
+~~~
 
-These manifests stay in winget-pkgs' own format rather than a bespoke one, so submitting upstream
-later is a copy, not a rewrite. Two things would need attention on that path: the signing note
-below, and `Agreements` being verified-developers-only in the community repo.
-
-> **Signing.** The installer is currently signed with a self-signed cert (`CN=unom`, subject ==
-> issuer) and ships a `.cer` users import manually. winget does not sign anything; it downloads and
-> runs the same binary, so SmartScreen behaves exactly as it does for a browser download. That is a
-> pre-existing condition rather than something winget introduces - but the community repo
-> (`microsoft/winget-pkgs`) gates on it via its `Binary-Validation-Error` /
-> `Validation-Defender-Error` checks, so a submission there needs a publicly-trusted cert (Azure
-> Trusted Signing is the cheap path). A self-hosted source has no such gate.
+Before submitting to winget-pkgs, use a publicly trusted code-signing certificate for the installer. The winget client does not sign binaries; it downloads the release asset and applies the same Windows trust checks as a browser download.

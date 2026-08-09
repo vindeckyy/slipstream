@@ -3,7 +3,7 @@
 The native Linux **client** - the shell (crate `slipstream-client-linux`, binary
 `slipstream-client`) plus the Vulkan session binary it execs for streaming (crate
 `slipstream-client-session`, binary `slipstream-session`) - is
-built by CI (`.github/workflows/flatpak.yml`) when enabled. There is no public Flatpak remote.
+built by CI (`GitHub Actions`) when enabled. There is no public Flatpak remote.
 Produce a **single-file `.flatpak` bundle** locally (see below) and install it with
 `flatpak install --user --bundle`, or attach the bundle to a
 [GitHub Release](https://github.com/vindeckyy/slipstream/releases). If you host your own OSTree
@@ -147,18 +147,7 @@ offline.
 If you want `flatpak update` instead of reinstalling bundles, host the OSTree repo flatpak-builder
 produces (GPG-signed) behind any static HTTP server, and publish a `.flatpakrepo` / `.flatpakref`
 that points at it. The scripts under `server/` in this directory are a starting point for a local
-Caddy container. There is no public Slipstream Flatpak remote.
+Caddy container. No public Flatpak remote is configured.
 
-**Signing key:** generate a dedicated Flatpak repo signing key; put the public half in
-[`unom-flatpak.gpg`](unom-flatpak.gpg) (or your own filename) and the private half in a CI secret
+**Signing key:** generate a dedicated Flatpak repository key and store its private half only in the deployment secret store.
 such as `FLATPAK_GPG_PRIVATE_KEY`.
-
-## Alternatives considered
-
-- **Self-hosted OSTree repo:** the option that gives `flatpak update` once you front the static
-  tree with HTTPS.
-- **Single-file `.flatpak` bundle (default here):** one build, one `flatpak install --bundle`; no
-  auto-update - fine for Decky and offline installs.
-- **Release attachment:** attach the bundle to a GitHub Release for a human-facing download page.
-- **Flathub (deferred):** best discoverability + zero hosting, but a separate submission/review
-  process; revisit once the client is past scaffold quality.

@@ -129,20 +129,18 @@ impl TransportPolicyShared {
     pub fn from_policy(p: TransportPolicy) -> TransportPolicyShared {
         TransportPolicyShared {
             burst_bytes: std::sync::atomic::AtomicU64::new(p.burst_bytes.unwrap_or(0) as u64),
-            pace_factor_x100: std::sync::atomic::AtomicU64::new(
-                (p.pace_factor * 100.0) as u64,
-            ),
+            pace_factor_x100: std::sync::atomic::AtomicU64::new((p.pace_factor * 100.0) as u64),
             fec_floor: std::sync::atomic::AtomicU8::new(p.fec_floor_pct),
-            queue_age_x100: std::sync::atomic::AtomicU64::new(
-                (p.queue_age_frames * 100.0) as u64,
-            ),
+            queue_age_x100: std::sync::atomic::AtomicU64::new((p.queue_age_frames * 100.0) as u64),
         }
     }
 
     /// Publish a new policy (called on a state transition).
     pub fn apply(&self, p: TransportPolicy) {
-        self.burst_bytes
-            .store(p.burst_bytes.unwrap_or(0) as u64, std::sync::atomic::Ordering::Relaxed);
+        self.burst_bytes.store(
+            p.burst_bytes.unwrap_or(0) as u64,
+            std::sync::atomic::Ordering::Relaxed,
+        );
         self.pace_factor_x100.store(
             (p.pace_factor * 100.0) as u64,
             std::sync::atomic::Ordering::Relaxed,
@@ -156,9 +154,7 @@ impl TransportPolicyShared {
     }
 
     pub fn burst_bytes(&self) -> Option<usize> {
-        let b = self
-            .burst_bytes
-            .load(std::sync::atomic::Ordering::Relaxed) as usize;
+        let b = self.burst_bytes.load(std::sync::atomic::Ordering::Relaxed) as usize;
         (b > 0).then_some(b)
     }
 
@@ -169,8 +165,7 @@ impl TransportPolicyShared {
     }
 
     pub fn fec_floor(&self) -> u8 {
-        self.fec_floor
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.fec_floor.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// The stale-deadline queue-age limit in frame periods.

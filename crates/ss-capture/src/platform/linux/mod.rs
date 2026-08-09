@@ -791,9 +791,7 @@ impl PortalCapturer {
     fn take_frame(&self) -> Option<CapturedFrame> {
         let frame = self.slot.lock().ok().and_then(|mut s| s.take());
         if frame.is_some() {
-            self.signals
-                .frames_taken
-                .fetch_add(1, Ordering::Relaxed);
+            self.signals.frames_taken.fetch_add(1, Ordering::Relaxed);
         }
         frame
     }

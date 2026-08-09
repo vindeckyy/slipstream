@@ -3,7 +3,7 @@
 A one-file, signed `setup.exe` for the slipstream streaming **host** on Windows. Build it with the
 scripts in this directory, or attach it to a
 [GitHub Release](https://github.com/vindeckyy/slipstream/releases). CI
-(`.github/workflows/windows-host.yml`) can still produce builds when you wire publishing.
+(`GitHub Actions`) can still produce builds when you wire publishing.
 
 > Full picture (drivers-from-source, toolchain, CI, dev loop): **slipstream-planning: `windows-build-and-packaging.md`** (internal planning repo). This README is the `packaging/windows/` file index.
 

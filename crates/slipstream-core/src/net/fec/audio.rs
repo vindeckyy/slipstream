@@ -15,7 +15,7 @@
 //! Audio frames are tiny (stereo 5 ms Opus ≈ 80–160 B), so a whole group fits comfortably
 //! in the coder's shard budget.
 
-use crate::fec::{ErasureCoder, Gf8Coder, FecError};
+use crate::fec::{ErasureCoder, FecError, Gf8Coder};
 
 /// Audio packets per FEC group. 8 × 5 ms = 40 ms — large enough to amortize the parity
 /// overhead and ride out a wifi burst, small enough that a group's shards stay well under
@@ -142,10 +142,7 @@ pub fn rebuild(
     let parity_refs: Vec<(usize, &[u8])> = parity.iter().map(|(i, p)| (*i, p.as_slice())).collect();
     coder.reconstruct_into(parity_count, &mut slot_refs, &have, &parity_refs)?;
 
-    Ok(missing
-        .iter()
-        .map(|&m| slots[m].clone())
-        .collect())
+    Ok(missing.iter().map(|&m| slots[m].clone()).collect())
 }
 
 /// The GF(2⁸) coder used by both the host parity path and the client rebuild path.
@@ -190,18 +187,16 @@ mod tests {
                 .filter(|(i, _)| *i != lose)
                 .map(|(_, p)| p.clone())
                 .collect();
-            let rebuilt = rebuild(
-                c.as_ref(),
-                &received,
-                &[lose],
-                1,
-                &[(0, parity[0].clone())],
-            )
-            .unwrap();
+            let rebuilt =
+                rebuild(c.as_ref(), &received, &[lose], 1, &[(0, parity[0].clone())]).unwrap();
             assert_eq!(rebuilt.len(), 1);
             // The rebuilt shard is padded to the group max length (the equal-length RS
             // invariant); the meaningful prefix is the original frame.
-            assert_eq!(&rebuilt[0][..group[lose].data.len()], group[lose].data, "lost position {lose}");
+            assert_eq!(
+                &rebuilt[0][..group[lose].data.len()],
+                group[lose].data,
+                "lost position {lose}"
+            );
         }
     }
 
@@ -216,7 +211,14 @@ mod tests {
             .filter(|(i, _)| *i != 2 && *i != 5)
             .map(|(_, p)| p.clone())
             .collect();
-        let rebuilt = rebuild(c.as_ref(), &received, &[2, 5], 2, &[(0, parity[0].clone()), (1, parity[1].clone())]).unwrap();
+        let rebuilt = rebuild(
+            c.as_ref(),
+            &received,
+            &[2, 5],
+            2,
+            &[(0, parity[0].clone()), (1, parity[1].clone())],
+        )
+        .unwrap();
         assert_eq!(rebuilt.len(), 2);
         assert_eq!(&rebuilt[0][..group[2].data.len()], group[2].data);
         assert_eq!(&rebuilt[1][..group[5].data.len()], group[5].data);

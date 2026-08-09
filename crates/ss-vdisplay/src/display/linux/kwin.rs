@@ -380,7 +380,10 @@ impl VirtualDisplay for KwinDisplay {
         // bootstrap output. Applied over kde_output_management_v2 in-process (immune to a wedged
         // kscreen-doctor backend; see `apply_topology`), with a kscreen-doctor fallback. `disabled`
         // is the physical/bootstrap outputs, each `(name, "WxH@Hz")`, to restore on teardown.
-        let exclusive = matches!(crate::effective_topology(), crate::policy::Topology::Exclusive);
+        let exclusive = matches!(
+            crate::effective_topology(),
+            crate::policy::Topology::Exclusive
+        );
         if self.first_in_group && exclusive {
             crate::monitor_hold::arm_before_topology(true);
         }

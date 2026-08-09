@@ -387,8 +387,9 @@ pub(super) async fn serve_session(
     let clip_available = clip.available;
     // Phase 6: the measured transport-state machine (control task feeds it, send path reads
     // its policy). One per session — the classification is link-private.
-    let transport_state =
-        Arc::new(std::sync::Mutex::new(crate::transport_state::TransportStateMachine::default()));
+    let transport_state = Arc::new(std::sync::Mutex::new(
+        crate::transport_state::TransportStateMachine::default(),
+    ));
     let transport_policy = Arc::new(crate::transport_state::TransportPolicyShared::from_env());
     tokio::spawn(control::run(
         ctrl_send,

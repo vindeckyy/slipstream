@@ -6,10 +6,10 @@
 #
 #   docker build -f ci/android-ci.Dockerfile -t slipstream-android-ci ci
 #
-# Version pins mirror what android.yml installed via sdkmanager: AGP 9.3 wants JDK 17–21;
+# Version pins mirror what android.yml installed via sdkmanager: AGP 9.3 wants JDK 17 - 21;
 # cmake;3.22.1 because kit/build.gradle.kts prepends $ANDROID_SDK/cmake/3.22.1/bin to PATH
 # for cargo-ndk's audiopus_sys (libopus) CMake build; platforms;android-37 is deliberately
-# absent (AGP auto-downloads it if a build ever needs it — same note as the old workflow).
+# absent (AGP auto-downloads it if a build ever needs it  -  same note as the old workflow).
 FROM ubuntu:26.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -36,7 +36,7 @@ RUN yes | sdkmanager --licenses >/dev/null \
         "ndk;30.0.14904198" "cmake;3.22.1" \
     && chmod -R a+rX "$ANDROID_HOME"
 
-# Toolchain shared across CI users (jobs may run as different uids) — same shape as
+# Toolchain shared across CI users (jobs may run as different uids)  -  same shape as
 # rust-ci.Dockerfile, plus the Android cross targets and cargo-ndk. The registry/git
 # download caches are stripped after the cargo-ndk install: jobs restore those from the
 # shared actions cache, and baking them would only bloat every pull.
@@ -52,14 +52,14 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
     && rustc --version && cargo ndk --version
 
 # Shared compile cache: jobs set RUSTC_WRAPPER=sccache (backend = RustFS S3 on the LAN,
-# see .github/workflows — the env lives there so dev use of this image stays uncached).
+# see GitHub Actions  -  the env lives there so dev use of this image stays uncached).
 ARG SCCACHE_VERSION=0.10.0
 RUN curl -fsSL "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
     | tar -xz --wildcards --strip-components=1 -C /usr/local/bin '*/sccache' \
     && sccache --version
 
 # actions/checkout (and every other JS action: cache, upload-artifact) execs `node` INSIDE
-# the job container — no node, no checkout (exit 127; same lesson flatpak.yml documents for
+# the job container  -  no node, no checkout (exit 127; same lesson flatpak.yml documents for
 # fedora:43). A separate trailing layer on purpose: appending here keeps the fat SDK/NDK
 # layers above cache-valid instead of invalidating the whole build.
 RUN apt-get update && apt-get install -y --no-install-recommends nodejs \

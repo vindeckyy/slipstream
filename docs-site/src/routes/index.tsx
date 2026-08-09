@@ -3,15 +3,16 @@ import { HomeLayout } from 'fumadocs-ui/layouts/home'
 import BrandMark from '@/components/BrandMark'
 import Wordmark from '@/components/Wordmark'
 import { baseOptions } from '@/lib/layout.shared'
+import { sitePath } from '@/lib/paths'
 
 export const Route = createFileRoute('/')({ component: Home })
 
 const journeys = [
   {
     eyebrow: 'Play',
-    title: 'Games on every screen you own',
+    title: 'Stream from Linux to the screens you use.',
     description:
-      'Stream from a powerful Linux host to a TV, Steam Deck, iPhone, or Android device. Launch from the game library, use Capture mouse for shooters, and keep Moonlight when you want it.',
+      'Run the host on Linux and connect from iPhone, Android, Steam Deck, or a Moonlight client when you enable GameStream. Launch games from the library or settle into a desktop session.',
     href: 'play',
     cta: 'Open the Play guide',
     secondary: [
@@ -24,7 +25,7 @@ const journeys = [
     eyebrow: 'Work',
     title: 'Your real desktop at the office',
     description:
-      'Reach the machine you left at home over a trusted VPN. Absolute mouse, clipboard, Workstation or Hot-desk presets, and picture settings tuned for sharp text.',
+      'Reach the machine you left at home over a trusted VPN. Precise mouse control, clipboard sharing, Work profiles, and picture settings tuned for sharp text.',
     href: 'desktop-at-work',
     cta: 'Open Desktop at work',
     secondary: [
@@ -44,7 +45,7 @@ const steps = [
   },
   {
     number: '02',
-    title: 'Pair a client',
+    title: 'Install and pair a client',
     description: 'iPhone, Android, Steam Deck, or Moonlight when you enable GameStream.',
     slug: 'pairing',
   },
@@ -85,7 +86,7 @@ const guides = [
   {
     title: 'API reference',
     description: 'Interactive OpenAPI for status, pairing, library, and host control.',
-    href: '/api',
+    href: sitePath('/api'),
   },
 ] as const
 
@@ -147,9 +148,36 @@ function Home() {
             </div>
 
             <p className="mt-6 text-sm text-fd-muted-foreground motion-safe:animate-[ss-rise_1.05s_ease-out]">
-              Native clients for every major platform · Moonlight-compatible when you enable GameStream ·
-              No accounts, no cloud
+              iPhone, Android, and Steam Deck clients · Optional Moonlight compatibility through GameStream ·
+              No Slipstream account or relay service
             </p>
+          </div>
+        </section>
+
+        <section className="border-b border-fd-border bg-fd-card/20">
+          <div className="mx-auto grid w-full max-w-6xl gap-10 px-6 py-14 md:grid-cols-[0.8fr_1.2fr] md:items-center md:px-8 md:py-20">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fd-primary">
+                One host, one clear path
+              </p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-fd-foreground md:text-4xl">
+                See the host before you connect.
+              </h2>
+              <p className="mt-4 max-w-md text-base leading-7 text-fd-muted-foreground">
+                The web console keeps pairing, displays, library, and live stream health in one place.
+                The guides explain the decisions behind each control.
+              </p>
+            </div>
+            <div className="overflow-hidden rounded-2xl border border-fd-border bg-fd-background p-2 shadow-2xl shadow-cyan-950/20">
+              <img
+                src={sitePath('/screenshots/dashboard.png')}
+                alt="Slipstream host dashboard showing stream health and connected clients"
+                width={1600}
+                height={1000}
+                loading="eager"
+                className="h-auto w-full rounded-xl"
+              />
+            </div>
           </div>
         </section>
 
@@ -276,7 +304,7 @@ function Home() {
                   <Link
                     key={guide.title}
                     to="/docs/$"
-                    params={{ _splat: guide.slug! }}
+                    params={{ _splat: 'slug' in guide ? guide.slug : '' }}
                     className="group block border-t border-fd-border pt-5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-primary"
                   >
                     <h3 className="font-semibold text-fd-foreground transition-colors group-hover:text-fd-primary">

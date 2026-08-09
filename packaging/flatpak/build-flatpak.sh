@@ -2,7 +2,7 @@
 # Build the slipstream Linux client as a single-file `.flatpak` bundle.
 #
 # Works on the Steam Deck (org.flatpak.Builder from Flathub, user-scope, NO root) and on any
-# Linux box with flatpak + flatpak-builder. The CI does the same steps (.github/workflows/flatpak.yml).
+# Linux box with flatpak + flatpak-builder. The CI does the same steps (GitHub Actions).
 #
 # On the Deck (one-time):
 #   flatpak install --user -y flathub org.flatpak.Builder
@@ -17,7 +17,7 @@
 #   BUILDER=...        override the flatpak-builder invocation (default: auto-detect host
 #                      flatpak-builder, else `flatpak run org.flatpak.Builder`).
 #   ARCH=...           target architecture (default: this machine's). `aarch64` builds the arm64
-#                      client — the manifest carries the per-arch PKG_CONFIG_PATH and the matching
+#                      client  -  the manifest carries the per-arch PKG_CONFIG_PATH and the matching
 #                      prebuilt Skia archive. NOTE this is not a cross-compile: flatpak-builder
 #                      runs the build inside a sandbox for that arch, so building aarch64 on an
 #                      x86_64 box needs qemu binfmt registered and is very slow. Run it on an
@@ -62,7 +62,7 @@ if [ "${ONLINE:-0}" = "1" ]; then
   [ -f packaging/flatpak/cargo-sources.json ] || echo '[]' > packaging/flatpak/cargo-sources.json
 elif [ -f packaging/flatpak/cargo-sources.json ] && [ "${FORCE_GEN:-0}" != "1" ]; then
   # Reuse a cargo-sources.json that was generated elsewhere (e.g. on a dev box with network +
-  # python aiohttp/toml, then rsynced to a build host that lacks them — like the Deck). The
+  # python aiohttp/toml, then rsynced to a build host that lacks them  -  like the Deck). The
   # offline crate cache is a pure function of Cargo.lock, so this is reproducible. FORCE_GEN=1
   # to regenerate anyway.
   echo "==> reusing existing packaging/flatpak/cargo-sources.json (FORCE_GEN=1 to regenerate)"
@@ -75,7 +75,7 @@ else
   fi
   # Needs python3 + aiohttp + tomlkit. On a host that lacks them (e.g. the Deck), generate on the
   # Mac / a dev box instead and rsync the result next to the manifest (reused by the branch above).
-  # Prune the microsoft/windows-rs git crates first (slipstream-client-windows only) — otherwise
+  # Prune the microsoft/windows-rs git crates first (slipstream-client-windows only)  -  otherwise
   # flatpak-builder full-clones that multi-GB repo and fills the disk. See prune-windows-lock.py.
   python3 packaging/flatpak/prune-windows-lock.py Cargo.lock /tmp/Cargo.flatpak.lock
   python3 "$GEN" /tmp/Cargo.flatpak.lock -o packaging/flatpak/cargo-sources.json
@@ -84,7 +84,7 @@ fi
 # --- build into a local ostree repo, then export a single-file bundle --------------------
 echo "==> flatpak-builder ($APP_ID, version $VERSION, arch $ARCH)"
 # --default-branch=stable matches CI / the hosted repo ref, so a locally-built install can also
-# track flatpak.unom.io. build-bundle must then be told the branch (else it defaults to `master`).
+# A hosted remote can use the stable branch; local builds keep the same default branch.
 "${FPB[@]}" --user --force-clean --disable-rofiles-fuse \
   --default-branch=stable \
   --arch="$ARCH" \

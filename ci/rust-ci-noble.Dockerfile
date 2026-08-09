@@ -1,25 +1,25 @@
-# LTS builder for the slipstream HOST .deb — Ubuntu 24.04 (noble), the current Ubuntu LTS.
+# LTS builder for the slipstream HOST .deb  -  Ubuntu 24.04 (noble), the current Ubuntu LTS.
 #
 # WHY THIS EXISTS (see packaging/debian/README.md → "Ubuntu 24.04 LTS"):
 # The default builder (ci/rust-ci.Dockerfile) is Ubuntu 26.04, so the host .deb it produces bakes
-# in a glibc 2.41 floor and a hard `Depends: libavcodec62, …` (FFmpeg 8). Ubuntu 24.04 LTS ships
-# glibc 2.39 and FFmpeg 6.1 (libavcodec60), so that .deb is uninstallable there — apt reports the
+# in a glibc 2.41 floor and a hard `Depends: libavcodec62, ...` (FFmpeg 8). Ubuntu 24.04 LTS ships
+# glibc 2.39 and FFmpeg 6.1 (libavcodec60), so that .deb is uninstallable there  -  apt reports the
 # deps as "too recent". Building the host on 24.04 instead lowers the glibc floor to 2.39 (the
-# binary then runs on 24.04 → 26.04), and the ONE library 24.04 is too old for — FFmpeg — is built
+# binary then runs on 24.04 → 26.04), and the ONE library 24.04 is too old for  -  FFmpeg  -  is built
 # from source here and BUNDLED into the .deb (packaging/debian/build-deb.sh, BUNDLE_FFMPEG=1), so
 # the package no longer depends on the distro's libav* at all. Everything else the host links
 # (PipeWire, Wayland, xkbcommon, GL/EGL/GBM, Vulkan; opus is vendored via cmake) is soname-compatible
 # on 24.04, so this ONE universal host .deb replaces the 26.04-built one for every Ubuntu user.
 #
 # libcuda is deliberately NOT provided: the host dlopen's libcuda.so.1 at runtime (ss-zerocopy /
-# ss-encode) and never link-imports it, so — unlike the full-workspace rust-ci image, which builds
-# tests that DO link a cuda stub — this host-only build needs no NVIDIA driver package. NVENC/EGL
+# ss-encode) and never link-imports it, so  -  unlike the full-workspace rust-ci image, which builds
+# tests that DO link a cuda stub  -  this host-only build needs no NVIDIA driver package. NVENC/EGL
 # come from whatever driver the target runs, out of band.
 #
-# Rebuilt+pushed by .github/workflows/docker.yml (matrix: slipstream-rust-ci-noble); consumed by the
-# `build-publish-host` job in .github/workflows/deb.yml. Bootstrap: like rust-ci, the first deb.yml
-# run after this image is added uses the image from a PRIOR docker.yml push — seed it once manually
-# (docker build -f ci/rust-ci-noble.Dockerfile -t … ci && docker push) before the host job can run.
+# Rebuilt+pushed by GitHub Actions (matrix: slipstream-rust-ci-noble); consumed by the
+# `build-publish-host` job in GitHub Actions Bootstrap: like rust-ci, the first deb.yml
+# run after this image is added uses the image from a PRIOR docker.yml push  -  seed it once manually
+# (docker build -f ci/rust-ci-noble.Dockerfile -t ... ci && docker push) before the host job can run.
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -39,7 +39,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # --- FFmpeg 8 from source -> /opt/ffmpeg (shared libs + .pc files) ----------------------------------
 # libavcodec.so.62, matching the 26.04 line's soname so the host behaves identically. This is an
 # LGPL build (no --enable-gpl / --enable-nonfree) so bundling the .so's into an MIT/Apache .deb stays
-# license-clean — LGPL's relink clause is satisfied by dynamic linking, and the only encoders the host
+# license-clean  -  LGPL's relink clause is satisfied by dynamic linking, and the only encoders the host
 # calls (h264/hevc/av1 _nvenc + _vaapi, plus scale_vaapi/hwmap filters; software H.264 fallback is the
 # BSD-2 openh264 crate, NOT FFmpeg libx264) are all LGPL-compatible.
 # Sourced from the official FFmpeg GitHub mirror by release tag, NOT ffmpeg.org: the CI build network
@@ -51,7 +51,7 @@ ARG FFMPEG_TAG=n8.0
 # nvenc.c. Pin the last SDK-12 tag (has the field FFmpeg 8.0 expects). Bump alongside FFMPEG_TAG.
 ARG NVHDR_TAG=n12.2.72.0
 RUN set -eux; \
-    # nv-codec-headers: the NVENC/NVDEC headers FFmpeg's --enable-nvenc needs (headers only, no lib —
+    # nv-codec-headers: the NVENC/NVDEC headers FFmpeg's --enable-nvenc needs (headers only, no lib  -
     # the driver is dlopen'd at runtime). Installs ffnvcodec.pc under /usr/local/lib/pkgconfig.
     git clone --depth 1 --branch "$NVHDR_TAG" https://github.com/FFmpeg/nv-codec-headers.git /tmp/nvhdr; \
     make -C /tmp/nvhdr install PREFIX=/usr/local; \
@@ -69,8 +69,8 @@ RUN set -eux; \
     test -e /opt/ffmpeg/lib/libavcodec.so.62
 
 # ffmpeg-sys-next discovers FFmpeg via pkg-config; point it at the bundled build. PKG_CONFIG_PATH is
-# PREPENDED to pkg-config's default dirs (not a replacement — that's PKG_CONFIG_LIBDIR), so PipeWire /
-# Wayland / libva / … still resolve from the system. FFMPEG_PREFIX is read by build-deb.sh's bundler.
+# PREPENDED to pkg-config's default dirs (not a replacement  -  that's PKG_CONFIG_LIBDIR), so PipeWire /
+# Wayland / libva / ... still resolve from the system. FFMPEG_PREFIX is read by build-deb.sh's bundler.
 ENV PKG_CONFIG_PATH=/opt/ffmpeg/lib/pkgconfig \
     FFMPEG_PREFIX=/opt/ffmpeg
 
@@ -85,7 +85,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
     && rustc --version && cargo clippy --version && cargo fmt --version
 
 # Shared compile cache: jobs set RUSTC_WRAPPER=sccache (backend = RustFS S3 on the LAN,
-# see .github/workflows — the env lives there so dev use of this image stays uncached).
+# see GitHub Actions  -  the env lives there so dev use of this image stays uncached).
 # musl build: one static binary serves the Ubuntu and Fedora images alike.
 ARG SCCACHE_VERSION=0.10.0
 RUN curl -fsSL "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" \

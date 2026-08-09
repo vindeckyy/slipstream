@@ -21,7 +21,8 @@ const files = execFileSync(
 )
   .split("\0")
   .filter(Boolean)
-  .filter((file) => !file.split("/").some((part) => skippedSegments.has(part)));
+  .filter((file) => !file.split("/").some((part) => skippedSegments.has(part)))
+  .filter((file) => existsSync(join(repoRoot, file)));
 
 const issues = [];
 const documentCache = new Map();

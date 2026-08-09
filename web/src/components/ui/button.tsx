@@ -1,13 +1,6 @@
 import { AnimatedButton, buttonVariants } from "@unom/ui/button";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
-
-// The console's Button IS @unom/ui's animated button — pill shape, specular
-// material gloss + UI click/hover sounds (via UnomProviders), driven by the
-// shared brand tokens. Same variant/size vocabulary the routes already use
-// (default/destructive/outline/secondary/ghost/link/success/accent +
-// default/sm/lg/icon/input). Hierarchy, focus, and pressed polish live here so
-// call sites stay unchanged.
 export type ButtonProps = ComponentProps<typeof AnimatedButton>;
 
 export const Button = ({

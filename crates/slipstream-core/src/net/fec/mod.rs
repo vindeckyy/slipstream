@@ -10,7 +10,7 @@ mod gf16;
 mod gf8;
 
 pub use audio::{
-    audio_coder, AudioFecData, AUDIO_GROUP_LEN, AUDIO_MAX_PARITY, generate_parity, rebuild,
+    audio_coder, generate_parity, rebuild, AudioFecData, AUDIO_GROUP_LEN, AUDIO_MAX_PARITY,
 };
 pub use gf16::Gf16Coder;
 pub use gf8::Gf8Coder;

@@ -12,7 +12,7 @@ use crate::capture::Capturer;
 use crate::encode;
 use crate::send_pacing::percentile;
 use anyhow::{Context, Result};
-use slipstream_core::latency::{now_ns, latency_artifact_enabled, FrameTimings, LatencyArtifact};
+use slipstream_core::latency::{latency_artifact_enabled, now_ns, FrameTimings, LatencyArtifact};
 use std::net::UdpSocket;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -651,7 +651,11 @@ pub(super) fn stream_body(
             if latency_on {
                 let t = &mut timings;
                 t.transport = "gamestream";
-                t.sampling = if arrival_driven { "arrival_wait" } else { "fixed_tick" };
+                t.sampling = if arrival_driven {
+                    "arrival_wait"
+                } else {
+                    "fixed_tick"
+                };
                 t.publish_ns = frame.pts_ns;
                 t.encode_submit_ns = sub_ns;
                 t.first_enc_pkt_ns = first_poll_ns;
@@ -675,11 +679,7 @@ pub(super) fn stream_body(
                     t.source_meta_pts_ns = s.source_meta_pts_ns;
                 }
             }
-            match raw_tx.try_send(RawFrame {
-                aus,
-                ts,
-                timings,
-            }) {
+            match raw_tx.try_send(RawFrame { aus, ts, timings }) {
                 Ok(()) => {
                     sent_batches += 1;
                     au_seq = au_seq.wrapping_add(batch_len);

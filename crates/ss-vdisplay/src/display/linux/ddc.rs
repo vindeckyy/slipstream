@@ -65,7 +65,11 @@ fn set_power(display_id: u32, value: &str) -> bool {
         .status();
     match status {
         Ok(s) if s.success() => {
-            tracing::info!(display_id, value, "DDC/CI: panel power mode commanded via ddcutil");
+            tracing::info!(
+                display_id,
+                value,
+                "DDC/CI: panel power mode commanded via ddcutil"
+            );
             true
         }
         Ok(s) => {

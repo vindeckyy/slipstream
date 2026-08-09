@@ -34,9 +34,9 @@ const RANK: Record<string, number> = {
 	ERROR: 4,
 };
 const LEVEL_CLASS: Record<string, string> = {
-	ERROR: "text-red-400",
-	WARN: "text-amber-400",
-	INFO: "text-sky-300",
+	ERROR: "text-destructive",
+	WARN: "text-warning",
+	INFO: "text-info",
 	DEBUG: "text-muted-foreground",
 	TRACE: "text-muted-foreground",
 };
@@ -45,7 +45,7 @@ const KEEP = 5_000; // accumulated entries (client memory bound)
 const SHOW = 1_000; // rendered rows (DOM bound)
 
 /**
- * Container: cursor-paged log polling. A non-empty page advances the cursor — a new query key,
+ * Container: cursor-paged log polling. A non-empty page advances the cursor  -  a new query key,
  * so the next page fetches immediately and a backlog drains fast; an empty page leaves the key
  * unchanged and `refetchInterval` paces the idle poll. Pausing (follow off) stops the interval.
  */
@@ -71,7 +71,7 @@ export const LogsSection: FC = () => {
 				refetchInterval: follow ? 2_000 : false,
 				// Pausing must actually pause. Stopping only the interval left React Query's default
 				// focus/reconnect refetches landing, and the append effect consumed them
-				// unconditionally — so tabbing away and back evicted the lines the operator had
+				// unconditionally  -  so tabbing away and back evicted the lines the operator had
 				// paused on, from behind the pause button.
 				refetchOnWindowFocus: follow,
 				refetchOnReconnect: follow,
@@ -82,7 +82,7 @@ export const LogsSection: FC = () => {
 	// Resync after the host goes away and comes back.
 	//
 	// The host's log ring restarts at seq 1 on every restart, while our cursor stays wherever it
-	// got to. `GET /logs?after=8000` against a fresh ring is not an error — it is a permanently
+	// got to. `GET /logs?after=8000` against a fresh ring is not an error  -  it is a permanently
 	// EMPTY page (`next` echoes `after`), so the page would poll forever showing stale lines with
 	// no error, no dropped badge and no way back short of a full reload. The console's own update
 	// flow restarts the host, so this was reachable from two clicks away.
@@ -104,11 +104,11 @@ export const LogsSection: FC = () => {
 		setEntries((prev) => {
 			const lastSeq = prev.at(-1)?.seq ?? -1;
 			// A page whose newest entry is OLDER than what we already hold can only mean the host's
-			// sequence restarted underneath us — the buffer describes a host that no longer exists,
+			// sequence restarted underneath us  -  the buffer describes a host that no longer exists,
 			// so replace it wholesale rather than filtering every new line away as "already seen".
 			const newest = data.entries.at(-1)?.seq ?? -1;
 			if (newest < lastSeq) return data.entries.slice(-KEEP);
-			// Otherwise append only what's newer — dedup by the monotonic `seq`. Guards a
+			// Otherwise append only what's newer  -  dedup by the monotonic `seq`. Guards a
 			// double-invoked mount effect (React StrictMode, or `data` warm in cache) from appending
 			// the same page twice (duplicate rows + duplicate React keys), and makes the post-resync
 			// re-read from 0 a no-op when the host did NOT restart.
@@ -121,7 +121,7 @@ export const LogsSection: FC = () => {
 	}, [data]);
 
 	// The card hands back the entries its filters currently match, so an export carries exactly what
-	// the viewer shows — never the DOM-bounded tail of it.
+	// the viewer shows  -  never the DOM-bounded tail of it.
 	return (
 		<LogsCard
 			entries={entries}
@@ -165,7 +165,7 @@ export const LogsSection: FC = () => {
 
 /**
  * Pure log viewer: level/min filter + text search (local UI state), follow, clear, and export.
- * Export is the filters' full result, not the rendered tail — the `SHOW` cap is a DOM budget and
+ * Export is the filters' full result, not the rendered tail  -  the `SHOW` cap is a DOM budget and
  * has no business truncating a file destined for a bug report.
  */
 export const LogsCard: FC<{
@@ -178,7 +178,7 @@ export const LogsCard: FC<{
 	onSupport: () => void;
 	shareMode: ShareMode | null;
 	dropped: boolean;
-	/** The poll's failure, if any — without it a broken /logs is indistinguishable from a quiet host. */
+	/** The poll's failure, if any  -  without it a broken /logs is indistinguishable from a quiet host. */
 	error?: unknown;
 	isLoading?: boolean;
 	onRetry?: () => void;
@@ -218,11 +218,11 @@ export const LogsCard: FC<{
 	//
 	// Keyed on the newest RENDERED seq, not on `visible.length`: `visible` is `matched.slice(-SHOW)`,
 	// so once the filter matches SHOW rows its length is pinned at SHOW forever. The effect then
-	// stopped re-running and follow-mode quietly stopped following — exactly when the log is busy
+	// stopped re-running and follow-mode quietly stopped following  -  exactly when the log is busy
 	// enough to need it. The newest seq keeps changing for as long as lines arrive.
 	const newestVisible = visible.at(-1)?.seq ?? -1;
 	// NOTE: biome flags `newestVisible` as an unnecessary dependency (it is not read in the body) and
-	// offers to remove it. Do NOT take that fix — it is a TRIGGER, the signal that new lines arrived.
+	// offers to remove it. Do NOT take that fix  -  it is a TRIGGER, the signal that new lines arrived.
 	// Removing it reinstates the bug this replaced: the effect stops re-running and follow-mode
 	// quietly stops following. The same warning was here before, on `visible.length`.
 	useEffect(() => {
@@ -233,7 +233,7 @@ export const LogsCard: FC<{
 
 	return (
 		<Card>
-			{/* This card has no CardHeader, so it has to put the top padding back itself — and it
+			{/* This card has no CardHeader, so it has to put the top padding back itself  -  and it
 			    must do so at BOTH breakpoints. `CardContent` is `p-4 pt-0 sm:p-6 sm:pt-0`, and
 			    tailwind-merge only resolves conflicts within the same variant: a bare `pt-6` cancels
 			    `pt-0` but leaves `sm:pt-0` standing, so the padding was 24px on a phone and 0 on a
@@ -298,7 +298,7 @@ export const LogsCard: FC<{
 							size="icon"
 							variant="ghost"
 							disabled={matched.length === 0}
-							title="Download the filtered log lines as a text file (full filter match, not just the on-screen tail)."
+							title="Download the filtered log lines as a text file (full filter match, and the on-screen tail)."
 							aria-label={m.logs_download()}
 							onClick={() => onDownload(matched)}
 						>
@@ -371,8 +371,8 @@ export const LogsCard: FC<{
 					</div>
 				</div>
 
-				{/* A failing poll while lines are already on screen keeps them there — during a host
-				    restart the last lines before it went away are the interesting ones — but says so,
+				{/* A failing poll while lines are already on screen keeps them there  -  during a host
+				    restart the last lines before it went away are the interesting ones  -  but says so,
 				    instead of letting a frozen view read as a quiet host. */}
 				{error != null && entries.length > 0 && (
 					<p

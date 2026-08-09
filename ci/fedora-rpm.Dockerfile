@@ -1,8 +1,8 @@
 # CI builder for the slipstream RPM. The Fedora version is parameterized so one Dockerfile
 # serves every target whose ffmpeg soname must match: Fedora 43 == Bazzite's base (group
 # "bazzite"), Fedora 44 == the Fedora KDE spin (group "fedora-44"). The RPM's auto-generated
-# library Requires (e.g. libavcodec.so.NN) pin to exactly what the chosen base — and thus the
-# target — ships. Used by .github/workflows/rpm.yml; built+pushed by .github/workflows/docker.yml.
+# library Requires (e.g. libavcodec.so.NN) pin to exactly what the chosen base  -  and thus the
+# target  -  ships. Used by GitHub Actions; built+pushed by GitHub Actions
 #
 #   docker build --build-arg FEDORA_VERSION=43 -f ci/fedora-rpm.Dockerfile -t slipstream-fedora-rpm ci
 #   docker build --build-arg FEDORA_VERSION=44 -f ci/fedora-rpm.Dockerfile -t slipstream-fedora44-rpm ci
@@ -17,7 +17,7 @@ RUN dnf -y install \
       "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm" \
   && dnf -y install \
       # rpmbuild + source-tarball tooling; nodejs runs the GitHub Actions JS (checkout/cache) only
-      # — the slipstream-web console builds AND runs on bun (installed below); unzip is for the bun
+      #  -  the slipstream-web console builds AND runs on bun (installed below); unzip is for the bun
       # installer.
       rpm-build rpmdevtools systemd-rpm-macros git tar gzip nodejs unzip \
       # build toolchain + bindgen
@@ -31,15 +31,15 @@ RUN dnf -y install \
       vulkan-headers \
   && dnf clean all
 
-# bun — both the BUILD tool and the RUNTIME for the slipstream-web console (`bun run build` -> the
-# Nitro `bun`-preset .output, served by `Bun.serve` with TLS — HTTP/1.1 over TLS). The
+# bun  -  both the BUILD tool and the RUNTIME for the slipstream-web console (`bun run build` -> the
+# Nitro `bun`-preset .output, served by `Bun.serve` with TLS  -  HTTP/1.1 over TLS). The
 # RPM vendors THIS bun binary. Not in Fedora repos; install the official standalone binary to a
 # system PATH dir so the rpmbuild `%build`/`%install` (run as any uid) find it.
 RUN curl -fsSL https://bun.sh/install | bash \
     && install -m0755 /root/.bun/bin/bun /usr/local/bin/bun \
     && bun --version
 
-# libcuda link stub — the zerocopy path links a fixed set of cuXxx driver symbols, but CI has
+# libcuda link stub  -  the zerocopy path links a fixed set of cuXxx driver symbols, but CI has
 # no GPU and never RUNS CUDA. Rather than drag in the NVIDIA userspace stack, synthesize a stub
 # libcuda.so.1 that just defines those symbols (the SAME approach the Ubuntu image takes with the
 # real driver lib, minus the driver). On Bazzite the real driver provides libcuda.so.1 at runtime.
@@ -68,7 +68,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
     && rustc --version && cargo --version
 
 # Shared compile cache: jobs set RUSTC_WRAPPER=sccache (backend = RustFS S3 on the LAN,
-# see .github/workflows — the env lives there so dev use of this image stays uncached).
+# see GitHub Actions  -  the env lives there so dev use of this image stays uncached).
 # musl build: one static binary serves the Ubuntu and Fedora images alike.
 ARG SCCACHE_VERSION=0.10.0
 RUN curl -fsSL "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" \

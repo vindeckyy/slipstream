@@ -4,13 +4,13 @@
 //! * the Welcome negotiates **GF(2¹⁶) Leopard FEC** (inexpressible in GameStream) + AES-GCM;
 //! * the client's Hello requests a display mode and the host creates a **native virtual
 //!   output** at exactly that size/refresh (same vdisplay backends as the GameStream path);
-//! * **input arrives as QUIC datagrams** — encrypted, congestion-managed, no ENet
-//!   retransmission spikes — and feeds the session's input injector;
+//! * **input arrives as QUIC datagrams**  -  encrypted, congestion-managed, no ENet
+//!   retransmission spikes  -  and feeds the session's input injector;
 //! * video frames carry a wall-clock `pts_ns`, so a same-host client measures the full
 //!   capture→encode→FEC→UDP→reassemble latency per frame.
 //!
 //! `slipstream-host slipstream1-host [--port 9777] [--source synthetic|virtual] [--seconds 30]
-//!  [--frames 300]` serves sessions back to back (one at a time — the virtual output and
+//!  [--frames 300]` serves sessions back to back (one at a time  -  the virtual output and
 //!  encoder are single-tenant); `slipstream-probe --connect host:9777` is the counterpart.
 //!  The data plane runs on native threads (no async on the frame path).
 //!
@@ -108,7 +108,7 @@ pub struct Slipstream1Options {
     pub max_sessions: u32,
     /// Maximum sessions streaming **at once** (a NVENC/GPU bound); further clients wait in the
     /// accept queue until a slot frees. Concurrent sessions each get their own virtual output +
-    /// encoder but share the host-lifetime input/audio/mic services — i.e. multiple devices viewing
+    /// encoder but share the host-lifetime input/audio/mic services  -  i.e. multiple devices viewing
     /// (and controlling) the *same* desktop on the shared-desktop backends (kwin/mutter/wlroots).
     /// `0` = unlimited (bounded only by the GPU). Default a conservative few.
     pub max_concurrent: usize,
@@ -125,15 +125,15 @@ pub struct Slipstream1Options {
     /// Paired-clients store path override (tests); `None` = the default config path.
     pub paired_store: Option<std::path::PathBuf>,
     /// Fixed data-plane UDP port. `None`/`Some(0)` (default): bind a random ephemeral port and
-    /// **hole-punch** — wait ~2.5 s for the client's punch, then fall back to its reported address
+    /// **hole-punch**  -  wait ~2.5 s for the client's punch, then fall back to its reported address
     /// (traverses NAT / a stateful inter-VLAN firewall with no forwarded port, at the cost of the
     /// punch-timeout on a firewall that drops the punch). `Some(p)`: bind that fixed port and
-    /// stream **directly** to the client's reported address with no punch-wait — for a host whose
+    /// stream **directly** to the client's reported address with no punch-wait  -  for a host whose
     /// data port is fixed + firewall-opened/forwarded, this removes the punch-timeout delay. A
     /// fixed port only fits one data plane at a time, so a concurrent session finding it busy
     /// falls back to random + hole-punch (see [`bind_data_socket`]).
     pub data_port: Option<u16>,
-    /// Control-connection idle timeout — the **disconnect-detection latency** (how long a vanished
+    /// Control-connection idle timeout  -  the **disconnect-detection latency** (how long a vanished
     /// client takes to be declared dead, which bounds how fast a dropped session tears down / lingers
     /// and thus the reconnect-overlap window). `None` = the core default (8s). Set from
     /// `SLIPSTREAM_IDLE_TIMEOUT_MS`; clamped to a ≥1s floor with a keep-alive that scales to it so a
@@ -141,14 +141,14 @@ pub struct Slipstream1Options {
     pub idle_timeout: Option<std::time::Duration>,
     /// Advertise this host over mDNS (`_slipstream._udp`). Default on; `--no-mdns` /
     /// `SLIPSTREAM_MDNS=0` turns it off for multicast-dead environments (bridged Docker, CI netns)
-    /// — clients then connect via `--connect HOST:PORT` / a manually-added host, which always works.
+    ///  -  clients then connect via `--connect HOST:PORT` / a manually-added host, which always works.
     pub mdns: bool,
 }
 
 /// Bind the per-session data-plane UDP socket, honoring [`Slipstream1Options::data_port`]. Returns
 /// `(socket, direct)`: `direct = true` (a successfully-bound fixed port) means "stream straight to
 /// the client's reported address, no hole-punch"; `false` (random port, or a busy fixed port) means
-/// "hole-punch". The socket is held from the handshake through streaming — no drop-then-rebind
+/// "hole-punch". The socket is held from the handshake through streaming  -  no drop-then-rebind
 /// window in which a concurrent session could steal a fixed port.
 fn bind_data_socket(data_port: Option<u16>) -> std::io::Result<(std::net::UdpSocket, bool)> {
     if let Some(p) = data_port.filter(|p| *p != 0) {
@@ -157,7 +157,7 @@ fn bind_data_socket(data_port: Option<u16>) -> std::io::Result<(std::net::UdpSoc
             Err(e) => tracing::warn!(
                 data_port = p,
                 error = %e,
-                "fixed --data-port is busy (a concurrent session already holds it?) — \
+                "fixed --data-port is busy (a concurrent session already holds it?)  -  \
                  falling back to a random port + hole-punch for this session"
             ),
         }
@@ -172,7 +172,7 @@ use crate::send_pacing::{percentile, PaceStat};
 /// and the GameStream loop; threaded into each session's `SessionContext`.
 use crate::stats_recorder::StatsRecorder;
 
-/// Minimum spacing between accepted pairing ceremonies (bounds online PIN guessing — with
+/// Minimum spacing between accepted pairing ceremonies (bounds online PIN guessing  -  with
 /// SPAKE2 an attacker already gets only one guess per ceremony; this caps the rate).
 pub(super) const PAIRING_COOLDOWN: std::time::Duration = std::time::Duration::from_secs(2);
 
@@ -199,7 +199,7 @@ pub fn run(opts: Slipstream1Options) -> Result<()> {
         .enable_all()
         .build()
         .context("tokio runtime")?;
-    // Standalone CLI: arm at startup iff --allow-pairing/--require-pairing (back-compat — the PIN
+    // Standalone CLI: arm at startup iff --allow-pairing/--require-pairing (back-compat  -  the PIN
     // is logged). The unified `serve --native` path instead arms on demand via the management API.
     let np = Arc::new(NativePairing::load_with(
         opts.paired_store.clone(),
@@ -207,7 +207,7 @@ pub fn run(opts: Slipstream1Options) -> Result<()> {
         opts.allow_pairing || opts.require_pairing,
     )?);
     // Standalone `slipstream1-host` has no mgmt API to arm capture, so this recorder stays disarmed
-    // (harmless — the loops' `is_armed()` gate is always false). The unified `serve` shares one
+    // (harmless  -  the loops' `is_armed()` gate is always false). The unified `serve` shares one
     // recorder across mgmt + both streaming paths instead.
     let stats = StatsRecorder::new(crate::stats_recorder::default_dir());
     // Standalone `slipstream1-host` runs no management API, so advertise no `mgmt` port (0).
@@ -221,11 +221,11 @@ pub(super) fn fingerprint_hex(fp: &[u8; 32]) -> String {
 /// The persistent listener: accept clients back to back on one endpoint. Sessions are
 /// served one at a time (the virtual output + NVENC are single-tenant); a client that
 /// connects mid-session waits in the accept queue. A failed session logs and the loop
-/// keeps serving — only endpoint-level failures are fatal.
+/// keeps serving  -  only endpoint-level failures are fatal.
 /// Config for the native (slipstream/1) host when the unified `serve` runs it in-process.
 pub(crate) struct NativeServe {
     pub port: u16,
-    /// Gate sessions on pairing. **Default on** — an open host any LAN device can stream from is
+    /// Gate sessions on pairing. **Default on**  -  an open host any LAN device can stream from is
     /// insecure; `serve --open` turns it off (trusted single-user setups). Pairing is armed on
     /// demand from the web console (arm → PIN); paired devices persist.
     pub require_pairing: bool,
@@ -236,7 +236,7 @@ pub(crate) struct NativeServe {
     /// [`Slipstream1Options::data_port`]. `None` = random port + hole-punch (the default).
     pub data_port: Option<u16>,
     /// Advertise over mDNS (`--no-mdns` / `SLIPSTREAM_MDNS=0` turns it off). Gates the native
-    /// `_slipstream._udp` advert AND the GameStream `_nvstream` advert — the serve-level knob for
+    /// `_slipstream._udp` advert AND the GameStream `_nvstream` advert  -  the serve-level knob for
     /// multicast-dead environments; see [`Slipstream1Options::mdns`].
     pub mdns: bool,
 }
@@ -245,7 +245,7 @@ pub(crate) struct NativeServe {
 /// persistent (no session/duration cut), pairing armed on demand via the management API (the
 /// shared [`NativePairing`] starts disarmed).
 /// Default cap on simultaneously-streaming sessions (each holds an NVENC session; high-res
-/// split-encode holds two). Conservative — consumer NVENC historically capped concurrent sessions;
+/// split-encode holds two). Conservative  -  consumer NVENC historically capped concurrent sessions;
 /// overflow clients wait in the accept queue. Override with `--max-concurrent`.
 pub(crate) const DEFAULT_MAX_CONCURRENT: usize = 4;
 
@@ -299,16 +299,16 @@ pub(crate) async fn serve(
         port = opts.port,
         source = ?opts.source,
         fingerprint = %fingerprint_hex(&fingerprint),
-        "slipstream/1 host listening (QUIC) — clients pin this fingerprint"
+        "slipstream/1 host listening (QUIC)  -  clients pin this fingerprint"
     );
 
     // mDNS: advertise the native service so clients auto-discover this host (the analogue of the
-    // GameStream _nvstream advert; both run in the unified host). Held for the host's lifetime —
+    // GameStream _nvstream advert; both run in the unified host). Held for the host's lifetime  -
     // dropping `_advert` unregisters. Best-effort: a discovery failure must not stop streaming
     // (manual `--connect HOST:PORT` always works), so we log and continue.
     let _advert = if !opts.mdns {
         tracing::info!(
-            "mDNS advertisement disabled (--no-mdns / SLIPSTREAM_MDNS) — clients connect by address"
+            "mDNS advertisement disabled (--no-mdns / SLIPSTREAM_MDNS)  -  clients connect by address"
         );
         None
     } else {
@@ -334,11 +334,11 @@ pub(crate) async fn serve(
     };
 
     // One audio capturer for the whole host lifetime, handed from session to session
-    // (avoids a PipeWire stream setup per session — see AudioCapSlot).
+    // (avoids a PipeWire stream setup per session  -  see AudioCapSlot).
     let audio_cap: AudioCapSlot = Arc::new(std::sync::Mutex::new(None));
     // One pointer/keyboard injector for the whole host lifetime (see InjectorService): the
     // RemoteDesktop-portal grant is established ONCE and reused, instead of a CreateSession per
-    // session — which, under rapid client reconnects, raced a prior session's portal teardown and
+    // session  -  which, under rapid client reconnects, raced a prior session's portal teardown and
     // wedged KWin's EIS setup ("EIS setup timed out"). Gamepads stay per-session (uinput).
     let injector = crate::inject::InjectorService::start();
     // One virtual microphone for the whole host lifetime (see [`crate::audio::MicPump`]): the
@@ -349,13 +349,13 @@ pub(crate) async fn serve(
     // endpoint churn).
     let mic_service = crate::audio::MicPump::start();
     // Host-lifetime worker that fires debounced TV-session restores (the managed gamescope path
-    // restores the box's autologin gaming session on idle, not per-disconnect — see
+    // restores the box's autologin gaming session on idle, not per-disconnect  -  see
     // `vdisplay::restore_managed_session`). Held for serve()'s lifetime; dropping it stops it.
     let _restore_worker = crate::vdisplay::start_restore_worker();
     // A3: recover a TV takeover stranded by a crashed previous host instance (persisted to
-    // $XDG_RUNTIME_DIR) — schedule a restore after a reconnect grace. No-op on a clean start.
+    // $XDG_RUNTIME_DIR)  -  schedule a restore after a reconnect grace. No-op on a clean start.
     crate::vdisplay::restore_takeover_on_startup();
-    // …and the other end of that: give the box its session back when WE are the ones going away.
+    // ...and the other end of that: give the box its session back when WE are the ones going away.
     install_shutdown_restore();
     // Host-lifetime cover-art warmer: fetches + caches GOG/Xbox cover art (no-auth api.gog.com /
     // displaycatalog) off the hot path so `all_games()` (the library list + launch resolve) never
@@ -369,7 +369,7 @@ pub(crate) async fn serve(
         tracing::info!(
             paired = st.paired_clients,
             require = opts.require_pairing,
-            "pairing armed — enter the PIN shown on the console to pair a client"
+            "pairing armed  -  enter the PIN shown on the console to pair a client"
         );
         // The PIN is a shared secret: print it straight to the operator's terminal, NOT through
         // tracing. A tracing event also lands in the DEBUG log ring that field bug reports ship
@@ -380,7 +380,7 @@ pub(crate) async fn serve(
     let opts = Arc::new(opts);
 
     // Concurrency: serve up to `max_concurrent` sessions at once. Each gets its own virtual output +
-    // NVENC encoder; they share the host-lifetime input/audio/mic services — i.e. multiple devices
+    // NVENC encoder; they share the host-lifetime input/audio/mic services  -  i.e. multiple devices
     // viewing (and controlling) the SAME desktop on the shared-desktop backends. A permit is taken
     // before accepting, so overflow clients wait in QUIC's accept backlog until a slot frees;
     // `max_concurrent == 0` means unlimited (GPU-bounded). The heavy handshake + pipeline run inside
@@ -404,7 +404,7 @@ pub(crate) async fn serve(
             None => break, // endpoint closed
         };
         // Complete the QUIC handshake in the accept loop (it's ~1 RTT): a failed handshake (e.g. a
-        // pin mismatch — the client aborts) must NOT consume a session slot, mirroring the old
+        // pin mismatch  -  the client aborts) must NOT consume a session slot, mirroring the old
         // serial loop. The slow part (control handshake, pairing, the capture/encode pipeline) runs
         // in the spawned task, so a slow client still never blocks accepting the next one.
         let conn = match incoming.await {
@@ -423,7 +423,7 @@ pub(crate) async fn serve(
         };
         // Take the session slot only AFTER the handshake, so a full host still ACCEPTS the
         // connection and the waiting client sees a live path (quinn's keep-alive holds it) instead
-        // of a silent dial timeout — previously the loop parked on this await before `accept()`, so
+        // of a silent dial timeout  -  previously the loop parked on this await before `accept()`, so
         // a host at its concurrency cap looked simply unreachable.
         let permit = sem
             .clone()
@@ -472,7 +472,7 @@ pub(crate) async fn serve(
                     // Make the failure legible to the client (the [`close_rejected`] discipline,
                     // extended to EVERY session error): a setup failure that just drops the
                     // connection reaches the client as a bare close mid-control-frame ("control
-                    // stream finished mid-frame") — indistinguishable from transport trouble.
+                    // stream finished mid-frame")  -  indistinguishable from transport trouble.
                     // Close with the typed setup-failed code, carrying the error text in the
                     // reason bytes for client-side logs. When a gate already closed with its own
                     // typed code, or the peer closed first, this close is a no-op (first wins).
@@ -506,13 +506,13 @@ pub(crate) async fn serve(
 const SHUTDOWN_RESTORE_GRACE: std::time::Duration = std::time::Duration::from_secs(20);
 
 /// Hand the box's own session back on the way out. Until this existed the host had NO signal
-/// handling at all: `SIGTERM` killed it outright, which is fine for a host that owns nothing — but
+/// handling at all: `SIGTERM` killed it outright, which is fine for a host that owns nothing  -  but
 /// a managed gamescope takeover owns the box's session, and on a mask-fragile display manager
 /// (Nobara's plasmalogin) it has STOPPED that display manager for the length of the stream. Killed
 /// there, the host leaves a box with no graphical session and nothing left to restart it: the
 /// crash-restore state lives in `$XDG_RUNTIME_DIR`, which logind removes along with the user
 /// manager, so even the next host start can't heal it. `systemctl --user restart slipstream-host`
-/// mid-stream — or a package update doing it for you — was enough.
+/// mid-stream  -  or a package update doing it for you  -  was enough.
 ///
 /// So: catch `SIGTERM`/`SIGINT`, restore, then exit. Restoring runs on a blocking thread (it shells
 /// out) under [`SHUTDOWN_RESTORE_GRACE`], and a host that took nothing over exits immediately.
@@ -525,7 +525,7 @@ fn install_shutdown_restore() {
             signal(SignalKind::interrupt()),
         ) else {
             tracing::warn!(
-                "could not install shutdown signal handlers — a host stopped mid-takeover will \
+                "could not install shutdown signal handlers  -  a host stopped mid-takeover will \
                  leave the box's own session down until it is restarted"
             );
             return;
@@ -536,7 +536,7 @@ fn install_shutdown_restore() {
         };
         tracing::info!(
             signal = sig,
-            "host stopping — handing the box's session back"
+            "host stopping  -  handing the box's session back"
         );
         let restore = tokio::task::spawn_blocking(crate::vdisplay::restore_takeover_now);
         if tokio::time::timeout(SHUTDOWN_RESTORE_GRACE, restore)
@@ -545,14 +545,14 @@ fn install_shutdown_restore() {
         {
             tracing::warn!(
                 secs = SHUTDOWN_RESTORE_GRACE.as_secs(),
-                "the session restore did not finish in time — exiting anyway"
+                "the session restore did not finish in time  -  exiting anyway"
             );
         }
         std::process::exit(0);
     });
 }
 
-/// The accept loop is sequential, so the control phase must be bounded — a client that
+/// The accept loop is sequential, so the control phase must be bounded  -  a client that
 /// connects and never finishes the handshake would otherwise wedge the host for everyone.
 pub(super) const HANDSHAKE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
@@ -577,7 +577,7 @@ pub(super) const STREAM_STOP_GRACE: std::time::Duration = std::time::Duration::f
 /// drops with the connection), so this only catches a genuine wedge.
 pub(super) const SIDE_THREAD_JOIN_GRACE: std::time::Duration = std::time::Duration::from_secs(10);
 
-/// Resolves once `stop` has been set for [`STREAM_STOP_GRACE`] — i.e. the session was told to end
+/// Resolves once `stop` has been set for [`STREAM_STOP_GRACE`]  -  i.e. the session was told to end
 /// and its stream thread *still* hasn't returned.
 ///
 /// Polled rather than notified: `stop` is a plain flag shared with blocking threads, and the poll
@@ -597,7 +597,7 @@ const REJECT_BUSY_CODE: u32 = slipstream_core::reject::REJECT_BUSY_CLOSE_CODE;
 
 /// Make a gate rejection legible to the client BEFORE erroring out of the session task: close
 /// with the typed application code (`slipstream_core::reject`) so the client renders the real
-/// reason ("pairing not armed", "denied in the console") — the task's `Err` then only logs.
+/// reason ("pairing not armed", "denied in the console")  -  the task's `Err` then only logs.
 /// Without this the dropped connection closes with a bare code 0, indistinguishable on the
 /// client from transport trouble (the "not accepted" support-thread failure mode).
 pub(super) fn close_rejected(
@@ -609,25 +609,25 @@ pub(super) fn close_rejected(
 
 /// QUIC application error code a client closes with on a **deliberate quit** (a user "stop", not a
 /// network drop). The host reads it off the connection's `ApplicationClosed` reason and tears the
-/// session's virtual display down IMMEDIATELY, skipping the keep-alive linger — an unwanted disconnect
+/// session's virtual display down IMMEDIATELY, skipping the keep-alive linger  -  an unwanted disconnect
 /// (idle timeout / reset / any other code) still lingers so a reconnect can resume. Shared with the
 /// clients via `slipstream_core::quic::QUIT_CLOSE_CODE`.
 pub(super) const QUIT_CODE: u32 = slipstream_core::quic::QUIT_CLOSE_CODE;
 
 /// Encoder bitrate (kbps) the host falls back to when the client expresses no preference
-/// (`Hello::bitrate_kbps == 0`) — the long-standing 20 Mbps default. A client that knows its
+/// (`Hello::bitrate_kbps == 0`)  -  the long-standing 20 Mbps default. A client that knows its
 /// link (e.g. after a speed test) requests an explicit rate instead.
 const DEFAULT_BITRATE_KBPS: u32 = 20_000;
 /// Bounds a client's requested bitrate before configuring NVENC: a 500 kbps floor keeps the stream
 /// above unusable, and a **2 Gbps** ceiling is generous headroom over the 1 Gbps+ target that
-/// GF(2¹⁶) Leopard FEC was built to reach — it lifts the GF(2⁸)/~1 Gbps wall, and at 1 Gbps a frame
+/// GF(2¹⁶) Leopard FEC was built to reach  -  it lifts the GF(2⁸)/~1 Gbps wall, and at 1 Gbps a frame
 /// is only a few-hundred shards in one block (far under the 65535 limit). Enough for 5K@240 with
 /// margin. Resolved value is echoed in `Welcome::bitrate_kbps`. The native data plane batches sends
 /// (`sendmmsg`) and paces each frame on a dedicated send thread (microburst cap), validated to a
 /// clean 1 Gbps with zero send-buffer drops; sustained overruns are still counted as
 /// `packets_send_dropped`.
 const MIN_BITRATE_KBPS: u32 = 500;
-// 8 Gbps ceiling — headroom for a 2.5 Gbps link and the 5 Gbps path (home-worker-3 → Mac Studio,
+// 8 Gbps ceiling  -  headroom for a 2.5 Gbps link and the 5 Gbps path (home-worker-3 → Mac Studio,
 // Mac is 10G). The encoder is pixel-rate bound, not bitrate bound (NVENC emits multi-Gbps trivially;
 // ~1 Gpix/s per engine, ~2 with the auto 2-way split), so the real ceiling is the transport send
 // path (UDP GSO + per-packet alloc removal), not this number.
@@ -644,7 +644,7 @@ fn resolve_bitrate_kbps(requested: u32) -> u32 {
 }
 
 /// [`resolve_bitrate_kbps`] with the codec's floor semantics: PyroWave has no useful
-/// low-rate regime (wavelet quality collapses far above the H.26x floor — plan §4.6), so
+/// low-rate regime (wavelet quality collapses far above the H.26x floor  -  plan §4.6), so
 /// an Automatic client (`0`) gets the codec's ~1.6 bpp operating point for the negotiated
 /// mode instead of the 20 Mbps H.26x default. The rate is then PINNED for the session:
 /// the client's ABR controller stays off for this codec and the host refuses mid-stream
@@ -671,7 +671,7 @@ fn resolve_bitrate_kbps_for(
             .unwrap_or(MAX_BITRATE_KBPS)
             .clamp(MIN_BITRATE_KBPS, MAX_BITRATE_KBPS);
         // Operator link ceiling. PyroWave's Automatic pin is open-loop (all-intra, so ABR and the
-        // capacity probe are off) — at a high pixel rate it can outrun the physical link (e.g.
+        // capacity probe are off)  -  at a high pixel rate it can outrun the physical link (e.g.
         // 4:4:4 + HDR at 5120x1440@240 pins ~5.3 Gbps, over a 5 GbE link), and the overshoot just
         // becomes packet loss / partial frames. `SLIPSTREAM_PYROWAVE_MAX_MBPS` lets a host on a
         // constrained link cap the pin to what the fabric carries; unset ⇒ no cap (unchanged).
@@ -680,7 +680,7 @@ fn resolve_bitrate_kbps_for(
                 tracing::warn!(
                     pin_kbps = pin,
                     ceiling_kbps = ceiling,
-                    "PyroWave Automatic bitrate pin exceeds SLIPSTREAM_PYROWAVE_MAX_MBPS — capping \
+                    "PyroWave Automatic bitrate pin exceeds SLIPSTREAM_PYROWAVE_MAX_MBPS  -  capping \
                      to the link ceiling (set an explicit client bitrate to choose your own)"
                 );
                 return ceiling.max(MIN_BITRATE_KBPS);
@@ -692,7 +692,7 @@ fn resolve_bitrate_kbps_for(
 }
 
 /// Operator ceiling for PyroWave's open-loop Automatic bitrate pin: `SLIPSTREAM_PYROWAVE_MAX_MBPS`
-/// (megabits/s) → kbps, or `None` when unset/zero/invalid (no cap — the raw bpp pin stands).
+/// (megabits/s) → kbps, or `None` when unset/zero/invalid (no cap  -  the raw bpp pin stands).
 /// Only consulted for `requested == 0` PyroWave sessions; an explicit client bitrate bypasses it.
 fn pyrowave_auto_pin_ceiling_kbps() -> Option<u32> {
     std::env::var("SLIPSTREAM_PYROWAVE_MAX_MBPS")
@@ -705,14 +705,14 @@ fn pyrowave_auto_pin_ceiling_kbps() -> Option<u32> {
 /// Resolve the audio channel count the session will capture + encode from the client's request.
 /// Normalizes to one of 2 (stereo) / 6 (5.1) / 8 (7.1); anything else (older client, garbage)
 /// becomes stereo. Both backends can produce the requested count (PipeWire pads/upmixes positions,
-/// WASAPI loopback up/downmixes via AUTOCONVERTPCM), so no capability clamp is needed here — the
+/// WASAPI loopback up/downmixes via AUTOCONVERTPCM), so no capability clamp is needed here  -  the
 /// surround channels just carry up/downmixed content when the host's sink has fewer real channels.
 fn resolve_audio_channels(requested: u8) -> u8 {
     slipstream_core::audio::normalize_channels(requested)
 }
 
 /// Static FEC override: `SLIPSTREAM_FEC_PCT`, when set, PINS the recovery percent and DISABLES
-/// adaptive FEC — so a speed test / measurement keeps a fixed, known overhead. `None` ⇒ adaptive
+/// adaptive FEC  -  so a speed test / measurement keeps a fixed, known overhead. `None` ⇒ adaptive
 /// FEC (the host sizes recovery to the loss the client reports). `0` disables FEC entirely.
 /// Clamped to ≤ 90.
 pub(super) fn fec_static_override() -> Option<u8> {
@@ -723,7 +723,7 @@ pub(super) fn fec_static_override() -> Option<u8> {
 }
 
 /// Adaptive-FEC band + starting point. Every recovery shard is extra wire bytes AND an extra
-/// packet, so on a clean link FEC decays toward [`FEC_MIN`] (fewer packets — the win for a
+/// packet, so on a clean link FEC decays toward [`FEC_MIN`] (fewer packets  -  the win for a
 /// packet-rate-bound uplink like the Steam Deck's WiFi tx); loss ramps it toward [`FEC_MAX`].
 /// Sessions start moderate so the first frames (before any loss report) are protected.
 const FEC_MIN: u8 = 1;
@@ -749,12 +749,12 @@ fn apply_fec_target(session: &mut Session, fec_target: &AtomicU8) {
 }
 
 /// Persistent audio-capturer slot, reused across sessions (same pattern as the GameStream
-/// path): keeps one warm PipeWire capture stream instead of a connect/negotiate cycle —
-/// and a daemon-side node churn — per session. (Drop now tears a capturer down cleanly.)
+/// path): keeps one warm PipeWire capture stream instead of a connect/negotiate cycle  -
+/// and a daemon-side node churn  -  per session. (Drop now tears a capturer down cleanly.)
 pub(super) type AudioCapSlot = Arc<std::sync::Mutex<Option<Box<dyn crate::audio::AudioCapturer>>>>;
 
-/// How long the host keeps an unpaired knock PARKED — connection held open — waiting for the
-/// operator to click Approve in the console (delegated approval, roadmap §8b-1). The QUIC
+/// How long the host keeps an unpaired knock PARKED  -  connection held open  -  waiting for the
+/// operator to click Approve in the console (delegated approval, delegated approval path). The QUIC
 /// keep-alive (4 s, under the 8 s idle timeout) holds the path warm meanwhile, so on approval the
 /// device pairs and streams with NO reconnect. Bounded well under the pending entry's TTL (10 min);
 /// the client uses a comparable connect timeout, and a client that gives up first closes the
@@ -763,11 +763,11 @@ pub(super) const PENDING_APPROVAL_WAIT: std::time::Duration = std::time::Duratio
 
 /// Backoff between reopen attempts after a host-lifetime service's backend (a capturer) fails
 /// to open or its worker dies, so a persistently-unavailable resource isn't hammered. (The
-/// virtual mic has its own tuning — see [`crate::audio::MicPump`].)
+/// virtual mic has its own tuning  -  see [`crate::audio::MicPump`].)
 const INJECTOR_REOPEN_BACKOFF: std::time::Duration = std::time::Duration::from_secs(2);
 
 /// Pack a `(width, height, refresh_hz)` mode into one atomic word (w:16|h:16|hz:16) for the live
-/// stats-mode slot — one store/load instead of three racy ones. Every dimension fits: the codec
+/// stats-mode slot  -  one store/load instead of three racy ones. Every dimension fits: the codec
 /// max dimension caps w/h well under 2^16 (`validate_dimensions`), refresh likewise.
 fn pack_mode(width: u32, height: u32, refresh_hz: u32) -> u64 {
     ((width as u64 & 0xffff) << 32)
@@ -786,7 +786,7 @@ pub(crate) fn unpack_mode(packed: u64) -> (u32, u32, u32) {
 
 /// Recover the integer refresh rate a pipeline was actually built at from its frame interval
 /// (`interval` is constructed as `1/effective_hz` in `build_pipeline`, so the round-trip is exact).
-/// This is the backend-honored rate — it differs from the requested mode when e.g. KWin caps a
+/// This is the backend-honored rate  -  it differs from the requested mode when e.g. KWin caps a
 /// virtual output at 60 Hz.
 fn interval_hz(interval: std::time::Duration) -> u32 {
     (1.0 / interval.as_secs_f64()).round() as u32
@@ -795,8 +795,8 @@ fn interval_hz(interval: std::time::Duration) -> u32 {
 /// The mode a pipeline is ACTUALLY delivering, for the H2/H3 corrective ack: the captured frame's
 /// real dimensions (`build_pipeline` opens the encoder at `frame.{width,height}`, so this is exactly
 /// what the client decodes) paced at the rate the pipeline achieved ([`interval_hz`]). It diverges
-/// from the requested mode when a backend can't honor it: KWin caps a virtual output's refresh, or —
-/// the case this exists for — Windows ss-vdisplay rejects an in-place `SetMode` to a resolution not
+/// from the requested mode when a backend can't honor it: KWin caps a virtual output's refresh, or  -
+/// the case this exists for  -  Windows ss-vdisplay rejects an in-place `SetMode` to a resolution not
 /// in the running monitor's advertised EDID list and the host falls back to the actual display mode
 /// (`capture::idd_push`: "sizing the ring to the display's actual mode"). Comparing this against the
 /// already-acked request decides whether a corrective `Reconfigured` ack is owed so the client
@@ -833,7 +833,7 @@ mod tests {
         for (w, h, hz) in [(1280u32, 720u32, 60u32), (3840, 2160, 144), (320, 200, 24)] {
             assert_eq!(unpack_mode(pack_mode(w, h, hz)), (w, h, hz));
         }
-        // `interval` is built as 1/effective_hz — the round-trip recovers the integer rate.
+        // `interval` is built as 1/effective_hz  -  the round-trip recovers the integer rate.
         for hz in [24u32, 30, 60, 75, 90, 120, 144, 165, 240] {
             let interval = std::time::Duration::from_secs_f64(1.0 / hz as f64);
             assert_eq!(interval_hz(interval), hz);
@@ -855,7 +855,7 @@ mod tests {
 
         // Resolution fallback (Windows ss-vdisplay rejected the out-of-list SetMode, host stayed at
         // the actual display mode): the frame's real dims flow through, so the delivered mode differs
-        // from the acked request and a corrective ack IS owed — the exact gap this fixes.
+        // from the acked request and a corrective ack IS owed  -  the exact gap this fixes.
         let fell_back = delivered_mode(1920, 1080, hz60);
         assert_ne!(fell_back, requested);
         assert_eq!(
@@ -883,7 +883,7 @@ mod tests {
         };
         use crate::encode::ChromaFormat;
         // Automatic (0) on PyroWave → the ~1.6 bpp operating point, not the 20 Mbps H.26x
-        // default (which would turn wavelets to mush — plan §4.6).
+        // default (which would turn wavelets to mush  -  plan §4.6).
         let kbps = resolve_bitrate_kbps_for(
             crate::encode::Codec::PyroWave,
             0,
@@ -941,7 +941,7 @@ mod tests {
     fn pyrowave_auto_pin_respects_operator_ceiling() {
         use crate::encode::{ChromaFormat, Codec};
         use slipstream_core::config::Mode;
-        // 5120x1440@240 4:4:4 10-bit pins ~5.29 Gbps open-loop — above a 5 GbE link.
+        // 5120x1440@240 4:4:4 10-bit pins ~5.29 Gbps open-loop  -  above a 5 GbE link.
         let mode = Mode {
             width: 5120,
             height: 1440,
@@ -981,7 +981,7 @@ mod tests {
     fn adapt_fec_maps_loss_to_recovery_band() {
         // A perfectly clean window (0 loss) lands on the floor.
         assert_eq!(adapt_fec(0), FEC_MIN);
-        // Any nonzero loss rounds up past the floor (ceil) — tiny but never below the cushion.
+        // Any nonzero loss rounds up past the floor (ceil)  -  tiny but never below the cushion.
         assert_eq!(adapt_fec(1), 2);
         // FEC exceeds the loss it covers (×1.4 + 1pt headroom).
         assert_eq!(adapt_fec(50_000), 8); // 5% loss → ceil(7)+1 = 8
@@ -1004,7 +1004,7 @@ mod tests {
 
     #[test]
     fn data_socket_fixed_binds_direct_then_falls_back_when_busy() {
-        // Learn a currently-free port (bind :0, read it, drop — the same reserve-then-rebind the
+        // Learn a currently-free port (bind :0, read it, drop  -  the same reserve-then-rebind the
         // host itself uses; a race here would only make the assert below flaky, not wrong).
         let free = std::net::UdpSocket::bind("0.0.0.0:0")
             .unwrap()
@@ -1029,14 +1029,14 @@ mod tests {
     }
 
     /// Freeze the gamepad wire contract: every button bit + axis id pinned to its exact value in
-    /// `slipstream_core::input::gamepad` — the single source both the slipstream/1 native wire and the
+    /// `slipstream_core::input::gamepad`  -  the single source both the slipstream/1 native wire and the
     /// GameStream/Limelight wire read from (they are one and the same). Renumbering a bit in core
     /// silently breaks every already-shipped client, so it must fail here first. This is the host
     /// counterpart to the client-side C-ABI cross-checks in the Apple/Android gamepad tests.
     #[test]
     fn gamepad_wire_bits_are_pinned() {
         use slipstream_core::input::gamepad as pf;
-        // buttonFlags — low 16 bits. The injectors now name these straight from core::input::gamepad
+        // buttonFlags  -  low 16 bits. The injectors now name these straight from core::input::gamepad
         // (the GameStream junk-drawer aliases were removed in the ss-inject un-coupling), so this pins
         // core directly.
         assert_eq!(pf::BTN_DPAD_UP, 0x0000_0001);
@@ -1054,7 +1054,7 @@ mod tests {
         assert_eq!(pf::BTN_B, 0x0000_2000);
         assert_eq!(pf::BTN_X, 0x0000_4000);
         assert_eq!(pf::BTN_Y, 0x0000_8000);
-        // buttonFlags2 — high 16 bits: back-grip paddles, plus the touchpad-click / Share bits the
+        // buttonFlags2  -  high 16 bits: back-grip paddles, plus the touchpad-click / Share bits the
         // DualSense/DS4 protos consume.
         assert_eq!(pf::BTN_PADDLE1, 0x0001_0000);
         assert_eq!(pf::BTN_PADDLE2, 0x0002_0000);
@@ -1062,7 +1062,7 @@ mod tests {
         assert_eq!(pf::BTN_PADDLE4, 0x0008_0000);
         assert_eq!(pf::BTN_TOUCHPAD, 0x0010_0000);
         assert_eq!(pf::BTN_MISC1, 0x0020_0000);
-        // Axis ids — dense, 0-based.
+        // Axis ids  -  dense, 0-based.
         assert_eq!(
             [
                 pf::AXIS_LS_X,
@@ -1099,7 +1099,7 @@ mod tests {
                     // buffer the connection owns; per the ABI contract that borrow stays valid until
                     // the NEXT `next_au` call on this handle. We read the whole slice here (the assert
                     // + length-checked indexing) before the loop's next `next_au`, and `conn` outlives
-                    // it — so the pointer is live, exactly `len` bytes, read-only, single-threaded (no
+                    // it  -  so the pointer is live, exactly `len` bytes, read-only, single-threaded (no
                     // aliasing/use-after-free).
                     let data = unsafe { std::slice::from_raw_parts(frame.data, frame.len) };
                     let idx = u32::from_le_bytes(data[0..4].try_into().unwrap());
@@ -1116,7 +1116,7 @@ mod tests {
         }
     }
 
-    /// End-to-end through the C ABI — the exact contract platform clients (Swift) link:
+    /// End-to-end through the C ABI  -  the exact contract platform clients (Swift) link:
     /// in-process slipstream/1 host, `slipstream_connect` (TOFU → pinned reconnect) →
     /// `slipstream_connection_next_au` pulls verified frames → `slipstream_connection_send_input`
     /// In-process-host tests each spin up a host on a fixed loopback port and share the process-global
@@ -1156,12 +1156,12 @@ mod tests {
         });
         std::thread::sleep(std::time::Duration::from_millis(500));
 
-        // Session 1: TOFU (no pin) — observe the host fingerprint.
+        // Session 1: TOFU (no pin)  -  observe the host fingerprint.
         let addr = std::ffi::CString::new("127.0.0.1").unwrap();
         let mut observed = [0u8; 32];
         // SAFETY: `addr` is a live `CString` ("127.0.0.1") whose `as_ptr()` is the NUL-terminated
         // UTF-8 host string the contract requires; `pin_sha256`/cert/key are NULL (all permitted), and
-        // `observed.as_mut_ptr()` is the local `[u8; 32]` — exactly the 32 writable bytes the contract
+        // `observed.as_mut_ptr()` is the local `[u8; 32]`  -  exactly the 32 writable bytes the contract
         // demands, not aliased during the call. Every pointer references a live local that outlives the
         // blocking connect.
         let conn = unsafe {
@@ -1183,7 +1183,7 @@ mod tests {
 
         let (mut w, mut h, mut hz) = (0u32, 0u32, 0u32);
         // SAFETY: `conn` is the live, non-null connection handle just asserted above; `&mut w/h/hz` are
-        // exclusive, writable borrows of local `u32`s that outlive this synchronous call — the three
+        // exclusive, writable borrows of local `u32`s that outlive this synchronous call  -  the three
         // writable out-params the contract names.
         let st = unsafe { slipstream_connection_mode(conn, &mut w, &mut h, &mut hz) };
         assert_eq!(st, SlipstreamStatus::Ok);
@@ -1199,7 +1199,7 @@ mod tests {
         assert_eq!(st, SlipstreamStatus::Ok);
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         loop {
-            // SAFETY: same as the earlier `slipstream_connection_mode` call — `conn` is the live handle
+            // SAFETY: same as the earlier `slipstream_connection_mode` call  -  `conn` is the live handle
             // and `&mut w/h/hz` are exclusive writable borrows of locals that outlive this synchronous
             // call.
             let st = unsafe { slipstream_connection_mode(conn, &mut w, &mut h, &mut hz) };
@@ -1227,15 +1227,15 @@ mod tests {
             flags: 0,
         };
         // SAFETY: `conn` is the live handle; `&ev` borrows the local `InputEvent`, valid and immutable
-        // for this synchronous enqueue — the contract's "valid InputEvent" pointer.
+        // for this synchronous enqueue  -  the contract's "valid InputEvent" pointer.
         let st = unsafe { slipstream_connection_send_input(conn, &ev) };
         assert_eq!(st, SlipstreamStatus::Ok);
         // SAFETY: `conn` was returned by `slipstream_connect` and is never used after this call (session
         // 2 below uses a fresh `conn2`); `close` takes ownership and frees the handle exactly once.
         unsafe { slipstream_connection_close(conn) };
 
-        // Session 2 (same host process — the listener survived): pin the fingerprint.
-        // SAFETY: as for session 1 — `addr` is the live NUL-terminated host string; here
+        // Session 2 (same host process  -  the listener survived): pin the fingerprint.
+        // SAFETY: as for session 1  -  `addr` is the live NUL-terminated host string; here
         // `observed.as_ptr()` is the 32-byte pin (the fingerprint captured above, a valid `[u8; 32]`),
         // `observed_sha256_out` is NULL and cert/key are NULL. All pointers reference live locals for
         // the duration of the blocking connect.
@@ -1254,7 +1254,7 @@ mod tests {
             )
         };
         assert!(!conn2.is_null(), "pinned reconnect failed");
-        // SAFETY: `conn2` is the live, non-null pinned handle, pulled only from this thread —
+        // SAFETY: `conn2` is the live, non-null pinned handle, pulled only from this thread  -
         // `pull_verified`'s requirement.
         unsafe { pull_verified(conn2, 25) };
         // SAFETY: `conn2` came from `slipstream_connect` and is not used after this; `close` frees it once.
@@ -1262,7 +1262,7 @@ mod tests {
 
         // Session 3: a wrong pin must be rejected by the handshake.
         let bad = [0xAAu8; 32];
-        // SAFETY: same shape as the prior connects — `addr` is the live host string, `bad.as_ptr()` is
+        // SAFETY: same shape as the prior connects  -  `addr` is the live host string, `bad.as_ptr()` is
         // the 32-byte `[0xAA; 32]` pin, and out/cert/key are NULL; all reference live locals across the
         // blocking call. (The handshake is expected to fail and return NULL here, which is sound.)
         let conn3 = unsafe {
@@ -1281,10 +1281,10 @@ mod tests {
         };
         assert!(conn3.is_null(), "wrong pin must fail the handshake");
 
-        // The host saw the rejected handshake attempt as session 3? No — a TLS-failed
+        // The host saw the rejected handshake attempt as session 3? No  -  a TLS-failed
         // handshake never yields a connection, so accept() is still waiting. Connect once
         // more (TOFU) to complete the host's third session and let it exit.
-        // SAFETY: same as session 1's connect — `addr` is the live host string, pin/out/cert/key all
+        // SAFETY: same as session 1's connect  -  `addr` is the live host string, pin/out/cert/key all
         // NULL; the pointers reference live locals for the duration of the blocking connect.
         let conn4 = unsafe {
             slipstream_connect(
@@ -1311,8 +1311,8 @@ mod tests {
 
     /// Shared clipboard end to end over a real synthetic session
     /// (`design/clipboard-and-file-transfer.md`): with the operator policy enabled, the host
-    /// advertises the capability, acknowledges an enable with a `ClipState`, and — a synthetic
-    /// session mirrors no compositor, so no clipboard backend binds — declines a fetch with an
+    /// advertises the capability, acknowledges an enable with a `ClipState`, and  -  a synthetic
+    /// session mirrors no compositor, so no clipboard backend binds  -  declines a fetch with an
     /// `Error` the client surfaces. Exercises the whole 0x40-0x44 control+fetch path across two real
     /// endpoints (client `NativeClient` ↔ host `serve_session`). The live-backend paths (a real
     /// compositor) are covered by the on-glass test against GNOME/Hyprland.
@@ -1453,7 +1453,7 @@ mod tests {
 
     /// Delegated approval (§8b-1) end to end in-process, the SEAMLESS flow: an
     /// identified-but-unpaired client's knock on a pairing-required host is PARKED (connection held
-    /// open) and shows up as a pending request (fingerprint-derived label — the connector sends no
+    /// open) and shows up as a pending request (fingerprint-derived label  -  the connector sends no
     /// Hello name); the operator approves it WHILE the client waits, and the SAME connection is
     /// admitted to a session with no PIN and no reconnect.
     #[test]
@@ -1506,7 +1506,7 @@ mod tests {
         };
 
         // Approver thread: wait for the parked knock to register, assert its label, then APPROVE it
-        // WHILE the client is still parked — the console "click accept" flow.
+        // WHILE the client is still parked  -  the console "click accept" flow.
         let np_approve = np.clone();
         let expect_fp = expected_fp.clone();
         let approver = std::thread::spawn(move || {
@@ -1536,7 +1536,7 @@ mod tests {
                 .expect("pending id must approve");
         });
 
-        // The knock: a SINGLE connect that parks until approved, then streams — no reconnect. The
+        // The knock: a SINGLE connect that parks until approved, then streams  -  no reconnect. The
         // timeout is generous (it covers the park + the approver's poll latency).
         let client = NativeClient::connect(
             "127.0.0.1",
@@ -1553,8 +1553,8 @@ mod tests {
             0,     // client_caps
             false, // frame_parts (whole-AU delivery)
             None,  // launch
-            None,  // name: absent on purpose — this test asserts the fingerprint-derived label
-            None,  // pin: TOFU — the operator's approval (not a PIN) authorizes this client
+            None,  // name: absent on purpose  -  this test asserts the fingerprint-derived label
+            None,  // pin: TOFU  -  the operator's approval (not a PIN) authorizes this client
             Some((cert, key)),
             std::time::Duration::from_secs(15),
         )
@@ -1639,7 +1639,7 @@ mod tests {
                 .expect("pairing with the right PIN");
         assert!(test_paired_path().exists());
 
-        // 3: the paired identity gets a session — pinned to the ceremony's fingerprint.
+        // 3: the paired identity gets a session  -  pinned to the ceremony's fingerprint.
         let client = NativeClient::connect(
             "127.0.0.1",
             19778,
@@ -1663,12 +1663,12 @@ mod tests {
         .expect("paired session");
         assert_eq!(client.host_fingerprint, host_fp);
         // The Welcome always reports a CONCRETE resolved gamepad backend. (Not asserted
-        // against a specific one: resolve_gamepad honors an ambient SLIPSTREAM_GAMEPAD —
+        // against a specific one: resolve_gamepad honors an ambient SLIPSTREAM_GAMEPAD  -
         // a dev box exporting it must not fail the suite.)
         assert_ne!(client.resolved_gamepad, GamepadPref::Auto);
         drop(client);
 
-        // 4: SINGLE-USE PIN — the completed ceremony in step 2 consumed the arming window, so a
+        // 4: SINGLE-USE PIN  -  the completed ceremony in step 2 consumed the arming window, so a
         // second pairing attempt (even with the CORRECT PIN) is now rejected. This is the documented
         // "one online guess" guarantee: an attacker can't brute-force the static 4-digit PIN. (The
         // operator re-arms via the console / restart for the next device.)

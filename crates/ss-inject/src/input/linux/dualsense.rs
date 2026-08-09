@@ -1,9 +1,9 @@
-//! Virtual Sony DualSense via UHID — the rich-controller path (roadmap §5).
+//! Virtual Sony DualSense via UHID  -  the rich-controller path (rich-controller path).
 //!
 //! Unlike the uinput X-Box-360 pad ([`super::gamepad`]), which only carries buttons + axes + a
 //! rumble back-channel, a UHID device presents a *real* DualSense HID interface to the kernel:
 //! `hid-playstation` binds it (matched by VID `054C`/PID `0CE6`) and exposes the full controller
-//! — gamepad, motion sensors, touchpad, lightbar + player LEDs, and adaptive triggers — to games.
+//!  -  gamepad, motion sensors, touchpad, lightbar + player LEDs, and adaptive triggers  -  to games.
 //! The host writes HID **input** reports (report `0x01`, our controller state) and reads HID
 //! **output** reports (report `0x02`, a game's rumble/LED/trigger feedback) back, which it
 //! forwards to the client as [`slipstream_core::quic::HidOutput`].
@@ -45,7 +45,7 @@ fn put_cstr(ev: &mut [u8], off: usize, cap: usize, s: &str) {
     ev[off..off + n].copy_from_slice(&s.as_bytes()[..n]); // rest already zero (NUL-terminated)
 }
 
-/// The UHID identity a [`DualSensePad`] is created with — the plain DualSense or the Edge (same
+/// The UHID identity a [`DualSensePad`] is created with  -  the plain DualSense or the Edge (same
 /// driver, same report codec; the Edge differs by PID + descriptor and carries the four extra
 /// `buttons[2]` bits). Mirrors the uinput pad's `PadIdentity` shape.
 pub struct DsUhidIdentity {
@@ -81,7 +81,7 @@ impl DsUhidIdentity {
     }
 }
 
-/// A virtual DualSense / DualSense Edge backed by `/dev/uhid` (hand-rolled codec — no bindgen,
+/// A virtual DualSense / DualSense Edge backed by `/dev/uhid` (hand-rolled codec  -  no bindgen,
 /// mirroring the uinput pad's style). Dropping it destroys the device (the kernel tears down the
 /// bound `hid-playstation` interface).
 pub struct DualSensePad {
@@ -145,9 +145,9 @@ impl DualSensePad {
     }
 
     /// Service the device, non-blocking: answer the kernel's feature-report GET_REPORTs (calibration
-    /// / pairing / firmware — required during `hid-playstation` init, or no input devices appear)
+    /// / pairing / firmware  -  required during `hid-playstation` init, or no input devices appear)
     /// and parse any HID OUTPUT reports (rumble / lightbar / player LEDs / adaptive triggers) into
-    /// a [`DsFeedback`] for pad `pad`. Call frequently — especially right after [`open`] so the
+    /// a [`DsFeedback`] for pad `pad`. Call frequently  -  especially right after [`open`] so the
     /// init handshake completes. The fd is `O_NONBLOCK`, so once drained `read` returns `WouldBlock`.
     pub fn service(&mut self, pad: u8) -> DsFeedback {
         let mut fb = DsFeedback::default();
@@ -184,7 +184,7 @@ impl DualSensePad {
                     let id = u32::from_ne_bytes([ev[4], ev[5], ev[6], ev[7]]);
                     let _ = self.reply_set_report(id);
                 }
-                _ => {} // Start/Stop/Open/Close — ignore
+                _ => {} // Start/Stop/Open/Close  -  ignore
             }
         }
         fb
@@ -231,7 +231,7 @@ impl Drop for DualSensePad {
 /// shaped (slot table, unplug sweep, heartbeat, feedback dedup) lives in [`UhidManager`].
 pub struct DsLinuxProto {
     /// Fallback policy for the Steam back grips a client may send (the DualSense has no back-button
-    /// HID slot). `SLIPSTREAM_STEAM_REMAP=paddles=…`; default drop.
+    /// HID slot). `SLIPSTREAM_STEAM_REMAP=paddles=...`; default drop.
     remap: crate::steam_remap::RemapConfig,
 }
 
@@ -266,7 +266,7 @@ impl PadProto for DsLinuxProto {
     /// Merge buttons/sticks/triggers from the frame, preserving touch + motion + pad clicks (those
     /// come on the rich-input plane and must survive a button-only frame).
     fn merge_frame(&self, prev: &DsState, f: &slipstream_core::input::GamepadFrame) -> DsState {
-        // Steam back grips have no DualSense slot — fold them onto standard buttons per the
+        // Steam back grips have no DualSense slot  -  fold them onto standard buttons per the
         // configured policy (default drop) so they aren't silently lost.
         let buttons = crate::steam_remap::fold_paddles(f.buttons, self.remap.paddles);
         let mut s = DsState::from_gamepad(
@@ -296,7 +296,7 @@ impl PadProto for DsLinuxProto {
     }
 
     /// Answer the kernel's init handshake (it blocks `hid-playstation` init until its GET_REPORTs
-    /// are answered — call frequently) and parse a game's feedback: motor rumble on the universal
+    /// are answered  -  call frequently) and parse a game's feedback: motor rumble on the universal
     /// 0xCA plane, the rich lightbar/player-LED/trigger events on the 0xCD plane.
     fn service(&self, pad: &mut DualSensePad, idx: u8) -> PadFeedback {
         let fb = pad.service(idx);
@@ -305,7 +305,7 @@ impl PadProto for DsLinuxProto {
             hidout: fb.hidout,
             // Rumble-plane liveness (arms the shared abandoned-rumble force-off). evdev-FF games
             // going through hid-playstation get their stops surfaced reliably, but Steam Input
-            // drives this pad over hidraw DIRECTLY — the same abandonment semantics as a Windows
+            // drives this pad over hidraw DIRECTLY  -  the same abandonment semantics as a Windows
             // game, so the same watchdog applies. SDL-class writers re-assert a held level every
             // ~2 s (inside the idle window), and a writer that goes silent on a latched level is
             // cut exactly as real firmware decay would cut it on a physical pad.
@@ -315,20 +315,20 @@ impl PadProto for DsLinuxProto {
     }
 }
 
-/// All virtual DualSense pads of a session — the rich-controller analog of
+/// All virtual DualSense pads of a session  -  the rich-controller analog of
 /// [`GamepadManager`](super::gamepad::GamepadManager), selected with `SLIPSTREAM_GAMEPAD=dualsense`.
 ///
 /// Unlike the uinput pad, a DualSense carries touchpad + motion, which arrive on a *separate*
 /// rich-input plane (`apply_rich`) from the button/stick frames (`handle`); the shared
 /// [`UhidManager`] keeps each pad's full [`DsState`], re-emits the merged report whenever either
 /// source changes, and heartbeats it through input silence (a real DualSense streams report `0x01`
-/// continuously — `hid-playstation`/Proton/SDL treat a multi-second gap as an unplug).
+/// continuously  -  `hid-playstation`/Proton/SDL treat a multi-second gap as an unplug).
 pub type DualSenseManager = UhidManager<DsLinuxProto>;
 
 /// The DualSense **Edge** half of the shared stateful manager: the plain-DualSense transport and
 /// report codec under the Edge USB identity (`054C:0DF2` + the Edge descriptor), with the four
 /// wire back-grip bits mapped onto the Edge's native `buttons[2]` slots instead of the
-/// fold/drop policy — the whole point of this backend (a client's Deck grips / Elite paddles
+/// fold/drop policy  -  the whole point of this backend (a client's Deck grips / Elite paddles
 /// stop vanishing). No remap config: every paddle has a native home.
 ///
 /// Kernel note: `hid-playstation` binds the Edge PID since 6.1 (forced vibration-v2 output), but
@@ -357,7 +357,7 @@ impl PadProto for DsEdgeLinuxProto {
         DsState::neutral()
     }
 
-    /// Merge buttons/sticks/triggers from the frame, preserving the rich-plane fields — like the
+    /// Merge buttons/sticks/triggers from the frame, preserving the rich-plane fields  -  like the
     /// plain DualSense, EXCEPT the wire paddles are not folded away: they land on the Edge's own
     /// `buttons[2]` bits (rebuilt from every button frame, so no extra persistence).
     fn merge_frame(&self, prev: &DsState, f: &slipstream_core::input::GamepadFrame) -> DsState {
@@ -388,7 +388,7 @@ impl PadProto for DsEdgeLinuxProto {
         let _ = pad.write_state(st);
     }
 
-    /// Same kernel handshake + feedback parse as the plain DualSense — the Edge's GET_REPORT set
+    /// Same kernel handshake + feedback parse as the plain DualSense  -  the Edge's GET_REPORT set
     /// (calibration 0x05 / pairing 0x09 / firmware 0x20) and output report 0x02 are identical
     /// (the Edge's rumble arrives via the vibration-v2 valid_flag2 bit, which
     /// [`parse_ds_output`] already handles).
@@ -399,7 +399,7 @@ impl PadProto for DsEdgeLinuxProto {
             hidout: fb.hidout,
             // Rumble-plane liveness (arms the shared abandoned-rumble force-off). evdev-FF games
             // going through hid-playstation get their stops surfaced reliably, but Steam Input
-            // drives this pad over hidraw DIRECTLY — the same abandonment semantics as a Windows
+            // drives this pad over hidraw DIRECTLY  -  the same abandonment semantics as a Windows
             // game, so the same watchdog applies. SDL-class writers re-assert a held level every
             // ~2 s (inside the idle window), and a writer that goes silent on a latched level is
             // cut exactly as real firmware decay would cut it on a physical pad.
@@ -409,7 +409,7 @@ impl PadProto for DsEdgeLinuxProto {
     }
 }
 
-/// All virtual DualSense Edge pads of a session — `SLIPSTREAM_GAMEPAD=edge`, or the per-pad kind a
+/// All virtual DualSense Edge pads of a session  -  `SLIPSTREAM_GAMEPAD=edge`, or the per-pad kind a
 /// client declares for a paddle-bearing physical controller.
 pub type DualSenseEdgeManager = UhidManager<DsEdgeLinuxProto>;
 
@@ -439,7 +439,7 @@ mod tests {
         out
     }
 
-    /// Whether the evdev at `node` advertises EV_FF (0x15) — the rumble-capable gamepad node
+    /// Whether the evdev at `node` advertises EV_FF (0x15)  -  the rumble-capable gamepad node
     /// (the touchpad / motion / headset siblings don't).
     fn has_ff(node: &str) -> bool {
         let Ok(f) = std::fs::OpenOptions::new().read(true).open(node) else {
@@ -455,7 +455,7 @@ mod tests {
     }
 
     /// Upload an FF_RUMBLE effect on `node` and play it, exactly like SDL's evdev haptic backend.
-    /// Returns the OPEN fd with the id — closing the fd erases the process's effects (stopping
+    /// Returns the OPEN fd with the id  -  closing the fd erases the process's effects (stopping
     /// the rumble), so the caller must hold it while asserting.
     fn evdev_rumble(node: &str, strong: u16, weak: u16) -> std::io::Result<(std::fs::File, i16)> {
         use std::io::Write as _;
@@ -529,7 +529,7 @@ mod tests {
 
     /// On-box proof of the full Linux feedback surface, playing the GAME's role against a real
     /// kernel: chain A drives rumble through evdev force feedback (`hid-playstation`'s ff-memless
-    /// → UHID_OUTPUT — what SDL/Steam fall back to without hidraw); chain B writes a raw DS5
+    /// → UHID_OUTPUT  -  what SDL/Steam fall back to without hidraw); chain B writes a raw DS5
     /// output report to the pad's hidraw node (SDL/Steam's real path, and the ONLY way adaptive
     /// triggers can arrive) and expects rumble + lightbar + player LEDs + both trigger blocks
     /// back verbatim. Also pins the per-pad pairing MAC: two pads must present distinct uniqs or
@@ -573,7 +573,7 @@ mod tests {
         assert_ne!(
             uniq("Slipstream DualSense 0"),
             uniq("Slipstream DualSense 1"),
-            "pads share one pairing MAC — SDL/Steam will dedup them into one controller"
+            "pads share one pairing MAC  -  SDL/Steam will dedup them into one controller"
         );
 
         // ---- Chain A: evdev force feedback ----
@@ -617,7 +617,7 @@ mod tests {
             .and_then(|mut f| std::io::Write::write_all(&mut f, &rep))
             .unwrap_or_else(|e| {
                 panic!(
-                    "cannot write {hr} as this user ({e}) — Steam/SDL would be equally blocked; \
+                    "cannot write {hr} as this user ({e})  -  Steam/SDL would be equally blocked; \
                      are the 60-slipstream.rules hidraw rules installed?"
                 )
             });

@@ -1,119 +1,52 @@
 ---
 title: Clients
-description: Connect to a Slipstream host from iPhone, Android, Steam Deck, or Moonlight.
+description: Connect from iPhone, Android, Steam Deck, or Moonlight.
 ---
 
-A Slipstream host accepts clients over its own `slipstream/1` protocol (the iPhone, Android, and
-Steam Deck apps) and over GameStream (Moonlight). Pick whichever fits the device you're streaming
-*to*. Ready to install?
-**[Install a Client](/docs/install-client)** has the step-by-step for each named client, plus how to
-[update](/docs/install-client#keeping-a-client-up-to-date) and
-[remove](/docs/install-client#removing-a-client) each one.
+## Named apps
 
-Two things apply to every named app:
-[profiles and `slipstream://` links](#profiles-and-links-every-app), and the keys and chords that
-work [while you're streaming](#while-youre-streaming). What each one lets you change, resolution,
-bitrate, codec, HDR, audio, controllers, is catalogued in
-[Client settings](/docs/client-settings).
+| Client | Install | Protocol |
+|--------|---------|----------|
+| **iPhone** | [TestFlight](https://testflight.apple.com/join/Qr7uSemk) | `slipstream/1` |
+| **Android / Android TV** | Play test track ([Discord](https://discord.gg/kaPNvzMuGU) invite) or APK from [Releases](https://github.com/vindeckyy/slipstream/releases) | `slipstream/1` |
+| **Steam Deck** | Decky plugin + Flatpak `slipstream-client` | `slipstream/1` |
 
-## iPhone
+Native apps discover hosts on the LAN, pair with a PIN, reconnect on a pinned identity, and can
+browse the host game library.
 
-The native app for iPhone speaks Slipstream's own [`slipstream/1`](/docs/how-it-works#two-protocols)
-protocol, the lowest-latency, most resilient path, with the full feature set:
+### Steam Deck
 
-- **Automatic host discovery**, hosts on your network appear under *On this network*; no IP typing.
-- **PIN pairing** built in, and pinned reconnects after that.
-- **Controllers**, including DualSense, rumble, adaptive triggers, lightbar, motion, and touchpad.
-- A **[game library](/docs/game-library)**, browse the host's installed games with cover art and
-  launch one straight into the stream.
-- A live **stats overlay** (resolution, fps, bitrate, latency) and a built-in **network speed test**
-  to pick a bitrate for your link.
-- **Widgets, Live Activities and Shortcuts**, a hosts widget for the home screen, a Live Activity
-  while a session runs, and App Intents so Siri and the Shortcuts app can start a stream.
+1. Install [Decky Loader](https://decky.xyz/).
+2. Install the Slipstream Decky plugin (adds a QAM panel in Gaming Mode).
+3. Install the Flatpak client the plugin drives (`slipstream-client`). Desktop Mode can run that Flatpak directly.
 
-Open the app, pick your host, [pair](/docs/pairing) once, and stream. It builds from the
-`clients/apple` directory in the repo (Swift / VideoToolbox / Metal). Install via
-[TestFlight](/docs/install-client#iphone).
+Deck controls forward as a Steam Deck pad when Steam Input is set for the client.
 
-## Android
+## Moonlight
 
-The native Android app speaks `slipstream/1` directly, on both phones and Android TV. It does hardware
-HEVC decode (including [HDR10](/docs/hdr#per-client)), Opus audio with a mic uplink, game
-controllers with rumble and DualSense feedback, automatic host discovery, PIN pairing with pinned
-reconnects, the host's **game library** with cover art, and a live stats overlay, with D-pad and
-game-controller focus navigation for the couch. It builds from the `clients/android` directory
-(Kotlin + a shared Rust core).
+Any [Moonlight](https://moonlight-stream.org/) client works when the host runs with `--gamestream`
+(the default packaged unit). Prefer native apps when available. GameStream uses weaker control-plane
+crypto; keep it on trusted LAN, or turn it off for VPN-only hosts (see [Install](/docs/install)).
 
-**Controllers.** Plug a **DualSense**, **DualSense Edge** or **DualShock 4** into the phone or tablet
-by USB and grant the USB permission Android asks for when it attaches, Slipstream then drives the pad
-itself instead of taking what Android's gamepad layer exposes, so the host gets rumble, adaptive
-triggers, the lightbar and gyro. The app's **Controllers** screen lists attached pads and their
-capture state, and the switch that turns this off is *DualSense / DualShock passthrough (USB)* in
-Settings. Over **Bluetooth** the pad still works as an ordinary gamepad, but adaptive triggers and
-the lightbar need the USB connection.
+## Pairing
 
-The app is on Google Play as a **test track** (closed testing for stable, internal testing for
-canary), request a tester invite on our [**Discord**](https://discord.gg/kaPNvzMuGU) and we'll add
-you, or sideload the public APK instead (see
-[Install a Client](/docs/install-client#android)). Then open the app, pick your host,
-[pair](/docs/pairing) once, and stream.
+No accounts. Trust is between this client and this host.
 
-## Steam Deck
+### Native (`slipstream/1`)
 
-On Steam Deck, Gaming Mode is the named product path: the **[Decky plugin](/docs/steam-deck)** adds a
-Slipstream panel to the Quick Access Menu. Under the hood the plugin launches the Flatpak
-`slipstream-client` (GTK4) so gamescope can fullscreen the stream. Desktop Mode can run that same
-Flatpak directly.
+1. Enable the [console](/docs/web-console).
+2. Open **Pairing** → arm pairing (2 minutes) **or** connect and **Approve** under Waiting for approval.
+3. On the client, select the host and enter the host PIN (native flow: host shows PIN).
 
-- **Gaming Mode** -> [Decky plugin](/docs/steam-deck) (install Decky Loader, the plugin, and the
-  Flatpak once).
-- **Desktop Mode** -> Flatpak, see [Install a Client -> Steam Deck](/docs/install-client#steam-deck).
+### Moonlight
 
-The Deck's built-in controls forward as a Steam Deck pad (paddles, trackpads, gyro) when Steam Input
-is set correctly; the Decky guide covers that.
+1. Host must be running with GameStream enabled.
+2. In Moonlight, start Pair (Moonlight shows the PIN).
+3. Enter that PIN in the console **Moonlight (GameStream) pairing** card.
 
-## Moonlight (optional)
+After pairing, reconnects are automatic. To revoke a device, remove it on the Pairing page.
 
-Slipstream also speaks the **GameStream** protocol, so any [Moonlight](https://moonlight-stream.org/)
-client, a browser, a smart TV, an old phone, a games console, connects with no slipstream-specific
-software. Moonlight is the catch-all for devices without a named Slipstream app. See
-[Connect with Moonlight](/docs/moonlight).
+## While streaming
 
-This is the broadest-compatibility option and great for couch gaming. It doesn't use the native
-protocol's FEC/encryption extensions, but for a healthy LAN that rarely matters.
-
-## Profiles and links (every app)
-
-Two things work the same in the iPhone, Android, and Steam Deck apps. **Settings profiles** are
-named sets of stream overrides, bitrate, resolution, codec, HDR and the rest, that you bind to a
-host or pick for a single connect, with every field you didn't touch still following your defaults.
-And a **`slipstream://` link** starts a stream from a shortcut or automation, carrying only
-*references* to things that already exist on your device, never a setting, and never a trust
-decision.
-
-[Profiles and links](/docs/profiles-and-links) has both in full: the link grammar, where each app
-puts **Copy link**, and what a link is refused for.
-
-## While you're streaming
-
-When a client **captures** input for games, you need a way to release it. On clients that support
-desktop shortcuts, **Ctrl+Alt+Shift+Q** gives mouse and keyboard back. On Steam Deck, hold
-**[L1 + R1 + Start + Select](/docs/input#leaving-with-a-controller)** to leave a stream.
-
-That chord, the others a stream reserves, the two mouse modes, the three touch modes and stylus
-input are all on [Mouse, touch and pen](/docs/input#getting-your-input-back).
-
-Copying between the two machines is a separate opt-in: the host operator allows it in `host.env`
-and you turn it on for that one host in your client. See [Shared clipboard](/docs/clipboard).
-
-## Which should I use?
-
-| You're streaming to... | Use |
-|---|---|
-| An **iPhone** | The **[iPhone app](#iphone)** (TestFlight) |
-| An **Android** phone or TV | The **[Android app](#android)** |
-| A **Steam Deck** | The **[Decky plugin](/docs/steam-deck)** in Gaming Mode, or the Flatpak in Desktop Mode |
-| A browser, smart TV, or any other device | **[Moonlight](/docs/moonlight)** (optional catch-all) |
-
-Whichever you choose, the first connection needs a one-time [pairing](/docs/pairing), and
-[Install a Client](/docs/install-client) covers installing, updating and removing it.
+- **Ctrl+Alt+Shift+Q** releases captured mouse/keyboard on clients that support it.
+- Mouse modes and picture settings: [Usage](/docs/client-settings).

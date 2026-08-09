@@ -1,13 +1,6 @@
-import { getRouteApi } from '@tanstack/react-router'
-import { FooterView } from '@unom/app-ui/footer'
 import BrandMark from '@/components/BrandMark'
 import Wordmark from '@/components/Wordmark'
-
-const rootApi = getRouteApi('__root__')
-
-const SITE_URL = 'https://github.com/vindeckyy/slipstream'
-const resolveHref = (to: string) =>
-  to.startsWith('/') ? new URL(to, SITE_URL).toString() : to
+import { sitePath } from '@/lib/paths'
 
 const footerLinks = [
   { label: 'Quick Start', href: '/docs/quickstart' },
@@ -17,14 +10,13 @@ const footerLinks = [
   { label: 'Network & VPN', href: '/docs/network-and-vpn' },
   { label: 'Troubleshooting', href: '/docs/troubleshooting' },
   { label: 'API', href: '/api' },
-  { label: 'Discord', href: 'https://discord.gg/kaPNvzMuGU' },
+  { label: 'GitHub', href: 'https://github.com/vindeckyy/slipstream' },
+  { label: 'Security', href: 'https://github.com/vindeckyy/slipstream/security/policy' },
 ] as const
 
 export default function Footer() {
-  const { footer } = rootApi.useLoaderData()
-
   return (
-    <div className="border-t border-fd-border">
+    <footer className="border-t border-fd-border">
       <div className="mx-auto w-full max-w-6xl px-6 py-10 md:px-8">
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           <div className="flex items-start gap-3">
@@ -38,16 +30,16 @@ export default function Footer() {
               </div>
               <p className="mt-2 max-w-sm text-sm leading-6 text-fd-muted-foreground">
                 Private desktop and game streaming for Linux hosts. Play on the couch,
-                Work from the office.
+                work from the office.
               </p>
             </div>
           </div>
 
-          <nav aria-label="Docs footer" className="flex flex-wrap gap-x-5 gap-y-2 md:max-w-md md:justify-end">
+          <nav aria-label="Docs footer" className="flex flex-wrap gap-x-5 gap-y-2 md:max-w-lg md:justify-end">
             {footerLinks.map((link) => (
               <a
                 key={link.label}
-                href={link.href}
+                href={link.href.startsWith('/') ? sitePath(link.href) : link.href}
                 className="text-sm text-fd-muted-foreground transition-colors hover:text-fd-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-primary"
               >
                 {link.label}
@@ -55,15 +47,10 @@ export default function Footer() {
             ))}
           </nav>
         </div>
+        <p className="mt-8 border-t border-fd-border/70 pt-5 text-xs text-fd-muted-foreground">
+          Slipstream is open source under the MIT OR Apache-2.0 license.
+        </p>
       </div>
-      <FooterView
-        sections={footer?.sections}
-        tagline={footer?.tagline}
-        socials={footer?.socials}
-        socialsLabel="Socials"
-        resolveHref={resolveHref}
-        className="border-t border-fd-border/70"
-      />
-    </div>
+    </footer>
   )
 }

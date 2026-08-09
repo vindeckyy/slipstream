@@ -1,10 +1,10 @@
 #!/bin/sh
-# Generate the per-release CycloneDX SBOM (CRA Annex I Part II §1 — machine-readable component
-# inventory, attached to every stable release by .github/workflows/sbom.yml).
+# Generate the per-release CycloneDX SBOM (CRA Annex I Part II §1  -  machine-readable component
+# inventory, attached to every stable release by GitHub Actions).
 #
 # syft walks the checkout and catalogs every lockfile-pinned dependency (both Rust workspaces via
 # their Cargo.locks, the Bun/pnpm/npm trees, the Swift Package.resolved);
-# compliance/sbom/manual-components.cdx.json contributes the components no lockfile records —
+# compliance/sbom/manual-components.cdx.json contributes the components no lockfile records  -
 # vendored C/C++ trees (pyrowave/Granite/volk/Vulkan-Headers, libvpl), dynamically-linked/bundled
 # libraries (FFmpeg, SDL3), the redistributed VB-CABLE driver, and the patched gamescope. Keep
 # that file current when vendoring changes (scripts/vendor-pyrowave.sh etc.).

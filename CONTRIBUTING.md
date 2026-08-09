@@ -90,8 +90,7 @@ cargo run -p slipstream-host -- openapi > api/openapi.json
 cp api/openapi.json docs-site/public/openapi.json
 ```
 
-Match the surrounding code's comment density and naming. Commit messages end with the
-`Co-Authored-By` trailer (see `git log`).
+Match the surrounding code's comment density and naming. Keep commit messages short and specific.
 
 ## Repository layout
 
@@ -117,7 +116,7 @@ include/             slipstream_core.h
 - **Packet-loss recovery scales.** GameStream stays Moonlight-compatible; `slipstream/1` can
   protect larger frames without retransmitting them.
 
-See the [README's Developing section](README.md#developing) for the extra dev commands (the FEC
+See the [README's Developing section](README.md#development) for the extra dev commands (the FEC
 loss harness, the standalone C-ABI proof), the [Repository layout](#repository-layout) and
 [Design invariants](#design-invariants) above for the rules a change is expected to hold to, and
 the [local docs site](docs-site/) (`docs-site/content/docs/`) for architecture and per-platform

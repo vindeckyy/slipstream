@@ -135,10 +135,17 @@ mod tests {
             std::env::remove_var("SLIPSTREAM_VBV_FRAMES");
         }
         let cfg = LatencyProfile::from_env().config();
-        assert!(cfg.zero_b_frames, "the existing contract already has B-frames off");
+        assert!(
+            cfg.zero_b_frames,
+            "the existing contract already has B-frames off"
+        );
         assert!(cfg.no_lookahead);
         assert_eq!(cfg.vbv_frames, 1.0, "env-default VBV is one frame");
-        assert_eq!(cfg.max_input_depth, usize::MAX, "balanced leaves depth alone");
+        assert_eq!(
+            cfg.max_input_depth,
+            usize::MAX,
+            "balanced leaves depth alone"
+        );
         assert!(!cfg.subframe_capability_gated);
         assert!(!cfg.prefer_zero_copy);
     }

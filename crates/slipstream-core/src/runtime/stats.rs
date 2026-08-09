@@ -115,10 +115,7 @@ impl StatsCounters {
     /// state; see [`FrameDropReason`]).
     #[inline]
     pub fn note_frame_drop(&self, reason: FrameDropReason) {
-        Self::add(
-            &self.frames_dropped,
-            1,
-        );
+        Self::add(&self.frames_dropped, 1);
         match reason {
             FrameDropReason::StaleDeadline => Self::add(&self.frames_stale_dropped, 1),
             FrameDropReason::SendBackpressure => Self::add(&self.frames_backpressure_dropped, 1),
@@ -137,7 +134,8 @@ impl StatsCounters {
     /// Record the send channel's high-water mark (bytes/frames observed by the host this session).
     #[inline]
     pub fn note_send_occupancy_max(&self, max_seen: u64) {
-        self.send_queue_occupancy_max.store(max_seen, Ordering::Relaxed);
+        self.send_queue_occupancy_max
+            .store(max_seen, Ordering::Relaxed);
     }
 
     /// Record the granted `SO_SNDBUF` (actual, post-clamping) and the pacing-option latches.

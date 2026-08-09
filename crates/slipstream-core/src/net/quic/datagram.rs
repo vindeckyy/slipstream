@@ -908,7 +908,10 @@ mod tests {
         assert_eq!((seq, pts), (7, 1_000_000_123));
         assert_eq!(payload, opus);
         let t = tail.expect("FEC tail present");
-        assert_eq!((t.group_id, t.parity_count, t.kind), (0xAB, 1, AUDIO_FEC_DATA));
+        assert_eq!(
+            (t.group_id, t.parity_count, t.kind),
+            (0xAB, 1, AUDIO_FEC_DATA)
+        );
 
         // Old decode (no tail knowledge) sees the tail as trailing payload bytes — expected,
         // and harmless: an old client never negotiates FEC, so it never receives tailed

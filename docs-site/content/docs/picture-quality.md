@@ -273,9 +273,7 @@ Call these out so expectations stay accurate:
   switch to HEVC.
 - **Web console cannot set bitrate or run a speed test** yet - client apps can. The console can
   show what a live session is using -
-  [Support matrix / roadmap notes](/docs/support-matrix).
-- **Multi-monitor as separate client windows** for one session is still on the
-  [roadmap](/docs/roadmap). Picture quality settings do not unlock that.
+  [Support matrix](/docs/support-matrix).
 
 ## Cross-links
 

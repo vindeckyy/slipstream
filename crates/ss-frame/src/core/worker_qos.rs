@@ -76,13 +76,15 @@ fn sched_fifo_enabled() -> bool {
 
 /// The explicitly configured CPU affinity (e.g. `"2,3"`). `None` = never touch affinity.
 fn affinity_cpus() -> Option<Vec<usize>> {
-    std::env::var("SLIPSTREAM_WORKER_AFFINITY").ok().and_then(|s| {
-        let cpus: Vec<usize> = s
-            .split(',')
-            .filter_map(|p| p.trim().parse::<usize>().ok())
-            .collect();
-        (!cpus.is_empty()).then_some(cpus)
-    })
+    std::env::var("SLIPSTREAM_WORKER_AFFINITY")
+        .ok()
+        .and_then(|s| {
+            let cpus: Vec<usize> = s
+                .split(',')
+                .filter_map(|p| p.trim().parse::<usize>().ok())
+                .collect();
+            (!cpus.is_empty()).then_some(cpus)
+        })
 }
 
 /// The nice adjustment for the `SCHED_OTHER` fallback, per class (matches `thread_qos`).
@@ -121,7 +123,10 @@ pub fn apply_worker_qos(thread_name: &str, class: WorkerClass) -> SchedOutcome {
 
 /// Read the recorded outcome for a thread name (diagnostics; `None` = not yet recorded).
 pub fn recorded_outcome(thread_name: &str) -> Option<SchedOutcome> {
-    OUTCOMES.lock().ok().and_then(|m| m.get(thread_name).copied())
+    OUTCOMES
+        .lock()
+        .ok()
+        .and_then(|m| m.get(thread_name).copied())
 }
 
 /// All recorded outcomes (diagnostics).
@@ -181,7 +186,10 @@ fn set_nice(nice: i32) {
     if rc == 0 {
         tracing::debug!(nice, "worker nice fallback applied");
     } else {
-        tracing::debug!(nice, "worker nice fallback no-op (needs CAP_SYS_NICE / RLIMIT_NICE)");
+        tracing::debug!(
+            nice,
+            "worker nice fallback no-op (needs CAP_SYS_NICE / RLIMIT_NICE)"
+        );
     }
 }
 
@@ -345,7 +353,10 @@ mod tests {
         record("test-thread", SchedOutcome::Applied);
         assert_eq!(recorded_outcome("test-thread"), Some(SchedOutcome::Applied));
         record("test-thread", SchedOutcome::Rejected);
-        assert_eq!(recorded_outcome("test-thread"), Some(SchedOutcome::Rejected));
+        assert_eq!(
+            recorded_outcome("test-thread"),
+            Some(SchedOutcome::Rejected)
+        );
         assert_eq!(recorded_outcome("never-recorded"), None);
     }
 }

@@ -16,14 +16,14 @@ display and injects input is desktop-specific, so pick your desktop on the
 > **Which releases.** There is one universal host package. It bundles FFmpeg 8 and needs **glibc 2.39
 > or newer**, that's **Ubuntu 24.04 LTS through 26.04**, the range it's built and tested for. Check
 > yours with `ldd --version`; below 2.39 the install fails and you build from source instead
-> ([appendix](#appendix--build-from-source)). The desktop *client* package is built on Ubuntu 26.04
+> ([appendix](#appendix-build-from-source)). The desktop *client* package is built on Ubuntu 26.04
 > and needs GTK4 ≥ 4.20 and SDL3, so it installs on **26.04 or newer** only, the host has no such
 > limit.
 
 > **Debian isn't a supported target.** The packages are built on Ubuntu images and their dependencies
 > are resolved against Ubuntu's package names, and nothing in CI builds or tests on Debian. Debian 12
 > (bookworm) is below the glibc floor and cannot install them at all. A newer Debian may work, but
-> it's untested, build from source ([appendix](#appendix--build-from-source)) if you want to try.
+> it's untested, build from source ([appendix](#appendix-build-from-source)) if you want to try.
 > The `debian` packaging tree in the repo is the *package format*, not a supported Debian distro.
 
 ## 1. GPU driver
@@ -62,7 +62,7 @@ sudo update-initramfs -u && sudo reboot
 > choose **Enrol MOK** at the blue screen. Or disable Secure Boot in firmware.
 
 On **AMD/Intel** none of the NVIDIA steps apply. Encode runs on the Mesa stack: **Vulkan Video** for
-HEVC and AV1 (`mesa-vulkan-drivers`), with **VAAPI** for H.264 and as the fallback, 
+HEVC and AV1 (`mesa-vulkan-drivers`), with **VAAPI** for H.264 and as the fallback,
 `mesa-va-drivers` on AMD, `intel-media-va-driver` on Intel, both of which the `slipstream-host`
 package recommends, so apt pulls the right one in with the host. Install `mesa-vulkan-drivers` too
 if it isn't already on the box.
@@ -165,7 +165,7 @@ Moonlight ports, TCP 47984, 47989 and 48010, UDP 47998-48000, plus the same mDNS
 **data plane** uses an ephemeral UDP port the client opens with a hole-punch, so there is nothing
 fixed to open for video.
 
-Running the web console (`slipstream-web`) and want to reach it from another device? Open it too, 
+Running the web console (`slipstream-web`) and want to reach it from another device? Open it too,
 that's **TCP 47992**:
 
 ```sh

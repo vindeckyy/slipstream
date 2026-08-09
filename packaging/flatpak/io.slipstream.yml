@@ -1,23 +1,23 @@
 # Flatpak manifest for the native slipstream Linux client: the shell (crate
 # slipstream-client-linux, binary `slipstream-client`) PLUS the Vulkan session binary (crate
 # slipstream-client-session, binary `slipstream-session`) that the shell execs for
-# `--connect`/`--browse` — both must ship or streaming from the Deck breaks (the Decky
+# `--connect`/`--browse`  -  both must ship or streaming from the Deck breaks (the Decky
 # wrapper launches the shell with those flags and the shell resolves its sibling
 # `slipstream-session`, see clients/linux/src/spawn.rs). Built into a single-file `.flatpak`
-# bundle and published to GitHub's generic package registry (see .github/workflows/flatpak.yml
+# bundle and published as a GitHub release asset (see GitHub Actions
 # + packaging/flatpak/README.md).
 #
-# Why flatpak for the CLIENT (the host stays an RPM/deb — see packaging/README.md "Why not
+# Why flatpak for the CLIENT (the host stays an RPM/deb  -  see packaging/README.md "Why not
 # Flatpak"): on SteamOS the Steam Deck's /usr is read-only and image-based, so a bare
 # `slipstream-client` binary in ~/.local/bin can't bring its own libadwaita / SDL3 (both
-# MISSING from the SteamOS system) — but flatpak is the Deck's native, update-survivable app
+# MISSING from the SteamOS system)  -  but flatpak is the Deck's native, update-survivable app
 # path (the user already runs Moonlight + chiaki-ng as flatpaks). Unlike the host, the client
 # is sandbox-friendly: it only needs the GPU render node, the host PipeWire socket, the
-# network, Wayland, hidraw for DualSense, and its config dir — all expressible as finish-args.
+# network, Wayland, hidraw for DualSense, and its config dir  -  all expressible as finish-args.
 #
-# Runtime: GNOME 50 ships GTK 4.20 and libadwaita 1.8 — both far exceed the crate floors
+# Runtime: GNOME 50 ships GTK 4.20 and libadwaita 1.8  -  both far exceed the crate floors
 # (gtk4 0.11 "v4_16", libadwaita 0.9 "v1_5"). GNOME 50 is built on freedesktop-sdk 25.08, so
-# `org.freedesktop.Sdk.Extension.rust-stable` resolves to //25.08 (rustc 1.96 — the GTK4 dep
+# `org.freedesktop.Sdk.Extension.rust-stable` resolves to //25.08 (rustc 1.96  -  the GTK4 dep
 # chain, e.g. pango-sys 0.22, needs >= 1.92, which the older GNOME-48/24.08 rust-stable at 1.89
 # could NOT satisfy). GNOME 50 is also a *supported* runtime (GNOME 48 went EOL in March 2026).
 # libopus and the PipeWire client lib are in the freedesktop base; SDL3 is NOT, so it is built
@@ -27,7 +27,7 @@
 # freedesktop runtime declares `org.freedesktop.Platform.codecs-extra` as a built-in extension
 # point (directory lib/x86_64-linux-gnu/codecs-extra, add-ld-path lib, auto-downloaded with the
 # runtime), whose full libavcodec.so.61 transparently shadows the base one at runtime. So HEVC
-# (software + VAAPI) works with NO app-side codec extension to declare — we just build against
+# (software + VAAPI) works with NO app-side codec extension to declare  -  we just build against
 # the SDK's linkable libavcodec.so.61 and let the runtime swap in the capable build.
 app-id: io.slipstream
 runtime: org.gnome.Platform
@@ -35,7 +35,7 @@ runtime-version: '50'
 sdk: org.gnome.Sdk
 # Build-time SDK extensions:
 #  - rust-stable: cargo/rustc 1.96 + the bundled mold linker (/usr/lib/sdk/rust-stable/bin).
-#  - llvm20: provides libclang (/usr/lib/sdk/llvm20/lib), which bindgen needs — ffmpeg-sys-next
+#  - llvm20: provides libclang (/usr/lib/sdk/llvm20/lib), which bindgen needs  -  ffmpeg-sys-next
 #    and sdl3-sys generate their FFI bindings via bindgen at build time. The base SDK ships no
 #    clang/libclang, so without this the build panics ("Unable to find libclang").
 # Both are added to PATH / LIBCLANG_PATH in build-options below.
@@ -60,22 +60,22 @@ finish-args:
   - --socket=fallback-x11            # Xwayland fallback when no Wayland socket is exposed
   - --share=ipc                      # required alongside X11 for shared-memory surfaces
   # --- GPU + all input devices ---
-  # --device=all (not just --device=dri): covers the GPU render node (VAAPI HEVC decode + GL),
+  # --device=all (and --device=dri): covers the GPU render node (VAAPI HEVC decode + GL),
   # evdev joysticks, AND the hidraw CHAR devices SDL3's HIDAPI needs for DualSense touchpad/
   # motion/adaptive-triggers/lightbar. flatpak cannot bind individual /dev/hidrawN via
-  # --filesystem (they are char devices — "unsupported type 0o20000"), and there is no granular
+  # --filesystem (they are char devices  -  "unsupported type 0o20000"), and there is no granular
   # --device=hidraw; --device=all is what game/emulator flatpaks (RetroArch, Dolphin) use. We
-  # self-host via the GitHub generic registry — NOT Flathub — so its --device=all review rule
+  # self-host via a configured package registry or static server
   # does not apply.
   - --device=all
   - --filesystem=/run/udev:ro        # SDL/HIDAPI enumerates devices via udev
   # --- audio: the client speaks the NATIVE PipeWire protocol (audio.rs `pw connect`), NOT the
-  #     PulseAudio shim — so it needs the real `pipewire-0` socket in the sandbox. With only
+  #     PulseAudio shim  -  so it needs the real `pipewire-0` socket in the sandbox. With only
   #     --socket=pulseaudio the sandbox has just `pulse/native`, no `pipewire-0`, and playback +
   #     mic both die with "pw connect (is PipeWire running in this session?)" (observed live on the
   #     Deck in Gaming Mode). We bind the native socket via --filesystem=xdg-run/pipewire-0 (NOT
   #     --socket=pipewire: this flatpak-builder toolchain rejects it as an "Unknown socket type",
-  #     and the Deck's flatpak 1.16 override CLI does too — the filesystem bind is the portable
+  #     and the Deck's flatpak 1.16 override CLI does too  -  the filesystem bind is the portable
   #     form, validated on-Deck to make pipewire-0 appear + the client register its audio node).
   #     --socket=pulseaudio stays as a fallback for any pulse-only path. ---
   - --filesystem=xdg-run/pipewire-0
@@ -86,24 +86,24 @@ finish-args:
   - --filesystem=~/.config/slipstream:create   # client-{cert,key}.pem, known-hosts, settings
   # --- HDR under gamescope (Steam Deck Game Mode) ---
   # A flatpak's Vulkan loader can't see the host's gamescope WSI layer, so the SDL3 surface never
-  # offers the HDR10 (ST.2084) colorspace and the presenter silently tone-maps PQ->SDR — the
+  # offers the HDR10 (ST.2084) colorspace and the presenter silently tone-maps PQ->SDR  -  the
   # Game-Mode HDR indicator stays dark (verified on a Deck OLED: the sandbox loader found NO
   # frog/gamescope layer). The layer ships as the runtime extension
   # `org.freedesktop.Platform.VulkanLayer.gamescope`, which org.gnome.Platform//50 auto-mounts at
   # /usr/lib/extensions/vulkan/gamescope once installed (a one-time, per-Deck step; keep it in the
   # Decky plugin's setup / docs):
   #     flatpak install --user -y flathub org.freedesktop.Platform.VulkanLayer.gamescope//25.08
-  # THREE things are needed, not two (verified live on a Deck OLED — the env vars alone left
+  # THREE things are needed, not two (verified live on a Deck OLED  -  the env vars alone left
   # hdr10_format=None). (1) VK_ADD_IMPLICIT_LAYER_PATH puts the layer's implicit-layer JSON on the
   # Vulkan loader's search path (the runtime point mounts the files but not onto the path). (2)
   # ENABLE_GAMESCOPE_WSI flips the layer's own `enable_environment` gate. (3) The layer, once
   # loaded, must open a *Wayland* connection to gamescope's private socket ($GAMESCOPE_WAYLAND_DISPLAY
-  # = gamescope-0) to negotiate the HDR10 colorspace via the gamescope_swapchain protocol — but the
+  # = gamescope-0) to negotiate the HDR10 colorspace via the gamescope_swapchain protocol  -  but the
   # Deck runs games as X11 clients (DISPLAY=:1, no WAYLAND_DISPLAY exported), so --socket=wayland
   # binds nothing and that socket never enters the sandbox. Without it the layer loads, maps, and
   # silently can't reach the compositor → no HDR10 offered → PQ tone-mapped to SDR, badge dark.
   # Binding xdg-run/gamescope-0 is the missing half (chiaki-ng does the same). With all three the
-  # surface offers HDR10 and the presenter's existing HDR10 swapchain path engages — no client code
+  # surface offers HDR10 and the presenter's existing HDR10 swapchain path engages  -  no client code
   # change. Harmless off-Deck: the layer no-ops when there's no gamescope socket to bind.
   - --env=VK_ADD_IMPLICIT_LAYER_PATH=/usr/lib/extensions/vulkan/gamescope/share/vulkan/implicit_layer.d
   - --env=ENABLE_GAMESCOPE_WSI=1
@@ -114,7 +114,7 @@ build-options:
   # The rust build resolves everything via pkg-config: gtk4/libadwaita/pipewire/opus AND a
   # linkable libavcodec.so.61 from org.gnome.Sdk//50 (the multiarch /usr dir), plus the bundled
   # SDL3's .pc from /app. (At runtime the codecs-extra extension swaps in the HEVC-capable
-  # libavcodec — see the header.)
+  # libavcodec  -  see the header.)
   env:
     PKG_CONFIG_PATH: /app/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig
     # bindgen (ffmpeg-sys-next / sdl3-sys) loads libclang from the llvm20 extension.
@@ -122,7 +122,7 @@ build-options:
     # mold (shipped in rust-stable) speeds the ~450-crate link on the Deck APU.
     RUSTFLAGS: -C link-arg=-fuse-ld=mold
   # The multiarch directory in PKG_CONFIG_PATH is per-architecture, and flatpak-builder does NOT
-  # shell-expand `env` values — so ${FLATPAK_ARCH} would be taken literally. An `arch` override is
+  # shell-expand `env` values  -  so ${FLATPAK_ARCH} would be taken literally. An `arch` override is
   # the supported way to vary it; everything else above is inherited. Only the runtime's own
   # /usr/lib/<triple> changes, so aarch64 differs from x86_64 in exactly this one string.
   arch:
@@ -132,10 +132,10 @@ build-options:
 
 modules:
   # ---------------------------------------------------------------------------------------
-  # SDL3 — NOT provided as a linkable libSDL3.so.0 by org.gnome.Platform/freedesktop-sdk
+  # SDL3  -  NOT provided as a linkable libSDL3.so.0 by org.gnome.Platform/freedesktop-sdk
   # 25.08, and there is no SDL3 recipe in flathub/shared-modules. Build it from source.
   # Pinned to 3.4.10 to match the crate exactly: sdl3-sys is `0.6.6+SDL-3.4.10`, i.e. its
-  # bindings target SDL 3.4.10 — building an older SDL risks missing symbols at link time.
+  # bindings target SDL 3.4.10  -  building an older SDL risks missing symbols at link time.
   # HIDAPI is enabled (DualSense touchpad/motion/triggers/lightbar over hidraw).
   # ---------------------------------------------------------------------------------------
   - name: sdl3
@@ -164,11 +164,11 @@ modules:
       - /lib/pkgconfig
 
   # ---------------------------------------------------------------------------------------
-  # Vulkan-Headers — the SESSION binary's ss-ffvk crate runs bindgen over FFmpeg's
+  # Vulkan-Headers  -  the SESSION binary's ss-ffvk crate runs bindgen over FFmpeg's
   # libavutil/hwcontext_vulkan.h, which `#include <vulkan/vulkan.h>`. The GNOME SDK is not
   # guaranteed to ship those dev headers, so install them into /app ourselves (headers only,
   # no compile) and point ss-ffvk's bindgen at them via PF_FFVK_VULKAN_INCLUDE below. Kept in
-  # cleanup — headers aren't needed at runtime (the Vulkan LOADER comes from the GL runtime).
+  # cleanup  -  headers aren't needed at runtime (the Vulkan LOADER comes from the GL runtime).
   # ---------------------------------------------------------------------------------------
   - name: vulkan-headers
     buildsystem: cmake-ninja
@@ -195,7 +195,7 @@ modules:
         CARGO_HOME: /run/build/slipstream-client/cargo
         CARGO_NET_OFFLINE: 'true'
         # The session binary's Skia (ss-console-ui → skia-safe) fetches prebuilt libskia in
-        # its build script — dead in the offline sandbox. skia-bindings accepts a file://
+        # its build script  -  dead in the offline sandbox. skia-bindings accepts a file://
         # override (read directly, no curl), so we point it at the archive that
         # flatpak-builder pre-downloaded as a pinned source below. No {tag}/{key}
         # placeholders needed: a template without them is used verbatim.
@@ -205,13 +205,13 @@ modules:
         PF_FFVK_VULKAN_INCLUDE: /app/include
     build-commands:
       # Drop every reference to the windows-rs GIT dependency before building. That git
-      # source is deliberately NOT vendored into cargo-sources.json — see
+      # source is deliberately NOT vendored into cargo-sources.json  -  see
       # packaging/flatpak/prune-windows-lock.py, which strips it so flatpak-builder doesn't
       # full-clone the multi-GB windows-rs repo. But `cargo --offline` needs every DECLARED
       # dependency's source just to build the unit graph (cfg(windows)-gated or not), so any
       # manifest still pinning it fails with "can't checkout ... you are in the offline
       # mode". Two declare it: the Windows client (removed from the workspace members) and
-      # ss-client-core's D3D11VA backend (entry pruned in place — nothing cfg(windows)
+      # ss-client-core's D3D11VA backend (entry pruned in place  -  nothing cfg(windows)
       # compiles here). Both edits touch only the sandbox copies. (No --locked: the lock no
       # longer matches the reduced graph; --offline still pins every crate to the vendored
       # cargo-sources.json, so the build stays reproducible.)
@@ -225,8 +225,8 @@ modules:
           -p slipstream-cli
       - install -Dm0755 target/release/slipstream-client ${FLATPAK_DEST}/bin/slipstream-client
       - install -Dm0755 target/release/slipstream-session ${FLATPAK_DEST}/bin/slipstream-session
-      # The headless CLI (design/client-architecture-split.md §4) — reachable as
-      # `flatpak run --command=slipstream io.slipstream …`.
+      # The headless CLI (design/client-architecture-split.md §4)  -  reachable as
+      # `flatpak run --command=slipstream io.slipstream ...`.
       - install -Dm0755 target/release/slipstream ${FLATPAK_DEST}/bin/slipstream
       # Desktop entry (renamed to the app id; Exec is the in-sandbox binary).
       - install -Dm0644 packaging/flatpak/io.slipstream.desktop
@@ -251,13 +251,13 @@ modules:
       # Generated offline crate cache (see the comment block above). Remove for --share=network.
       - cargo-sources.json
       # Prebuilt Skia for skia-bindings 0.87.0 (SKIA_BINARIES_URL above). The key encodes the
-      # crate's pinned skia commit + target + resolved features — when bumping skia-safe, build
+      # crate's pinned skia commit + target + resolved features  -  when bumping skia-safe, build
       # the workspace once locally and take the new name from
       # target/release/build/skia-bindings-*/out/.cache/, then update url + sha256 together.
       # One entry per architecture, selected by `only-arches`; both land on the SAME
       # dest-filename, so SKIA_BINARIES_URL above stays a single literal path. The upstream
       # release publishes the aarch64 archive under the same skia commit hash and the same
-      # resolved-feature key, so the two stay in lockstep on a skia-safe bump — take both new
+      # resolved-feature key, so the two stay in lockstep on a skia-safe bump  -  take both new
       # names and sha256s together.
       - type: file
         only-arches: [x86_64]

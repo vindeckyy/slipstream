@@ -8,16 +8,16 @@ import type {
 } from "./types";
 
 const STATUS_DOT: Record<StatusIndicatorStatus, string> = {
-	healthy: "bg-emerald-500",
-	degraded: "bg-amber-500",
-	offline: "bg-red-500",
+	healthy: "bg-success",
+	degraded: "bg-warning",
+	offline: "bg-destructive",
 	unknown: "bg-muted-foreground/60",
 };
 
 const STATUS_TEXT: Record<StatusIndicatorStatus, string> = {
-	healthy: "text-emerald-700 dark:text-emerald-300",
-	degraded: "text-amber-700 dark:text-amber-300",
-	offline: "text-red-700 dark:text-red-300",
+	healthy: "text-success",
+	degraded: "text-warning",
+	offline: "text-destructive",
 	unknown: "text-muted-foreground",
 };
 

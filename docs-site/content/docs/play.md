@@ -196,9 +196,6 @@ Full guide: [Controllers](/docs/controllers).
 
 Call these out so Play expectations stay accurate:
 
-- **No multi-monitor client windows yet** for one session (several clients can each get a display;
-  one device showing several host monitors as separate windows is still on the
-  [roadmap](/docs/roadmap)).
 - **Webcam / camera uplink** for video calls on the host is not a finished product story yet.
 - **gamescope / Gaming Mode** hosts are excellent for games and cannot take absolute Desktop mouse -
   fine for Play, a poor fit for office UI ([gamescope](/docs/gamescope), [input](/docs/input)).

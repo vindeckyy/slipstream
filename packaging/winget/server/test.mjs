@@ -1,4 +1,4 @@
-// Drives the Worker's handle() directly — no Workers runtime, no network, no deploy.
+// Drives the Worker's handle() directly  -  no Workers runtime, no network, no deploy.
 //
 // This is the gate that catches a broken source BEFORE winget sees it. A source that returns the
 // wrong shape does not error loudly: winget reports "no package found" and the failure looks like a
@@ -8,7 +8,7 @@
 import { readFileSync } from "node:fs";
 import { handle } from "./handler.mjs";
 
-// The catalogue is an argument, not an import — same way server.mjs passes it — so this suite runs
+// The catalogue is an argument, not an import  -  same way server.mjs passes it  -  so this suite runs
 // against a generated data.json with no server, no network and no container.
 const DATA = JSON.parse(readFileSync(new URL("./data/data.json", import.meta.url), "utf8"));
 const BASE = "https://winget.example/";
@@ -19,7 +19,7 @@ function check(name, cond, detail = "") {
     console.log(`ok   ${name}`);
   } else {
     failed++;
-    console.log(`FAIL ${name}${detail ? ` — ${detail}` : ""}`);
+    console.log(`FAIL ${name}${detail ? `  -  ${detail}` : ""}`);
   }
 }
 
@@ -76,7 +76,7 @@ const post = (p, body) =>
   check("non-matching Filter excludes (AND semantics)", res.status === 204, `got ${res.status}`);
 }
 {
-  // An unsupported field must never accidentally match — we told the client we don't serve it.
+  // An unsupported field must never accidentally match  -  we told the client we don't serve it.
   const res = await post("manifestSearch", {
     Filters: [{ PackageMatchField: "NormalizedPackageNameAndPublisher", RequestMatch: { KeyWord: "slipstreamhostunom", MatchType: "Exact" } }],
   });
@@ -101,7 +101,7 @@ const post = (p, body) =>
   check("manifest: installer-level fields folded into the entry", inst?.InstallerType === "inno" && inst?.Scope === "machine");
   check("manifest: ProductCode preserved for correlation", !!inst?.ProductCode || !!v?.ProductCodes?.length);
   // A Log switch is only useful if winget SUBSTITUTES the path. <LOGPATH> is the one token it
-  // replaces; anything else is passed through verbatim, and `|LOGPATH|` shipped in 0.20.0 — Inno
+  // replaces; anything else is passed through verbatim, and `|LOGPATH|` shipped in 0.20.0  -  Inno
   // then rejected `|` as a filename and aborted with "Error creating log file", in EVERY install
   // mode, for any caller that requests a log (UniGetUI does by default). Reported from the field.
   const log = inst?.InstallerSwitches?.Log;
@@ -112,7 +112,7 @@ const post = (p, body) =>
   );
 }
 {
-  const res = await get("packageManifests/UNOM.SLIPSTREAMHOST");
+  const res = await get("packageManifests/VINDECKYY.SLIPSTREAMHOST");
   check("manifest: PackageIdentifier is case-insensitive", res.status === 200, `got ${res.status}`);
 }
 {

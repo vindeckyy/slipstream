@@ -1,9 +1,9 @@
-# Inner Caddy (plain HTTP on :3230); the edge proxy on github-pages-1 does TLS.
+# Inner Caddy serves the local OSTree tree over HTTP. Put a TLS proxy in front for remote use.
 :3230 {
 	root * /srv
 	file_server browse
 
-	# OSTree summary/refs change every publish — keep them fresh; objects are immutable.
+	# OSTree summary/refs change every publish  -  keep them fresh; objects are immutable.
 	@mutable path /repo/summary* /repo/refs/*
 	header @mutable Cache-Control "public, max-age=30"
 	@objects path /repo/objects/* /repo/deltas/*

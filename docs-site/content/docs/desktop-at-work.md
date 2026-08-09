@@ -234,8 +234,7 @@ One person, several clients (office laptop, home tablet, phone):
 - Pair each device once ([Pairing](/docs/pairing)); revoke a lost laptop from the console rather
   than leaving it on the allow-list.
 
-Do not expect one client window to show several host monitors yet - that is still on the
-[roadmap](/docs/roadmap).
+Do not expect one client window to show several host monitors in one session. Several clients can each receive a display.
 
 ### File transfer alternatives
 
@@ -256,9 +255,7 @@ on - that is the shipping office path today.
 
 Call these out so Work expectations stay accurate:
 
-- **No multi-monitor client windows yet** for one session (several clients can each get a display;
-  one laptop showing several host monitors as separate windows is still on the
-  [roadmap](/docs/roadmap)).
+- **One client window cannot show several host monitors** in one session. Several clients can each receive a display.
 - **Webcam / camera uplink** for video calls on the host is not a finished product story yet.
 - **File transfer over clipboard** is policy-ready on the host but no shipping client asks for it
   yet - use your VPN file share, `scp`, or cloud storage for large files.

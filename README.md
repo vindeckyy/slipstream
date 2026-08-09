@@ -1,163 +1,114 @@
-<div align="center">
-<pre style="display: inline-block; text-align: left;">
-▞▀▖▌  ▜▘▛▀▖▞▀▖▀▛▘▛▀▖▛▀▘▞▀▖▙▗▌
-▚▄ ▌  ▐ ▙▄▘▚▄  ▌ ▙▄▘▙▄ ▙▄▌▌▘▌
-▖ ▌▌  ▐ ▌  ▖ ▌ ▌ ▌▚ ▌  ▌ ▌▌ ▌
-▝▀ ▀▀▘▀▘▘  ▝▀  ▘ ▘ ▘▀▀▘▘ ▘▘ ▘
-</pre>
-</div>
-
-<p align="center"><b>Low-latency desktop and game streaming for Linux hosts. Play from the couch, or use your real desktop at work.</b></p>
+# Slipstream
 
 <p align="center">
-  <a href="#what-it-is">What it is</a> ·
-  <a href="#highlights">Highlights</a> ·
-  <a href="#console">Console</a> ·
-  <a href="#how-it-works">How it works</a> ·
-  <a href="#install">Install</a> ·
-  <a href="#connect-a-client">Connect</a> ·
-  <a href="#developing">Developing</a> ·
-  <a href="#license">License</a>
+  <img src="assets/slipstream-logo.png" alt="Slipstream" width="420">
 </p>
+
+<p align="center">Low-latency desktop and game streaming from a Linux host to the devices you already use.</p>
 
 <p align="center">
-  <img src="assets/screenshots/dashboard.png" alt="Slipstream live status dashboard while streaming 1080p120 HEVC" width="900" />
+  <a href="https://vindeckyy.github.io/slipstream/">Documentation</a> |
+  <a href="https://github.com/vindeckyy/slipstream/releases">Releases</a> |
+  <a href="SECURITY.md">Security</a>
 </p>
 
----
+Slipstream turns a Linux machine into a private streaming host. Pair a client once, then stream a
+virtual display at the client's resolution and refresh rate over a trusted LAN or private VPN.
 
-## What it is
+The host captures the compositor output, encodes it, sends it over the selected transport, and the
+client decodes and presents it. Native clients are available for iPhone, Android, and Steam Deck.
+Moonlight clients are supported through the optional GameStream compatibility path.
 
-Slipstream turns a Linux machine into a private **desktop and game streaming** host. Install the
-host, pair a client once, and stream to any screen on your LAN or VPN at that screen's own
-resolution and refresh rate. Games on the couch, or your real desktop from an office laptop. No
-accounts, no cloud relay, no subscription.
+## What you get
 
-Three pieces work together: a **host** that creates a per-client virtual display, captures it,
-encodes it, and streams it; **clients** for iPhone, Android, and the Steam Deck, plus any
-[Moonlight](https://moonlight-stream.org/) client through GameStream you enable; and a **browser
-console** that manages pairing, displays, the game library, plugins, and settings.
+| Surface | Purpose |
+| --- | --- |
+| Native streaming | The slipstream/1 path with QUIC control, UDP media, and forward error correction. |
+| GameStream compatibility | Optional Moonlight support for clients that need the established protocol. |
+| Linux host | Per-client virtual displays, compositor-specific capture, GPU-first encoding, and input injection. |
+| Web console | Pairing, display presets, library management, plugins, configuration, and live status. |
+| Trusted networking | LAN or private VPN use. Public port forwarding is unsupported. |
 
-## Highlights
+Slipstream is designed for two sessions on the same machine: Play for a TV or Steam Deck, and Work
+for a full desktop from another location. The web console exposes the current host state so a stream
+can be diagnosed from the same place it is configured.
 
-| Feature | What it means |
-|---|---|
-| Per-client virtual display | Exact WxH@Hz for every device, no letterboxing. |
-| Play and work on the same host | Games to a TV or Deck, or the full desktop from the office. |
-| Display policy you control | Keep a game alive across disconnects, dedicate a couch box, or extend the desktop. |
-| GPU-first encode | Zero-copy where the platform allows it, with VAAPI and software fallbacks. |
-| Self-filling library | Steam titles plus plugins (ROM Manager, VirtualHere, ...), no scanning by hand. |
-| PIN pairing, no accounts | SPAKE2 once, then pinned identities, mDNS discovery. |
+## Install the host
 
-## Console
+The supported host is Linux. Start with the platform requirements and install guide in the
+[documentation](https://vindeckyy.github.io/slipstream/docs/requirements/).
 
-Manage the host from a browser: pairing, virtual-display presets, live sessions, and the plugin
-store.
+For a source build, install the system libraries listed in
+[CONTRIBUTING.md](CONTRIBUTING.md), then run:
 
-<p align="center">
-  <img src="assets/screenshots/virtual-displays.png" alt="Virtual display presets (shared desktop, hot-desk, workstation, headless)" width="900" />
-</p>
+    cargo build -p slipstream-host
+    ./target/debug/slipstream-host serve --mgmt-bind 127.0.0.1:47990
 
-<p align="center">
-  <img src="assets/screenshots/pairing.png" alt="PIN pairing with slipstream/1 and Moonlight clients" width="900" />
-</p>
+The web console runs locally during development:
 
-<p align="center">
-  <img src="assets/screenshots/configuration.png" alt="Recommended host configuration with clickable toggles" width="900" />
-</p>
+    cd web
+    bun install
+    bun run dev
 
-<p align="center">
-  <img src="assets/screenshots/host.png" alt="Host identity and preflight checks" width="900" />
-</p>
-
-<p align="center">
-  <img src="assets/screenshots/performance.png" alt="Per-session latency by stage and throughput charts" width="900" />
-</p>
-
-## How it works
-
-```
-compositor → capture → encode → FEC → network → decode → present
-```
-
-Each client gets its own virtual output at an exact WxH@Hz, so a 4K TV and a 1080p phone can
-watch the same host at the same time, each rendered natively. The host speaks **GameStream** for
-Moonlight clients and **`slipstream/1`**, the native plane with QUIC control, UDP data, and
-built-in forward error correction. Latency numbers: [stats overlay](docs-site/content/docs/stats.md).
-
-## Install
-
-Local and private setup is the default. Build from source, or use the packages under
-[`packaging/`](packaging/).
-
-```sh
-# Host
-cargo build -p slipstream-host
-./target/debug/slipstream-host serve --mgmt-bind 127.0.0.1:47990
-
-# Console (dev)
-cd web && bun install && bun run dev   # http://127.0.0.1:47992
-```
-
-Packaged installs (apt, rpm, Arch, Bazzite, Flatpak) live under `packaging/` with their own
-READMEs. Point package URLs and update feeds at your own registry when you publish.
+Open http://127.0.0.1:47992 after the host is running. The management token stays on the host;
+the browser receives a session cookie, never the token.
 
 ## Connect a client
 
-| Device | Client |
-|--------|--------|
-| iPhone | `clients/apple` |
-| Android | `clients/android` |
-| Steam Deck | Decky plugin or Flatpak |
-| Scripts | `slipstream` CLI (`clients/cli`) |
-| Anything else | Moonlight over GameStream |
+1. Install a client for iPhone, Android, or Steam Deck.
+2. Put the client and host on the same LAN or on a private VPN.
+3. Pair with the one-time PIN shown by the host.
+4. Choose Play or Work settings for the session.
 
-Pairing is a one-time PIN. Per-distro packages and host tips: [docs site](docs-site/content/docs/).
+Moonlight discovery requires GameStream broadcast to be enabled, usually with the host's
+--gamestream option. Slipstream cannot share GameStream ports, mDNS, or virtual-display drivers
+with Sunshine or another Moonlight-compatible host while that host is active.
 
-## Status
+## Screenshots
 
-| Piece | State |
-|-------|-------|
-| `slipstream-core` + C ABI | Complete |
-| GameStream → Moonlight | Live (opt-in `--gamestream` on trusted LAN) |
-| `slipstream/1` native path | Live |
-| Linux host | Live |
-| iPhone / Android / Steam Deck clients | Streaming |
-| Web console (`web/`) | Live over the OpenAPI mgmt API |
+<p align="center">
+  <img src="assets/screenshots/dashboard.png" alt="Slipstream host dashboard with live stream status" width="900">
+</p>
 
-Bare `slipstream-host serve` is **native-only** (`slipstream/1` + mgmt/console). Add
-`--gamestream` only on a LAN you trust.
+<p align="center">
+  <img src="assets/screenshots/pairing.png" alt="Slipstream client pairing screen" width="900">
+</p>
 
-## Developing
+<p align="center">
+  <img src="assets/screenshots/configuration.png" alt="Slipstream host configuration controls" width="900">
+</p>
 
-```sh
-cargo build --workspace
-cargo test  --workspace --locked
-cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo fmt --all --check
-```
+## Documentation
 
-Extra dev commands (the FEC loss harness and the standalone C-ABI proof):
+The [documentation site](https://vindeckyy.github.io/slipstream/) covers installation, compositor
+support, client pairing, network setup, security, input, picture quality, troubleshooting, and the
+[OpenAPI reference](https://vindeckyy.github.io/slipstream/api/).
 
-```sh
-cargo run -p loss-harness
-bash crates/slipstream-core/tests/c/run.sh
-```
+Source documentation is under [docs-site/content/docs](docs-site/content/docs). Product behavior
+described there is tied to the host and client paths in this repository.
 
-The C header regenerates into `include/slipstream_core.h` on build. iPhone and Android clients
-have their own toolchains. Repo **layout**, **design invariants**, and the contribution guide:
-[CONTRIBUTING.md](CONTRIBUTING.md).
+## Development
+
+Run the same checks used by the public CI:
+
+    cargo fmt --all --check
+    cargo clippy --workspace --all-targets --locked -- -D warnings
+    cargo test --workspace --locked
+
+The web console and documentation site use Bun. Each directory has its own lockfile and validation
+commands. See [CONTRIBUTING.md](CONTRIBUTING.md) before changing generated API, client, or license
+artifacts.
+
+## Security
+
+Slipstream controls a machine through the network. Keep it on a trusted LAN or private VPN, use the
+pairing boundary, and do not expose it through public port forwarding. Report vulnerabilities
+through the [GitHub security policy](https://github.com/vindeckyy/slipstream/security/policy).
 
 ## License
 
-MIT OR Apache-2.0. See [LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE), and
-[CONTRIBUTING.md](CONTRIBUTING.md).
-
-Third-party notices for shipped binaries: [`THIRD-PARTY-NOTICES.txt`](THIRD-PARTY-NOTICES.txt).
-Historical copyright lines for earlier lineage (where required) live in [NOTICE](NOTICE).
-
-### Trademarks
+MIT OR Apache-2.0. See [LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE), [NOTICE](NOTICE),
+and [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
 
 Slipstream is independent and is not affiliated with NVIDIA, Microsoft, Sony, Valve, or Moonlight.
-"GameStream", "Moonlight", "Xbox", "DualSense", "DualShock", and "PlayStation" are trademarks of
-their owners and are used only to describe interoperability.
+Their names are used only to describe interoperability.

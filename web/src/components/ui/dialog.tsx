@@ -1,7 +1,3 @@
-// The console's Dialog IS @unom/ui's radix dialog — brand surface (material gloss + card radius)
-// with the shared close/overlay behaviour. @unom/ui ships the SURFACE only and leaves placement to
-// the app, so `DialogContent` here is the surface already wrapped in its portal + overlay and
-// centred in the viewport; everything else is re-exported unchanged.
 import {
 	Dialog,
 	DialogClose,

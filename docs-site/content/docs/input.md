@@ -163,7 +163,7 @@ to the compositor.
 
 **Before touch passthrough and pen input can work**, the host needs access to `/dev/uinput`, the
 same `input` group step the virtual gamepads need, covered under
-[After installing](/docs/install#after-installing). Without it, GNOME falls back to a single
+[After installing](/docs/install#after-install). Without it, GNOME falls back to a single
 pointer and the host never offers pen input.
 
 **If the host is too old, or pen is switched off**, nothing breaks: the client keeps folding the

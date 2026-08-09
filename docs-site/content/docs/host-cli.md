@@ -118,7 +118,7 @@ line.
 
 Both `serve` and `slipstream1-host` advertise the host on the network so clients can discover it. The
 graphical client browses the LAN for you, so it needs no command; from a terminal on the client
-machine, [`slipstream hosts list --probe`](/docs/clients#scripting-the-slipstream-cli) re-checks the hosts you
+machine, [`slipstream hosts list --probe`](/docs/host-cli#slipstream-on-the-client-machine) re-checks the hosts you
 have already saved by asking each one directly, which is how you confirm a routed or VPN host that mDNS never reaches.
 (`slipstream-probe --discover` also browses the LAN, but it is a developer tool built from the repo,
 `cargo run -p slipstream-probe -- --discover`, and no package installs it.)
@@ -154,7 +154,7 @@ Tags flag what's worth knowing before you pick: `primary`, `disabled` (nothing t
 selected. It reads the live compositor, so run it in (or with the environment of) the session you
 want to stream.
 
-`slipstream-host mirror-test --monitor <CONNECTOR> [--seconds N] [--cpu]` then proves the whole path, 
+`slipstream-host mirror-test --monitor <CONNECTOR> [--seconds N] [--cpu]` then proves the whole path,
 mirror, capture, frames, with no client involved. It reports the first frame, the frame count and
 the negotiated size. Screen recording is damage-driven, so move the mouse on the host while it runs;
 an idle desktop legitimately yields almost nothing.
@@ -199,7 +199,7 @@ what a session-bringup script should gate on instead of a blind `sleep`.
 ## `detect-conflicts`
 
 `slipstream-host detect-conflicts` reports other Moonlight-compatible hosts (Sunshine, Apollo, and
-forks) installed or running on this machine. Running one alongside Slipstream is **unsupported**, 
+forks) installed or running on this machine. Running one alongside Slipstream is **unsupported**,
 they fight over the same ports and virtual-display driver. Prints what it found and exits **1** if
 any conflict exists, **0** if clean (so installers and scripts can gate on it). The host also runs
 this check at `serve` startup and reports it in the logs and in the management API's status
@@ -212,7 +212,7 @@ The client half has its own command, `slipstream`, the same core the graphical a
 window, so a script gets what a click gets, including waking a sleeping host and waiting for it.
 
 Its verbs, where it ships, the `<host-ref>` grammar and the stable exit codes are on [Clients -> the
-`slipstream` CLI](/docs/clients#scripting-the-slipstream-cli); `slipstream help <command>` prints one
+`slipstream` CLI](/docs/host-cli#slipstream-on-the-client-machine); `slipstream help <command>` prints one
 verb's flags. `slipstream wake` has its own exit codes, on [Wake on LAN -> From the command
 line](/docs/wake-on-lan#from-the-command-line).
 

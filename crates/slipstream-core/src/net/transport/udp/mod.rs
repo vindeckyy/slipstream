@@ -397,7 +397,8 @@ impl Transport for UdpTransport {
             // A read that fills the whole buffer means the datagram was larger than any
             // valid packet — drop it rather than hand a truncated, corrupt packet up.
             Ok(n) if n >= RECV_BUF => Ok(None),
-            Ok(n) => {                buf.truncate(n);
+            Ok(n) => {
+                buf.truncate(n);
                 Ok(Some(buf))
             }
             Err(e) if is_transient_io(&e) => Ok(None),
