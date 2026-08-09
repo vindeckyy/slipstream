@@ -17,7 +17,7 @@ crate-type = ["cdylib"]
 # The whole protocol/transport/FEC/crypto + the embeddable NativeClient connector. `quic` pulls
 # the slipstream/1 control plane (now ring-only — no aws-lc, see slipstream-core/Cargo.toml).
 slipstream-core = { path = "../../../crates/slipstream-core", features = ["quic"] }
-jni = "0.21"
+jni = "0.22"
 log = "0.4"
 # LAN host discovery: browse the host's `_slipstream._udp` mDNS advert — the SAME crate + service the
 # The Linux client uses (`crates/ss-client-core/src/discovery.rs`), replacing Android's per-OEM
