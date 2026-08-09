@@ -41,9 +41,9 @@ jobs:
         with:
           bun-version: latest
       - run: bun install --frozen-lockfile
+      - run: bun run build
       - run: bun run lint
       - run: bun test
-      - run: bun run build
 
   docs:
     name: Documentation
@@ -58,5 +58,5 @@ jobs:
           bun-version: latest
       - run: bun install --frozen-lockfile
       - run: bun run check:links
-      - run: bun run lint
       - run: bun run build
+      - run: bun run lint
