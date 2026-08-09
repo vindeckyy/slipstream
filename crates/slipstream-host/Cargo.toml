@@ -72,7 +72,7 @@ rand = "0.8"
 hex = "0.4"
 # Cover-art delivery in the game library: encode Lutris's local JPEGs into `data:` URLs and decode
 # the Epic launcher's base64 `catcache.bin`.
-base64 = "0.22"
+base64 = "0.23"
 # Blocking HTTP for the library cover-art warmer, run on a background thread off the hot path.
 # `ureq` is small + sync (no tokio here) and bundles webpki roots (no system cert dependency).
 ureq = "2"
