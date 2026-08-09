@@ -25,15 +25,7 @@ export function baseOptions(): BaseLayoutProps {
       { text: 'Install', url: '/docs/install' },
       { text: 'Clients', url: '/docs/clients' },
       { text: 'API', url: '/api' },
-      {
-        type: 'menu',
-        text: 'Community',
-        items: [
-          { text: 'GitHub Issues', url: 'https://github.com/vindeckyy/slipstream/issues' },
-          { text: 'Reddit', url: 'https://www.reddit.com/r/Slipstream/' },
-          { text: 'Support on Ko-fi', url: 'https://ko-fi.com/slipstream' },
-        ],
-      },
+      { text: 'GitHub Issues', url: 'https://github.com/vindeckyy/slipstream/issues' },
     ],
   }
 }

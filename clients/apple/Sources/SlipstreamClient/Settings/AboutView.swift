@@ -165,7 +165,7 @@ struct AboutView: View {
                 identity
                 VStack(spacing: 10) {
                     tvAddress("Documentation", Destination.docs)
-                    tvAddress("Community", Destination.community)
+                    tvAddress("Support", Destination.support)
                     tvAddress("Source code", Destination.source)
                 }
                 NavigationLink("Acknowledgements") { AcknowledgementsView() }
