@@ -116,8 +116,8 @@ pub fn rebuild(
     let mut slots: Vec<Vec<u8>> = Vec::with_capacity(total);
     let mut have: Vec<bool> = Vec::with_capacity(total);
     let mut data_idx = 0usize;
-    for i in 0..total {
-        if missing_set[i] {
+    for &is_missing in &missing_set {
+        if is_missing {
             slots.push(vec![0u8; max_len]);
             have.push(false);
         } else {
