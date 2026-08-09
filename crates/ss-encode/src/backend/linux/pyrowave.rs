@@ -1719,6 +1719,7 @@ mod tests {
             format: PixelFormat::Bgrx,
             payload: FramePayload::Cpu(buf),
             cursor: None,
+            stage_ns: Default::default(),
         }
     }
 
@@ -1957,6 +1958,7 @@ mod tests {
             format: fmt,
             payload: FramePayload::Cpu(buf),
             cursor: None,
+            stage_ns: Default::default(),
         }
     }
 
@@ -2168,6 +2170,7 @@ mod tests {
             format: PixelFormat::Bgrx,
             payload: FramePayload::Cpu(buf),
             cursor: None,
+            stage_ns: Default::default(),
         }
     }
 

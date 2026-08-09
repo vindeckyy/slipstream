@@ -2518,6 +2518,7 @@ mod tests {
             format: PixelFormat::Nv12,
             payload: FramePayload::Cuda(buf),
             cursor: None,
+            stage_ns: Default::default(),
         }
     }
 
@@ -2656,6 +2657,7 @@ mod tests {
             format: PixelFormat::X2Rgb10,
             payload: FramePayload::Cuda(buf),
             cursor: None,
+            stage_ns: Default::default(),
         }
     }
 
@@ -2845,6 +2847,7 @@ mod tests {
                 format: PixelFormat::Yuv444,
                 payload: FramePayload::Cuda(buf),
                 cursor: None,
+                stage_ns: Default::default(),
             };
             enc.submit_indexed(&frame, i).expect("submit 444");
             while let Some(_au) = enc.poll().expect("poll") {

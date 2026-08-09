@@ -474,27 +474,35 @@ mod tests {
     #[test]
     fn from_env_gates_on_the_env_var() {
         let path = test_path("env");
+        // SAFETY: this test owns the unique variable name for the duration of the mutation.
         unsafe {
             std::env::set_var("SLIPSTREAM_LATENCY_ARTIFACT", &path);
         }
-        let mut a = LatencyArtifact::from_env().expect("var set to a writable path → artifact");
+        let mut a =
+            LatencyArtifact::from_env().expect("var set to a writable path enables the artifact");
         a.write_frame(&FrameTimings::new("synthetic")).unwrap();
         drop(a);
+        // SAFETY: this test is the only code mutating this uniquely named test variable.
         unsafe {
             std::env::remove_var("SLIPSTREAM_LATENCY_ARTIFACT");
         }
-        assert!(LatencyArtifact::from_env().is_none(), "unset → disabled");
+        assert!(
+            LatencyArtifact::from_env().is_none(),
+            "unset disables the artifact"
+        );
         let out = read_all(&path);
         let _ = std::fs::remove_file(&path);
         assert!(out.starts_with("{\"kind\":\"host_frame\""));
 
+        // SAFETY: this test owns the unique variable name for this empty-value check.
         unsafe {
             std::env::set_var("SLIPSTREAM_LATENCY_ARTIFACT", "");
         }
         assert!(
             LatencyArtifact::from_env().is_none(),
-            "empty path → disabled"
+            "empty path disables the artifact"
         );
+        // SAFETY: this test mutates only the uniquely named variable it owns.
         unsafe {
             std::env::remove_var("SLIPSTREAM_LATENCY_ARTIFACT");
         }

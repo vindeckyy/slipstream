@@ -301,32 +301,38 @@ mod tests {
 
     #[test]
     fn affinity_parses_only_explicit_cpus() {
-        // Unset env → None (never touch affinity by default — the Phase-7 contract).
+        // Unset env means None; the default path never changes affinity.
+        // SAFETY: this test mutates only environment variables owned by the test.
         unsafe {
             std::env::remove_var("SLIPSTREAM_WORKER_AFFINITY");
         }
         assert!(affinity_cpus().is_none());
 
+        // SAFETY: this test mutates only environment variables owned by the test.
         unsafe {
             std::env::set_var("SLIPSTREAM_WORKER_AFFINITY", "2,3");
         }
         assert_eq!(affinity_cpus(), Some(vec![2, 3]));
 
+        // SAFETY: this test mutates only environment variables owned by the test.
         unsafe {
             std::env::set_var("SLIPSTREAM_WORKER_AFFINITY", " 1 , 4 ");
         }
         assert_eq!(affinity_cpus(), Some(vec![1, 4]));
 
-        // Empty / junk → None (nothing to pin).
+        // Empty or invalid input means None; nothing is pinned.
+        // SAFETY: this test mutates only environment variables owned by the test.
         unsafe {
             std::env::set_var("SLIPSTREAM_WORKER_AFFINITY", "");
         }
         assert!(affinity_cpus().is_none());
+        // SAFETY: this test mutates only environment variables owned by the test.
         unsafe {
             std::env::set_var("SLIPSTREAM_WORKER_AFFINITY", "abc");
         }
         assert!(affinity_cpus().is_none());
 
+        // SAFETY: this test mutates only environment variables owned by the test.
         unsafe {
             std::env::remove_var("SLIPSTREAM_WORKER_AFFINITY");
         }
@@ -334,14 +340,17 @@ mod tests {
 
     #[test]
     fn sched_fifo_is_explicitly_opt_in() {
+        // SAFETY: this test mutates only environment variables owned by the test.
         unsafe {
             std::env::set_var("SLIPSTREAM_SCHED_FIFO", "1");
         }
         assert!(sched_fifo_enabled());
+        // SAFETY: this test mutates only environment variables owned by the test.
         unsafe {
             std::env::set_var("SLIPSTREAM_SCHED_FIFO", "0");
         }
         assert!(!sched_fifo_enabled());
+        // SAFETY: this test mutates only environment variables owned by the test.
         unsafe {
             std::env::remove_var("SLIPSTREAM_SCHED_FIFO");
         }
