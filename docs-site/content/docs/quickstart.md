@@ -27,7 +27,7 @@ Open `https://<host-ip>:47992`, accept the self-signed certificate, and set the 
 | Device | Path |
 |--------|------|
 | **iPhone** | [TestFlight](https://testflight.apple.com/join/Qr7uSemk) |
-| **Android** | Play test track (invite via [Discord](https://discord.gg/kaPNvzMuGU)) or APK from [Releases](https://github.com/vindeckyy/slipstream/releases) |
+| **Android** | Invite-only Play test track or APK from [Releases](https://github.com/vindeckyy/slipstream/releases) |
 | **Steam Deck** | Decky plugin + Flatpak (see [Clients](/docs/clients#steam-deck)) |
 | Other | [Moonlight](https://moonlight-stream.org/) with GameStream enabled on the host |
 

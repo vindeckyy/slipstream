@@ -22,8 +22,8 @@ Google TV, budget Amlogic boxes) that otherwise reject a 64-bit-only build as "n
 
 ## Get it
 
-Published to **Google Play (Internal Testing)** - join the beta via the
-[Discord](https://discord.gg/kaPNvzMuGU). Per-device setup and pairing:
+Published to **Google Play (Internal Testing)** - access is invite-only. Signed APKs are linked from
+[GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when available. Per-device setup and pairing:
 **[docs-site/content/docs/install-client.md](../../docs-site/content/docs/install-client.md)**.
 
 ## How it's built - Rust-heavy

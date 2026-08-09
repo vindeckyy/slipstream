@@ -8,7 +8,7 @@ description: Connect from iPhone, Android, Steam Deck, or Moonlight.
 | Client | Install | Protocol |
 |--------|---------|----------|
 | **iPhone** | [TestFlight](https://testflight.apple.com/join/Qr7uSemk) | `slipstream/1` |
-| **Android / Android TV** | Play test track ([Discord](https://discord.gg/kaPNvzMuGU) invite) or APK from [Releases](https://github.com/vindeckyy/slipstream/releases) | `slipstream/1` |
+| **Android / Android TV** | Invite-only Play test track or APK from [Releases](https://github.com/vindeckyy/slipstream/releases) | `slipstream/1` |
 | **Steam Deck** | Decky plugin + Flatpak `slipstream-client` | `slipstream/1` |
 
 Native apps discover hosts on the LAN, pair with a PIN, reconnect on a pinned identity, and can

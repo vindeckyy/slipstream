@@ -205,9 +205,9 @@ stop testing, that removes the app and its data with it.
 
 ### Android / Android TV
 
-Uninstall the app from Google Play or from Settings -> Apps. The Android client is still an invited
-test track, so if you also want your account taken off the tester list, say so on
-[Discord](https://discord.gg/kaPNvzMuGU).
+Uninstall the app from Google Play or from Settings -> Apps. The Android client is still an invite-only
+test track. If you want your account removed from the tester list, open a
+[GitHub issue](https://github.com/vindeckyy/slipstream/issues).
 
 ### Steam Deck, Decky plugin
 

@@ -19,7 +19,7 @@ struct AboutView: View {
     /// three of them can be checked against the README in one glance.
     private enum Destination {
         static let docs = URL(string: "https://github.com/vindeckyy/slipstream/tree/main/docs-site")!
-        static let community = URL(string: "https://discord.gg/kaPNvzMuGU")!
+        static let support = URL(string: "https://github.com/vindeckyy/slipstream/issues")!
         static let source = URL(string: "https://github.com/vindeckyy/slipstream")!
     }
 
@@ -46,8 +46,8 @@ struct AboutView: View {
             }
             Section {
                 linkRow("Documentation", systemImage: "book", url: Destination.docs)
-                linkRow("Community", systemImage: "bubble.left.and.bubble.right",
-                        url: Destination.community)
+                linkRow("Support", systemImage: "bubble.left.and.bubble.right",
+                        url: Destination.support)
                 linkRow("Source Code", systemImage: "chevron.left.forwardslash.chevron.right",
                         url: Destination.source)
             }

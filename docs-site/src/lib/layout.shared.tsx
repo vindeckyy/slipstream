@@ -29,7 +29,7 @@ export function baseOptions(): BaseLayoutProps {
         type: 'menu',
         text: 'Community',
         items: [
-          { text: 'Discord', url: 'https://discord.gg/kaPNvzMuGU' },
+          { text: 'GitHub Issues', url: 'https://github.com/vindeckyy/slipstream/issues' },
           { text: 'Reddit', url: 'https://www.reddit.com/r/Slipstream/' },
           { text: 'Support on Ko-fi', url: 'https://ko-fi.com/slipstream' },
         ],

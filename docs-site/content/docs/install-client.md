@@ -37,12 +37,11 @@ Open the app, and your hosts appear automatically under *On this network*.
 ## Android
 
 The Android client (phone + Android TV) is on Google Play as a **test track**, **closed testing**
-for stable releases, **internal testing** for canary builds. To join, request a tester invite on our
-[**Discord**](https://discord.gg/kaPNvzMuGU) and we'll add your Google account:
+for stable releases, **internal testing** for canary builds. Access is invite-only. Use a signed APK
+from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when available, or build from
+`clients/android/`.
 
-**[Request access on Discord ->](https://discord.gg/kaPNvzMuGU)**
-
-Once you're added, install it from Google Play, then open the app and pick your host:
+If you already have tester access, install it from Google Play, then open the app and pick your host:
 
 **[Get Slipstream on Google Play ->](https://play.google.com/store/apps/details?id=io.slipstream)**
 _(only resolves once your account is on the tester list)_
