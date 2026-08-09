@@ -7,7 +7,7 @@ description: Connect from Android, Steam Deck, or Moonlight.
 
 | Client | Install | Protocol |
 |--------|---------|----------|
-| [**Android / Android TV**](https://github.com/vindeckyy/slipstream/releases/download/android-preview/slipstream-android.apk) | [Download the Android preview APK](https://github.com/vindeckyy/slipstream/releases/download/android-preview/slipstream-android.apk) | `slipstream/1` |
+| [**Android / Android TV**](https://github.com/vindeckyy/slipstream/releases/download/v0.23.0-public/app-release.apk) | [Download the Android public APK](https://github.com/vindeckyy/slipstream/releases/download/v0.23.0-public/app-release.apk) | `slipstream/1` |
 | **Steam Deck** | Decky plugin + Flatpak `io.slipstream.Slipstream` | `slipstream/1` |
 
 Native apps discover hosts on the LAN, pair with a PIN, reconnect on a pinned identity, and can

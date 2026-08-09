@@ -5,7 +5,7 @@ description: How Slipstream preview builds and tagged releases are published.
 
 Slipstream currently has two public distribution states:
 
-- **Preview:** the Android APK attached to the `android-preview` GitHub release. It is intended for
+- **Public:** the Android APK attached to the `v0.23.0-public` GitHub release. It is intended for
   testers and is not a stable store release.
 - **Tagged release:** a `vX.Y.Z` tag builds and publishes the Linux host archive, Steam Deck
   Flatpak and Decky packages, checksums, SBOM, attribution file, and provenance attestation through
@@ -19,7 +19,7 @@ uploaded manually. There is no public app store, Flatpak remote, or Decky packag
 | Surface | Current source |
 |---|---|
 | Linux host | Source or the Linux archive attached to a tagged GitHub release |
-| Android | Preview APK from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) |
+| Android | Public APK from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) |
 | Steam Deck | Flatpak or Decky package attached to a tagged GitHub release |
 | Moonlight | Any Moonlight client when GameStream is explicitly enabled |
 

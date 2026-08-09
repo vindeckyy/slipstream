@@ -20,22 +20,22 @@ Already installed? Skip to [Keeping a client up to date](#keeping-a-client-up-to
 
 | Device | Install |
 |--------|---------|
-| **Android / Android TV** | [Download the preview APK](#android) |
+| **Android / Android TV** | [Download the public APK](#android) |
 | **Steam Deck** | [Decky plugin](/docs/steam-deck) for Gaming Mode, or [Flatpak in Desktop Mode](#steam-deck) |
 | Anything else (browser, old phone, TV) | [Moonlight](/docs/moonlight) |
 
 ## Android
 
-The Android client is currently distributed as a preview APK. Sideload the
-[Android APK](https://github.com/vindeckyy/slipstream/releases/download/android-preview/slipstream-android.apk)
+The Android client is currently distributed as a public APK. Sideload the
+[Android APK](https://github.com/vindeckyy/slipstream/releases/download/v0.23.0-public/app-release.apk)
 or build from `clients/android/`. Download the accompanying
-[checksum](https://github.com/vindeckyy/slipstream/releases/download/android-preview/slipstream-android.apk.sha256)
+[checksum](https://github.com/vindeckyy/slipstream/releases/download/v0.23.0-public/app-release.apk.sha256)
 and verify it before copying the APK to the tablet, then allow installs from your browser or file
 manager the first time.
 
 ```sh
-sha256sum -c slipstream-android.apk.sha256
-adb install -r slipstream-android.apk
+sha256sum -c app-release.apk.sha256
+adb install -r app-release.apk
 ```
 
 ## Steam Deck
@@ -75,7 +75,7 @@ same version, but keeping them close is the least surprising. (Updating the **ho
 
 | Client | How it updates |
 |---|---|
-| **Android** | Download the current preview APK from GitHub Releases and install it over the existing app |
+| **Android** | Download the current public APK from GitHub Releases and install it over the existing app |
 | **Steam Deck (Decky)** | Install a newer packaged zip from a reachable URL, see [Steam Deck -> Updating](/docs/steam-deck#updating) |
 | **Steam Deck (Flatpak alone)** | Download the newer `.flatpak` bundle and reinstall it with `flatpak install --user --bundle`, without `sudo` |
 

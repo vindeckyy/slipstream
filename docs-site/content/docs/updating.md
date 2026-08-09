@@ -112,7 +112,7 @@ lands in `~/.config/slipstream/logs/update-steamos.log`.
 
 ## Updating a client
 
-This page is about the host. The Android preview is updated by downloading the latest APK from
+This page is about the host. The Android public APK is updated by downloading the latest APK from
 GitHub Releases. Decky and Flatpak bundles are updated by reinstalling a newer package. The per-platform table is in
 [Install a Client -> Keeping a client up to date](/docs/install-client#keeping-a-client-up-to-date).
 A host and a client don't have to be on the same version, but keeping them close is the least
