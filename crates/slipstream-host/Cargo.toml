@@ -76,7 +76,7 @@ base64 = "0.22"
 # Blocking HTTP for the library cover-art warmer, run on a background thread off the hot path.
 # `ureq` is small + sync (no tokio here) and bundles webpki roots (no system cert dependency).
 ureq = "2"
-rcgen = { version = "0.13", default-features = false, features = ["ring", "pem"] }
+rcgen = { version = "0.14", default-features = false, features = ["ring", "pem"] }
 x509-parser = "0.16"
 # Only used for the plain-HTTP nvhttp listener (`bind().serve()`); HTTPS/mTLS is hand-rolled over
 # tokio-rustls (axum-server can't surface the peer cert), so we do NOT enable `tls-rustls` — that
