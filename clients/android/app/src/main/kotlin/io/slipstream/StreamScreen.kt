@@ -269,7 +269,7 @@ fun StreamScreen(session: ActiveSession, onDisconnect: () -> Unit) {
     val virtualPad = remember(handle) { VirtualPadController(handle) }
     val virtualPadHaptics = remember(handle) { VirtualPadHaptics(context) { virtualPadConfig.haptics } }
     // Per-session visibility. Default: shown when enabled AND no physical controller is attached —
-    // a controller-less tablet (the Fire HD 10 case) gets a pad automatically; a phone with an Xbox
+    // a controller-less tablet gets a pad automatically; a phone with an Xbox
     // pad paired does not. The quick panel toggles it live.
     var padVisible by remember(handle) {
         mutableStateOf(virtualPadConfig.enabled && Gamepad.firstPad() == null)

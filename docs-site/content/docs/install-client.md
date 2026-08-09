@@ -38,16 +38,6 @@ sha256sum -c slipstream-android.apk.sha256
 adb install -r slipstream-android.apk
 ```
 
-### Fire HD 10 (13th Gen)
-
-The 2023 Fire HD 10 uses model `KFTUWI` and has a 1920 x 1200 panel. Slipstream's safe default on
-this tablet is **1680 x 1050 at 60 Hz**, using hardware HEVC when the decoder accepts it. Amazon's
-documented hardware decoder limits cover 1080p60, so 1920 x 1200 stays an experimental custom mode;
-the client probes the decoder and falls back to 1680 x 1050 or 1920 x 1080 when necessary.
-
-AV1 is not advertised on this model. If HEVC cannot be configured, select H.264 in the host or
-client profile. Keep the tablet on a 5 GHz Wi-Fi network for high-bitrate streams.
-
 ## Steam Deck
 
 Most Deck users want **Gaming Mode**: install the **[Decky plugin](/docs/steam-deck)** and a

@@ -87,7 +87,7 @@ class VirtualPadHaptics(context: Context, private val enabled: () -> Boolean) {
 /** Persisted virtual-pad preferences (`SharedPreferences`, like [SettingsStore]). */
 data class VirtualPadConfig(
     /** Master switch: the overlay exists at all (the in-stream toggle still hides it per session). */
-    val enabled: Boolean = true,
+    val enabled: Boolean = false,
     /** 0.25..1.0 — how opaque the controls render. */
     val opacity: Float = 0.6f,
     /** 0.7..1.4 — uniform size multiplier for every control. */
@@ -103,7 +103,7 @@ class VirtualPadStore(context: Context) {
         context.applicationContext.getSharedPreferences("virtual_pad", Context.MODE_PRIVATE)
 
     fun load(): VirtualPadConfig = VirtualPadConfig(
-        enabled = prefs.getBoolean(K_ENABLED, true),
+        enabled = prefs.getBoolean(K_ENABLED, false),
         opacity = prefs.getFloat(K_OPACITY, 0.6f).coerceIn(0.25f, 1f),
         scale = prefs.getFloat(K_SCALE, 1f).coerceIn(0.7f, 1.4f),
         haptics = prefs.getBoolean(K_HAPTICS, true),

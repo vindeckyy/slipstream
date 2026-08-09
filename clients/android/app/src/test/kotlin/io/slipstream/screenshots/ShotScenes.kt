@@ -31,8 +31,6 @@ import io.slipstream.BrandDark
 import io.slipstream.ConnectModal
 import io.slipstream.ConnectPhase
 import io.slipstream.ConnectTakeover
-import io.slipstream.DeviceProfiles
-import io.slipstream.FireHd10TuningCard
 import io.slipstream.Settings
 import io.slipstream.TouchMode
 import io.slipstream.SettingsCategory
@@ -198,37 +196,6 @@ internal fun SettingsCategoryScene(category: SettingsCategory) {
             onBack = {},
             initialCategory = category,
         )
-    }
-}
-
-/** Fire HD 10's device-specific tuning card at the tablet width it is designed for. */
-@Composable
-internal fun FireHd10TuningScene() {
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(
-            Modifier.padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text("Slipstream", style = MaterialTheme.typography.headlineLarge)
-            Text(
-                "A stream profile tuned for the Fire HD 10 13th Gen.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            FireHd10TuningCard(
-                profile = DeviceProfiles.FIRE_HD_10,
-                settings = Settings(
-                    width = 1920,
-                    height = 1200,
-                    hz = 120,
-                    renderScale = 1.5,
-                    lowLatencyMode = false,
-                    presentPriority = "smooth",
-                    smoothBuffer = 3,
-                ),
-                onApply = {},
-                onOpenSettings = {},
-            )
-        }
     }
 }
 

@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.slipstream.design.glassSurface
@@ -91,12 +92,16 @@ fun StreamQuickPanel(
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
                         )
                         Text(
                             sessionLine,
                             color = Color.White.copy(alpha = 0.55f),
                             fontSize = 12.sp,
                             maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                     Icon(
@@ -214,12 +219,16 @@ private fun PanelTile(
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 sub,
                 color = Color.White.copy(alpha = if (enabled) 0.45f else 0.2f),
                 fontSize = 11.sp,
                 maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

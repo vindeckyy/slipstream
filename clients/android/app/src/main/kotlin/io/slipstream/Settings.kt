@@ -74,7 +74,7 @@ data class Settings(
      * `gamepadUIEnabled`. On by default; turn it off to keep the touch UI even with a pad attached.
      * A TV (leanback) is always in this mode regardless (its remote/pad is the only input).
      */
-    val gamepadUiEnabled: Boolean = true,
+    val gamepadUiEnabled: Boolean = false,
     /**
      * Show the experimental game-library browser (the coverflow reached with Y from a saved host).
      * Fetched from the host's management API over mTLS; needs a paired host. Mirrors the Apple
@@ -235,7 +235,7 @@ class SettingsStore(context: Context) {
             ?.let { name -> TouchMode.entries.firstOrNull { it.name == name } }
             // Migration: the pre-enum Boolean "trackpad_mode" (true = trackpad, false = direct).
             ?: if (prefs.getBoolean(K_TRACKPAD, true)) TouchMode.TRACKPAD else TouchMode.POINTER,
-        gamepadUiEnabled = prefs.getBoolean(K_GAMEPAD_UI, true),
+        gamepadUiEnabled = prefs.getBoolean(K_GAMEPAD_UI, false),
         libraryEnabled = prefs.getBoolean(K_LIBRARY, true),
         lowLatencyMode = prefs.getBoolean(K_LOW_LATENCY, true),
         presentPriority = prefs.getString(K_PRESENT_PRIORITY, "latency") ?: "latency",
@@ -369,98 +369,6 @@ fun nativeDisplayMode(context: Context): Triple<Int, Int, Int> {
 }
 
 /**
- * Device-specific safe defaults for the mode requested from the host. The Fire HD 10 (13th Gen)
- * panel is 1920x1200, but Amazon documents its hardware H.264 and HEVC decoders through 1080p60.
- * Requesting the panel's full height therefore fails on this device even though the display can
- * show it. Keep the panel mode available as an explicit custom request, while making the first
- * connection use a 16:10 mode inside the documented decoder envelope.
- */
-object DeviceProfiles {
-    const val FIRE_HD_10_13_MODEL = "KFTUWI"
-
-    /** A small, user-facing description of a known device's safe streaming envelope. */
-    data class Profile(
-        val model: String,
-        val name: String,
-        val recommendedMode: Triple<Int, Int, Int>,
-        val decoderLabel: String,
-        val networkLabel: String,
-    )
-
-    val FIRE_HD_10 = Profile(
-        model = FIRE_HD_10_13_MODEL,
-        name = "Fire HD 10 (13th Gen)",
-        recommendedMode = Triple(1680, 1050, 60),
-        decoderLabel = "HEVC or H.264 hardware decode up to 1080p60",
-        networkLabel = "5 GHz Wi-Fi recommended",
-    )
-
-    fun isFireHd10(model: String?): Boolean =
-        model?.trim()?.uppercase() == FIRE_HD_10_13_MODEL
-
-    fun forModel(model: String?, native: Triple<Int, Int, Int>): Profile? =
-        if (isFireHd10(model)) {
-            FIRE_HD_10.copy(recommendedMode = streamDefaultMode(model, native))
-        } else {
-            null
-        }
-
-    /**
-     * Apply the safe stream-side defaults without baking Fire dimensions into the global store.
-     * Keeping the mode fields at zero means the policy still adapts if the same install moves to
-     * another display later.
-     */
-    fun optimizedSettings(current: Settings): Settings = current.copy(
-        width = 0,
-        height = 0,
-        hz = 0,
-        renderScale = 1.0,
-        lowLatencyMode = true,
-        presentPriority = "latency",
-        smoothBuffer = 0,
-        audioChannels = 2,
-    )
-
-    fun isOptimized(settings: Settings): Boolean =
-        settings.lowLatencyMode &&
-            settings.presentPriority != "smooth" &&
-            settings.smoothBuffer == 0 &&
-            settings.renderScale <= 1.0 &&
-            settings.audioChannels == 2 &&
-            settings.hz <= 60 &&
-            (settings.width == 0 || settings.width <= 1920) &&
-            (settings.height == 0 || settings.height <= 1080)
-
-    fun streamDefaultMode(model: String?, native: Triple<Int, Int, Int>): Triple<Int, Int, Int> {
-        if (!isFireHd10(model)) return native
-        val (width, height, hz) = native
-        if (width >= 1920 && height >= 1200) {
-            return Triple(1680, 1050, hz.coerceIn(1, 60))
-        }
-        return native
-    }
-
-    /**
-     * Keep an explicit mode request when the selected decoder supports it. On the Fire HD 10,
-     * prefer the native-aspect safe mode, then standard 1080p, when a decoder rejects the request.
-     * The callback is supplied by the platform codec probe so this policy remains unit-testable.
-     */
-    fun resolveModeForDecoder(
-        model: String?,
-        requested: Triple<Int, Int, Int>,
-        supports: (Triple<Int, Int, Int>) -> Boolean,
-    ): Triple<Int, Int, Int> {
-        if (!isFireHd10(model) || supports(requested)) return requested
-        val hz = requested.third.coerceAtMost(60)
-        val candidates = listOf(
-            Triple(1680, 1050, hz),
-            Triple(1920, 1080, hz),
-        )
-        return candidates.firstOrNull(supports) ?: requested
-    }
-}
-
-/**
  * True when this device's display can actually present HDR10, so we should advertise HDR to the
  * host. On an SDR panel we advertise `0` instead — the host then sends a proper 8-bit BT.709 stream
  * rather than BT.2020 PQ the panel would mis-tone-map (the washed-out/dark failure). Mirrors the
@@ -496,7 +404,7 @@ fun displaySupportsHdr(context: Context): Boolean {
 
 /** Resolve [Settings] (with its 0=native placeholders) to the concrete mode to request. */
 fun Settings.effectiveMode(context: Context): Triple<Int, Int, Int> {
-    val native = DeviceProfiles.streamDefaultMode(Build.MODEL, nativeDisplayMode(context))
+    val native = nativeDisplayMode(context)
     val w = if (width > 0) width else native.first
     val h = if (height > 0) height else native.second
     val hz = if (hz > 0) hz else native.third

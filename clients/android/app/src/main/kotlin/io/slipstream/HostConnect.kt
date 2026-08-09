@@ -52,34 +52,10 @@ suspend fun connectToHost(
         // sync loop feeds whole AUs only, so parts must never arrive when it is selected.
         val frameParts = settings.lowLatencyMode && partialFrame
         val codecBits = VideoDecoders.decodableCodecBits()
-        // Automatic codec (P5, measured NP3 ↔ RTX 4090): AV1 beat HEVC by ~1.2 ms end-to-end at
-        // identical conditions, so under "Automatic" this device prefers AV1 when it hardware-
-        // decodes it (the AV1 bit is only ever set for a real, non-blocked hardware decoder) AND
-        // it lacks FEATURE_PartialFrame — a partial-frame device keeps HEVC, whose slice overlap
-        // AV1 cannot ride (AV1 has no slices; the host's chunked poll never arms). The host
-        // honors the preference only inside the probed shared codec set, so an AV1-less encoder
-        // still resolves HEVC. An explicit user choice always wins unchanged.
         val preferredCodec = settings.preferredCodec().takeIf { it != 0 }
             ?: if (codecBits and 4 != 0 && !partialFrame) 4 else 0
-        val modeMime = when (preferredCodec) {
-            1 -> "video/avc"
-            4 -> "video/av01"
-            else -> "video/hevc"
-        }
         val requestedMode = Triple(requestedW, requestedH, hz)
-        val resolvedMode = DeviceProfiles.resolveModeForDecoder(
-            Build.MODEL,
-            requestedMode,
-        ) { candidate ->
-            VideoDecoders.supportsMode(modeMime, candidate.first, candidate.second, candidate.third)
-        }
-        if (resolvedMode != requestedMode) {
-            Log.w(
-                "pf.caps",
-                "decoder rejected ${requestedMode.first}x${requestedMode.second}@${requestedMode.third}; " +
-                    "using ${resolvedMode.first}x${resolvedMode.second}@${resolvedMode.third} ($modeMime)",
-            )
-        }
+        val resolvedMode = requestedMode
         // The connect-time capability readout (`adb logcat -s pf.caps`): the P2 slice pipeline
         // is client-inert unless BOTH probes pass — this line says which decoder failed one.
         Log.i(

@@ -59,7 +59,6 @@ import io.slipstream.components.HostCard
 import io.slipstream.components.HostMenuItem
 import io.slipstream.components.SectionLabel
 import io.slipstream.design.AuroraBackdrop
-import io.slipstream.kit.Gamepad
 import io.slipstream.kit.NativeBridge
 import io.slipstream.kit.discovery.DiscoveredHost
 import io.slipstream.kit.discovery.HostDiscovery
@@ -146,10 +145,6 @@ fun ConnectScreen(
     var attempt by remember { mutableStateOf<ConnectAttempt?>(null) }
     // The host streams at exactly this mode; "Native" settings resolve from the device display.
     val (w, h, hz) = settings.effectiveMode(context)
-    val deviceProfile = remember(context) {
-        DeviceProfiles.forModel(Build.MODEL, nativeDisplayMode(context))
-    }
-
     // mDNS discovery scoped to this screen, via the native mdns-sd browse (HostDiscovery) — its
     // onChange fires on the main thread, so it can set Compose state directly. (Emulator SLIRP drops
     // multicast → empty; that's the network, not the API.) Raw multicast reception only needs the
@@ -833,7 +828,6 @@ fun ConnectScreen(
         // so the touch and console modes read as ONE app instead of two themes.
         AuroraBackdrop(Modifier.fillMaxSize(), scrim = false)
         val gridMinCardWidth = when {
-            deviceProfile != null -> 260.dp
             maxWidth >= 900.dp -> 220.dp
             else -> 160.dp
         }
@@ -854,19 +848,6 @@ fun ConnectScreen(
                     // Hero: the brand mark + name over the aurora, with a quiet tagline under.
                     HomeHero()
                     Spacer(Modifier.height(26.dp))
-
-                    deviceProfile?.let { profile ->
-                        FireHd10TuningCard(
-                            profile = profile,
-                            settings = settings,
-                            onApply = {
-                                onSettingsChange(DeviceProfiles.optimizedSettings(settings))
-                                notice = "Fire HD 10 tuning applied. New sessions use the low-latency path."
-                            },
-                            onOpenSettings = onOpenSettings,
-                        )
-                        Spacer(Modifier.height(16.dp))
-                    }
 
                     notice?.let {
                         Surface(
