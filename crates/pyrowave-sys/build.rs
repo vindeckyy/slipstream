@@ -1,13 +1,11 @@
 //! Build the vendored PyroWave codec (C++/Vulkan compute) as static archives via
 //! CMake and generate bindings over its C API (`pyrowave.h`).
 //!
-//! Linux + Windows only — the platforms whose hosts/clients run the Vulkan codec
-//! path (design/pyrowave-codec-plan.md §5). Other targets get an empty bindings
-//! file so the workspace builds everywhere (the Apple client is a native Metal
-//! port, §4.7 — it never links this crate).
+//! Linux only. Other targets get an empty bindings file so platform-specific
+//! client workspaces can inspect the package metadata without linking this crate.
 //!
 //! Everything compiles from the committed vendor tree: no network, no system
-//! pyrowave, no pkg-config — CI, MSVC, and the offline flatpak builder all get
+//! pyrowave, and no pkg-config, so the offline flatpak builder gets
 //! reproducible builds (§4.1). Vulkan headers come vendored too; only a libclang
 //! for bindgen is required on the build machine.
 
@@ -23,10 +21,10 @@ fn main() {
     let bindings_path = out.join("bindings.rs");
 
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
-    if target_os != "linux" && target_os != "windows" {
+    if target_os != "linux" {
         std::fs::write(
             &bindings_path,
-            "// pyrowave-sys: Linux/Windows-only, empty on this target\n",
+            "// pyrowave-sys: Linux-only, empty on this target\n",
         )
         .unwrap();
         return;
@@ -38,7 +36,6 @@ fn main() {
 
     // Always Release: a debug build of the wavelet kernels' host code buys no
     // debuggability (the hot path is GPU shaders baked into the source) and the
-    // MSVC debug CRT would clash with Rust's release CRT.
     let dst = cmake::Config::new(&manifest_dir)
         .profile("Release")
         .build_target("pyrowave-capi")
@@ -58,7 +55,6 @@ fn main() {
             "cargo:rustc-link-search=native={}",
             build.join(sub).display()
         );
-        // MSVC multi-config generators put archives in a Release/ subdir.
         println!(
             "cargo:rustc-link-search=native={}",
             build.join(sub).join("Release").display()
@@ -84,11 +80,6 @@ fn main() {
         println!("cargo:rustc-link-lib=dylib=dl");
         println!("cargo:rustc-link-lib=dylib=pthread");
     }
-    if target_os == "windows" {
-        // Granite's breadcrumbs tracker raises a MessageBoxA on device hang.
-        println!("cargo:rustc-link-lib=dylib=user32");
-    }
-
     let bindings = bindgen::Builder::default()
         .header("wrapper.h")
         .clang_arg(format!("-I{}", vendor.display()))

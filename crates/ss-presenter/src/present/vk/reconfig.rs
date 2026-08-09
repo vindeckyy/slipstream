@@ -221,7 +221,7 @@ impl Presenter {
         let Some(ext) = &self.hdr_metadata_d else {
             return;
         };
-        // Same generic baseline as the Windows presenter: BT.2020 primaries + D65
+        // Same generic HDR10 baseline: BT.2020 primaries + D65
         // white, 1000-nit mastering display, MaxCLL 1000 / MaxFALL 400.
         let m = self.hdr_meta.unwrap_or(slipstream_core::quic::HdrMeta {
             display_primaries: [[8500, 39850], [6550, 2300], [35400, 14600]],
@@ -277,7 +277,7 @@ impl Presenter {
         // The planar (PyroWave) pass renders to the same intermediate — rebuild it at the
         // new format too (an HDR pyrowave session needs the 10-bit intermediate exactly
         // like the H.26x path; 8-bit PQ bands visibly).
-        #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+        #[cfg(feature = "pyrowave")]
         if let Some(p) = self.csc_planar.take() {
             p.destroy(&self.device);
             self.csc_planar = Some(CscPass::new_planar(&self.device, self.video_format)?);

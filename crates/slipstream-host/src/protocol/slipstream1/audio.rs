@@ -1,8 +1,7 @@
 //! The native audio plane (plan §W1 — carved out of the [`super`] module): desktop capture → Opus
 //! (48 kHz, 5 ms, CBR — the same tuning as the GameStream path) → `AUDIO_MAGIC` QUIC datagrams, at
-//! the negotiated channel count. The encoder ([`NativeAudioEnc`]) and the capture/encode/send loop
-//! ([`audio_thread`]) are gated to linux/windows (libopus + a real capturer); other targets get the
-//! stub, so a dev build streams video-only rather than failing to compile.
+//! the negotiated channel count. The encoder ([`NativeAudioEnc`]) and capture/encode/send loop
+//! use PipeWire and libopus on Linux.
 
 use super::*;
 use slipstream_core::fec::{generate_parity, AudioFecData, AUDIO_GROUP_LEN, AUDIO_MAX_PARITY};
@@ -10,13 +9,11 @@ use slipstream_core::fec::{generate_parity, AudioFecData, AUDIO_GROUP_LEN, AUDIO
 /// Opus encoder for the native audio plane: a plain stereo encoder (the live-validated,
 /// byte-identical path) or a libopus *multistream* encoder for 5.1/7.1, both behind one
 /// `encode_float`. Surround uses the safe `opus::MSEncoder` (no `audiopus_sys`).
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 enum NativeAudioEnc {
     Stereo(opus::Encoder),
     Surround(opus::MSEncoder),
 }
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 impl NativeAudioEnc {
     /// Build the encoder for `channels` (2/6/8), hard-CBR + RESTRICTED_LOWDELAY like the
     /// GameStream path; bitrate from the shared layout table (stereo keeps the validated 128 kbps).
@@ -53,13 +50,11 @@ impl NativeAudioEnc {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 #[derive(Default)]
 struct AudioPacer {
     next_send: Option<std::time::Instant>,
 }
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 impl AudioPacer {
     const FRAME_INTERVAL: std::time::Duration = std::time::Duration::from_millis(5);
 
@@ -96,7 +91,6 @@ impl AudioPacer {
 /// (an old frame is latency, not audio). Each Opus frame is one datagram (one frame per packet).
 /// A periodic telemetry line records the negotiated quantum, ring occupancy, underruns, and
 /// playout age — audio health is never inferred from the video latency statistic.
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 pub(super) fn audio_thread(
     conn: quinn::Connection,
     stop: Arc<AtomicBool>,
@@ -122,11 +116,8 @@ pub(super) fn audio_thread(
     // Reuse the cached capturer ONLY when its channel count matches this session's; a stereo
     // capturer left by a prior session must not feed a 5.1/7.1 session (the encoder + the client's
     // decoder are sized for `want`, so a mismatched capturer would garble/desync the audio).
-    // A FAILED first open does not end the session's audio: session start is peak endpoint churn
-    // on Windows (the virtual-display attach and the wiring plan's own default-device flips race
-    // the WASAPI activate — 0x80070002 mid-re-registration), so it enters the same
-    // reopen-with-backoff loop a mid-session capture death does; audio then starts a few seconds
-    // late instead of never.
+    // A failed first open does not end the session's audio. It enters the same reopen-with-backoff
+    // loop as a mid-session capture failure, so audio can start after the desktop audio graph settles.
     let capturer = match audio_cap.lock().unwrap().take() {
         Some(mut c) if c.channels() == want as u32 => {
             c.drain(); // discard audio captured between sessions (also re-claims routing)
@@ -325,9 +316,7 @@ pub(super) fn audio_thread(
     if let Some(f) = &mut fec {
         let _ = f.flush(&conn, &mut pacer);
     }
-    // Park the live capturer for the next session (None if it died and never reopened),
-    // releasing its session-scoped routing claim (Linux: the default sink moves back;
-    // Windows: dropped, restoring the operator's default playback device).
+    // Park the live capturer for the next session, releasing its session-scoped routing claim.
     if let Some(mut c) = capturer {
         c.idle();
         crate::audio::park_audio_capture(&audio_cap, c);
@@ -342,7 +331,6 @@ pub(super) fn audio_thread(
 /// (GF(2¹⁶) Leopard-RS — the same engine as the video plane), 2 shards on WAN, 1 on LAN (the
 /// transport state's FEC floor decides). The group is the send-side reorder window: parity
 /// always trails its data, so the client can rebuild a lost packet from the survivors.
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 struct FecSender {
     /// The current group's frames: `(seq, pts_ns, opus payload)`.
     frames: Vec<(u32, u64, Vec<u8>)>,
@@ -358,7 +346,6 @@ struct FecSender {
     frames_buffered: u64,
 }
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 impl FecSender {
     fn new(transport_policy: Arc<crate::transport_state::TransportPolicyShared>) -> Self {
         Self {
@@ -455,18 +442,4 @@ impl FecSender {
             true
         }
     }
-}
-
-/// Stub — slipstream/1 audio needs Linux (PipeWire capture + libopus); non-Linux dev builds
-/// run sessions without it, same as when the capturer fails to open.
-#[cfg(not(any(target_os = "linux", target_os = "windows")))]
-pub(super) fn audio_thread(
-    _conn: quinn::Connection,
-    _stop: Arc<AtomicBool>,
-    _audio_cap: AudioCapSlot,
-    _channels: u8,
-    _transport_policy: Arc<crate::transport_state::TransportPolicyShared>,
-    _audio_fec: bool,
-) {
-    tracing::warn!("slipstream/1 audio requires Linux or Windows — session continues without it");
 }

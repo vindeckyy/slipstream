@@ -88,8 +88,8 @@ import io.slipstream.kit.security.KnownHostStore
  * it becomes a two-pane list-detail (the list stays on the left, the detail on the right). Edits
  * persist immediately; [onBack] returns to the connect screen.
  *
- * **Structure mirrors the desktop/Apple settings revamp** ([SettingsCategory], and the Windows
- * client's `app/settings.rs`), so every client reads the same way: General = session/app behaviour,
+ * **Structure mirrors the desktop/Apple settings revamp** ([SettingsCategory]), so every client
+ * reads the same way: General = session/app behaviour,
  * Display = everything about the picture, Input = touch/keyboard/mouse, Audio, Controllers, About.
  * Each field carries its explanation DIRECTLY under it (the `described()` idiom — see
  * [SettingDropdown]'s `caption` and [ToggleRow]'s `subtitle`) rather than as loose paragraphs
@@ -450,8 +450,8 @@ private fun OverrideBadge(field: String?) {
 
 /**
  * The top-level settings groups — each opens its own subpage (list on phone, split on tablet).
- * The map and its order are the cross-client one (Apple's `SettingsCategory`, the Windows
- * NavigationView, the GTK pages): General, Display, Input, Audio, Controllers, About.
+ * The map and its order are shared with Apple's `SettingsCategory` and the GTK pages: General,
+ * Display, Input, Audio, Controllers, About.
  *
  * [profileable] is false for a category with no profileable rows at all — it isn't offered in
  * profile scope, rather than opening onto an empty page.

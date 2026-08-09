@@ -10,24 +10,26 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   codeql:
     name: CodeQL
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
     strategy:
       fail-fast: false
       matrix:
         language: [javascript-typescript, rust]
     steps:
-      - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: github/codeql-action/init@0fa1882f994fbd81a47ab0804f93354f5ea40147 # v3.28.17
         with:
           languages: ${{ matrix.language }}
-      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/autobuild@0fa1882f994fbd81a47ab0804f93354f5ea40147 # v3.28.17
         if: matrix.language == 'rust'
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@0fa1882f994fbd81a47ab0804f93354f5ea40147 # v3.28.17
 
   dependency-review:
     name: Dependency review
@@ -35,7 +37,15 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      pull-requests: write
+      pull-requests: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/dependency-review-action@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/dependency-review-action@ce3cf9537a52e8119d91fd484ab5b8a807627bf8 # v4.6.0
+
+  repository-audit:
+    name: Repository policy checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check repository policy
+        run: bash scripts/ci/check-repository-policy.sh

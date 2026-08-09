@@ -1,11 +1,6 @@
-//! Frame capture (plan §7 / §W6): the capturers themselves — the Linux xdg-ScreenCast/PipeWire
-//! portal capturer and the Windows IDD direct-push capturer — plus the synthetic test sources and
-//! the `Capturer` trait, extracted into a subsystem crate. Speaks the shared frame vocabulary
-//! (`ss-frame`) + the zero-copy plumbing (`ss-zerocopy`) and the display leaves (`ss-win-display`),
-//! and NEVER `ss-encode` — the capture→encode edge is one-way (the encode-backend facts arrive
-//! pre-resolved in a [`ZeroCopyPolicy`], and the Windows sealed-channel delivery arrives as a
-//! [`FrameChannelSender`] closure, so this crate reaches neither the encoder nor the host
-//! orchestrator).
+//! Frame capture: the Linux xdg-ScreenCast and PipeWire portal capturer plus synthetic test
+//! sources behind the `Capturer` trait. The crate uses `ss-frame` and `ss-zerocopy`; encode-backend
+//! facts arrive pre-resolved in [`ZeroCopyPolicy`].
 
 // Every unsafe block in this crate carries a `// SAFETY:` proof; enforce it (unsafe-proof program).
 #![deny(clippy::undocumented_unsafe_blocks)]
@@ -135,8 +130,7 @@ pub trait Capturer: Send {
     /// is why this predicate exists rather than leaving callers to infer liveness from an error they
     /// have often already discarded.
     ///
-    /// `true` (the default) for backends with no such state: the synthetic sources, and the Windows
-    /// IDD-push capturer, whose failures already end the session through its own rebuild path.
+    /// `true` (the default) for backends with no terminal state, including synthetic sources.
     fn is_alive(&self) -> bool {
         true
     }
@@ -157,22 +151,15 @@ pub trait Capturer: Send {
     // The out-of-band pointer: where it is, who draws it, and (Linux/gamescope) where to read it.
 
     /// The capture source's LIVE cursor state, when it arrives out-of-band from the frames
-    /// (the Windows IddCx hardware-cursor channel). Polled by the encode loop every tick and
-    /// preferred over `CapturedFrame::cursor` — with a hardware cursor, pointer-only moves
-    /// produce NO new frame, so the frame-attached overlay would go stale on a static desktop.
     /// Default `None`: the Linux portal path attaches its cursor to frames instead.
     fn cursor(&mut self) -> Option<ss_frame::CursorOverlay> {
         None
     }
 
     /// LIVE cursor-render flip for a cursor-forward session (design/remote-desktop-sweep.md §8):
-    /// `on = true` — the client draws the pointer, keep it OUT of the video; `on = false` —
-    /// the capture mouse model, the pointer must be IN the video again. The Windows IDD
-    /// capturer implements the composite side ITSELF (slot-copy + alpha-blended quad from the
-    /// GDI poller) — a declared IddCx hardware cursor is irrevocable, so DWM can never be
-    /// handed the job back. Called every encode tick (implementations cache; steady state is
-    /// one compare). Default no-op: the Linux portal never bakes the pointer into frames —
-    /// the encode loop blends its overlay instead.
+    /// `on = true` asks the client to draw the pointer outside the video; `on = false` keeps it in
+    /// the video. The Linux portal keeps the cursor metadata separate and the encode loop blends
+    /// it when needed.
     fn set_cursor_forward(&mut self, _on: bool) {}
 
     /// Attach a gamescope cursor source (remote-desktop-sweep Phase C). gamescope paints no
@@ -188,8 +175,8 @@ pub trait Capturer: Send {
     // ---- Stream properties ------------------------------------------------------------------
 
     /// The source's static HDR mastering metadata (SMPTE ST.2086 + content light level), when the
-    /// capturer can read it from the output (Windows `IDXGIOutput6::GetDesc1`), or a generic HDR10
-    /// block once an HDR stream is negotiated (Linux — neither the portal nor gamescope exposes a
+    /// capturer can read it from the output, or a generic HDR10 block once an HDR stream is
+    /// negotiated (Linux, where neither the portal nor gamescope exposes a
     /// real mastering volume). `None` = unknown / SDR / a backend that doesn't expose it.
     /// The stream loop forwards this to the encoder (in-band SEI) and the client (`0xCE` datagram),
     /// so the two stay a single source of truth. May change mid-session if the source is regraded.
@@ -213,10 +200,8 @@ pub trait Capturer: Send {
     // implements `resize_output` without the identity leaves the caller no way to check that the
     // display it just reconfigured is still this capturer's. Both defaults decline.
 
-    /// The OS display-target id this capturer is bound to (Windows IDD-push), so the resize path
-    /// can verify the display it just reconfigured is STILL the one this capturer serves (an
-    /// in-place resize keeps the target; a re-arrival fallback mints a new one, which needs a
-    /// fresh capturer). `None` = the backend has no such identity (every non-IDD backend).
+    /// The OS display-target id this capturer is bound to. `None` means the backend has no such
+    /// identity.
     ///
     /// PAIRED with [`resize_output`](Self::resize_output) — see the cluster note above.
     fn capture_target_id(&self) -> Option<u32> {
@@ -477,15 +462,6 @@ pub fn capturer_supports_444(_encoder_ingests_rgb_444: bool) -> bool {
 pub fn capturer_supports_hdr() -> bool {
     false
 }
-/// Windows: the IDD-push capturer proactively enables advanced colour and delivers P010/Rgb10a2.
-#[cfg(target_os = "windows")]
-pub fn capturer_supports_hdr() -> bool {
-    true
-}
-#[cfg(not(any(target_os = "linux", target_os = "windows")))]
-pub fn capturer_supports_hdr() -> bool {
-    false
-}
 
 /// Which HDR capture source a `want_hdr` negotiation failure belongs to.
 ///
@@ -550,90 +526,15 @@ pub(crate) fn note_hdr_capture_failed(source: HdrSource) {
         }
     }
 }
-#[cfg(target_os = "windows")]
-pub fn capturer_supports_444(encoder_ingests_rgb_444: bool) -> bool {
-    // IDD-push delivers full-chroma RGB for a 4:4:4 session — BGRA on an SDR display, packed 10-bit
-    // BT.2020 PQ (`Rgb10a2`) on an HDR one — skipping the subsampling converters entirely. Only a
-    // backend that ingests RGB and CSCs it to 4:4:4 itself can use that: today just direct-NVENC
-    // (AMF can't 4:4:4 at all; the QSV/ffmpeg path has no RGB-input 4:4:4 wiring).
-    //
-    // The display's HDR state is deliberately NOT part of this answer, and no longer needs to be:
-    // both depths have a full-chroma source now, so the chroma resolved here — before the Welcome —
-    // is the chroma the stream really carries. (It used to be a lie whenever the display was HDR:
-    // this returned true, the Welcome promised 4:4:4, and the capturer then quietly emitted P010.)
-    encoder_ingests_rgb_444
-}
-#[cfg(not(any(target_os = "linux", target_os = "windows")))]
-pub fn capturer_supports_444(_encoder_ingests_rgb_444: bool) -> bool {
-    false
-}
-
-/// Host-registered HID compose-kick hook: `(target_rect, desktop_bounds) -> accepted`, both
-/// `(x, y, w, h)` in desktop coordinates (from CCD). The host facade registers it once at startup
-/// when the resident virtual HID mouse exists (`inject::mouse_windows::hid_kick`); the IDD-push
-/// capturer's compose kick then prefers it over `SendInput`, because device-level input is
-/// delivered regardless of this process's session or the active desktop and wakes a powered-off
-/// display — the lid-closed first-frame fix. Same one-way-edge philosophy as
-/// [`FrameChannelSender`]: this crate never reaches back into the host's inject module. `false`
-/// from the hook = mouse not available right now → the caller falls back to `SendInput`.
-#[cfg(target_os = "windows")]
-pub static HID_COMPOSE_KICK: std::sync::OnceLock<HidKickFn> = std::sync::OnceLock::new();
-
-/// The [`HID_COMPOSE_KICK`] hook's shape: `(target_rect, desktop_bounds) -> accepted`, both
-/// `(x, y, w, h)` in desktop coordinates.
-#[cfg(target_os = "windows")]
-pub type HidKickFn = fn((i32, i32, i32, i32), (i32, i32, i32, i32)) -> bool;
-
-/// Delivers a monitor's sealed frame channel to the ss-vdisplay driver (`IOCTL_SET_FRAME_CHANNEL`) —
-/// the ONE reach the IDD-push capturer would otherwise make into the host's `vdisplay` module. The
-/// host facade builds this closure (capturing the ss-vdisplay control device handle + the
-/// `send_frame_channel` IOCTL wrapper) and hands it in, so this crate delivers the channel without a
-/// path back to the orchestrator. Called once per ring generation (at attach), never per-frame —
-/// guardrail-compliant. The handle values in `req` were just duplicated into the driver's WUDFHost
-/// by the capturer's [`windows::idd_push`] broker; on IOCTL success the DRIVER owns them.
-#[cfg(target_os = "windows")]
-pub type FrameChannelSender = std::sync::Arc<
-    dyn Fn(&ss_driver_proto::control::SetFrameChannelRequest) -> Result<()> + Send + Sync,
->;
-
-/// Delivery closure for the v5 hardware-cursor channel (`IOCTL_SET_CURSOR_CHANNEL`) — same
-/// facade contract as [`FrameChannelSender`]. `Some` also OPTS THE SESSION IN: the capturer
-/// creates + delivers the cursor section only when the host hands it a sender (the negotiated
-/// cursor-forward sessions), and the driver only declares the hardware cursor once that
-/// delivery lands — so a plain session keeps DWM's composited pointer untouched.
-#[cfg(target_os = "windows")]
-pub type CursorChannelSender = std::sync::Arc<
-    dyn Fn(&ss_driver_proto::control::SetCursorChannelRequest) -> Result<()> + Send + Sync,
->;
-
-/// The mid-stream cursor-render flip (`IOCTL_SET_CURSOR_FORWARD`, proto v6) as a host-facade
-/// closure — same contract as [`CursorChannelSender`]. `bool` = declare the IddCx hardware
-/// cursor (`true`) or stand it down (`false`; the host facade additionally forces the same-mode
-/// re-commit that actualises the OS's software-cursor default). The capturer drives this from
-/// its secure-desktop watch: UAC/Winlogon render only through the software-cursor path, so a
-/// path pinned to the hardware cursor never presents them (the 0.18.0 secure-desktop
-/// regression).
-#[cfg(target_os = "windows")]
-pub type CursorForwardSender = std::sync::Arc<dyn Fn(bool) -> Result<()> + Send + Sync>;
-
-// Platform backends live under `platform/{linux,windows}/`. Crate-root shims below keep every
-// existing `ss_capture::*` path stable (dxgi, synthetic_nv12, pwinit, gnome_hdr_monitor_active).
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+// The Linux platform backend lives under `platform/linux/`; crate-root shims keep the public
+// capture paths stable.
+#[cfg(target_os = "linux")]
 mod platform;
 
 // One-time PipeWire library init, shared by the video (portal) and audio capture threads.
 #[cfg(target_os = "linux")]
 pub use platform::linux::pwinit;
 
-// Windows capture is IDD direct-push only (DXGI Desktop Duplication + the WGC relay were removed).
-#[cfg(target_os = "windows")]
-pub use platform::windows::dxgi;
-#[cfg(target_os = "windows")]
-pub use platform::windows::synthetic_nv12;
-// The WUDFHost-identity check the IDD-push broker uses is reused by the host's gamepad-channel
-// bootstrap (`inject::windows::gamepad_raii`); re-export it so that reach stays a leaf dependency.
-#[cfg(target_os = "windows")]
-pub use platform::windows::verify_is_wudfhost;
 // The GNOME BT.2100 colour-mode probe — the host's capture-side gate for offering HDR on the
 // portal monitor path (see `open_portal_monitor`'s `want_hdr`).
 #[cfg(target_os = "linux")]
@@ -774,34 +675,4 @@ pub fn probe_nvfbc_for_monitor(monitor: Option<&str>) -> bool {
 #[cfg(target_os = "linux")]
 pub fn open_wlr_desktop() -> Result<Box<dyn Capturer>> {
     platform::linux::WlrCapturer::open().map(|c| Box::new(c) as Box<dyn Capturer>)
-}
-
-/// Open the Windows IDD direct-push capturer on a ss-vdisplay target. `sender` delivers the sealed
-/// frame channel to the driver (the host facade builds it from the vdisplay control device). On
-/// failure the `keepalive` is handed back so the caller can retire the display.
-#[cfg(target_os = "windows")]
-#[allow(clippy::too_many_arguments)]
-pub fn open_idd_push(
-    target: ss_frame::dxgi::WinCaptureTarget,
-    preferred: Option<(u32, u32, u32)>,
-    client_10bit: bool,
-    want_444: bool,
-    pyrowave: bool,
-    keepalive: Box<dyn Send>,
-    sender: FrameChannelSender,
-    cursor_sender: Option<CursorChannelSender>,
-    cursor_forward: Option<CursorForwardSender>,
-) -> std::result::Result<Box<dyn Capturer>, (anyhow::Error, Box<dyn Send>)> {
-    platform::windows::idd_push::IddPushCapturer::open(
-        target,
-        preferred,
-        client_10bit,
-        want_444,
-        pyrowave,
-        keepalive,
-        sender,
-        cursor_sender,
-        cursor_forward,
-    )
-    .map(|c| Box::new(c) as Box<dyn Capturer>)
 }

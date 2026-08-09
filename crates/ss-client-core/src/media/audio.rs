@@ -390,8 +390,7 @@ struct MicData {
 /// Whether the mic echo-cancellation hooks run this session: the `echo_cancel` setting, with
 /// `SLIPSTREAM_NO_AEC=1` as a one-way override OFF. The env var wins — it is the escape hatch
 /// for a box whose canceller misbehaves, and it predates the setting; nothing turns AEC back
-/// on once it is set. Here the hook is the echo-cancelled-source preference below; the WASAPI
-/// twin gates its Communications stream category the same way.
+/// on once it is set. Here the hook is the echo-cancelled-source preference below.
 fn aec_enabled(echo_cancel: bool) -> bool {
     echo_cancel && !std::env::var("SLIPSTREAM_NO_AEC").is_ok_and(|v| !v.is_empty() && v != "0")
 }

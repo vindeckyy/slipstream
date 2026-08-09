@@ -2,7 +2,7 @@
 //!
 //! The hard part is canary: every packaging channel spells the same CI build differently
 //! (`0.23.0~ci10250.gab12cd34` on deb, `0.23.0-0.ci10250.g…` on rpm, a zero-padded pkgrel on
-//! pacman, `0.23.10250` on Windows/decky). Comparing those strings to each other is
+//! pacman, or a run-as-patch package). Comparing those strings to each other is
 //! meaningless, so canary compares `(major, minor)` and then the **CI run number**, which is
 //! the one monotonic axis every channel carries. Stable compares the plain triple.
 //!
@@ -42,8 +42,8 @@ pub fn triple(v: &str) -> Option<(u64, u64, u64)> {
 }
 
 /// The CI run number embedded in a canary version string, wherever the channel's format hid
-/// it: `0.23.0~ci10250.g<sha>` (deb), `0.23.0-0.ci10250.g<sha>` (rpm), `0.23.10250`
-/// (Windows/decky style, run-as-patch). A stable string yields `None`.
+/// it: `0.23.0~ci10250.g<sha>` (deb), `0.23.0-0.ci10250.g<sha>` (rpm), or a
+/// run-as-patch package. A stable string yields `None`.
 pub fn canary_run(version: &str) -> Option<u64> {
     // `ci` immediately followed by digits, anywhere.
     let mut rest = version;
@@ -89,15 +89,6 @@ pub fn is_newer(
     }
 }
 
-/// Windows canary installers are versioned `M.m.<run>` where `<run>` is a 4+ digit CI run
-/// number; stable patch numbers stay small. Heuristic, documented in the plan (R10).
-pub fn windows_channel_of(version: &str) -> Channel {
-    match triple(version) {
-        Some((_, _, patch)) if patch >= 1000 => Channel::Canary,
-        _ => Channel::Stable,
-    }
-}
-
 /// `CHANNEL=canary` in a shell-style conf (the sysext updater's own format).
 pub fn conf_channel(conf: &str) -> Option<Channel> {
     for line in conf.lines() {
@@ -128,7 +119,7 @@ mod tests {
     fn canary_runs() {
         assert_eq!(canary_run("0.23.0~ci10250.gab12cd34"), Some(10250));
         assert_eq!(canary_run("0.23.0-0.ci777.g12345678"), Some(777));
-        assert_eq!(canary_run("0.23.10250"), Some(10250)); // run-as-patch (Windows/decky)
+        assert_eq!(canary_run("0.23.10250"), Some(10250)); // run-as-patch
         assert_eq!(canary_run("0.23.0"), None); // stable string
         assert_eq!(canary_run("0.23.0-1"), None);
     }
@@ -143,7 +134,7 @@ mod tests {
 
     #[test]
     fn newer_canary_compares_runs_not_patch() {
-        // deb canary current vs Windows-style manifest version, same run ⇒ NOT newer,
+        // A run-as-patch manifest compared with a deb canary of the same run is NOT newer,
         // even though a naive triple compare says 10250 > 0.
         assert!(!is_newer(
             "0.23.10250",
@@ -166,12 +157,6 @@ mod tests {
         ));
         // No run extractable on either side ⇒ conservative false.
         assert!(!is_newer("0.23.10250", None, "0.23.0", Channel::Canary));
-    }
-
-    #[test]
-    fn windows_channel_heuristic() {
-        assert_eq!(windows_channel_of("0.22.2"), Channel::Stable);
-        assert_eq!(windows_channel_of("0.23.10118"), Channel::Canary);
     }
 
     #[test]

@@ -114,7 +114,7 @@ Whatever the surface, the client sends only an **id**. The host looks that id up
 and runs what it already knows about the title, so a client can never hand the host a command to run.
 
 - **Native clients**, the browser is a per-device setting in **Settings -> Library**, and it needs a
-  **paired** host. It is **on by default on iPhone and Android**. Turn it on and a paired host's card
+  **paired** host. It is **on by default on Android**. Turn it on and a paired host's card
   offers **Browse library...**; pick a title and the stream starts with the host launching it. See
   [Client settings](/docs/client-settings).
 - **Android**, the library lives only in the controller-optimized home, which a TV always uses and a

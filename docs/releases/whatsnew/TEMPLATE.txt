@@ -8,8 +8,8 @@ HOW TO USE THIS FILE
   headline change>" will ship to the Play Store exactly as written. Nothing checks your prose.
 
 WHAT BELONGS HERE
-  Only what changed in the ANDROID APP. Host-side work  -  Windows installers, gamescope, the web
-  console  -  means nothing to someone reading a phone app's store listing, and it is spending
+  Only what changed in the ANDROID APP. Host-side work, gamescope and the web console mean nothing to
+  someone reading a phone app's store listing, and it is spending
   characters you do not have. The full release notes in ../vX.Y.Z.md are where that lives.
 
 RULES THE CI GATE ENFORCES (GitHub Actions)

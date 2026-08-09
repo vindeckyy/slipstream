@@ -1,5 +1,8 @@
 # slipstream - Linux client
 
+> This client is development-only. Slipstream currently publishes Android and Steam Deck clients;
+> there is no public Linux desktop download or package feed.
+
 The native **Linux** app for streaming a slipstream host to your desktop, laptop, or Steam Deck.
 It's a clean relm4/GTK4/libadwaita **shell** that finds hosts on your network, pairs with a PIN,
 and manages your settings and library - the stream itself runs in the sibling
@@ -36,14 +39,11 @@ Built in Rust end to end (no C ABI): the shell shares its plumbing with the sess
 
 ## Get it
 
-Most people should install a package rather than build from source:
+Build from source for development:
 
-| Distro | Install |
-|--------|---------|
-| **Flatpak** (any distro, Steam Deck) | `io.slipstream` - see [`packaging/flatpak`](../../packaging/flatpak/README.md) |
-| **Ubuntu / Debian** (apt) | `sudo apt install slipstream-client` *(after adding the repo)* |
-| **Fedora / Bazzite** (rpm) | `rpm-ostree install slipstream-client` |
-| **Arch** (PKGBUILD) | see [`packaging/arch`](../../packaging/arch/README.md) |
+The Flatpak and native package recipes are retained for engineering and local Steam Deck builds;
+they do not currently have a public package feed. See [`packaging/flatpak`](../../packaging/flatpak/README.md)
+for the local bundle path.
 
 Per-device install steps and pairing walkthrough:
 **[docs-site/content/docs/install-client.md](../../docs-site/content/docs/install-client.md)**.

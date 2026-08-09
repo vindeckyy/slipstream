@@ -1,9 +1,8 @@
 //! Operator power controls: restart or stop this **host process** (not the OS).
 //!
 //! Used by `POST /api/v1/host/restart` and `POST /api/v1/host/shutdown`. Restart prefers the
-//! service manager (systemd user unit / Windows SCM helper), then falls back to re-exec of the
-//! same binary + argv. Shutdown always exits this process without asking a supervisor to start
-//! it again.
+//! systemd user unit, then falls back to re-exec of the same binary + argv. Shutdown always exits
+//! this process without asking a supervisor to start it again.
 
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -56,57 +55,26 @@ pub(crate) fn schedule_shutdown() {
         .expect("spawn shutdown thread");
 }
 
-/// Try to bounce via the installed service unit/service. Returns `Ok(true)` if that path was
+/// Try to bounce via the installed systemd unit. Returns `Ok(true)` if that path was
 /// taken, `Ok(false)` if no supervisor owns this install (caller should re-exec).
 fn try_supervisor_restart() -> Result<bool, String> {
-    #[cfg(target_os = "linux")]
-    {
-        let active = Command::new("systemctl")
-            .args(["--user", "is-active", "slipstream-host.service"])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
-        if !active {
-            return supervisor_decision(false, false, "");
-        }
-        let status = Command::new("systemctl")
-            .args(["--user", "--no-block", "restart", "slipstream-host.service"])
-            .status()
-            .map_err(|e| format!("systemctl restart slipstream-host: {e}"))?;
-        supervisor_decision(
-            true,
-            status.success(),
-            &format!("systemctl restart slipstream-host failed with {status}"),
-        )
+    let active = Command::new("systemctl")
+        .args(["--user", "is-active", "slipstream-host.service"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    if !active {
+        return supervisor_decision(false, false, "");
     }
-    #[cfg(target_os = "windows")]
-    {
-        // Match `windows/service.rs` SERVICE_NAME. Spawn a breakaway helper so this process can
-        // die under `sc stop` while the helper brings it back.
-        const SERVICE_NAME: &str = "SlipstreamHost";
-        let probe = Command::new("sc.exe")
-            .args(["query", SERVICE_NAME])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
-        if !probe {
-            return Ok(false);
-        }
-        let exe = std::env::current_exe().map_err(|e| format!("current_exe: {e}"))?;
-        use std::os::windows::process::CommandExt as _;
-        const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        Command::new(&exe)
-            .args(["service", "restart"])
-            .creation_flags(CREATE_BREAKAWAY_FROM_JOB | CREATE_NO_WINDOW)
-            .spawn()
-            .map_err(|e| format!("spawn service restart helper: {e}"))?;
-        Ok(true)
-    }
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-    {
-        Ok(false)
-    }
+    let status = Command::new("systemctl")
+        .args(["--user", "--no-block", "restart", "slipstream-host.service"])
+        .status()
+        .map_err(|e| format!("systemctl restart slipstream-host: {e}"))?;
+    supervisor_decision(
+        true,
+        status.success(),
+        &format!("systemctl restart slipstream-host failed with {status}"),
+    )
 }
 
 fn supervisor_decision(
@@ -130,9 +98,7 @@ fn schedule_reexec() -> Result<(), String> {
 
     // The replacement must not bind until this process has released the ports. Spawning the
     // binary immediately races the parent (Address already in use on --mgmt-bind).
-    #[cfg(unix)]
-    {
-        let mut cmd = Command::new("sh");
+    let mut cmd = Command::new("sh");
         // $0 / $@ are the exe + serve args passed after -c.
         let wait =
             format!("while kill -0 {parent} 2>/dev/null; do sleep 0.05; done; exec \"$0\" \"$@\"");
@@ -157,53 +123,8 @@ fn schedule_reexec() -> Result<(), String> {
         for a in &args {
             cmd.arg(a);
         }
-        cmd.spawn()
-            .map_err(|e| format!("spawn replacement host waiter: {e}"))?;
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt as _;
-        const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        // Wait-Process until the parent exits, then Start-Process the same command line.
-        let mut ps = String::from(format!(
-            "Wait-Process -Id {parent} -ErrorAction SilentlyContinue; Start-Process -FilePath "
-        ));
-        ps.push('\'');
-        ps.push_str(&exe.display().to_string().replace('\'', "''"));
-        ps.push('\'');
-        if !args.is_empty() {
-            ps.push_str(" -ArgumentList ");
-            let joined: Vec<String> = args
-                .iter()
-                .map(|a| {
-                    let s = a.to_string_lossy();
-                    format!("'{}'", s.replace('\'', "''"))
-                })
-                .collect();
-            ps.push_str(&joined.join(","));
-        }
-        Command::new("powershell.exe")
-            .args(["-NoProfile", "-Command", &ps])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .creation_flags(CREATE_BREAKAWAY_FROM_JOB | CREATE_NO_WINDOW)
-            .spawn()
-            .map_err(|e| format!("spawn replacement host waiter: {e}"))?;
-    }
-    #[cfg(not(any(unix, windows)))]
-    {
-        let mut child = Command::new(&exe);
-        child.args(&args);
-        child
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        child
-            .spawn()
-            .map_err(|e| format!("spawn replacement host: {e}"))?;
-    }
+    cmd.spawn()
+        .map_err(|e| format!("spawn replacement host waiter: {e}"))?;
 
     std::thread::Builder::new()
         .name("ss-power-reexec-exit".into())

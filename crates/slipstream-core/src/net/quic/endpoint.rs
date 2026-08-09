@@ -12,9 +12,8 @@ use std::sync::{Arc, Mutex};
 /// several keepalives can be lost back-to-back (a wifi roam, a brief blip) without a false
 /// close, while a genuinely dead peer is still detected within `MAX_IDLE`.
 /// The default control-connection idle timeout (disconnect-detection latency). A vanished client
-/// is declared dead within this window — the Windows IDD-push path needs it short so a RECONNECT
-/// recreates a fresh virtual monitor instead of joining the still-lingering old session; the Linux
-/// path pairs it with the same-client reconnect preempt. Host-tunable via `server_with_identity_idle`.
+/// is declared dead within this window. The host pairs it with same-client reconnect handling to
+/// avoid joining a stale session. Host-tunable via `server_with_identity_idle`.
 pub const DEFAULT_IDLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(8);
 
 fn stream_transport() -> Arc<quinn::TransportConfig> {

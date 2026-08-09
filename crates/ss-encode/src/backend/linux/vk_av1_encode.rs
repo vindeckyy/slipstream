@@ -514,7 +514,7 @@ pub fn stype(raw: i32) -> vk::StructureType {
 // the type system relates them to the C definitions any more: an edit that inserts, drops, widens or
 // re-pads a field is not a compile error, it is the driver reading our bytes at the wrong offsets.
 // The assertions below are the missing compile error. They are `const` rather than `#[cfg(test)]`
-// (the shape `amf.rs` uses) so they hold in every build, including the shipped one, and on any
+// so they hold in every build, including the shipped one, and on any
 // target this module compiles for.
 //
 // What they catch: a changed field width, an inserted or removed field, a changed array length, a

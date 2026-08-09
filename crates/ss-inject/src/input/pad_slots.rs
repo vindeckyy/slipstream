@@ -1,5 +1,4 @@
-//! Shared virtual-pad slot table + creation lifecycle, used by every backend manager (Linux
-//! uinput/uhid, Windows XUSB/UMDF). See [`PadSlots`].
+//! Shared virtual-pad slot table and creation lifecycle for Linux uinput and UHID managers.
 
 use crate::pad_gate::PadGate;
 use anyhow::Result;
@@ -34,12 +33,11 @@ pub struct PadSlots<P> {
     /// Create-retry gate: a transient backend failure backs off and retries instead of permanently
     /// disabling every pad for the session.
     gate: PadGate,
-    /// Backend tag in the shared lifecycle log lines, e.g. `"DualSense/Windows"` — keeps every
-    /// existing per-backend line byte-identical (ops greps survive the extraction).
+    /// Backend tag in the shared lifecycle log lines.
     label: &'static str,
     /// Device name in the create-failure line ("virtual `<device>` creation failed …").
     device: &'static str,
-    /// Suffix for the create-failure line — empty on Linux, the driver-install hint on Windows.
+    /// Suffix for the create-failure line.
     hint: &'static str,
 }
 

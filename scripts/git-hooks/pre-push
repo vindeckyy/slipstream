@@ -26,12 +26,4 @@ if ! (cd "$root" && cargo fmt --all --check >/dev/null 2>&1); then
          "cargo fmt --all"
 fi
 
-# 2. UMDF driver workspace — mirrors windows-drivers.yml's gate (the shipped drivers + the
-# audited safe layer; ss-vdisplay is deliberately NOT gated there, so not here either).
-if ! (cd "$root/packaging/windows/drivers" \
-      && cargo fmt -p ss-umdf-util -p ss-xusb -p ss-gamepad -p ss-mouse --check >/dev/null 2>&1); then
-    fail "driver workspace is not rustfmt-clean (windows-drivers.yml would fail)" \
-         "(cd packaging/windows/drivers && cargo fmt -p ss-umdf-util -p ss-xusb -p ss-gamepad -p ss-mouse)"
-fi
-
 exit 0

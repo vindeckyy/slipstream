@@ -1,8 +1,8 @@
-# Virtual-display orchestration (plan §W6): the on-demand client-sized headless output — per-compositor
-# Linux backends (KWin zkde-screencast, wlroots swaymsg, Mutter RemoteDesktop, Hyprland) and the
-# Windows IddCx/ss-vdisplay driver backend — behind one VirtualDisplay trait, plus the mode-conflict
+# Virtual-display orchestration: the on-demand client-sized headless output and per-compositor Linux
+# backends (KWin zkde-screencast, wlroots swaymsg, Mutter RemoteDesktop, and Hyprland) behind one
+# VirtualDisplay trait, plus the mode-conflict
 # admission registry and the DDC/CI panel control. Extracted into a subsystem crate; depends on the
-# shared leaves (ss-frame's DXGI identity, ss-win-display's CCD helpers, ss-gpu, ss-paths) + ss-encode
+# shared leaves (ss-gpu, ss-paths) + ss-encode
 # (the NVENC session-budget admission gate), never on capture/inject or the orchestrator (the display
 # lifecycle events invert to a host-registered sink).
 [package]
@@ -11,7 +11,7 @@ version.workspace = true
 edition = "2021"
 rust-version.workspace = true
 license = "MIT OR Apache-2.0"
-description = "slipstream host virtual-display orchestration: per-compositor Linux backends + the Windows IddCx driver backend behind one VirtualDisplay trait."
+description = "slipstream host virtual-display orchestration: per-compositor Linux backends behind one VirtualDisplay trait."
 publish = false
 
 [dependencies]
@@ -20,8 +20,7 @@ ss-frame = { path = "../ss-frame" }
 ss-gpu = { path = "../ss-gpu" }
 ss-host-config = { path = "../ss-host-config" }
 ss-paths = { path = "../ss-paths" }
-ss-win-display = { path = "../ss-win-display" }
-# The Windows admission gate consults NVENC's session budget (can_open_another_session).
+# The admission gate consults the encoder's session budget.
 ss-encode = { path = "../ss-encode" }
 anyhow = "1"
 tracing = "0.1"
@@ -59,23 +58,6 @@ bitflags = "2"
 # The gamescope bare-spawn splash client (gamescope/splash.rs): pure-Rust X11 core protocol (the
 # same no-libxcb-link stance as ss-capture's XFixes cursor source), no extension features needed.
 x11rb = { version = "0.13", default-features = false }
-
-[target.'cfg(target_os = "windows")'.dependencies]
-# The host<->driver wire contract for the ss-vdisplay IddCx backend (control IOCTLs + Pod structs).
-ss-driver-proto = { path = "../ss-driver-proto" }
-bytemuck = { version = "1.19", features = ["derive"] }
-windows = { version = "0.62", features = [
-    "Win32_Foundation",
-    "Win32_Devices_DeviceAndDriverInstallation",
-    "Win32_Devices_Display",
-    "Win32_Graphics_Gdi",
-    "Win32_Storage_FileSystem",
-    "Win32_System_IO",
-    # `proc`'s budget ends the helper's whole process TREE: every Windows helper is reached through
-    # a shell, so the process that hangs is a grandchild `Child::kill` cannot reach.
-    "Win32_System_JobObjects",
-    "Win32_System_Threading",
-] }
 
 [lints]
 workspace = true

@@ -8,16 +8,14 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
-# Same Linux+Windows gating as the rest of the client stack.
-[target.'cfg(any(target_os = "linux", windows))'.dependencies]
+# Linux client UI dependencies.
+[target.'cfg(target_os = "linux")'.dependencies]
 ss-presenter = { path = "../ss-presenter" }
 # MenuEvent/MenuPulse (the gamepad service's menu mode drives the library).
 ss-client-core = { path = "../ss-client-core" }
 
 # Skia on the presenter's VkDevice (`vulkan`); `textlayout` = skparagraph/harfbuzz for
-# the typography the console library needs (~15 MB stripped, prebuilt binaries exist for
-# this feature set on x86_64-unknown-linux-gnu AND x86_64-pc-windows-msvc — a source
-# build is never triggered on either).
+# the typography the console library needs (~15 MB stripped).
 skia-safe = { version = "0.87", features = ["vulkan", "textlayout"] }
 ash = { version = "0.38", features = ["loaded"] }
 
@@ -26,13 +24,8 @@ tracing = "0.1"
 # `config::GamepadPref` keys the button-glyph style (PlayStation shapes vs ABXY).
 slipstream-core = { path = "../slipstream-core" }
 
-# Linux links the system SDL3; Windows builds it from source (same choice as the rest
-# of the workspace's Windows SDL consumers).
-[target.'cfg(target_os = "linux")'.dependencies]
+# Linux links the system SDL3.
 sdl3 = { version = "0.18", features = ["hidapi", "ash"] }
-
-[target.'cfg(windows)'.dependencies]
-sdl3 = { version = "0.18", features = ["hidapi", "ash", "build-from-source"] }
 
 [lints]
 workspace = true

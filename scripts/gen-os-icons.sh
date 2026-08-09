@@ -6,7 +6,6 @@
 # because they cannot consume the master directly:
 #
 #   GTK shell     symbolic SVG, black fill  -> clients/linux/data/icons/scalable/actions/
-#   Windows shell PNG, h=32, mid-grey       -> clients/windows/assets/os/
 #   Apple clients vector PDF, black fill    -> clients/apple/.../OsIcons.xcassets/
 #
 # The web console, the Decky plugin and the Android client transcribe the master's path
@@ -20,13 +19,7 @@ cd "$(dirname "$0")/.."
 
 MASTERS=assets/os-icons
 GTK=clients/linux/data/icons/scalable/actions
-WIN=clients/windows/assets/os
 APPLE=clients/apple/Sources/SlipstreamKit/Resources/OsIcons.xcassets
-
-# The Windows shell has no vector element and no theme-aware tint, so its PNGs are baked in
-# one mid-grey that stays legible on both the light and the dark WinUI theme.
-WIN_GREY='#8A8F98'
-WIN_HEIGHT=32
 
 log() { printf '\033[1;36m==>\033[0m %s\n' "$*"; }
 
@@ -51,11 +44,6 @@ for t in "${tokens[@]}"; do
   # GTK: the master with the fill resolved to black — Adwaita recolors a `-symbolic` icon
   # from the fill it finds, so the value only has to be a real colour, not the final one.
   sed 's/currentColor/#000000/' "$src" > "$GTK/ss-os-$t-symbolic.svg"
-
-  # Windows: same black-to-grey substitution, rasterized at a fixed height so every mark
-  # shares an optical size and keeps its own aspect ratio.
-  sed "s/currentColor/$WIN_GREY/" "$src" > "$tmp/$t.grey.svg"
-  rsvg-convert -h "$WIN_HEIGHT" -f png -o "$WIN/$t.png" "$tmp/$t.grey.svg"
 
   # Apple: a vector PDF at the master's natural size, in a template imageset — SwiftUI
   # tints it from foregroundStyle, so the baked colour is irrelevant.
@@ -93,5 +81,5 @@ done
 echo
 log "Remember: a NEW token also has to be added to each client's shipped-token list —"
 log "  clients/linux/src/ui_hosts.rs, clients/linux/data/resources.gresource.xml,"
-log "  clients/windows/src/app/os_icons.rs, clients/apple/.../SlipstreamKit/OsIcon.swift,"
+log "  clients/apple/.../SlipstreamKit/OsIcon.swift,"
 log "  plus the three inline registries above."

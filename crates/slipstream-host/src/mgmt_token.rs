@@ -20,6 +20,7 @@ use rand::RngCore;
 use std::fs;
 use std::path::Path;
 
+const TOKEN_HEX_BYTES: usize = 32;
 const ENV_VAR: &str = "SLIPSTREAM_MGMT_TOKEN";
 const FILE: &str = "mgmt-token";
 const PLUGIN_ENV_VAR: &str = "SLIPSTREAM_PLUGIN_TOKEN";
@@ -38,17 +39,30 @@ pub fn load_or_generate_plugin() -> Result<String> {
     load_or_generate_impl(PLUGIN_ENV_VAR, PLUGIN_FILE)
 }
 
+/// Validate an operator-supplied bearer token. Tokens are deliberately fixed-size hex so they
+/// have 256 bits of entropy and can be carried safely in environment files and command lines.
+pub fn validate(token: &str) -> Result<String> {
+    let token = token.trim();
+    if token.len() != TOKEN_HEX_BYTES * 2 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        anyhow::bail!(
+            "management tokens must be exactly {} hexadecimal characters",
+            TOKEN_HEX_BYTES * 2
+        );
+    }
+    Ok(token.to_ascii_lowercase())
+}
+
 fn load_or_generate_impl(env_var: &str, file: &str) -> Result<String> {
     if let Ok(v) = std::env::var(env_var) {
         let v = v.trim();
         if !v.is_empty() {
-            return Ok(v.to_string());
+            return validate(v).with_context(|| format!("validate {env_var}"));
         }
     }
     let path = ss_paths::config_dir().join(file);
     if let Ok(contents) = fs::read_to_string(&path) {
         if let Some(tok) = parse_token(&contents, env_var) {
-            return Ok(tok);
+            return validate(&tok).with_context(|| format!("validate {}", path.display()));
         }
     }
     let mut buf = [0u8; 32];
@@ -90,14 +104,22 @@ mod tests {
 
     #[test]
     fn parses_bare_and_keyvalue_forms() {
-        assert_eq!(parse_token("abc123\n", ENV_VAR).as_deref(), Some("abc123"));
+        let token = "a".repeat(TOKEN_HEX_BYTES * 2);
         assert_eq!(
-            parse_token("SLIPSTREAM_MGMT_TOKEN=deadbeef\n", ENV_VAR).as_deref(),
-            Some("deadbeef")
+            parse_token(&format!("{token}\n"), ENV_VAR).as_deref(),
+            Some(token.as_str())
         );
         assert_eq!(
-            parse_token("SLIPSTREAM_PLUGIN_TOKEN=deadbeef\n", PLUGIN_ENV_VAR).as_deref(),
-            Some("deadbeef")
+            parse_token(&format!("SLIPSTREAM_MGMT_TOKEN={token}\n"), ENV_VAR).as_deref(),
+            Some(token.as_str())
+        );
+        assert_eq!(
+            parse_token(
+                &format!("SLIPSTREAM_PLUGIN_TOKEN={token}\n"),
+                PLUGIN_ENV_VAR
+            )
+            .as_deref(),
+            Some(token.as_str())
         );
         assert_eq!(parse_token("\n  \n", ENV_VAR), None);
         assert_eq!(parse_token("SLIPSTREAM_MGMT_TOKEN=\n", ENV_VAR), None);
@@ -108,9 +130,10 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("ss-mgmt-token-test-{}", std::process::id()));
         let _ = fs::create_dir_all(&dir);
         let path = dir.join(FILE);
-        write_token(&path, ENV_VAR, "cafef00d").unwrap();
+        let token = "cafe".repeat(TOKEN_HEX_BYTES / 2);
+        write_token(&path, ENV_VAR, &token).unwrap();
         let read = fs::read_to_string(&path).unwrap();
-        assert_eq!(parse_token(&read, ENV_VAR).as_deref(), Some("cafef00d"));
+        assert_eq!(parse_token(&read, ENV_VAR).as_deref(), Some(token.as_str()));
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -118,5 +141,16 @@ mod tests {
             assert_eq!(mode, 0o600);
         }
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn rejects_short_or_non_hex_tokens() {
+        assert!(validate("deadbeef").is_err());
+        assert!(validate(&"g".repeat(TOKEN_HEX_BYTES * 2)).is_err());
+        let uppercase = "A".repeat(TOKEN_HEX_BYTES * 2);
+        assert_eq!(
+            validate(&uppercase).unwrap(),
+            "a".repeat(TOKEN_HEX_BYTES * 2)
+        );
     }
 }

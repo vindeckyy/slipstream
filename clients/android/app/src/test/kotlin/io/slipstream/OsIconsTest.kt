@@ -21,7 +21,7 @@ class OsIconsTest {
 
     @Test
     fun defaultSizeCarriesTheViewportAspect() {
-        for (chain in listOf("windows", "linux", "opensuse", "steam", "apple", "bazzite")) {
+        for (chain in listOf("linux", "opensuse", "steam", "apple", "bazzite")) {
             val v = resolveOsIcon(chain)
             assertNotNull("no mark for $chain", v)
             v!!

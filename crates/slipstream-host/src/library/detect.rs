@@ -90,8 +90,7 @@ impl DetectSpec {
         }
     }
 
-    /// Add an install directory to an existing spec (Steam pairs one with its appid so the Windows
-    /// matcher, which has no reaper, still has something to go on).
+    /// Add an install directory to an existing spec for launchers that expose it.
     pub fn with_dir(mut self, dir: impl Into<PathBuf>) -> Self {
         self.install_dir = Some(dir.into());
         self

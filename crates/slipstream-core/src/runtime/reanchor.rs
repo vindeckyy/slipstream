@@ -9,8 +9,8 @@
 //! second intra-refresh recovery mark ([`USER_FLAG_RECOVERY_POINT`]) since the loss.
 //!
 //! This module owns that decision so every embedder shares ONE implementation instead of re-deriving
-//! it (the Linux/Deck pump in `ss-client-core`, the Windows in-process pump, the Android decode loops,
-//! and — over the C ABI — the Apple client). The state machine is time-driven but takes `now` as a
+//! it (the Linux/Deck pump in `ss-client-core`, the Android decode loops, and - over the C ABI -
+//! the Apple client). The state machine is time-driven but takes `now` as a
 //! parameter so it is unit-testable without a clock; the C ABI wrappers supply `Instant::now()`.
 //!
 //! [`USER_FLAG_RECOVERY_POINT`]: crate::packet::USER_FLAG_RECOVERY_POINT
@@ -167,7 +167,7 @@ impl ReanchorGate {
     /// `SlipstreamFrame.flags`); the gate reads [`FLAG_SOF`](crate::packet::FLAG_SOF) (the host sets it
     /// only on IDR AUs — the codec-agnostic keyframe signal the platform decoders don't expose),
     /// [`USER_FLAG_RECOVERY_ANCHOR`] and [`USER_FLAG_RECOVERY_POINT`]. `decoder_keyframe` is an optional
-    /// belt from decoders that flag IDRs themselves (libavcodec's `AV_FRAME_FLAG_KEY` on Linux/Windows);
+    /// belt from decoders that flag IDRs themselves (libavcodec's `AV_FRAME_FLAG_KEY`);
     /// pass `false` where the decoder doesn't (Android MediaCodec, Apple VideoToolbox) and rely on the
     /// wire `FLAG_SOF`.
     ///

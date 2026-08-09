@@ -81,9 +81,6 @@ dropped packets.
 2. **Client**:
    - Steam Deck: set **Settings -> Video codec -> PyroWave (wired LAN)** in the session / Decky
      settings, or launch with `SLIPSTREAM_PREFER_PYROWAVE=1`. Wired / docked strongly recommended.
-   - iPhone: set **Settings -> Codec -> PyroWave (wired LAN)**. The option appears only on devices
-     whose GPU passes the decode probe (A13-class or newer). The decoder follows the stream: 4:2:0
-     or 4:4:4 per what the session negotiated.
    - Android has no PyroWave decoder.
 3. Leave the bitrate on Automatic: a PyroWave session pins itself to the ~1.6 bpp rate for
    your mode ( approx 200 Mbps at 1080p60; ~2.6 bpp for 4:4:4, +15 % for HDR). An explicit bitrate is honored if you set one, but the
@@ -96,6 +93,6 @@ The stats overlay shows `pyrowave` as the decode path when the mode is active.
 
 ## Current limits
 
-- Linux hosts; Steam Deck (session client, including a docked Deck) and iPhone (A13-or-newer, native
-  Metal decode) today. Android has no PyroWave decoder.
+- Linux hosts and Steam Deck (session client, including a docked Deck) today. Android has no
+  PyroWave decoder.
 - **A Linux-hosted PyroWave session is SDR** (see [4:4:4 and HDR](#444-and-hdr) above). 4:4:4 works.

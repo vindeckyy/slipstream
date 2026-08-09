@@ -18,12 +18,6 @@ pub struct InjectorService {
 
 impl InjectorService {
     pub fn start() -> InjectorService {
-        // Windows: make sure the process-wide resident virtual HID mouse exists (idempotent).
-        // Without a pointing device present, win32k reports no cursor and DWM composites none
-        // into the IDD frame — SendInput injection alone moves an invisible pointer.
-        #[cfg(target_os = "windows")]
-        super::mouse_windows::ensure_resident();
-
         let (tx, rx) = std::sync::mpsc::channel::<InputEvent>();
         if let Err(e) = std::thread::Builder::new()
             .name("slipstream-injector".into())

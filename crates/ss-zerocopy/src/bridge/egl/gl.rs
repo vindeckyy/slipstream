@@ -119,7 +119,7 @@ pub(crate) const FRAG_SRC: &[u8] = b"#version 330 core\nuniform sampler2D image;
 //     U = (128 + 224·(-0.1146R-0.3854G+0.5000B))/255  → R channel
 //     V = (128 + 224·( 0.5000R-0.4542G-0.0458B))/255  → G channel
 // RG8's (R=U, G=V) byte order matches NV12's interleaved [U,V]. All outputs clamped to [0,1].
-// Matches the Windows VideoConverter (BT.709, limited/studio range) so the two hosts look identical.
+// Matches the BT.709 limited/studio-range conversion used by the other capture path.
 pub(crate) const FRAG_Y_SRC: &[u8] = b"#version 330 core\nuniform sampler2D image;\nin vec2 v_tex;\nout vec4 o_color;\nvoid main(){vec3 c=texture(image,v_tex).rgb;float Y=(16.0+219.0*(0.2126*c.r+0.7152*c.g+0.0722*c.b))/255.0;o_color=vec4(clamp(Y,0.0,1.0),0.0,0.0,1.0);}\n";
 pub(crate) const FRAG_UV_SRC: &[u8] = b"#version 330 core\nuniform sampler2D image;\nin vec2 v_tex;\nout vec4 o_color;\nvoid main(){vec3 c=texture(image,v_tex).rgb;float U=(128.0+224.0*(-0.1146*c.r-0.3854*c.g+0.5000*c.b))/255.0;float V=(128.0+224.0*(0.5000*c.r-0.4542*c.g-0.0458*c.b))/255.0;o_color=vec4(clamp(U,0.0,1.0),clamp(V,0.0,1.0),0.0,1.0);}\n";
 

@@ -2,9 +2,9 @@
 <!-- AppStream metainfo for the slipstream Linux client flatpak. Validate with:
        appstreamcli validate packaging/flatpak/io.slipstream.metainfo.xml
      The component id MUST equal the flatpak app-id; the <launchable> MUST name the installed
-     desktop file (io.slipstream.desktop). -->
+       desktop file (io.slipstream.Slipstream.desktop). -->
 <component type="desktop-application">
-  <id>io.slipstream</id>
+  <id>io.slipstream.Slipstream</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT OR Apache-2.0</project_license>
   <name>Slipstream</name>
@@ -27,7 +27,7 @@
     </ul>
   </description>
 
-  <launchable type="desktop-id">io.slipstream.desktop</launchable>
+  <launchable type="desktop-id">io.slipstream.Slipstream.desktop</launchable>
 
   <categories>
     <category>Network</category>
@@ -48,7 +48,7 @@
   <url type="bugtracker">https://github.com/vindeckyy/slipstream/issues</url>
   <url type="vcs-browser">https://github.com/vindeckyy/slipstream</url>
 
-  <developer id="io.slipstream">
+  <developer>
     <name>Slipstream</name>
   </developer>
 

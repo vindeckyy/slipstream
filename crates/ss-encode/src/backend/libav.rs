@@ -1,8 +1,6 @@
-//! Shared libavcodec (FFmpeg) glue for the three libav encode backends — Linux NVENC
-//! (`encode/linux/mod.rs`), VAAPI (`encode/linux/vaapi.rs`), and Windows AMF/QSV
-//! (`encode/windows/ffmpeg_win.rs`) — so the byte-identical pieces live once (plan §2.2, the Tier-2
-//! gap). Free functions and consts over borrowed handles; nothing here is per-frame `dyn`,
-//! allocating, or on the zero-copy ingest path.
+//! Shared libavcodec (FFmpeg) glue for the Linux NVENC and VAAPI backends. Free functions and
+//! constants operate on borrowed handles; nothing here is per-frame `dyn`, allocating, or on the
+//! zero-copy ingest path.
 use crate::EncodedFrame;
 use anyhow::{Context, Result};
 use ffmpeg_next as ffmpeg;
@@ -17,7 +15,7 @@ pub(crate) const SWS_POINT: c_int = 0x10;
 /// swscale colorspace id for ITU-R BT.709 (`SWS_CS_ITU709`) — the CSC coefficients for our RGB→YUV.
 pub(crate) const SWS_CS_ITU709: c_int = 1;
 /// swscale colorspace id for ITU-R BT.2020 non-constant-luminance (`SWS_CS_BT2020`) — the CSC
-/// coefficients for the HDR X2BGR10→P010 path (Windows only today).
+/// coefficients for the HDR X2BGR10→P010 path.
 pub(crate) const SWS_CS_BT2020: c_int = 9;
 
 /// `Pixel` → `AVPixelFormat`. `Pixel` is `#[repr(i32)]`-compatible with `AVPixelFormat` (the bindgen
@@ -79,10 +77,8 @@ impl Drop for AvBuffer {
 /// Freeing the graph is the same ownership question as unref'ing a buffer, so it gets the same
 /// answer.
 ///
-/// Linux-only: the VAAPI dmabuf path is the sole filter-graph user in this crate. The Windows
-/// AMF/QSV backends feed the encoder directly and build no graph, so on Windows this type would be
-/// dead code — cfg'd out rather than `allow`ed, because "nothing here uses it" is the honest
-/// statement and an `allow` would keep it compiling after it stopped being true anywhere.
+/// The VAAPI dmabuf path is the sole filter-graph user in this crate. It is cfg'd out when the
+/// Linux backend is not built, because no other path constructs a filter graph.
 #[cfg(target_os = "linux")]
 pub(crate) struct AvFilterGraph(*mut ffi::AVFilterGraph);
 
@@ -119,7 +115,7 @@ impl Drop for AvFilterGraph {
 
 /// One `receive_packet` attempt, with the not-ready states kept distinct so a blocking drain can
 /// tell "still encoding" (retry) from "stream over" (stop). The Linux NVENC/VAAPI polls collapse
-/// `Again`/`Eof` to `None`; the Windows AMF/QSV path keeps them apart for its deadline-driven loop.
+/// `Again`/`Eof` to `None` for the Linux polling paths.
 pub(crate) enum PollOutcome {
     Packet(EncodedFrame),
     Again,
@@ -138,7 +134,7 @@ pub(crate) enum PollOutcome {
 /// (bitrate/fps); `SLIPSTREAM_VBV_FRAMES` tunes it (larger = better motion quality, bigger bursts).
 ///
 /// The caller still owns `set_format` (pixel format) and `gop_size` (GOP policy differs: NVENC's
-/// infinite/intra-refresh wave vs the VAAPI/AMF `i32::MAX`), since those are backend-specific.
+/// infinite/intra-refresh wave vs the VAAPI `i32::MAX`), since those are backend-specific.
 pub(crate) fn apply_low_latency_rc(
     video: &mut encoder::video::Video,
     fps: u32,
@@ -161,7 +157,7 @@ pub(crate) fn apply_low_latency_rc(
     }
 }
 
-/// Drain the encoder for one packet (shared across the NVENC/VAAPI/AMF/QSV libav backends). The
+/// Drain the encoder for one packet (shared across the Linux NVENC and VAAPI libav backends). The
 /// `EncodedFrame`'s only allocation is the `to_vec()` of the bitstream — the same copy each backend
 /// already made — so this stays off any per-frame `dyn`/`Box`/channel path.
 pub(crate) fn poll_encoder(enc: &mut encoder::video::Encoder, fps: u32) -> Result<PollOutcome> {

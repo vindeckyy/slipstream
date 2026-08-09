@@ -12,38 +12,28 @@ found on the network](/docs/troubleshooting#the-host-isnt-found-on-the-network).
 Already installed? Skip to [Keeping a client up to date](#keeping-a-client-up-to-date) or
 [Removing a client](#removing-a-client).
 
-> The links below are the **stable** channel (moves on `vX.Y.Z` releases). For the latest `main`
-> build, use the **canary** channel, Play Internal, or the `canary/` download URLs. See
+> The Android link below is the current preview channel. Host releases and future stable client
+> channels are published from version tags. See
 > [Release Channels](/docs/channels).
 
 ## Pick your device
 
 | Device | Install |
 |--------|---------|
-| **Android / Android TV** | [Play test track, or sideload the APK](#android) |
+| **Android / Android TV** | [Download the preview APK](#android) |
 | **Steam Deck** | [Decky plugin](/docs/steam-deck) for Gaming Mode, or [Flatpak in Desktop Mode](#steam-deck) |
 | Anything else (browser, old phone, TV) | [Moonlight](/docs/moonlight) |
 
 ## Android
 
-The Android client (phone + Android TV) is on Google Play as a **test track**, **closed testing**
-for stable releases, **internal testing** for canary builds. Access is invite-only. You can
-[download the Android APK](https://github.com/vindeckyy/slipstream/releases/download/android-preview/slipstream-android.apk)
-or build from `clients/android/`.
-
-If you already have tester access, install it from Google Play, then open the app and pick your host:
-
-**[Get Slipstream on Google Play ->](https://play.google.com/store/apps/details?id=io.slipstream)**
-_(only resolves once your account is on the tester list)_
-
-**Prefer not to wait for an invite?** Sideload the
+The Android client is currently distributed as a preview APK. Sideload the
 [Android APK](https://github.com/vindeckyy/slipstream/releases/download/android-preview/slipstream-android.apk)
-or build from `clients/android/`. Download the matching `.sha256` file and verify it before copying
+or build from `clients/android/`. Download the accompanying checksum and verify it before copying
 the APK to the tablet, then allow installs from your browser or file manager the first time.
 
 ```sh
-sha256sum -c slipstream-android-<version>.apk.sha256
-adb install -r slipstream-android-<version>.apk
+sha256sum -c slipstream-android.apk.sha256
+adb install -r slipstream-android.apk
 ```
 
 ### Fire HD 10 (13th Gen)
@@ -95,9 +85,9 @@ but keeping them close is the least surprising. (Updating the **host** is its ow
 
 | Client | How it updates |
 |---|---|
-| **Android** | Google Play updates it; if you sideloaded, download the APK again and install over it |
+| **Android** | Download the current preview APK from GitHub Releases and install it over the existing app |
 | **Steam Deck (Decky)** | the panel's **Update** button, see [Steam Deck -> Updating](/docs/steam-deck#updating) |
-| **Steam Deck (Flatpak alone)** | `flatpak update --user io.slipstream`, **without `sudo`** |
+| **Steam Deck (Flatpak alone)** | `flatpak update --user io.slipstream.Slipstream`, **without `sudo`** |
 
 ## Removing a client
 

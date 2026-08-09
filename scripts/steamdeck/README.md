@@ -54,8 +54,8 @@ bash ~/slipstream/scripts/steamdeck/install.sh --no-gamestream  # native slipstr
 bash ~/slipstream/scripts/steamdeck/update.sh             # after pulling new source
 ```
 
-Note: unlike a bare `serve` (native-only by default), the Deck install enables `--gamestream` by
-default so stock Moonlight clients work out of the box; `--no-gamestream` turns that surface off.
+The Deck install uses native-only `serve` by default. Pass `--gamestream` when stock Moonlight
+clients are needed on a trusted LAN.
 
 Env overrides: `SLIPSTREAM_SRC` (source dir, default `~/slipstream`), `SLIPSTREAM_BOX` (container name,
 default `pf2`), `SLIPSTREAM_MGMT_PORT` (47990), `SLIPSTREAM_WEB_PORT` (47992).
@@ -66,8 +66,8 @@ default `pf2`), `SLIPSTREAM_MGMT_PORT` (47990), `SLIPSTREAM_WEB_PORT` (47992).
 - **Config:** `~/.config/slipstream/host.env` (encoder/compositor) and `web.env` (session secret).
   The browser-selected login password is saved in `web-password`. Trust material (`cert.pem`,
   `mgmt-token`, `slipstream1-paired.json`) lives here too and persists across updates.
-- **Services:** `~/.config/systemd/user/slipstream-host.service` (runs `serve --gamestream --mgmt-bind
-  0.0.0.0:47990`, `+ --open` if chosen — `--gamestream` adds the Moonlight-compat planes so the Deck's
+- **Services:** `~/.config/systemd/user/slipstream-host.service` (runs `serve --mgmt-bind
+  0.0.0.0:47990`, `+ --gamestream` and `--open` if chosen; `--gamestream` adds the Moonlight-compat planes so the Deck's
   Game Mode also streams to stock Moonlight; the native `slipstream/1` plane is always on),
   `slipstream-web.service`, `slipstream-rebuild-check.service` (post-OS-update self-heal, enabled), and
   `slipstream-scripting.service` (plugin runner, **opt-in** — enable it once you use plugins/scripts).

@@ -417,7 +417,7 @@ public final class StreamViewController: StreamViewControllerBase {
             guard let self else { return }
             self.setCaptured(!self.captured)
         }
-        // ⌃⌥⇧Q (cross-client parity with macOS/Windows/Linux) releases the captured pointer +
+        // ⌃⌥⇧Q (cross-client parity with macOS/Linux/Android) releases the captured pointer +
         // keyboard so the Magic Keyboard trackpad returns to driving the local iPad UI. Detected
         // from the HID stream in InputCapture (no NSEvent monitor on iOS); unlike the ⌘⎋ toggle it
         // only ever RELEASES — re-pressing it while already released is a no-op (setCaptured guards).

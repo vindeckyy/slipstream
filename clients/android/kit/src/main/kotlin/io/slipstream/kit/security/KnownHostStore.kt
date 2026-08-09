@@ -27,7 +27,7 @@ data class KnownHost(
      */
     val mac: List<String> = emptyList(),
     /**
-     * The host's OS-identity chain (`windows` | `linux/<family>/<id>`, ...) learned from its mDNS
+     * The host's OS-identity chain (`linux/<family>/<id>`, ...) learned from its mDNS
      * `os` TXT while online, so the card's OS icon survives the host going to sleep. Empty until
      * first learned (or forever, against an older host).
      */

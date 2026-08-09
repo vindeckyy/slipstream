@@ -1,10 +1,10 @@
 //! Pure HDR static-metadata helpers shared by the capture (source mastering metadata) and encode
 //! (in-band SEI) paths — kept platform-independent and unit-tested here so the byte-level logic is
-//! verified on every target, even though the only *callers* of the SEI builders are the Windows
-//! NVENC path (`encode/nvenc.rs`) and of the display conversion the Windows DXGI/WGC capturers.
+//! verified on every target, even though the SEI builders are consumed by the
+//! host encoder and display conversion paths.
 //!
 //! Units follow the HDR10 standards so the values pass straight through:
-//! - chromaticities in 1/50000 increments (SMPTE ST.2086 / DXGI `DXGI_HDR_METADATA_HDR10`),
+//! - chromaticities in 1/50000 increments (SMPTE ST.2086 HDR metadata),
 //! - mastering luminance in 0.0001 cd/m²,
 //! - content light level (MaxCLL/MaxFALL) in cd/m² (nits).
 
@@ -22,8 +22,8 @@ fn xy_to_2086(v: f32) -> u16 {
 }
 
 /// Build an [`HdrMeta`] from a source display's measured colour volume — the chromaticities (CIE xy)
-/// and luminances (cd/m²) reported by e.g. Windows `IDXGIOutput6::GetDesc1`. `max_cll`/`max_fall`
-/// are content light levels in nits; pass `0` when unknown (GetDesc1 doesn't expose them — Apollo
+/// and luminances (cd/m²) reported by the capture backend. `max_cll`/`max_fall`
+/// are content light levels in nits; pass `0` when unknown — Apollo
 /// zeroes them too, and a `0` lets the display fall back to the mastering luminance).
 #[allow(clippy::too_many_arguments)]
 pub fn hdr_meta_from_display(

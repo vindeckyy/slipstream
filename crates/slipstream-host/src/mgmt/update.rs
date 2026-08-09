@@ -24,7 +24,7 @@ pub(crate) struct UpdateManifestInfo {
     pub stale: bool,
 }
 
-/// A running apply job (or a spawned installer that hasn't resolved yet).
+/// A running apply job.
 #[derive(Serialize, Deserialize, ToSchema)]
 pub(crate) struct UpdateJobInfo {
     /// The version being installed.
@@ -49,9 +49,6 @@ pub(crate) struct UpdateResultInfo {
     pub stage: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
-    /// The installer's own log file on this host, for diagnosis.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub log_path: Option<String>,
     /// Applied but activates on the next reboot (rpm-ostree).
     #[serde(default)]
     pub staged: bool,
@@ -60,8 +57,8 @@ pub(crate) struct UpdateResultInfo {
 /// The full update-check state for this host.
 #[derive(Serialize, Deserialize, ToSchema)]
 pub(crate) struct UpdateStatus {
-    /// How this host was installed: `windows-installer` | `sysext` | `rpm-ostree` | `apt` |
-    /// `dnf` | `pacman` | `steamos-source` | `nix` | `source`.
+    /// How this host was installed: `sysext` | `rpm-ostree` | `apt` | `dnf` | `pacman` |
+    /// `steamos-source` | `nix` | `source`.
     pub install_kind: String,
     /// Release channel this install follows: `stable` | `canary`.
     pub channel: String,
@@ -110,8 +107,8 @@ fn status_from(snap: update::Snapshot) -> UpdateStatus {
         .as_ref()
         .map(|c| detect::is_newer(&c.manifest.version, c.manifest.ci_run, current, channel))
         .unwrap_or(false);
-    // A spawned installer that hasn't resolved shows as a `restarting` job even though the
-    // in-process job died with the previous host (the console poller needs continuity here).
+    // An apply intent that survived the previous host process shows as a `restarting` job until
+    // the new process records its result.
     let job = snap
         .job
         .as_ref()
@@ -158,7 +155,6 @@ fn status_from(snap: update::Snapshot) -> UpdateStatus {
             finished_unix: r.finished_unix,
             stage: r.stage.clone(),
             error: r.error.clone(),
-            log_path: r.log_path.clone(),
             staged: r.staged,
         }),
     }
@@ -223,8 +219,8 @@ pub(crate) struct ApplyRequest {
 
 /// Apply the available update
 ///
-/// Starts the one-click apply for install kinds that support it (Windows installer). The
-/// request carries no version or URL — the host installs exactly what its verified manifest
+/// Starts the one-click apply for Linux install kinds that support it. The request carries no
+/// version or URL, and the host installs exactly what its verified manifest
 /// announced. Progress is polled via `GET /update/status` (`job`); the host restarts as part
 /// of the apply, and the outcome lands in `last_result` after it comes back.
 #[utoipa::path(

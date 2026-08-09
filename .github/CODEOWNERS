@@ -1,0 +1,8 @@
+# Default review owner for the repository.
+* @vindeckyy
+
+# Security-sensitive code and release automation.
+.github/workflows/ @vindeckyy
+web/server/ @vindeckyy
+crates/slipstream-host/src/protocol/ @vindeckyy
+scripts/ci/ @vindeckyy

@@ -33,9 +33,7 @@ pub use approval::{PairingDecision, PendingRequest};
 pub use arming::PinAttempt;
 pub use store::PairedClient;
 
-/// Re-exported for the stream marker's quoting (its `imp` is `cfg(unix)`  -  gate alike, or the
-/// Windows build trips `-D unused-imports`).
-#[cfg(unix)]
+/// Re-exported for the stream marker's quoting.
 pub(crate) use sanitize::is_spoofy_char;
 /// The untrusted-device-name sanitizer lives in its own module (plan §W5); re-exported so
 /// `crate::native_pairing::sanitize_device_name` stays stable (the `native` accept loop

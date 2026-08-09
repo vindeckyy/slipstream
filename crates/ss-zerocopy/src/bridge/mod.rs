@@ -93,7 +93,7 @@ pub fn enabled() -> bool {
 /// deleting NVENC's internal RGB→YUV CSC, which otherwise runs on the SM/3D engine the game
 /// saturates (Tier 2A). **Default ON** (validated color-correct on the RTX 5070 Ti via
 /// `nv12-selftest` + live decode on dev + Bazzite/KWin boxes; latency- and CPU-neutral idle,
-/// frees SM headroom under load — the same default the Windows host ships). `SLIPSTREAM_NV12=0`
+/// frees SM headroom under load). `SLIPSTREAM_NV12=0`
 /// restores the RGB/BGRx feed. LINEAR (gamescope/Vulkan-bridge) captures are unaffected either way.
 pub fn nv12_enabled() -> bool {
     flag_opt("SLIPSTREAM_NV12").unwrap_or(true)

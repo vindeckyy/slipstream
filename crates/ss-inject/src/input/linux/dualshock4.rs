@@ -10,7 +10,7 @@
 //! 0xCA plane) and the lightbar (HID-output 0xCD `Led`). The button/stick/dpad/touchpad mapping is
 //! identical to the DualSense, so we reuse its pure [`DsState`] + [`DsState::from_gamepad`]; the
 //! report codec (input `0x01` serializer, output `0x05` parser, touch dims) is the pure
-//! [`super::dualshock4_proto`], shared with the Windows UMDF backend — this module is only the
+//! [`super::dualshock4_proto`], shared with the protocol parser — this module is only the
 //! `/dev/uhid` transport plus the report descriptor + feature-report handshake the kernel needs.
 
 use super::dualsense_proto::DsState;
@@ -400,7 +400,7 @@ mod tests {
     use super::*;
 
     // The report 0x01 serializer + output 0x05 parser are covered in `dualshock4_proto` (the codec
-    // is shared with the Windows backend); only the UHID-transport-specific pieces are tested here.
+    // is shared with the protocol parser); only the UHID-transport-specific pieces are tested here.
 
     /// Feature-report arrays carry the right report id + length the kernel expects.
     #[test]

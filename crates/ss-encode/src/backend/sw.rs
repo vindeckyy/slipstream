@@ -1,5 +1,5 @@
-//! Software H.264 encoder (openh264) — the GPU-less encode path for the Windows host (and a
-//! fallback when NVENC is unavailable). Low-latency screen-content config: single-reference,
+//! Software H.264 encoder (openh264), the GPU-less Linux encode path and fallback when hardware
+//! encoding is unavailable. Low-latency screen-content config: single-reference,
 //! no B-frames (Baseline), bitrate rate-control, in-band SPS/PPS each IDR.
 //! Synchronous: `submit` encodes immediately and stashes the AU for `poll` (no internal queue).
 //!
@@ -192,8 +192,7 @@ impl Encoder for OpenH264Encoder {
             captured.format,
             self.src_format
         );
-        // Refutable once the capture backend adds `FramePayload::D3d11`; today `Cpu` is the only
-        // non-Linux variant, so the pattern is (temporarily) irrefutable.
+        // The software path accepts CPU frames; keep the pattern tolerant of future payload variants.
         #[allow(irrefutable_let_patterns)]
         let FramePayload::Cpu(bytes) = &captured.payload
         else {

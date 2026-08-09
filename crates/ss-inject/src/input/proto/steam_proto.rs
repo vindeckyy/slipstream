@@ -1,7 +1,7 @@
 //! Transport-independent Steam Controller / Steam Deck HID contract — the Steam analogue of
 //! [`super::dualsense_proto`]. The report descriptor, the command/feature IDs, the byte-exact
 //! Deck input-report serializer, the `XInput`/rich-input → state mappers, and the rumble-feedback
-//! parser. Pure logic, shared by the Linux UHID backend and (later) a Windows UMDF backend.
+//! parser. Pure logic used by the Linux UHID backend.
 //!
 //! **Layout source of truth:** the kernel `drivers/hid/hid-steam.c` `steam_do_deck_input_event`
 //! (+ `steam_do_deck_sensors_event`) — every offset/bit/sign below is transcribed verbatim from
@@ -246,8 +246,8 @@ impl SteamState {
     /// DualSense touchpad); the left pad arrives via the M3 `TouchpadEx` surface. [`RichInput::Motion`]
     /// passes gyro/accel straight through (raw i16; cross-device unit scaling is M3).
     ///
-    /// The wire's touch coordinates are SCREEN convention — +y DOWN, what SDL/Windows/Android
-    /// capture APIs all produce — but the Deck's raw trackpad fields are stick convention
+    /// The wire's touch coordinates use screen convention, with +y down, as SDL and Android
+    /// capture APIs produce, but the Deck's raw trackpad fields are stick convention
     /// (+y UP, centre origin), and Steam Input parses our report as real Deck hardware. Y is
     /// therefore negated here, on the device boundary; leaving it through was the "both
     /// trackpads inverted" bug the first live Deck-to-Deck session surfaced (2026-07-08).
@@ -545,13 +545,12 @@ pub fn deck_unit_id(index: u8) -> u32 {
 }
 
 /// A Steam-accepted alphanumeric unit serial (a real Deck's is e.g. `"FVZZ4200469B"`). Steam
-/// validates the serial's FORMAT before accepting it: a `"PF"`-leading serial is REJECTED
-/// ("Invalid or missing unit serial number …") and Steam then substitutes a hash AND mangles the
-/// displayed controller name (observed as "Steam Deck Controllerggg" on Windows). An `'F'`-leading
+/// validates the serial's format before accepting it: a `"PF"`-leading serial is rejected and Steam
+/// then substitutes a hash and mangles the displayed controller name. An `'F'`-leading
 /// serial passes, so we keep the Slipstream marker one slot in (`"FVPF"`) — still distinct from a
 /// real Deck's `"FVZZ"` for the self-detection below while satisfying Steam's format check.
 /// Derived from [`deck_unit_id`] so the `0xAE` serial reply and the `0x83` unit-id attrs stay
-/// consistent. (The Windows UMDF driver mirrors this exact format — see ss-gamepad lib.rs.)
+/// consistent with the descriptor accepted by Steam Input.
 pub fn deck_serial(index: u8) -> String {
     format!("FVPF{:08X}", deck_unit_id(index))
 }

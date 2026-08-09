@@ -1,40 +1,30 @@
 //! slipstream-tray — a small per-user system-tray companion for the slipstream host service.
 //!
-//! Shows at a glance whether the host is running / stopped / degraded / failed (no more digging
-//! through logs after a reboot or an update), and offers the common one-click actions: open the
-//! web console, start/stop/restart the service (UAC-elevated per action on Windows,
-//! `systemctl --user` on Linux), review a pending pairing request, exit.
+//! Shows at a glance whether the host is running, stopped, degraded, or failed, and offers one-click
+//! access to the web console and Linux service controls.
 //!
-//! Status comes from two sources, service manager FIRST (a fake listener on the mgmt port can
-//! never make a stopped service look running): the SCM / systemd user unit for the process state,
-//! then the host's loopback-only unauthenticated `GET /api/v1/local/summary` for the streaming
-//! details. Windows-subsystem binary — a console exe in the HKLM Run key would flash a terminal
-//! window at every sign-in.
+//! Status comes from two sources. The systemd user unit determines process state, then the host's
+//! loopback-only unauthenticated `GET /api/v1/local/summary` supplies streaming details.
 // Unsafe-proof program: every `unsafe {}` in the tray carries a `// SAFETY:` proof.
 #![deny(clippy::undocumented_unsafe_blocks)]
-#![cfg_attr(windows, windows_subsystem = "windows")]
-
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(target_os = "linux")]
 mod platform;
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(target_os = "linux")]
 mod status;
 
 #[cfg(target_os = "linux")]
 use platform::linux;
-#[cfg(windows)]
-use platform::win;
 
 /// CLI configuration (hand-rolled parse, house style). The mgmt address/port default to the
-/// host's defaults; they are flags because the tray cannot read `host.env` on Windows (it is
-/// DACL-locked to SYSTEM/Administrators), so an operator who moved `--mgmt-bind` adjusts the
-/// autostart command line instead.
+/// host's defaults; they are flags so an operator who moved `--mgmt-bind` can
+/// adjust the autostart command line instead.
 pub struct Args {
-    /// Ask an already-running tray instance to exit (Windows; used by the uninstaller).
+    /// Ask an already-running tray instance to exit.
     pub quit: bool,
-    /// Launched from the desktop autostart entry: exit silently when this box doesn't run a host
-    /// (Linux; the package installs the autostart file for every desktop user).
+    /// Launched from the desktop autostart entry; the package installs the entry for every desktop
+    /// user.
     pub autostart: bool,
-    /// Management API address to poll (loopback only; the summary route rejects anything else).
+    /// Management API address to poll (loopback only).
     pub mgmt_addr: String,
     pub mgmt_port: u16,
     /// Web console port for the "Open web console" action.
@@ -85,18 +75,12 @@ fn main() -> anyhow::Result<()> {
     run(args)
 }
 
-#[cfg(windows)]
-fn run(args: Args) -> anyhow::Result<()> {
-    win::run(args)
-}
-
 #[cfg(target_os = "linux")]
 fn run(args: Args) -> anyhow::Result<()> {
     linux::run(args)
 }
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(not(target_os = "linux"))]
 fn run(_args: Args) -> anyhow::Result<()> {
-    // Workspace-stub build (macOS CI etc.) — the tray ships on Windows and Linux only.
-    anyhow::bail!("slipstream-tray supports Windows and Linux hosts only")
+    anyhow::bail!("slipstream-tray supports Linux hosts only")
 }

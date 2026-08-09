@@ -8,7 +8,7 @@ button), so you can find a host, pair, and start streaming **without leaving Gam
 couch-friendly front end for the Steam Deck, built from real Steam UI, gamepad-navigable end to end.
 
 Under the hood the plugin doesn't decode video itself: it discovers hosts, runs the PIN pairing, and
-**launches the Flatpak client** (`io.slipstream`) the way gamescope needs so it fullscreens
+**launches the Flatpak client** (`io.slipstream.Slipstream`) the way gamescope needs so it fullscreens
 correctly. So the Deck has two ways to stream, and they share one client + one paired identity:
 
 - **Gaming Mode** -> the **Decky plugin** (this page).
@@ -121,7 +121,7 @@ The plugin check follows the [channel](/docs/channels) you installed from: a plu
 **stable** link tracks stable releases; one installed from the **canary** link tracks `main` builds.
 
 > **Updating the client from the terminal?** The Flatpak client is installed **per-user**, so run
-> `flatpak update --user io.slipstream`, **without `sudo`**. `sudo flatpak update` only touches
+> `flatpak update --user io.slipstream.Slipstream`, **without `sudo`**. `sudo flatpak update` only touches
 > the *system* installation and silently skips the client. (Un-sudo'd `flatpak update` updates both
 > scopes, so it's the safe default.)
 
@@ -159,7 +159,7 @@ Removing the plugin through Decky removes the plugin and nothing else, so do the
 3. **Remove the client**, if you're done streaming on this Deck. In Desktop Mode:
 
    ```sh
-   flatpak uninstall --user --delete-data io.slipstream
+   flatpak uninstall --user --delete-data io.slipstream.Slipstream
    ```
 
    Your identity and saved hosts live in `~/.config/slipstream` and survive that, delete the

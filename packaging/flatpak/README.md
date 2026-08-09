@@ -20,7 +20,7 @@ is the Deck's native, update-survivable app path (the user already runs Moonligh
 as flatpaks), and the bundle carries libadwaita (from `org.gnome.Platform//50`) + a bundled SDL3,
 with HEVC-capable FFmpeg supplied automatically by the runtime's `codecs-extra` extension.
 
-App id: **`io.slipstream`** (matches the Apple bundle id family and the Decky plugin's
+App id: **`io.slipstream.Slipstream`** (the Flatpak application id used by the Decky plugin's
 flatpak fallback).
 
 ## Install (local bundle)
@@ -32,7 +32,7 @@ bash packaging/flatpak/build-flatpak.sh
 # Flathub must be enabled so the GNOME runtime + codecs-extra extension pull in:
 flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak install --user --bundle dist/slipstream-client-*.flatpak
-flatpak run io.slipstream
+flatpak run io.slipstream.Slipstream
 ```
 
 Or download a `.flatpak` from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases)
@@ -41,11 +41,11 @@ when attached and `flatpak install --user --bundle` that file.
 Run it:
 
 ```sh
-flatpak run io.slipstream                 # GUI host list (mDNS)
-flatpak run io.slipstream --connect HOST:PORT
+flatpak run io.slipstream.Slipstream                 # GUI host list (mDNS)
+flatpak run io.slipstream.Slipstream --connect HOST:PORT
 ```
 
-The **Decky plugin** launches exactly this (`flatpak run io.slipstream --connect ...`) once
+The **Decky plugin** launches exactly this (`flatpak run io.slipstream.Slipstream --connect ...`) once
 installed - see [`../../clients/decky/README.md`](../../clients/decky/README.md).
 
 ## Updating the bundle install
@@ -127,9 +127,9 @@ ffmpeg-next 8.x) is supplied **automatically at runtime** by the freedesktop `co
 extension point (auto-downloaded with the runtime; no app-side codec declaration). A bundled
 **SDL3 3.4.10** module (pinned to match `sdl3-sys 0.6.6+SDL-3.4.10`), and finish-args for Wayland +
 `--device=all` (GPU/VAAPI render node + evdev + the hidraw char-devices SDL3 needs for DualSense)
-+ `--socket=pulseaudio` (PipeWire-pulse: playback + mic) + `--share=network`. Alongside it:
-`io.slipstream.desktop`, `io.slipstream.metainfo.xml`, `io.slipstream.svg` (all
-installed by the manifest). A `vulkan-headers` module supplies what the session binary's ash/Vulkan
+`--socket=pulseaudio` (PipeWire-pulse: playback + mic) + `--share=network`. The manifest installs
+the desktop file, AppStream metadata, and icon under the `io.slipstream.Slipstream` application id.
+A `vulkan-headers` module supplies what the session binary's ash/Vulkan
 build needs. `cargo-sources.json` (the offline crate cache) is a pure function of
 `Cargo.lock`; CI regenerates it each build and it is **gitignored** - generate it on any box with
 network + `python3`/`aiohttp`/`tomlkit` (`build-flatpak.sh` does this automatically) and, for a

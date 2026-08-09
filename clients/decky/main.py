@@ -4,7 +4,7 @@ slipstream Decky plugin  -  backend.
 The Gaming-Mode UI (``src/index.tsx``) calls these methods over the Decky bridge. The actual
 STREAM is NOT launched here  -  it is launched by the frontend through Steam
 (SteamClient.Apps.RunGame on a hidden non-Steam shortcut that points at ``bin/slipstreamrun.sh``),
-because gamescope only focuses/fullscreens windows in the process tree Steam launched via
+because gamescope only focuses/fullscreens the game in the process tree Steam launched via
 ``reaper``. A flatpak spawned from this backend would be invisible/unfocused (gamescope#484).
 The backend's jobs are the things Steam can't do:
 
@@ -48,7 +48,7 @@ from pathlib import Path
 import decky
 
 # Flatpak application id of the GTK client (packaging/flatpak/io.slipstream.yml).
-APP_ID = "io.slipstream"
+APP_ID = "io.slipstream.Slipstream"
 
 # Service type advertised by slipstream/1 hosts (matches NATIVE_SERVICE in the Rust host).
 SERVICE_TYPE = "_slipstream._udp"
@@ -339,7 +339,7 @@ def _flatpak() -> str | None:
 # The flatpak is the Deck's usual client, but it is not the only one: a sysext, a .deb/.rpm, an
 # AUR build, a nix profile and a hand-built binary all install a NATIVE `slipstream-client`, and
 # on those the plugin used to be dead in the water  -  every headless call went through
-# `flatpak run io.slipstream` and simply failed. Both kinds keep identity, known-hosts and
+# `flatpak run io.slipstream.Slipstream` and simply failed. Both kinds keep identity, known-hosts and
 # settings in the same ~/.config/slipstream (the flatpak's sandbox HOME resolves to the real
 # home), so nothing else in this file has to care which one answered.
 NATIVE_BIN = "slipstream-client"

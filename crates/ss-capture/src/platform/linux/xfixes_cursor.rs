@@ -75,7 +75,7 @@ const MIT_MAGIC_COOKIE_1: &[u8] = b"MIT-MAGIC-COOKIE-1";
 const REDISCOVER: Duration = Duration::from_secs(2);
 
 /// Position out-paces the stream fps (`POLL`); shape rides `CursorNotify` events drained each tick.
-/// 4 ms ≈ 250 Hz matches the Windows GDI poller — the polled position IS the composited position
+/// 4 ms is fast enough for the pointer poller. The polled position is the composited position
 /// and must out-run a 240 fps session or the pointer stutters.
 const POLL: Duration = Duration::from_millis(4);
 

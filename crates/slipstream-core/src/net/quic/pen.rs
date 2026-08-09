@@ -106,8 +106,8 @@ pub struct PenSample {
     pub x: f32,
     /// Normalized `0.0..=1.0` across the video frame.
     pub y: f32,
-    /// Tip force, `0..=65535` full scale, `0` while hovering. Injectors rescale (Windows pens
-    /// are 0..1024, uinput declares its own range) — full u16 keeps every source's precision.
+    /// Tip force, `0..=65535` full scale, `0` while hovering. Injectors rescale to their device
+    /// range; full u16 keeps every source's precision.
     pub pressure: u16,
     /// Hover distance, `0..=65534` normalized (0 = touching the hover floor), or
     /// [`PEN_DISTANCE_UNKNOWN`].

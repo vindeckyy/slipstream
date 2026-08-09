@@ -34,8 +34,7 @@ struct PairedState {
 }
 
 fn default_path() -> Result<PathBuf> {
-    // `config_dir()` resolves XDG/HOME on Linux and falls back to %APPDATA% on Windows — so the
-    // native paired-store works without a HOME env var (which a Windows service/task doesn't set).
+    // Keep the paired store below the host configuration directory.
     Ok(ss_paths::config_dir().join("slipstream1-paired.json"))
 }
 

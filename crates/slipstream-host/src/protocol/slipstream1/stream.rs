@@ -435,11 +435,11 @@ impl PhaseController {
 /// the encode of N under GPU contention (the depth-1 ~50 fps collapse), so run **depth-1 by
 /// default** and escalate to the capturer's max ONLY when the loop can't hold its cadence at
 /// depth-1 (the contention tell), then stick there for the session (escalate-and-hold  -  no
-/// oscillation; de-escalation is a v2 item). `SLIPSTREAM_IDD_ADAPTIVE=0` pins the capturer's full
-/// depth (the pre-adaptive behaviour). Off when the capturer's max depth is already 1.
-fn idd_adaptive_enabled() -> bool {
+/// oscillation; de-escalation is a v2 item). `SLIPSTREAM_PIPELINE_ADAPTIVE=0` pins the capturer's full
+/// depth (the pre-adaptive behavior). Off when the capturer's max depth is already 1.
+fn adaptive_pipeline_enabled() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var("SLIPSTREAM_IDD_ADAPTIVE").as_deref() != Ok("0"))
+    *ON.get_or_init(|| std::env::var("SLIPSTREAM_PIPELINE_ADAPTIVE").as_deref() != Ok("0"))
 }
 
 /// Seal one access unit and send it with MICROBURST pacing (the shared
@@ -1584,8 +1584,8 @@ pub(super) struct SessionContext {
     /// + per-tick `0xD0` state while the client draws the pointer locally.
     pub(super) cursor_forward: bool,
     /// LIVE render split for cap sessions (client `CursorRenderMode`, §8 mid-stream flip):
-    /// `true` = client draws (exclude from video + forward), `false` = host composites (the
-    /// capture mouse model  -  DWM on Windows, encoder blend on Linux). Control task writes;
+    /// `true` = client draws (exclude from video + forward), `false` = host composites.
+    /// Control task writes;
     /// the encode loop edge-detects per tick. Always `true` for non-cap sessions (inert).
     pub(super) cursor_client_draws: Arc<AtomicBool>,
     /// SHAPE bridge to the control task (the control stream's sole writer)  -  mirrors
@@ -1641,7 +1641,6 @@ pub(super) struct SessionContext {
     pub(super) resize_ms: Arc<AtomicU32>,
     /// The session's input pipeline (the same channel client datagrams feed)  -  the stream loop
     /// uses it to PARK the seat pointer on the streamed surface (see [`park_pointer`]).
-    #[cfg(target_os = "linux")]
     pub(super) input_tx: std::sync::mpsc::Sender<super::input::ClientInput>,
 }
 
@@ -1659,7 +1658,6 @@ pub(super) struct SessionContext {
 /// again on the mid-stream flip to the capture model, which heals a pointer that drifted off the
 /// output's edge  -  pins the pointer to the surface the client actually sees. A desktop-model
 /// client overrides it with its first absolute move, so the jump is invisible in practice.
-#[cfg(target_os = "linux")]
 fn park_pointer(input_tx: &std::sync::mpsc::Sender<super::input::ClientInput>, w: u32, h: u32) {
     let ev = slipstream_core::input::InputEvent {
         kind: slipstream_core::input::InputKind::MouseMoveAbs,
@@ -1681,9 +1679,8 @@ fn park_pointer(input_tx: &std::sync::mpsc::Sender<super::input::ClientInput>, w
 }
 
 pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDisplay>) -> Result<()> {
-    // This thread runs the capture+encode loop (single-process  -  the only topology: Linux portal /
-    // synthetic, Windows in-process IDD-push). Elevate it so a CPU-heavy game can't deschedule our GPU
-    // submission.
+    // This thread runs the capture and encode loop. Elevate it so a CPU-heavy game cannot
+    // deschedule GPU submission.
     boost_thread_priority(true);
     // Resolve the per-session capture / topology / encoder decision ONCE (Goal-1 stage 3): the deployed
     // path now reads this typed `SessionPlan` instead of re-deriving from config at each dispatch site
@@ -1773,13 +1770,8 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         client_hdr,
         bringup,
         resize_ms,
-        #[cfg(target_os = "linux")]
         input_tx,
     } = ctx;
-    // Only the Linux paths (`launch_is_nested`, `set_gamescope_route`) read it; gamescope does not
-    // exist on Windows, where every one of those call sites is cfg'd out.
-    #[cfg(target_os = "windows")]
-    let _ = &gamescope_route;
     // Reference point for adopting the launched game's processes: anything the host will call "this
     // session's game" has to have started after this instant. Taken HERE, before the display (and
     // therefore before a bare-spawn gamescope's nested child) exists, because a reading taken after
@@ -1860,72 +1852,24 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
     let (mut vd, pipe) = match prepared {
         Some(p) => (p.vd, p.pipeline),
         None => {
-            // Open the backend FIRST  -  on Windows this constructs the vdisplay backend, which
-            // initialises the host-lifetime VirtualDisplayManager (§2.5). It does NO monitor work,
-            // so it must precede the IDD-push preempt below (which reaches the manager)  -
-            // otherwise `vdm()` is called before init and panics.
+            // Open the backend before creating the virtual output. The backend does not perform
+            // monitor work until the pipeline is built.
             let mut vd = crate::vdisplay::open(compositor)?;
-            // Per-client STABLE monitor identity (Phase 2): hand the backend the connecting
-            // client's cert fingerprint so a freshly CREATED virtual monitor gets this client's
-            // persistent id  -  Windows then reapplies the client's saved per-monitor config (DPI
-            // scaling) on reconnect. No-op on Linux backends and for anonymous/GameStream clients
-            // (no fingerprint → the driver auto-allocates).
+            // Pass the connecting client's identity to the backend when it supports stable output
+            // allocation. Anonymous clients leave this unset.
             vd.set_client_identity(endpoint::peer_fingerprint(&conn));
-            // The client display's HDR volume (Hello) → a freshly created virtual monitor's EDID
-            // CTA HDR block (ss-vdisplay), so host apps + the OS tone-map to the client's real
-            // panel instead of the driver's built-in ~1000-nit placeholder. No-op on Linux
-            // backends and for older/SDR clients.
+            // Pass the client's HDR volume to backends that expose it to the virtual output.
             vd.set_client_hdr(client_hdr);
-            // THIS SESSION's colourimetry (distinct from the client panel's volume above): a
-            // 10-bit session needs the output brought up HDR, which on gamescope means spawning
-            // it with the HDR flags so nested games get HDR surfaces at all. Decided in the
-            // Welcome (`capture::capturer_supports_hdr_for`), so it cannot change under us.
+            // A 10-bit session needs an HDR-capable output configuration.
             vd.set_hdr(bit_depth >= 10);
-            // Out-of-band cursor request: cursor-forward sessions (Windows ss-vdisplay /
-            // IddCx hardware cursor; Linux metadata mode) AND no-channel host-composite
-            // sessions (Linux only  -  `metadata_composite` is `plan.cursor_blend`-gated, so
-            // it is always false on Windows). The backend keeps the pointer out of the
-            // pixels; the host blend (or the client) puts it back.
+            // Keep the pointer out of captured pixels when the host or client will render it.
             vd.set_hw_cursor(cursor_forward || metadata_composite);
-            // Deliberate-quit wiring (Windows ss-vdisplay; no-op elsewhere): every lease the
-            // backend mints  -  the retry-hold below AND the capturer's  -  carries the session's quit
-            // flag, so a user "stop" (⌘D → the QUIT close code) tears the virtual monitor down the
-            // moment the pipeline drops instead of lingering 10 s. The reconnect then finds the
-            // manager Idle and does a clean fresh ADD (with the user's think-time as driver
-            // settle) rather than the Lingering-preempt's REMOVE→ADD churn. `keep_alive = forever`
-            // (gaming-rig) outranks the quit  -  the monitor pins as before.
+            // Carry the deliberate-quit flag into the display lease.
             vd.set_quit_flag(quit.clone());
-            // Per-session launch (non-Windows): hand the resolved command to the backend instance
-            // so gamescope's bare spawn nests it  -  per-instance, no process-global env, so
-            // concurrent sessions can't stomp each other's launch target. The other backends'
-            // default `set_launch_command` is a no-op; they get the command spawned into the live
-            // session after capture is up (below).
-            #[cfg(not(target_os = "windows"))]
+            // Keep the resolved launch target on this backend instance. Gamescope can then nest the
+            // command without changing process-global environment state.
             vd.set_launch_command(launch.clone());
-            // Same per-instance discipline for the gamescope sub-mode this session resolved at
-            // handshake time: it used to arrive through SLIPSTREAM_GAMESCOPE_NODE/_SESSION, which a
-            // second connect (or the switch watcher below) could overwrite before this `create`.
-            #[cfg(not(target_os = "windows"))]
             vd.set_gamescope_route(gamescope_route.clone());
-            // IDD-push reconnect preempt (the dance now lives in the manager, Goal-1 §2.5):
-            // serialize setup so a reconnect FLOOD can't run concurrent monitor create/teardown,
-            // STOP the prior session + WAIT for it to release its monitor (instead of tearing a
-            // monitor out from under a still-live session), and register THIS session's stop. The
-            // returned guard holds the setup lock across the pipeline build; dropping it (end of
-            // this arm) lets the next reconnect begin (and preempt us). Held BEFORE the monitor is
-            // created (build_pipeline → vd.create), so the preempt still precedes this session's
-            // monitor creation. SLOT-scoped (Stage W1): the preempt targets only a prior session
-            // holding THIS client's slot  -  a different identity's session is an admission
-            // question, never a preempt.
-            #[cfg(target_os = "windows")]
-            let _idd_setup_guard = (plan.capture == crate::session_plan::CaptureBackend::IddPush)
-                .then(|| {
-                    let slot = crate::vdisplay::manager::slot_id_for(
-                        endpoint::peer_fingerprint(&conn),
-                        (mode.width, mode.height),
-                    );
-                    crate::vdisplay::manager::vdm().begin_idd_setup(slot, stop.clone())
-                });
             let pipe = build_pipeline_with_retry(
                 &mut vd,
                 mode,
@@ -1938,8 +1882,6 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                 8,
                 Some(bringup.as_ref()),
             )?;
-            // Setup done  -  the IDD-push setup lock releases as the guard leaves this arm's scope,
-            // so the next reconnect can begin (and preempt us).
             (vd, pipe)
         }
     };
@@ -1958,20 +1900,9 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
     // session never negotiated). Adopt it before anything downstream reads `bitrate_kbps`.
     adopt_built_bitrate(&mut bitrate_kbps, built_bitrate, &live_bitrate);
 
-    // Capture is live  -  launch the requested title so it renders onto the streamed output and
-    // grabs focus. Windows spawns the library id into the interactive user session; Linux spawns
-    // the resolved command into the live session for every backend that didn't already nest it
-    // (gamescope's bare spawn ran it inside the fresh gamescope  -  launching again would start it
-    // twice). Best-effort: a launch failure (no recipe, launcher missing, no interactive user)
-    // leaves the user on the streamed desktop/session, never tears the stream down. Launched ONCE
-    // here  -  the mid-stream rebuild paths below must not re-spawn it.
-    #[cfg(target_os = "windows")]
-    if let Some(id) = launch.as_deref() {
-        if let Err(e) = crate::library::launch_title(id) {
-            tracing::warn!(launch_id = id, error = %e, "could not launch requested library title");
-        }
-    }
-    #[cfg(target_os = "linux")]
+    // Capture is live, so launch the requested title into the active session. Gamescope may have
+    // nested the command already, in which case launching again would start it twice. A failure
+    // leaves the stream running on the current desktop.
     let spawned_launch = match launch.as_deref() {
         Some(cmd) if crate::vdisplay::launch_is_nested(compositor, gamescope_route.as_ref()) => {
             tracing::info!(command = %cmd, "launch nested into the per-session gamescope");
@@ -1986,8 +1917,6 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         },
         None => None,
     };
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-    let _ = &launch;
 
     // The launched game's lifetime, in both directions (design/session-game-lifetime.md):
     //
@@ -1999,14 +1928,8 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
     // * **this session ending can end it**  -  never by default; only when the operator asked, and for
     //   a mere disconnect only after a reconnect window (`_game_life`'s drop, below).
     let game_lease = launch_target.as_ref().map(|target| {
-        #[cfg(target_os = "linux")]
         let nested = crate::vdisplay::launch_is_nested(compositor, gamescope_route.as_ref());
-        #[cfg(not(target_os = "linux"))]
-        let nested = false;
-        #[cfg(target_os = "linux")]
         let child = spawned_launch.map(|s| (s.child, s.group_leader));
-        #[cfg(not(target_os = "linux"))]
-        let child = None;
 
         let on_exit: crate::gamelease::OnExit = {
             let conn = conn.clone();
@@ -2229,11 +2152,6 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
     let mut cur_mode = mode;
     const MAX_CAPTURE_REBUILDS: u32 = 5;
     let mut capture_rebuilds: u32 = 0;
-    // Exclusive-topology eviction generation last seen (Windows IDD-push; see the recovery block
-    // in the loop): the vdisplay watchdog bumps it on every eviction, each of which drives
-    // COMMIT_MODES on the live IDD path and orphans this pipeline's capture ring.
-    #[cfg(target_os = "windows")]
-    let mut seen_reassert_gen = crate::vdisplay::manager::topology_reassert_gen();
     // Encode-stall watchdog: AMF/QSV (and async NVENC) poll non-blocking, so a wedged driver
     // shows up as poll() returning None forever while submits keep succeeding  -  `inflight` grows,
     // no AU ever reaches the send thread, and the client freezes on the last frame with nothing
@@ -2255,10 +2173,9 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
     // keeps meaning submit→AU while the wire pts anchors at PipeWire delivery (queue age included).
     let mut inflight: std::collections::VecDeque<(u64, u64, std::time::Instant)> =
         std::collections::VecDeque::new();
-    // Diagnostic: distinguish NEW captured frames (the source produced a fresh frame) from REPEATS (the
-    // loop re-encoded the last frame because `try_latest` had nothing). A low new-frame rate at a high
-    // send rate ⇒ the capture source isn't producing frames (e.g. an IDD virtual display DWM isn't
-    // compositing), NOT an encoder problem. Logged every 2 s when `SLIPSTREAM_PERF`.
+    // Diagnostic: distinguish fresh captured frames from repeats when the source has no new frame.
+    // A low fresh-frame rate at a high send rate points to capture, not encoding. Logged every 2 s
+    // when `SLIPSTREAM_PERF` is enabled.
     let (mut diag_new, mut diag_repeat) = (0u64, 0u64);
     // Seat-pointer park schedule (see `park_pointer`): per (re)built display, and re-armed by
     // the capture-model flip. More than one attempt because the first park of a session can
@@ -2267,16 +2184,11 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
     // capture model with no live cursor overlay, keep trying up to the cap: no overlay there
     // means the pointer still isn't on the streamed output, and a relative-only client can
     // never fix that itself.
-    #[cfg(target_os = "linux")]
     let mut parked_display = None;
-    #[cfg(target_os = "linux")]
     let mut park_attempts: u32 = 0;
-    #[cfg(target_os = "linux")]
     let mut next_park_at = std::time::Instant::now();
-    #[cfg(target_os = "linux")]
     const PARK_ATTEMPTS_MAX: u32 = 10;
     // Per-session one-shot latches for the host-composite breadcrumbs below.
-    #[cfg(not(target_os = "windows"))]
     let (mut composite_saw_overlay, mut composite_saw_none) = (false, false);
     let mut diag_at = std::time::Instant::now();
     // Anchor for the forced-IDR cooldown (see the keyframe-request handling below): the timestamp of
@@ -2317,7 +2229,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         Vec<u32>,
         Vec<u32>,
     ) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
-    // Adaptive pipeline depth (see [`idd_adaptive_enabled`]): run depth-1 for latency and
+    // Adaptive pipeline depth (see [`adaptive_pipeline_enabled`]): run depth-1 for latency and
     // escalate to the capturer's max on sustained cadence overrun. `cur_depth` is the live
     // target (clamped to the capturer's current max each iteration  -  a rebuild can change it);
     // `behind_score` is a leaky bucket over the "fell behind the cadence deadline" signal;
@@ -2483,39 +2395,13 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
             } else {
                 bitrate_kbps
             };
-            // IN-PLACE fast path first (latency plan P2.3, Windows IDD-push): keep the capturer +
-            // send thread, mode-set the SAME monitor in place (P2.1/P2.2), resize the ring, swap
-            // only the encoder. Any decline (v3 driver → the manager re-arrived, ring recreate
-            // failed, no new-size frame) falls through to the full rebuild below.
-            #[cfg(target_os = "windows")]
-            let fast_done = plan.capture == crate::session_plan::CaptureBackend::IddPush
-                && try_inplace_resize(
-                    &mut vd,
-                    &mut capturer,
-                    &mut enc,
-                    &mut frame,
-                    &mut interval,
-                    new_mode,
-                    mode_bitrate,
-                    bit_depth,
-                    plan,
-                    &quit,
-                    resize_trace.as_ref(),
-                    false,
-                );
-            #[cfg(not(target_os = "windows"))]
-            let fast_done = false;
-            // The rate the rebuilt encoder ends up opened at. Seeded with the new mode's own
-            // re-resolve, which is what the Windows in-place fast path applies (it swaps only the
-            // encoder and never reaches `build_pipeline`); a full rebuild overwrites it with the
-            // rate `build_pipeline` actually used, which differs when the source delivers a size
-            // the mode did not ask for.
+            // The rate the rebuilt encoder ends up opened at. A full rebuild may adjust it when
+            // the source delivers a size different from the requested mode.
             let mut built_bitrate = mode_bitrate;
             // Full rebuild  -  build the new pipeline BEFORE dropping the old one: the host already
             // acked the switch as accepted, so a rebuild failure must not kill an otherwise
             // healthy session  -  keep streaming the current mode and log instead.
-            let rebuilt = fast_done
-                || match build_pipeline(
+            let rebuilt = match build_pipeline(
                     &mut vd,
                     new_mode,
                     mode_bitrate,
@@ -2603,55 +2489,6 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                 encoder_resets = 0;
                 last_forced_idr = Some(std::time::Instant::now()); // fresh encoder opens on an IDR  -  anchor the cooldown
                 resize_trace.finish("pipeline_rebuilt");
-            }
-        }
-        // Exclusive-topology eviction recovery (Windows IDD-push): the vdisplay watchdog just
-        // evicted a display that crept back into the "exclusive" desktop, via the full isolate  -
-        // its forced re-commit restarts OS presentation to the virtual display (a gentle
-        // supplied-config eviction left capture one stashed frame and then nothing, on-glass),
-        // but it also hands the live IDD path a fresh swap-chain while this pipeline's ring
-        // keeps waiting on the old attachment; with an unchanged descriptor the poller's
-        // two-strike debounce never trips, so frames would just stop. Rebuild the capture
-        // attachment in place at the CURRENT mode (same-mode ring recreate + driver re-attach +
-        // fresh encoder  -  the resize fast path's cost). If even that fails, end the session with
-        // a clear error: the client's reconnect rebuilds from scratch, which beats streaming a
-        // frozen image forever.
-        #[cfg(target_os = "windows")]
-        if plan.capture == crate::session_plan::CaptureBackend::IddPush {
-            let reassert_gen = crate::vdisplay::manager::topology_reassert_gen();
-            if reassert_gen != seen_reassert_gen {
-                seen_reassert_gen = reassert_gen;
-                tracing::info!(
-                    "exclusive-topology eviction bounced the virtual display's modes  -  rebuilding \
-                     the capture attachment in place at the current mode"
-                );
-                let trace = crate::bringup::Trace::start("reassert-recover", resize_ms.clone());
-                if try_inplace_resize(
-                    &mut vd,
-                    &mut capturer,
-                    &mut enc,
-                    &mut frame,
-                    &mut interval,
-                    cur_mode,
-                    bitrate_kbps,
-                    bit_depth,
-                    plan,
-                    &quit,
-                    trace.as_ref(),
-                    true,
-                ) {
-                    // The owed AUs died with the old encoder  -  same bookkeeping as a resize.
-                    inflight.clear();
-                    last_au_at = std::time::Instant::now();
-                    encoder_resets = 0;
-                    last_forced_idr = Some(std::time::Instant::now());
-                    trace.finish("pipeline_rebuilt");
-                } else {
-                    return Err(anyhow!(
-                        "exclusive-topology eviction recovery failed  -  ending the session for a \
-                         clean reconnect (a fresh bring-up re-attaches capture)"
-                    ));
-                }
             }
         }
         // Adaptive bitrate: drain to the NEWEST requested rate (the client's controller may step
@@ -2969,7 +2806,6 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                                       // the streamed surface (see `park_pointer` and the schedule state above).
                                       // Not gamescope  -  its nested seat owns the pointer and its cursor comes from
                                       // the XFixes source regardless of seat position.
-                #[cfg(target_os = "linux")]
                 if compositor != ss_vdisplay::Compositor::Gamescope
                     && parked_display != Some((cur_node_id, cur_display_gen))
                 {
@@ -2995,16 +2831,10 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                 // library instead of surfacing a failure  -  rather than the capture-loss rebuild + 40 s
                 // timeout. Gated to the dedicated bare-spawn launch (`launch_is_nested`), so a normal
                 // Bazzite/desktop capture loss still rebuilds in place.
-                // `cur_node_id` (the capture 5-tuple's node id) is read only by the Linux
-                // dedicated-game-exit check below; keep it read on other platforms so it isn't a
-                // write-only variable under `-D warnings` (the `let _ = &launch` idiom above).
-                #[cfg(not(target_os = "linux"))]
-                let _ = &cur_node_id;
                 // Backstop for a nested launch the lease can't recognize (no detect signals): a
                 // bare-spawn gamescope exits with its child, so its node staying gone means the game
                 // quit. Honors the same operator setting as the lease's own exit path  -  with
                 // end-session-on-game-exit off, a lost capture is just a rebuild.
-                #[cfg(target_os = "linux")]
                 if launch.is_some()
                     && crate::session_settings::get().session_on_game_exit
                     && crate::vdisplay::launch_is_nested(compositor, gamescope_route.as_ref())
@@ -3218,23 +3048,16 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
             }
         }
         // Cursor channel (M2 + the §8 mid-stream render flip). While the CLIENT draws the
-        // pointer (the desktop mouse model): every iteration  -  new frame OR repeat  -  states
+        // pointer (the desktop mouse model): every iteration, new frame or repeat, states
         // the pointer (self-healing under datagram loss) and forwards a changed shape via the
         // control bridge; `frame.cursor` is stripped so no blend path double-draws it. While
         // the HOST composites (the capture model, `CursorRenderMode { client_draws: false }`):
-        // the forwarder goes quiet and `frame.cursor` rides into the encoder blend (Linux  -
-        // on Windows the flip re-enables DWM composition via the capturer hook below, and
-        // frames never carry an overlay). A hidden-but-known pointer (overlay with
+        // the forwarder goes quiet and `frame.cursor` rides into the encoder blend. A hidden-but-known pointer (overlay with
         // `visible: false`) is the M3 relative-mode hint. The capturer's LIVE cursor (the
-        // Windows GDI-poller channel, where pointer-only moves produce no frame) outranks the
-        // frame-attached overlay (the Linux portal path).
+        // portal path) outranks the frame-attached overlay.
         if let Some(fwd) = cursor_fwd.as_mut() {
             let client_draws = cursor_client_draws.load(Ordering::Relaxed);
-            // EVERY tick, not edge-gated: the capturer caches the applied state (an Option
-            // compare in steady state) and clears it on channel re-deliveries  -  so the render
-            // state survives capturer rebuilds AND driver-side monitor re-arrivals, which an
-            // edge detector here silently lost. Windows IDD (un)declares the driver's hardware
-            // cursor; no-op on every other capturer.
+            // Apply the state every tick so it survives capturer rebuilds and re-deliveries.
             capturer.set_cursor_forward(client_draws);
             if client_draws != cursor_client_drew {
                 cursor_client_drew = client_draws;
@@ -3267,46 +3090,36 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                 // The client draws the pointer  -  a blend-capable encoder must not also draw it.
                 frame.cursor = None;
             } else {
-                // Host composites (Linux): the encoder blend IS the composite mechanism, but the
+                // Host composites: the encoder blend is the composite mechanism, but the
                 // frame-attached overlay is the position at the LAST DAMAGE frame  -  repeats
                 // re-encoding a static desktop froze the blended pointer between redraws
                 // (on-glass: composite cursor stuttered while window drags, constant damage,
                 // were smooth). Refresh the repeat's overlay from the capturer's LIVE cursor so
                 // pointer-only motion re-blends at tick rate  -  the same bandwidth the pre-channel
                 // embedded mode paid, where the compositor damaged frames for cursor moves.
-                // NOT Windows: its capturer composites internally (cursor_blend.rs) and frames
-                // must never carry an overlay a blend path would double-draw.
-                #[cfg(not(target_os = "windows"))]
-                {
-                    // One-shot breadcrumbs (per session), both directions: capture-mode field
-                    // triage starts with "did the composite arm ever SEE an overlay"  -
-                    // ss-capture's sibling lines say whether the meta/bitmap arrived; these say
-                    // whether the encoder was ever handed one.
-                    match capturer.cursor() {
-                        Some(live) => {
-                            if !composite_saw_overlay {
-                                composite_saw_overlay = true;
-                                tracing::info!(
-                                    x = live.x,
-                                    y = live.y,
-                                    w = live.w,
-                                    h = live.h,
-                                    visible = live.visible,
-                                    "host-composite: first live cursor overlay handed to the \
-                                     encoder blend"
-                                );
-                            }
-                            frame.cursor = Some(live);
+                // One-shot breadcrumbs show whether capture has delivered an overlay to the
+                // encoder blend.
+                match capturer.cursor() {
+                    Some(live) => {
+                        if !composite_saw_overlay {
+                            composite_saw_overlay = true;
+                            tracing::info!(
+                                x = live.x,
+                                y = live.y,
+                                w = live.w,
+                                h = live.h,
+                                visible = live.visible,
+                                "host-composite: first live cursor overlay handed to the encoder blend"
+                            );
                         }
-                        None => {
-                            if !composite_saw_none {
-                                composite_saw_none = true;
-                                tracing::info!(
-                                    "host-composite active but the capture has no live cursor \
-                                     overlay yet (no SPA_META_Cursor bitmap)  -  the stream is \
-                                     cursorless until one arrives"
-                                );
-                            }
+                        frame.cursor = Some(live);
+                    }
+                    None => {
+                        if !composite_saw_none {
+                            composite_saw_none = true;
+                            tracing::info!(
+                                "host-composite active but capture has no live cursor overlay yet"
+                            );
                         }
                     }
                 }
@@ -3319,7 +3132,6 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
             // static desktop re-blends at tick rate instead of freezing at the last damage
             // frame (the same reason the channel's composite arm above re-reads it). A
             // grabbed/hidden pointer arrives `visible: false` and is stripped just below.
-            #[cfg(not(target_os = "windows"))]
             match capturer.cursor() {
                 Some(live) => {
                     if !composite_saw_overlay {
@@ -3350,8 +3162,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         }
         // The overlay surfaces hidden pointers too (for the hint above)  -  strip them
         // HERE, after forwarding, so no blend path ever draws an invisible cursor.
-        // Exception: while we hide the host OS cursor for streaming, keep drawing the
-        // last known shape for the client (Win32 CURSOR_SHOWING / blank-theme sprites).
+        // Keep the last known shape when the host hides the pointer during streaming.
         if frame.cursor.as_ref().is_some_and(|c| !c.visible) {
             if ss_capture::host_cursor_flag::is_hidden_for_stream() {
                 if let Some(c) = frame.cursor.as_mut() {
@@ -3373,7 +3184,6 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         // Armed from the loop's first tick  -  a static desktop may never deliver a fresh frame
         // (`parked_display` is only bookkeeping for rebuild re-arming), and the pointer must be
         // parked regardless.
-        #[cfg(target_os = "linux")]
         if compositor != ss_vdisplay::Compositor::Gamescope
             && park_attempts < PARK_ATTEMPTS_MAX
             && std::time::Instant::now() >= next_park_at
@@ -4114,14 +3924,11 @@ type Pipeline = (
     Box<dyn crate::encode::Encoder>,
     crate::capture::CapturedFrame,
     std::time::Duration,
-    // The virtual output's PipeWire node id  -  used by the B2 dedicated game-exit probe to check THIS
-    // session's own node (scoped), not any gamescope node. `0` for backends without a PipeWire node
-    // (Windows IDD-push), which never take the dedicated-gamescope B2 path anyway.
+    // The virtual output's PipeWire node id is used by the dedicated game-exit probe to check this
+    // session's own node, not a gamescope node.
     u32,
-    // The display's registry pool generation (Linux keep-alive pool only; `None` on Windows  -  the
-    // manager leases in place  -  and for non-poolable outputs). A mode-switch rebuild uses it to
-    // `registry::retire` the superseded old display, so linger/forever keep-alive policies don't
-    // accumulate kept monitors at stale modes (design/midstream-resolution-resize.md H4).
+    // The display's registry pool generation. A mode-switch rebuild uses it to retire the
+    // superseded display, so keep-alive policies do not accumulate stale modes.
     Option<u64>,
     // The bitrate the encoder was ACTUALLY opened at (kbps). Normally the one asked for; different
     // when an Automatic rate was re-resolved because the source delivers a size the session did not
@@ -4130,173 +3937,8 @@ type Pipeline = (
     u32,
 );
 
-/// The in-place resize fast path (latency plan P2.3, Windows IDD-push): the manager mode-sets the
-/// SAME monitor in place (driver protocol v4  -  `IOCTL_UPDATE_MODES`; internally falls back to
-/// re-arrival against an older driver), then the existing capturer re-sizes its ring immediately
-/// (no descriptor-poll debounce) and only the ENCODER is swapped once the first new-size frame
-/// arrives  -  the capture pipeline, its send thread and the whole session transport survive.
-/// Returns `true` when the stream is now delivering the new mode on the same capturer; `false`
-/// routes the caller to the full rebuild (which is also the correct path when the manager had to
-/// re-arrive a fresh monitor  -  this capturer's ring/broker are bound to the departed target).
-#[cfg(target_os = "windows")]
-#[allow(clippy::too_many_arguments)]
-fn try_inplace_resize(
-    vd: &mut Box<dyn crate::vdisplay::VirtualDisplay>,
-    capturer: &mut Box<dyn crate::capture::Capturer>,
-    enc: &mut Box<dyn crate::encode::Encoder>,
-    frame: &mut crate::capture::CapturedFrame,
-    interval: &mut std::time::Duration,
-    new_mode: slipstream_core::Mode,
-    bitrate_kbps: u32,
-    bit_depth: u8,
-    plan: crate::session_plan::SessionPlan,
-    quit: &Arc<AtomicBool>,
-    trace: &crate::bringup::Trace,
-    // Same-mode swap-chain recovery (the exclusive re-assert bounced the IDD's modes): recreate
-    // the ring even though the size is unchanged  -  `resize_output`'s same-size fast path would
-    // no-op exactly the case being recovered.
-    recover_ring: bool,
-) -> bool {
-    let Some(cur_target) = capturer.capture_target_id() else {
-        return false; // not an IDD-push capturer  -  nothing to reuse
-    };
-    // Acquire at the new mode: the manager's resize branch runs the in-place mode set (or its
-    // re-arrival fallback) and returns a +1-ref lease, released again when `vout` drops below  -
-    // the capturer keeps holding its own original lease (`gen` is preserved by both paths).
-    // In-place resize keeps the SAME display (no supersede  -  the manager resizes the live monitor).
-    // Same display-rate multiplier the initial build applies, so a mid-stream resize doesn't
-    // silently drop back to 1×.
-    let new_display_mode = display_mode_for(new_mode);
-    let vout = match crate::vdisplay::registry::acquire(vd, new_display_mode, quit.clone(), None) {
-        Ok(v) => v,
-        Err(e) => {
-            tracing::warn!(error = %format!("{e:#}"), "in-place resize: acquire failed");
-            return false;
-        }
-    };
-    trace.mark("display_resized");
-    let achieved_hz = vout
-        .preferred_mode
-        .map(|(_, _, hz)| hz)
-        .filter(|&hz| hz > 0)
-        .unwrap_or(new_display_mode.refresh_hz);
-    let effective_hz = pacing_hz(new_mode.refresh_hz, achieved_hz);
-    if vout.win_capture.as_ref().map(|t| t.target_id) != Some(cur_target) {
-        // The manager re-arrived a fresh monitor (old driver / in-place failure): this capturer is
-        // bound to the departed target. The full rebuild re-acquires (JOINing the already-resized
-        // monitor) with a fresh capturer.
-        tracing::info!(
-            "resize: monitor re-arrived (no in-place support)  -  running the full pipeline rebuild"
-        );
-        return false;
-    }
-    let ring_ok = if recover_ring {
-        capturer.recreate_ring_in_place()
-    } else {
-        capturer.resize_output(new_mode.width, new_mode.height)
-    };
-    if !ring_ok {
-        return false;
-    }
-    trace.mark("ring_recreated");
-    // Bounded wait for the first frame at the new size (the driver re-attaches to the fresh ring;
-    // the mode-set full redraw composes promptly). Mirrors the capturer's own 3 s recover-or-drop.
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
-    let new_frame = loop {
-        match capturer.try_latest() {
-            Ok(Some(f)) if (f.width, f.height) == (new_mode.width, new_mode.height) => break f,
-            Ok(_) => {
-                if std::time::Instant::now() >= deadline {
-                    tracing::warn!(
-                        "resize: no new-size frame within 3s of the in-place mode set  -  running \
-                         the full pipeline rebuild"
-                    );
-                    return false;
-                }
-                std::thread::sleep(std::time::Duration::from_millis(5));
-            }
-            Err(e) => {
-                tracing::warn!(error = %format!("{e:#}"),
-                    "resize: capture failed after the in-place mode set  -  running the full rebuild");
-                return false;
-            }
-        }
-    };
-    // Liveness gate for the eviction recovery: the driver re-delivers its STASH on re-attach, so
-    // the first frame proves only the ring  -  not that the OS resumed presenting (measured: the
-    // stash arrives in ~50 ms, then new_fps=0 forever). Require a SECOND, newer present  -  the
-    // forced mode reset just triggered a full redraw, so a live display produces one promptly  -
-    // before declaring recovery; a stash-only re-attach must FAIL so the caller ends the session
-    // cleanly (a reconnect's fresh bring-up always recovers) instead of streaming a frozen frame.
-    let new_frame = if recover_ring {
-        let first_pts = new_frame.pts_ns;
-        let live_deadline = std::time::Instant::now() + std::time::Duration::from_millis(1500);
-        loop {
-            match capturer.try_latest() {
-                Ok(Some(f)) if f.pts_ns != first_pts => break f,
-                Ok(_) => {
-                    if std::time::Instant::now() >= live_deadline {
-                        tracing::warn!(
-                            "eviction recovery: ring re-attached but only the stashed frame \
-                             arrived  -  the OS is not presenting; failing the in-place recovery"
-                        );
-                        return false;
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(10));
-                }
-                Err(e) => {
-                    tracing::warn!(error = %format!("{e:#}"),
-                        "eviction recovery: capture failed while waiting for a live frame");
-                    return false;
-                }
-            }
-        }
-    } else {
-        new_frame
-    };
-    trace.mark("first_new_frame");
-    // Fresh encoder at the delivered size  -  the one component that can't follow a resolution
-    // change in place today (P2.4 stays unimplemented: `open_video` is ms-scale, measured).
-    let mut new_enc = match crate::encode::open_video(
-        plan.codec,
-        new_frame.format,
-        new_frame.width,
-        new_frame.height,
-        effective_hz,
-        bitrate_kbps as u64 * 1000,
-        new_frame.is_cuda(),
-        bit_depth,
-        plan.chroma,
-        plan.cursor_blend,
-        plan.max_slices,
-    ) {
-        Ok(e) => e,
-        Err(e) => {
-            tracing::warn!(error = %format!("{e:#}"),
-                "resize: encoder open failed after the in-place mode set  -  running the full rebuild");
-            return false;
-        }
-    };
-    if let Some(c) = plan.wire_chunk {
-        new_enc.set_wire_chunking(c);
-    }
-    // Re-report the capturer's ring depth: in-place backends bound async pipelining by it, and a
-    // rebuilt encoder starts with it unset.
-    new_enc.set_input_ring_depth(capturer.pipeline_depth().max(1));
-    *enc = new_enc;
-    *frame = new_frame;
-    *interval = std::time::Duration::from_secs_f64(1.0 / effective_hz.max(1) as f64);
-    trace.mark("encoder_open");
-    true
-}
-
-/// The Welcome-time display-prep hand-off (latency plan P1.1/P1.2): the opened vdisplay backend +
-/// the fully built pipeline  -  monitor create, activation, settle, capture attach, first frame,
-/// encoder open  -  produced on the prep/stream thread while the client's Start round-trip and the
-/// UDP hole-punch are still in flight, so the entire display bring-up hides behind the network
-/// waits. Constructed on the Windows native path only today: the Linux backends bind launch
-/// semantics before create (gamescope nests the launch command), which must not run for a client
-/// that never sends Start.
+/// The optional display-prep hand-off: an opened backend and a fully built pipeline can be passed
+/// to the stream thread after negotiation.
 pub(super) struct PreparedDisplay {
     pub(super) vd: Box<dyn crate::vdisplay::VirtualDisplay>,
     pub(super) pipeline: Pipeline,
@@ -4311,14 +3953,7 @@ pub(super) type PrepHandle = (
     std::thread::JoinHandle<Result<()>>,
 );
 
-/// Build the session's display + pipeline at Welcome time (latency plan P1.1/P1.2), before the
-/// client's `Start` and the hole-punch  -  the negotiated mode is final once the Welcome is built,
-/// and nothing in monitor create → activation → settle → capture attach → encoder open needs the
-/// punched socket. Mirrors `virtual_stream`'s inline bring-up exactly: same backend setters, same
-/// slot-scoped `begin_idd_setup` serialization (the guard releases when this returns), same
-/// retry-wrapped build. The caller threads the SAME values the Welcome committed, so the prepared
-/// pipeline and the later `SessionContext` can never disagree.
-#[cfg(target_os = "windows")]
+/// Build a session display and pipeline before the data plane starts.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn prepare_display(
     compositor: crate::vdisplay::Compositor,
@@ -4345,9 +3980,7 @@ pub(super) fn prepare_display(
         bit_depth,
         chroma,
         codec,
-        // Blend capability  -  must MATCH virtual_stream's resolve. Windows-only path, where
-        // the rule is a constant `false` (the IDD capturer composites itself); passed through
-        // the shared rule anyway so the two resolves cannot drift.
+        // Use the same blend capability rule as `virtual_stream`.
         crate::session_plan::cursor_blend_for(
             cursor_forward,
             compositor == ss_vdisplay::Compositor::Gamescope,
@@ -4368,14 +4001,7 @@ pub(super) fn prepare_display(
     vd.set_hdr(bit_depth >= 10);
     vd.set_hw_cursor(cursor_forward);
     vd.set_quit_flag(quit.clone());
-    // Slot-scoped setup serialization + reconnect preempt  -  see the inline arm in
-    // `virtual_stream` for the full rationale; released when this fn returns.
-    let _idd_setup_guard =
-        (plan.capture == crate::session_plan::CaptureBackend::IddPush).then(|| {
-            let slot =
-                crate::vdisplay::manager::slot_id_for(client_identity, (mode.width, mode.height));
-            crate::vdisplay::manager::vdm().begin_idd_setup(slot, stop.clone())
-        });
+    let _ = stop;
     let pipeline = build_pipeline_with_retry(
         &mut vd,
         mode,
@@ -4428,23 +4054,6 @@ fn build_pipeline_with_retry(
     // a first-connect timeout would tear down the warm session (forcing another cold start on
     // reconnect). A genuinely permanent failure still fails fast via `is_permanent_build_error`;
     // only transient "no frame yet" retries consume the budget.
-    // IDD-push only: HOLD one monitor lease across all build attempts. A failed attempt's capturer
-    // drop releases ITS lease, but this held lease keeps the shared monitor Active (refs >= 1), so the
-    // next attempt's `vd.create` JOINS it (refcount++) instead of finding it Lingering and tripping the
-    // IDD-push reconnect PREEMPT (teardown + recreate). That preempt-per-retry was the REMOVE→ADD churn
-    // that exhausts the IddCx monitor-slot pool and wedges ADD at 0x80070490  -  one ADD per cold start
-    // now, not one per attempt. Non-IDD-push backends (Linux portal, WGC) don't use the refcount manager
-    // and aren't churn-wedge-prone, so they keep create-per-attempt (a held lease there would allocate a
-    // second virtual output). Dropped when this fn returns  -  on success the Pipeline's own lease keeps
-    // the monitor Active; on failure refs falls to 0 → Lingering → linger-timeout teardown.
-    let _retry_hold = if matches!(plan.capture, crate::session_plan::CaptureBackend::IddPush) {
-        Some(
-            vd.create(mode)
-                .context("acquire virtual output for the session (retry-hold lease)")?,
-        )
-    } else {
-        None
-    };
     // Attempt 1 waits only briefly for the first frame: a PipeWire stream connected while
     // gamescope re-initializes its headless takeover negotiates a format and reaches `Streaming`
     // but never receives a buffer  -  a FRESH connect then delivers within ~0.5 s (observed on
@@ -4644,12 +4253,9 @@ fn build_pipeline(
     // gen BEFORE `capture_virtual_output` consumes `vout`. (Linux-only  -  the pool is Linux.)
     #[cfg(target_os = "linux")]
     let reused_gen = vout.reused_gen;
-    // The display's pool generation (fresh AND reused), threaded out so a mode-switch rebuild can
-    // `registry::retire` the display this pipeline supersedes (H4). `None` off Linux / non-poolable.
-    #[cfg(target_os = "linux")]
+    // The display's pool generation is threaded out so a mode-switch rebuild can retire the
+    // display this pipeline supersedes.
     let pool_gen = vout.pool_gen;
-    #[cfg(not(target_os = "linux"))]
-    let pool_gen = None;
     // The virtual output's PipeWire node id  -  kept for the B2 dedicated game-exit probe (scoped to
     // this session's own node). Read before `capture_virtual_output` consumes `vout`.
     let node_id = vout.node_id;
@@ -4683,10 +4289,7 @@ fn build_pipeline(
     // Pace the encoder + frame clock at the session's rate, floored by what the display achieved
     //  -  never above either.
     let effective_hz = pacing_hz(mode.refresh_hz, achieved_hz);
-    // HDR vs SDR for the IDD-push conversion: a negotiated 10-bit session (client advertised
-    // VIDEO_CAP_10BIT + host opted in via SLIPSTREAM_10BIT) is our HDR path → BT.2020 PQ Rgb10a2;
-    // otherwise the FP16 IDD frames are converted to 8-bit SDR. (Ignored by non-IDD-push backends,
-    // which auto-detect HDR from the monitor state.)
+    // Select the capture format for the negotiated SDR or HDR session.
     let mut capturer =
         crate::capture::capture_virtual_output(vout, plan.output_format(), plan.capture)
             .context("capture virtual output")?;
@@ -4700,9 +4303,7 @@ fn build_pipeline(
     // it  -  and the cursor source would then blank the pointer for the whole game session (it asks
     // the connected display "are you drawing the pointer?" and gets "no"). The source re-runs this
     // every couple of seconds, so a stream that starts before the game converges, and a display
-    // that dies is retried. Same one-way-edge shape as the Windows channel senders: the closure
-    // wraps the host's discovery, and ss-capture never reaches back into ss-vdisplay.
-    #[cfg(target_os = "linux")]
+    // that dies is retried. The closure keeps capture discovery separate from the display backend.
     if plan.gamescope_cursor {
         capturer.attach_gamescope_cursor(std::sync::Arc::new(
             ss_vdisplay::gamescope_xwayland_cursor_targets,
@@ -4720,7 +4321,6 @@ fn build_pipeline(
         Ok(f) => f,
         Err(e) => {
             // A reused kept display was dead  -  invalidate it so the next attempt creates fresh (A2).
-            #[cfg(target_os = "linux")]
             if let Some(g) = reused_gen {
                 crate::vdisplay::registry::mark_failed(g);
             }

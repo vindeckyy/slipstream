@@ -62,7 +62,7 @@ too bright or too dim on your TV.
 ### Linux + GNOME
 
 A Slipstream host serves [two protocols](/docs/how-it-works#two-protocols): its own `slipstream/1`,
-which the iPhone, Android and Steam Deck apps speak, and GameStream, which
+which the Android and Steam Deck apps speak, and GameStream, which
 [Moonlight](/docs/moonlight) speaks. GNOME HDR is available on the GameStream side only.
 
 GNOME 50 added HDR screencast for **real monitors** only, so this route mirrors a monitor instead of
@@ -86,7 +86,6 @@ mirror that can be HDR.
 
 | Client | HDR10 present | Advertises HDR when |
 |---|---|---|
-| **iPhone** | Yes, Metal, `rgba16Float` in BT.2100 PQ with EDR | the setting is on **and** the display reports HDR capability |
 | **Android** (phone + TV) | Yes, HDR10 via the Surface dataspace plus static metadata | the setting is on **and** the panel reports HDR10 or HDR10+. On an SDR panel the toggle is disabled |
 | **Steam Deck** | Yes, through the same presenter path the Deck session client uses | the setting is on. Look for `HDR` versus `HDR->SDR` on the stats overlay |
 | **Moonlight** | Its own HDR toggle, which appears only when the host advertises a 10-bit codec |, |
@@ -148,8 +147,8 @@ Host, in [`host.env`](/docs/configuration):
 | `SLIPSTREAM_VIDEO_SOURCE=portal` | unset | Required for the GNOME 50+ monitor-mirror route. GameStream/Moonlight only, it has no effect on `slipstream/1` sessions. |
 
 Client: one toggle, in Settings under **Quality** with
-[the rest of the video settings](/docs/client-settings#video), **10-bit HDR** on iPhone, **HDR** on
-Android. It is **on by default**. Turning it off means "never send me 10-bit", and the host then
+[the rest of the video settings](/docs/client-settings#video), **HDR** on Android. It is **on by
+default**. Turning it off means "never send me 10-bit", and the host then
 never upgrades the session. Like the other video settings it can be set per
 [profile](/docs/profiles-and-links), so a Work profile can prefer 4:4:4 while a Couch profile
 prefers HDR.

@@ -155,10 +155,10 @@ impl SettingsOverlay {
 
     /// Record, as overrides, every tier-P field that differs between two settings snapshots.
     ///
-    /// This is for front-ends that commit PER CONTROL rather than per dialog (the WinUI shell
-    /// writes on every change; the GTK one writes once on close). They can't hand over a list
-    /// of touched fields, so they hand over "the effective settings before this control fired"
-    /// and "after": the only field that can differ is the one the user just touched.
+    /// This is for front-ends that commit PER CONTROL rather than per dialog (one shell writes
+    /// on every change; another writes once on close). They can't hand over a list of touched
+    /// fields, so they hand over "the effective settings before this control fired" and
+    /// "after": the only field that can differ is the one the user just touched.
     ///
     /// That is not the diff-on-save this design rejects. The comparison is against the
     /// EFFECTIVE settings — what the control was showing — not against the globals, so setting

@@ -1495,7 +1495,7 @@ impl PyroWaveEncoder {
         if let Some(p) = packets.first() {
             crate::pyrowave_wire::stamp_color_bits(&mut self.bitstream, p.offset, false);
         }
-        // Frame into the wire AU via the shared helper (byte-identical on Linux + Windows): the dense
+        // Frame into the wire AU via the shared helper: the dense
         // single packet, or the datagram-aligned windowed AU (§4.4).
         let pkts: Vec<(usize, usize)> = packets.iter().map(|p| (p.offset, p.size)).collect();
         let au = crate::pyrowave_wire::build_au(&pkts, &self.bitstream, self.wire_chunk);

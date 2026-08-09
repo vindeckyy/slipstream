@@ -12,23 +12,14 @@
 //!   `org.gnome.Mutter.RemoteDesktop.Session` D-Bus API carries the same clipboard operations (the
 //!   xdg `org.freedesktop.portal.Clipboard` would need an interactive grant a headless host can't
 //!   answer — so we skip it and talk to Mutter directly, as the input injector already does).
-//! * [`windows`] — the Win32 clipboard: a hidden message-only window watches `WM_CLIPBOARDUPDATE`
-//!   and serves client content via OLE delayed rendering (`WM_RENDERFORMAT`).
 //!
 //! The `zwlr-data-control-unstable-v1` fallback (older wlroots/KWin) is a follow-up. The module
-//! compiles on Linux and Windows; the [`session`] coordinator is backend-agnostic.
+//! compiles on Linux; the [`session`] coordinator is backend-agnostic.
 
 #[cfg(target_os = "linux")]
 mod mutter;
 #[cfg(target_os = "linux")]
 mod wayland;
-#[cfg(target_os = "windows")]
-mod windows;
-/// Pure Win32-clipboard ↔ wire byte conversions (CF_HTML offset math, UTF-16 text, RTF NUL
-/// trimming). Free of any Win32 dependency, so it compiles — and its unit tests run — on any host
-/// (`cfg(test)`); the Windows backend is the only production consumer.
-#[cfg(any(target_os = "windows", test))]
-mod winfmt;
 
 pub mod session;
 
@@ -67,11 +58,6 @@ pub enum PasteResponder {
     /// trailing `SelectionWriteDone` call that Mutter's transfer requires.
     #[cfg(target_os = "linux")]
     Channel(tokio::sync::oneshot::Sender<Vec<u8>>),
-    /// Windows: hand the bytes to the `WM_RENDERFORMAT` handler blocking the clipboard message-loop
-    /// thread, which then `SetClipboardData`s them for the pasting app (`std::sync::mpsc`, since that
-    /// thread waits synchronously — see [`windows`]).
-    #[cfg(target_os = "windows")]
-    Sync(std::sync::mpsc::Sender<Vec<u8>>),
 }
 
 impl PasteResponder {
@@ -84,10 +70,6 @@ impl PasteResponder {
             }
             #[cfg(target_os = "linux")]
             PasteResponder::Channel(tx) => {
-                let _ = tx.send(bytes);
-            }
-            #[cfg(target_os = "windows")]
-            PasteResponder::Sync(tx) => {
                 let _ = tx.send(bytes);
             }
         }
@@ -103,24 +85,19 @@ fn fulfill_paste(fd: OwnedFd, bytes: &[u8]) -> std::io::Result<()> {
     Ok(())
 }
 
-/// The active host clipboard backend, chosen per session: `ext-data-control`
-/// (KWin/wlroots/Hyprland/Sway) or Mutter's direct RemoteDesktop clipboard (GNOME) on Linux, or the
-/// Win32 clipboard on Windows. Presented as one type so the [`session`] coordinator is
-/// backend-agnostic.
+/// The active Linux host clipboard backend, chosen per session: `ext-data-control`
+/// (KWin/wlroots/Hyprland/Sway) or Mutter's direct RemoteDesktop clipboard (GNOME).
 pub enum HostClipboard {
     #[cfg(target_os = "linux")]
     DataControl(wayland::ClipboardBackend),
     #[cfg(target_os = "linux")]
     Mutter(mutter::MutterClipboard),
-    #[cfg(target_os = "windows")]
-    Windows(windows::WindowsClipboard),
 }
 
 impl HostClipboard {
-    /// Open whichever backend this session supports. Linux tries data-control first
-    /// (KWin/wlroots/Hyprland/Sway) then Mutter's direct clipboard (GNOME); Windows opens the Win32
-    /// clipboard. Errors when none is available (gamescope, no live compositor) — the caller then
-    /// reports `BACKEND_UNAVAILABLE`.
+    /// Open whichever Linux backend this session supports. The host tries data-control first
+    /// (KWin/wlroots/Hyprland/Sway) then Mutter's direct clipboard (GNOME). Errors when none is
+    /// available (gamescope, no live compositor); the caller then reports `BACKEND_UNAVAILABLE`.
     pub async fn open() -> anyhow::Result<(
         HostClipboard,
         tokio::sync::mpsc::UnboundedReceiver<ClipEvent>,
@@ -143,11 +120,6 @@ impl HostClipboard {
             })?;
             Ok((HostClipboard::Mutter(m), rx))
         }
-        #[cfg(target_os = "windows")]
-        {
-            let (b, rx) = windows::WindowsClipboard::open().await?;
-            Ok((HostClipboard::Windows(b), rx))
-        }
     }
 
     /// The current host selection's wire MIMEs (empty = nothing to offer).
@@ -157,8 +129,6 @@ impl HostClipboard {
             HostClipboard::DataControl(b) => b.current_wire_mimes(),
             #[cfg(target_os = "linux")]
             HostClipboard::Mutter(m) => m.current_wire_mimes(),
-            #[cfg(target_os = "windows")]
-            HostClipboard::Windows(w) => w.current_wire_mimes(),
         }
     }
 
@@ -170,11 +140,6 @@ impl HostClipboard {
             #[cfg(target_os = "linux")]
             HostClipboard::Mutter(m) => {
                 m.set_offer(wire_mimes);
-                Ok(())
-            }
-            #[cfg(target_os = "windows")]
-            HostClipboard::Windows(w) => {
-                w.set_offer(wire_mimes);
                 Ok(())
             }
         }
@@ -190,17 +155,11 @@ impl HostClipboard {
                 m.clear_offer();
                 Ok(())
             }
-            #[cfg(target_os = "windows")]
-            HostClipboard::Windows(w) => {
-                w.clear_offer();
-                Ok(())
-            }
         }
     }
 
     /// Read one wire format of the current host selection (a client's fetch). Async: data-control
-    /// blocks on a pipe (offloaded), Mutter round-trips D-Bus + reads a pipe, Windows reads the
-    /// clipboard on a blocking thread.
+    /// blocks on a pipe (offloaded), or Mutter round-trips D-Bus and reads a pipe.
     pub async fn read_current(self: &Arc<Self>, wire_mime: &str) -> anyhow::Result<Vec<u8>> {
         match &**self {
             #[cfg(target_os = "linux")]
@@ -216,8 +175,6 @@ impl HostClipboard {
             }
             #[cfg(target_os = "linux")]
             HostClipboard::Mutter(m) => m.read_current(wire_mime).await,
-            #[cfg(target_os = "windows")]
-            HostClipboard::Windows(w) => w.read_current(wire_mime).await,
         }
     }
 }

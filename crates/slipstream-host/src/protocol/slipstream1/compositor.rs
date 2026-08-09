@@ -45,19 +45,9 @@ pub(super) fn resolve_compositor(
     Option<crate::vdisplay::GamescopeRoute>,
 )> {
     use crate::vdisplay::Compositor;
-    // Windows has a single virtual-display backend (ss-vdisplay); vdisplay::open ignores the compositor
-    // arg there, so short-circuit the Linux session-detection state machine with a placeholder.
-    #[cfg(target_os = "windows")]
-    {
-        let _ = (pref, dedicated_launch);
-        Ok((Compositor::Kwin, None))
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        // A client is (re)connecting → cancel any pending TV-session restore so the box stays in the
-        // streamed session (covers the keep-alive REUSE reconnect, which skips create_managed_session's
-        // own cancel — review #3). No-op when nothing is pending.
-        crate::vdisplay::cancel_pending_tv_restore();
+    // A client is (re)connecting, so cancel any pending TV-session restore before choosing a
+    // compositor. No-op when nothing is pending.
+    crate::vdisplay::cancel_pending_tv_restore();
         // Explicit operator override (legacy / CI / forcing a backend for a test) wins and is assumed
         // to come with a hand-set env — don't retarget the process env in that case.
         let overridden = ss_host_config::config().compositor.is_some();
@@ -161,8 +151,7 @@ pub(super) fn resolve_compositor(
                 "auto-detected compositor (client: auto)"
             ),
         }
-        Ok((chosen, route))
-    }
+    Ok((chosen, route))
 }
 
 #[cfg(test)]

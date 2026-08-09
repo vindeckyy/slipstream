@@ -1,6 +1,6 @@
 //! Shared PyroWave AU wire-framing (design/pyrowave-codec-plan.md §4.4) — the single source of
-//! truth for the on-wire access-unit shape, used by BOTH the Linux (dmabuf/CSC) and Windows (NV12
-//! zero-copy) host encoders. It turns pyrowave's packetized bitstream into either the **dense**
+//! truth for the on-wire access-unit shape used by the Linux dmabuf/CSC host encoder. It turns
+//! pyrowave's packetized bitstream into either the **dense**
 //! single-packet AU or the **datagram-aligned** windowed AU. Pure (no GPU/FFI) so it is unit-tested
 //! on any platform and both encoders emit byte-identical framing — the clients parse this exact
 //! layout, so it must stay in ONE place.
@@ -28,8 +28,8 @@ pub(crate) fn packet_boundary(wire_chunk: Option<usize>, dense_cap: usize) -> us
 
 /// Patch the frame's `BitstreamSequenceHeader` to signal `ycbcr_range = LIMITED`. pyrowave's C API
 /// fills the header with `= {}` (all VUI fields zeroed) and offers NO way to set colour/range, so it
-/// signals `ycbcr_range = 0 = YCBCR_RANGE_FULL` — but BOTH host CSCs (`rgb2yuv.comp` on Linux, the
-/// D3D11 `BgraToYuvPlanes` on Windows) always emit BT.709 **LIMITED** Y′CbCr (black = Y′16). A client
+/// signals `ycbcr_range = 0 = YCBCR_RANGE_FULL`, but the Linux host CSC (`rgb2yuv.comp`) always
+/// emits BT.709 **LIMITED** Y′CbCr (black = Y′16). A client
 /// that honours the VUI (the Apple wavelet decoder reads `(word1 >> 30) & 1`) then skips the
 /// limited→full expansion and shows washed-out, raised blacks. Patching the bit makes the bitstream
 /// HONEST for every client — clients that hardcode limited (the Vulkan `video_pyrowave` path) are

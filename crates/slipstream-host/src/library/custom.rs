@@ -114,11 +114,9 @@ impl From<CustomEntry> for GameEntry {
 }
 
 fn custom_path() -> PathBuf {
-    // The shared, hardened host config dir (`%ProgramData%\slipstream` / `~/.config/slipstream`, with
-    // the `SLIPSTREAM_CONFIG_DIR` override) — NOT a bespoke XDG/HOME resolver with a CWD-relative
-    // fallback. This file drives operator `prep`/`launch` command execution, so it must live where the
-    // rest of the privileged host config does and be DACL/0600-locked against a non-privileged local
-    // user planting one (security-review 2026-07-17). Matches hooks.json / the mgmt token.
+    // The shared, hardened host config dir (`~/.config/slipstream`, with the
+    // `SLIPSTREAM_CONFIG_DIR` override). This file drives operator `prep`/`launch` command
+    // execution, so it stays beside the rest of the host config with owner-only permissions.
     ss_paths::config_dir().join("library.json")
 }
 
@@ -153,14 +151,12 @@ pub fn custom_local_art_bytes(id: &str, kind: ArtKind) -> Option<(Vec<u8>, Strin
 
 fn save_custom(entries: &[CustomEntry]) -> Result<()> {
     let dir = ss_paths::config_dir();
-    // Owner-private dir (0700 / SYSTEM+Admins DACL) so a non-privileged local user can't plant a
-    // library.json whose `prep`/`launch` commands the host would later execute — the same trust
-    // boundary hooks.json and the mgmt token already use.
+    // Owner-private dir (0700) so another local user cannot plant a library.json whose
+    // `prep`/`launch` commands the host would later execute.
     ss_paths::create_private_dir(&dir).with_context(|| format!("create {}", dir.display()))?;
     let json = serde_json::to_string_pretty(entries)?;
     // Write-then-rename so a crash mid-write never truncates the catalog; `write_secret_file` gives
-    // the temp file its restrictive perms (0600 / SYSTEM+Admins DACL) before the rename carries them
-    // to the final path.
+    // the temporary file restrictive owner-only permissions before the rename.
     let tmp = custom_path().with_extension("json.tmp");
     ss_paths::write_secret_file(&tmp, json.as_bytes())
         .with_context(|| format!("write {}", tmp.display()))?;
@@ -377,8 +373,7 @@ fn emit_changed(source: &str) {
 
 /// A digits-only Steam appid: the sole client-influenced part of a Steam launch, validated before it
 /// is interpolated into any command / URI (so a client-sent id can never carry shell or URI syntax).
-/// Cross-platform — used by the Linux shell mapping ([`command_for`]) and the Windows spawn mapping
-/// ([`windows_launch_for`]).
+/// Used by the Linux shell mapping before the app id is interpolated into a launch URI.
 pub(crate) fn valid_steam_appid(value: &str) -> bool {
     !value.is_empty() && value.bytes().all(|b| b.is_ascii_digit())
 }

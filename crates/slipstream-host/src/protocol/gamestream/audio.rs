@@ -20,9 +20,7 @@
 // Every `unsafe` block in this file carries a `// SAFETY:` proof; enforce it.
 #![deny(clippy::undocumented_unsafe_blocks)]
 
-#[cfg(any(target_os = "linux", target_os = "windows", test))]
 use crate::audio::SAMPLE_RATE;
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 use {
     super::AUDIO_PORT,
     crate::audio::{self, AudioCapturer},
@@ -34,7 +32,6 @@ use {
     std::time::{Duration, Instant},
 };
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 type Aes128CbcEnc = cbc::Encryptor<aes::Aes128>;
 
 /// RTP payload types (moonlight-common-c `RtpAudioQueue.c`: `RTP_PAYLOAD_TYPE_AUDIO  97`,
@@ -204,16 +201,11 @@ fn build_fec_rtp(
 /// Slot for the persistent audio capturer, reused across streams (no leaked PipeWire
 /// thread). A surround session that needs a different channel count drops the cached
 /// capturer (clean RAII teardown) and opens a fresh one.
-#[cfg(target_os = "linux")]
 pub type AudioCapSlot = Arc<std::sync::Mutex<Option<Box<dyn AudioCapturer>>>>;
-#[cfg(not(target_os = "linux"))]
-pub type AudioCapSlot =
-    std::sync::Arc<std::sync::Mutex<Option<Box<dyn crate::audio::AudioCapturer>>>>;
 
 /// Spawn the audio stream thread (idempotent via `running`). Stops when `running` clears.
 /// `gcm_key`/`rikeyid` come from `/launch` and key the AES-CBC payload encryption;
 /// `params` is the negotiated [`AudioParams`] from the RTSP ANNOUNCE.
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 pub fn start(
     running: Arc<AtomicBool>,
     gcm_key: [u8; 16],
@@ -234,24 +226,6 @@ pub fn start(
         });
 }
 
-/// Stub — the audio plane needs an audio-capture backend (PipeWire on Linux, WASAPI on
-/// Windows) + libopus; this keeps the remaining targets (e.g. macOS) compiling (crate doc:
-/// "the crate compiles everywhere"). Reports failure the same way the real stream thread
-/// does: clears `running`.
-#[cfg(not(any(target_os = "linux", target_os = "windows")))]
-pub fn start(
-    running: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    _gcm_key: [u8; 16],
-    _rikeyid: i32,
-    _params: AudioParams,
-    _audio_cap: AudioCapSlot,
-    _on_lost: super::OnSessionLost,
-) {
-    tracing::error!("GameStream audio requires Linux (PipeWire) or Windows (WASAPI) + libopus");
-    running.store(false, std::sync::atomic::Ordering::SeqCst);
-}
-
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 fn run(
     running: &AtomicBool,
     gcm_key: &[u8; 16],
@@ -261,8 +235,7 @@ fn run(
     on_lost: &super::OnSessionLost,
 ) -> Result<()> {
     let sock = UdpSocket::bind(("0.0.0.0", AUDIO_PORT)).context("bind audio UDP")?;
-    // Grow SO_SNDBUF/RCVBUF; the opt-in DSCP/QoS tag happens after connect below (Windows
-    // qWAVE derives the flow from the connected 5-tuple).
+    // Grow SO_SNDBUF/RCVBUF before connecting the media socket.
     slipstream_core::transport::grow_socket_buffers(&sock);
     // The client pings the audio port (~every 500ms) so we learn where to send.
     sock.set_read_timeout(Some(Duration::from_secs(10)))?;
@@ -273,8 +246,7 @@ fn run(
         .context("audio: no client ping within 10s")?;
     sock.connect(client)
         .context("connect client audio endpoint")?;
-    // Opt-in DSCP/QoS-tag this as the audio class (SLIPSTREAM_DSCP=1); the guard keeps the
-    // Windows qWAVE flow alive for the whole stream (this function's scope IS the stream).
+    // Opt-in DSCP/QoS tagging keeps the audio flow in the media class for the whole stream.
     let _qos_flow = slipstream_core::transport::set_media_qos(
         &sock,
         slipstream_core::transport::MediaClass::Audio,
@@ -302,20 +274,18 @@ fn run(
     };
     let result = audio_body(&mut *cap, &sock, gcm_key, rikeyid, params, running, on_lost);
     cap.idle(); // parked between sessions — release the routing claim (Linux stream sink)
-    audio::park_audio_capture(audio_cap, cap); // drop on Windows (restores the default), keep on Linux
+    audio::park_audio_capture(audio_cap, cap);
     result
 }
 
 /// Opus encoder for one session: the plain stereo encoder (the live-validated path, byte
 /// identical) or the safe `opus::MSEncoder` multistream encoder for 5.1/7.1. Both are
-/// cross-platform (Linux + Windows) — surround no longer needs `audiopus_sys`.
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+/// uses the safe `opus::MSEncoder` multistream encoder for 5.1/7.1.
 enum SessionEncoder {
     Stereo(opus::Encoder),
     Surround(opus::MSEncoder),
 }
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 impl SessionEncoder {
     fn new(layout: &'static OpusLayout) -> Result<SessionEncoder> {
         // RESTRICTED_LOWDELAY (`opus::Application::LowDelay`) + hard CBR, matching Sunshine — CBR
@@ -358,7 +328,6 @@ impl SessionEncoder {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 #[allow(clippy::too_many_arguments)]
 fn audio_body(
     cap: &mut dyn AudioCapturer,

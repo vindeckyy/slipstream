@@ -11,20 +11,17 @@
 //! - **`run`** — a shell command, executed detached with the event JSON on stdin plus flat
 //!   `PF_EVENT_*` env vars (the [`crate::stream_marker`] `PF_STREAM_*` vocabulary's sibling).
 //!   Per-hook timeout (default 30 s) kills the whole process group on expiry; reaped
-//!   off-thread (the `try_recover_session` recipe). On a SYSTEM-service Windows host the
-//!   command runs **in the interactive user session** (never SYSTEM); that path cannot carry
-//!   per-process env/stdin, so the event JSON lands in a temp file appended as the command's
-//!   last argument (a console-mode Windows host gets env + stdin like Unix).
+//!   off-thread (the `try_recover_session` recipe).
 //! - **`webhook`** — POST the event JSON to an operator URL. TLS-verified, redirects are not
 //!   followed, no slipstream credentials are attached; an optional per-hook secret file yields
 //!   an `X-Slipstream-Signature: sha256=<hex HMAC>` header so the receiver can authenticate us.
 //!
 //! Bounds (RFC §9.6): at most [`MAX_CONCURRENT_HOOKS`] hook executions in flight (excess
 //! firings are dropped with a warning, never queued unboundedly), per-hook `debounce_ms`, the
-//! exec timeout + process-group kill. Trust model (RFC §9.1): `hooks.json` is
-//! operator-privileged config in the DACL'd/0700 config dir; before executing a hook whose
-//! command is a script *path*, the host verifies the file is owned by the operator (or root)
-//! and not group/world-writable — the sshd/sudoers rule — and refuses loudly otherwise.
+//! exec timeout + process-group kill. Trust model (RFC §9.1): `hooks.json` is operator-owned
+//! configuration in the private config directory; before executing a hook whose command is a
+//! script *path*, the host verifies the file is owned by the operator or root and is not
+//! group/world-writable.
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -470,18 +467,9 @@ fn exec_path_check(cmd: &str) -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(not(unix))]
-fn exec_path_check(_cmd: &str) -> Result<(), String> {
-    // Windows: hooks.json lives in the SYSTEM/Admins-DACL'd config dir and the command runs in
-    // the interactive user session (never SYSTEM) — the config itself is the trust boundary.
-    // A per-script ACL check is a hardening follow-up.
-    Ok(())
-}
-
 /// Run one hook command to completion (or timeout), blocking the reaper thread it runs on.
 /// Returns whether the command ran to completion successfully (exit 0) — the prep machinery
 /// gates each step's `undo` on it.
-#[cfg(unix)]
 fn run_hook_process(
     cmd: &str,
     event_json: &str,
@@ -523,14 +511,9 @@ fn run_hook_process(
                 if Instant::now() >= deadline {
                     tracing::warn!(cmd = %cmd, timeout_s = timeout.as_secs(),
                         "hook command timed out — killing its process group");
-                    #[cfg(target_os = "linux")]
-                    {
-                        // SAFETY: kill(2) with a negative pid signals the process group we
-                        // created via process_group(0); no memory is touched.
-                        unsafe { libc::kill(-(child.id() as i32), libc::SIGKILL) };
-                    }
-                    #[cfg(not(target_os = "linux"))]
-                    let _ = child.kill();
+                    // SAFETY: kill(2) with a negative pid signals the process group we created
+                    // via process_group(0); no memory is touched.
+                    unsafe { libc::kill(-(child.id() as i32), libc::SIGKILL) };
                     let _ = child.wait(); // reap — never leave a zombie
                     return false;
                 }
@@ -540,83 +523,6 @@ fn run_hook_process(
                 tracing::warn!(cmd = %cmd, error = %e, "hook command wait failed");
                 return false;
             }
-        }
-    }
-}
-
-/// Windows: on a SYSTEM host the command must run in the interactive user session
-/// ([`crate::interactive::spawn_in_active_session`], never SYSTEM) — that path can't carry
-/// per-process env or stdin, so the event JSON is written to a private temp file whose path is
-/// appended as the command's last argument. A console-mode host (dev) falls back to a plain
-/// spawn with the full Unix-style context (env + stdin).
-#[cfg(windows)]
-fn run_hook_process(
-    cmd: &str,
-    event_json: &str,
-    env: &[(String, String)],
-    timeout: Duration,
-) -> bool {
-    use std::io::Write;
-    let stamp = format!(
-        "ss-hook-{}-{}.json",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0)
-    );
-    let json_path = std::env::temp_dir().join(stamp);
-    if std::fs::write(&json_path, event_json).is_err() {
-        tracing::warn!(cmd = %cmd, "hook: could not write event JSON temp file");
-    }
-    let cmdline = format!("{cmd} \"{}\"", json_path.display());
-    match crate::interactive::spawn_in_active_session(&cmdline, None) {
-        Ok(pid) => {
-            tracing::debug!(cmd = %cmd, pid, "hook command launched in the interactive session");
-            // No child handle on this path — wait out the timeout, then clean the temp file.
-            std::thread::sleep(timeout);
-            let _ = std::fs::remove_file(&json_path);
-            // Detached in the user session: completion/exit status is unobservable here —
-            // report "ran" (prep `undo`s stay armed).
-            true
-        }
-        Err(e) => {
-            tracing::debug!(error = %format!("{e:#}"),
-                "interactive-session spawn unavailable — running hook in-console");
-            let mut ok = false;
-            let mut c = std::process::Command::new("cmd.exe");
-            c.arg("/C")
-                .arg(cmd)
-                .stdin(std::process::Stdio::piped())
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null());
-            c.envs(env.iter().map(|(k, v)| (k.as_str(), v.as_str())));
-            match c.spawn() {
-                Ok(mut child) => {
-                    if let Some(mut stdin) = child.stdin.take() {
-                        let _ = stdin.write_all(event_json.as_bytes());
-                    }
-                    let deadline = Instant::now() + timeout;
-                    loop {
-                        match child.try_wait().ok().flatten() {
-                            Some(status) => {
-                                ok = status.success();
-                                break;
-                            }
-                            None if Instant::now() >= deadline => {
-                                tracing::warn!(cmd = %cmd, "hook command timed out — killing it");
-                                let _ = child.kill();
-                                let _ = child.wait();
-                                break;
-                            }
-                            None => std::thread::sleep(Duration::from_millis(100)),
-                        }
-                    }
-                }
-                Err(e) => tracing::error!(cmd = %cmd, error = %e, "hook command failed to launch"),
-            }
-            let _ = std::fs::remove_file(&json_path);
-            ok
         }
     }
 }

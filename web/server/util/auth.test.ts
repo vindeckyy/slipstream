@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, test } from "node:test";
-import { configureUiPassword, uiPassword } from "./auth";
+import { configureUiPassword, isLoopbackAddress, uiPassword } from "./auth";
 
 const originalPassword = process.env.SLIPSTREAM_UI_PASSWORD;
 const originalPasswordFile = process.env.SLIPSTREAM_UI_PASSWORD_FILE;
@@ -20,6 +20,31 @@ afterEach(() => {
 });
 
 describe("web console password setup", () => {
+	test("allows first-run setup only from loopback peers", () => {
+		for (const address of [
+			"127.0.0.1",
+			"127.42.7.9",
+			"::1",
+			"[::1]",
+			"0:0:0:0:0:0:0:1",
+			"::ffff:127.0.0.1",
+			"::ffff:7f00:1",
+		]) {
+			strictEqual(isLoopbackAddress(address), true, address);
+		}
+
+		for (const address of [
+			"0.0.0.0",
+			"192.168.1.20",
+			"::",
+			"::ffff:192.168.1.20",
+			"127.0.0.999",
+			"unknown",
+		]) {
+			strictEqual(isLoopbackAddress(address), false, address);
+		}
+	});
+
 	test("persists a password and makes it available immediately", () => {
 		tempDir = mkdtempSync(join(tmpdir(), "slipstream-auth-"));
 		process.env.SLIPSTREAM_UI_PASSWORD_FILE = join(tempDir, "web-password");

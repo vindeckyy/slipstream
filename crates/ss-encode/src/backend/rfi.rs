@@ -1,24 +1,11 @@
-//! The slot-family RFI (reference-frame invalidation) recovery **policy**, shared by the three
-//! backends that answer a loss with a re-reference to a known-good older frame instead of an IDR:
-//! native AMF (user-LTR bitfield), native QSV (`mfxExtRefListCtrl` LTR) and Vulkan Video (the
-//! app-owned DPB slot table). One decision, three mechanisms — the policy lived as three
-//! hand-copies and had already diverged once (the fecbec2d taint sweep reached AMF/QSV a commit
-//! before the Vulkan backend was carved out, and Vulkan shipped without it until a later fix).
-//! The NVENC twins' *range* policy is the other half of WP7.2, in
-//! [`super::nvenc_core::plan_range_recovery`].
+//! The slot-family RFI (reference-frame invalidation) recovery policy for the Linux Vulkan Video
+//! backend. A loss is answered by re-referencing a known-good older frame instead of an IDR. The
+//! policy keeps taint tracking and anchor selection in one pure function; the backend owns the DPB
+//! slot representation and applies the returned taints.
 //!
-//! Policy only. Every mechanism — how a force is applied, how distrust is *persisted* (AMF clears
-//! its mirror slot to `None`, QSV sets a separate `ltr_tainted` flag because its mirror must keep
-//! naming the slot for the RejectedRefList, Vulkan blanks `slot_wire` to `-1` while `slot_poc`
-//! keeps the picture resident for the RPS) — stays in its backend. Callers feed their
-//! **currently-trusted** references and apply the returned taints through their own marker; that
-//! caller-side filter is exactly what makes the three persistence schemes equivalent under one
-//! pure function.
-//!
-//! The decline arm is also the backend's: AMF/QSV clear an un-consumed `pending_force` (the sweep
-//! may have emptied the slot it points at), while Vulkan deliberately leaves `pending_loss` armed
-//! (a stale arm is re-resolved at frame-build, where a failed re-pick forces the IDR that heals
-//! the stream). Do not harmonize them here.
+//! The decline arm remains the backend's responsibility. Vulkan leaves its pending loss armed so
+//! a stale loss report is re-resolved at frame build, where a failed re-pick forces the IDR that
+//! heals the stream.
 
 /// One loss event's recovery decision over a slot table: which trusted references become
 /// untrustworthy, and which one anchors the recovery.

@@ -6,7 +6,7 @@
 //! exactly how 0.22.0 shipped a stub as `slipstream-session` — and only a gate that runs
 //! the thing catches the class. The help paths are the right probe: they touch no config
 //! stores and no network, so they are safe on any runner.
-#![cfg(any(target_os = "linux", windows))]
+#![cfg(target_os = "linux")]
 
 use std::process::Command;
 

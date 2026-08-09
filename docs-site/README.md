@@ -19,16 +19,16 @@ cargo run -p slipstream-host -- openapi > api/openapi.json
 cp api/openapi.json docs-site/public/openapi.json
 ```
 
-Nothing in CI diffs the two, so the snapshot goes stale silently — that manual `cp` is the only
-thing keeping them in sync. Before publishing docs, check that they match:
+The build copies the repository spec into the public snapshot before Vite runs. CI then checks that
+the generated files match, so an API change cannot silently leave the published reference stale.
+You can run the same check locally:
 
 ```bash
 diff <(jq -S . api/openapi.json) <(jq -S . docs-site/public/openapi.json)
 ```
 
-That should print nothing. Right now it doesn't: the committed snapshot predates the
-`/api/v1/update/check`, `/api/v1/update/apply` and `/api/v1/update/status` endpoints, so the
-published `/api` reference is missing the host self-update surface — re-copy it.
+That should print nothing. If it reports a difference, regenerate the API output and rerun the
+documentation build before committing.
 
 ## Develop
 

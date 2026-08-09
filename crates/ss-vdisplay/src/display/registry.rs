@@ -2,11 +2,7 @@
 //! owner of the display lifecycle, so a display can outlive the session that created it (keep-alive)
 //! and the management API can list + release kept displays.
 //!
-//! **Windows** already owns its lifecycle in [`super::manager::VirtualDisplayManager`] (one shared
-//! IddCx monitor, refcounted, lingering); [`acquire`] there is a pass-through to `vd.create` (the
-//! manager does the leasing), and [`snapshot`]/[`release`] read/control it.
-//!
-//! **Linux** gains a per-session **pool** here, driven by the pure [`super::lifecycle`] machine. The
+//! The registry uses a per-session **pool**, driven by the pure [`super::lifecycle`] machine. The
 //! key enabling fact: KWin / Mutter / gamescope put their capture node on the *default* PipeWire
 //! daemon (`VirtualOutput::remote_fd == None`), reachable by `node_id` alone — so keeping the
 //! backend's keepalive alive keeps the node alive, and a reconnect just re-attaches a fresh PipeWire
@@ -17,7 +13,7 @@
 //!
 //! The ownership split: the session's capturer no longer owns the real keepalive — the registry does.
 //! [`acquire`] hands the session a `VirtualOutput` whose `keepalive` is a lightweight, gen-stamped
-//! `DisplayLease` (mirrors the Windows `MonitorLease`); dropping it releases the registry refcount,
+//! `DisplayLease`; dropping it releases the registry refcount,
 //! and the lifecycle machine decides linger / teardown. `capture_virtual_output`'s signature is
 //! unchanged — it just holds a lease instead of the real keepalive.
 
@@ -40,8 +36,7 @@ pub struct DisplayInfo {
     pub sessions: u32,
     /// Short client label (cert-fp prefix / peer), when the owner tracks it.
     pub client: Option<String>,
-    /// Display **group** (shared desktop) id (design §6.1): Linux gives every backend session one
-    /// group; Windows is single-group (`1`).
+    /// Display **group** (shared desktop) id (design §6.1). Each backend session uses one group.
     pub group: u32,
     /// This display's ordinal within its group, in acquire order (0-based) — the §6A "which monitor".
     pub display_index: u32,
@@ -79,8 +74,7 @@ fn topology_str() -> String {
 /// the capturer consumes as before — but its `keepalive` is a registry lease, so the *display*
 /// outlives the capturer per the keep-alive policy.
 ///
-/// Windows delegates to the [`manager`](super::manager) via `vd.create` (unchanged); Linux uses the
-/// pool below; other platforms pass through.
+/// The Linux pool below reuses compatible kept displays and creates a fresh display otherwise.
 /// `quit` is the session's deliberate-quit flag: when the session ends with it set (the client closed
 /// with the quit application code — a user "stop", not a network drop), the display is torn down
 /// **immediately**, skipping the keep-alive linger. A bare disconnect leaves it `false` → normal linger.
@@ -97,17 +91,7 @@ pub fn acquire(
     supersedes: Option<u64>,
 ) -> Result<super::VirtualOutput> {
     let backend = vd.name();
-    #[cfg(target_os = "linux")]
     let out = linux::acquire(vd, mode, quit, supersedes);
-    #[cfg(not(target_os = "linux"))]
-    let out = {
-        // Windows leases in the manager (its own linger); its deliberate-quit skip is wired through
-        // `VirtualDisplay::set_quit_flag` on the backend instance (set by the session before any
-        // `create`, so the retry-hold lease gets it too) — not through this parameter. The
-        // supersede handoff is Linux-pool-only too (the manager resizes in place).
-        let _ = (quit, supersedes);
-        vd.create(mode)
-    };
     if out.is_ok() {
         crate::emit_display_event(crate::DisplayEvent::Created {
             backend: backend.to_string(),
@@ -122,40 +106,8 @@ pub fn acquire(
 /// Snapshot the host's managed virtual displays. Cheap + side-effect-free (a state-lock read);
 /// safe per management request.
 pub fn snapshot() -> Snapshot {
-    #[cfg(target_os = "windows")]
-    {
-        // Windows slots (Stage W1): one group — the shared desktop — with the manager's slot list in
-        // acquire order (`display_index`), each at its group-layout position. `identity_slot` is the
-        // slot key (`None` for the anonymous slot 0).
-        let displays = super::manager::snapshot()
-            .into_iter()
-            .enumerate()
-            .map(|(idx, i)| DisplayInfo {
-                slot: i.gen,
-                backend: i.backend.to_string(),
-                mode: i.mode,
-                state: i.state.to_string(),
-                expires_in_ms: i.expires_in_ms,
-                sessions: i.sessions,
-                client: None,
-                group: 1,
-                display_index: idx as u32,
-                position: i.position,
-                identity_slot: (i.slot_id != 0).then_some(i.slot_id),
-                topology: topology_str(),
-            })
-            .collect();
-        Snapshot { displays }
-    }
-    #[cfg(target_os = "linux")]
-    {
-        Snapshot {
-            displays: linux::snapshot(),
-        }
-    }
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-    {
-        Snapshot::default()
+    Snapshot {
+        displays: linux::snapshot(),
     }
 }
 
@@ -164,17 +116,7 @@ pub fn snapshot() -> Snapshot {
 /// refused (releasing a display with live sessions is session management). Returns the number
 /// released.
 pub fn release(slot: Option<u64>) -> usize {
-    #[cfg(target_os = "windows")]
-    // Windows slots (Stage W1): `slot` selects one kept monitor by its gen stamp
-    // ([`DisplayInfo::slot`]); `None` releases every kept one.
-    let released = super::manager::force_release(slot);
-    #[cfg(target_os = "linux")]
     let released = linux::force_release(slot);
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-    let released = {
-        let _ = slot;
-        0
-    };
     if released > 0 {
         crate::emit_display_event(crate::DisplayEvent::Released {
             count: released as u32,
@@ -185,13 +127,10 @@ pub fn release(slot: Option<u64>) -> usize {
 
 /// Tear down a **reused-but-dead** pool entry by its generation stamp (A2). Called by the pipeline
 /// builder when the first frame fails on a display [`acquire`] handed back as REUSED — so the retry
-/// loop's next `acquire` creates fresh instead of re-wedging on the same corpse. No-op off Linux / if
-/// the entry is already gone (idempotent — the subsequent stale-gen lease drop no-ops too).
+/// loop's next `acquire` creates fresh instead of re-wedging on the same corpse. No-op if the entry
+/// is already gone (idempotent — the subsequent stale-gen lease drop no-ops too).
 pub fn mark_failed(gen: u64) {
-    #[cfg(target_os = "linux")]
     linux::mark_failed(gen);
-    #[cfg(not(target_os = "linux"))]
-    let _ = gen;
 }
 
 /// Force-release a **superseded** kept display by its generation stamp
@@ -200,24 +139,17 @@ pub fn mark_failed(gen: u64) {
 /// keep-alive policy every resize would accumulate kept monitors at stale modes. The mode-switch
 /// arm calls this once the new pipeline is up and the old capturer is dropped. Only a KEPT
 /// (lingering/pinned) entry is released — an Active one is refused, like `/display/release` — and
-/// a gen that's already gone (immediate teardown) is a no-op. No-op off Linux (Windows
-/// reconfigures the same monitor in place — nothing is superseded).
+/// a gen that's already gone (immediate teardown) is a no-op.
 pub fn retire(gen: u64) {
-    #[cfg(target_os = "linux")]
     linux::retire(gen);
-    #[cfg(not(target_os = "linux"))]
-    let _ = gen;
 }
 
 /// Invalidate every kept display of `backend` — its compositor instance is gone (a Game↔Desktop switch
 /// tore it down), so `/display/state` must stop listing it and its keepalive must be reaped
 /// (`design/gamemode-and-dedicated-sessions.md` A4). Called from the session-switch watcher / a
-/// per-connect re-detect that finds the previous backend's compositor gone. No-op off Linux.
+/// per-connect re-detect that finds the previous backend's compositor gone.
 pub fn invalidate_backend(backend: &str) {
-    #[cfg(target_os = "linux")]
     linux::invalidate_backend(backend);
-    #[cfg(not(target_os = "linux"))]
-    let _ = backend;
 }
 
 // ---------------------------------------------------------------------------------------------

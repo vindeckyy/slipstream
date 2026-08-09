@@ -1,7 +1,7 @@
 //! The native input plane (plan §W1 — carved out of the [`super`] module): the client→host input
 //! thread and the per-pad virtual-gamepad router ([`Pads`]) that fans mixed controller kinds out to
-//! the right injector backend (uinput / UHID on Linux, XUSB / UMDF on Windows), plus rumble
-//! feedback. `serve_session` spawns [`input_thread`] and feeds it a channel of [`ClientInput`].
+//! the right Linux injector backend, plus rumble feedback. `serve_session` spawns [`input_thread`]
+//! and feeds it a channel of [`ClientInput`].
 
 use super::*;
 
@@ -85,12 +85,9 @@ const MAX_WIRE_PADS: usize = slipstream_core::input::MAX_PADS;
 /// indices routed to it. A manager's `active_mask` unplug sweep stays correct across managers
 /// because an index another manager owns is `None` in this one, so the sweep never touches it.
 ///
-/// - Xbox 360 / One — uinput on Linux ([`GamepadManager`](crate::inject::gamepad::GamepadManager),
-///   two identities), the XUSB companion driver (classic XInput) on Windows.
-/// - DualSense / DualSense Edge / DualShock 4 — Linux UHID `hid-playstation`, or the Windows UMDF
-///   minidriver (device-type 0/2/1).
-/// - Steam Deck — Linux UHID `hid-steam` (or usbip/gadget), or the Windows UMDF minidriver
-///   (device-type 3, Steam-Input-promoted).
+/// - Xbox 360 / One use uinput identities.
+/// - DualSense, DualSense Edge, and DualShock 4 use Linux UHID.
+/// - Steam Deck and Steam Controller variants use Linux UHID.
 ///
 /// [`resolve_pad_kind`] folds any kind a platform can't build into one it can, so this never
 /// constructs a manager the build lacks.
@@ -121,14 +118,6 @@ struct Pads {
     steamctrl2: Option<crate::inject::steam_controller2::Triton2Manager>,
     #[cfg(target_os = "linux")]
     steamctrl2_puck: Option<crate::inject::steam_controller2::Triton2Manager>,
-    #[cfg(target_os = "windows")]
-    dualsense_win: Option<crate::inject::dualsense_windows::DualSenseWindowsManager>,
-    #[cfg(target_os = "windows")]
-    dualsense_edge_win: Option<crate::inject::dualsense_edge_windows::DualSenseEdgeWindowsManager>,
-    #[cfg(target_os = "windows")]
-    dualshock4_win: Option<crate::inject::dualshock4_windows::DualShock4WindowsManager>,
-    #[cfg(target_os = "windows")]
-    steamdeck_win: Option<crate::inject::steam_deck_windows::SteamDeckWindowsManager>,
 }
 
 impl Pads {
@@ -162,14 +151,6 @@ impl Pads {
             steamctrl2: None,
             #[cfg(target_os = "linux")]
             steamctrl2_puck: None,
-            #[cfg(target_os = "windows")]
-            dualsense_win: None,
-            #[cfg(target_os = "windows")]
-            dualsense_edge_win: None,
-            #[cfg(target_os = "windows")]
-            dualshock4_win: None,
-            #[cfg(target_os = "windows")]
-            steamdeck_win: None,
         }
     }
 
@@ -267,30 +248,6 @@ impl Pads {
                     )
                 })
                 .handle(ev),
-            #[cfg(target_os = "windows")]
-            GamepadPref::DualSense => self
-                .dualsense_win
-                .get_or_insert_with(crate::inject::dualsense_windows::DualSenseWindowsManager::new)
-                .handle(ev),
-            #[cfg(target_os = "windows")]
-            GamepadPref::DualSenseEdge => self
-                .dualsense_edge_win
-                .get_or_insert_with(
-                    crate::inject::dualsense_edge_windows::DualSenseEdgeWindowsManager::new,
-                )
-                .handle(ev),
-            #[cfg(target_os = "windows")]
-            GamepadPref::DualShock4 => self
-                .dualshock4_win
-                .get_or_insert_with(
-                    crate::inject::dualshock4_windows::DualShock4WindowsManager::new,
-                )
-                .handle(ev),
-            #[cfg(target_os = "windows")]
-            GamepadPref::SteamDeck => self
-                .steamdeck_win
-                .get_or_insert_with(crate::inject::steam_deck_windows::SteamDeckWindowsManager::new)
-                .handle(ev),
             _ => self
                 .xbox360
                 .get_or_insert_with(crate::inject::gamepad::GamepadManager::new)
@@ -368,30 +325,6 @@ impl Pads {
                     m.apply_rich(rich)
                 }
             }
-            #[cfg(target_os = "windows")]
-            GamepadPref::DualSense => {
-                if let Some(m) = &mut self.dualsense_win {
-                    m.apply_rich(rich)
-                }
-            }
-            #[cfg(target_os = "windows")]
-            GamepadPref::DualSenseEdge => {
-                if let Some(m) = &mut self.dualsense_edge_win {
-                    m.apply_rich(rich)
-                }
-            }
-            #[cfg(target_os = "windows")]
-            GamepadPref::DualShock4 => {
-                if let Some(m) = &mut self.dualshock4_win {
-                    m.apply_rich(rich)
-                }
-            }
-            #[cfg(target_os = "windows")]
-            GamepadPref::SteamDeck => {
-                if let Some(m) = &mut self.steamdeck_win {
-                    m.apply_rich(rich)
-                }
-            }
             _ => {}
         }
     }
@@ -409,8 +342,8 @@ impl Pads {
 
     /// Service feedback for every instantiated backend each cycle. `rumble` carries motor
     /// force-feedback on the universal plane (every backend, tagged with its own pad index);
-    /// `hidout` carries rich feedback (lightbar / player LEDs / adaptive triggers) for the UHID/UMDF
-    /// pads. The `&mut` closure re-borrows satisfy `FnMut` for each backend.
+    /// `hidout` carries rich feedback (lightbar, player LEDs, and adaptive triggers) for the
+    /// supported pads. The `&mut` closure re-borrows satisfy `FnMut` for each backend.
     fn pump(
         &mut self,
         mut rumble: impl FnMut(u16, u16, u16),
@@ -449,24 +382,9 @@ impl Pads {
                 m.pump(&mut rumble, &mut hidout);
             }
         }
-        #[cfg(target_os = "windows")]
-        {
-            if let Some(m) = &mut self.dualsense_win {
-                m.pump(&mut rumble, &mut hidout);
-            }
-            if let Some(m) = &mut self.dualsense_edge_win {
-                m.pump(&mut rumble, &mut hidout);
-            }
-            if let Some(m) = &mut self.dualshock4_win {
-                m.pump(&mut rumble, &mut hidout);
-            }
-            if let Some(m) = &mut self.steamdeck_win {
-                m.pump(&mut rumble, &mut hidout);
-            }
-        }
     }
 
-    /// Keep every instantiated virtual UHID/UMDF pad alive during input silence (re-emit its HID
+    /// Keep every instantiated virtual UHID pad alive during input silence (re-emit its HID
     /// report so the kernel driver / SDL don't drop a held-steady pad). The X-Box pads need no
     /// heartbeat (evdev holds last-known state). Per-pad gap timers inside each manager govern the
     /// actual emit cadence, not this per-tick call.
@@ -493,22 +411,6 @@ impl Pads {
                 m.heartbeat(gap);
             }
             if let Some(m) = &mut self.steamctrl2 {
-                m.heartbeat(gap);
-            }
-        }
-        #[cfg(target_os = "windows")]
-        {
-            let gap = std::time::Duration::from_millis(8);
-            if let Some(m) = &mut self.dualsense_win {
-                m.heartbeat(gap);
-            }
-            if let Some(m) = &mut self.dualsense_edge_win {
-                m.heartbeat(gap);
-            }
-            if let Some(m) = &mut self.dualshock4_win {
-                m.heartbeat(gap);
-            }
-            if let Some(m) = &mut self.steamdeck_win {
                 m.heartbeat(gap);
             }
         }

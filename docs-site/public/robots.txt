@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://vindeckyy.github.io/slipstream/sitemap.xml

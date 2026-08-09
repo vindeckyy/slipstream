@@ -15,7 +15,6 @@ Wants=slipstream-web-init.service
 # Retry indefinitely while the host is still writing the mgmt token + identity cert. Without this,
 # systemd's default rate limit (5 starts / 10 s) plus RestartSec=2 gives up permanently after ~10 s
 # - so a console enabled before the host's first run stayed dead until someone restarted it by hand
-# (the same defect the Windows SlipstreamWeb task had).
 StartLimitIntervalSec=0
 
 [Service]
@@ -27,6 +26,8 @@ EnvironmentFile=%h/.config/slipstream/mgmt-token
 EnvironmentFile=-%h/.config/slipstream/web-password
 Environment=SLIPSTREAM_MGMT_URL=https://127.0.0.1:47990
 Environment=PORT=47992
+# First-run setup accepts the initial password only from a loopback peer. Keep the LAN bind so the
+# configured console is reachable remotely as soon as local setup completes, without a restart.
 Environment=HOST=0.0.0.0
 # Serve HTTPS (HTTP/1.1 over TLS) with the host's own identity cert; mark the
 # session cookie Secure. The host's `serve` writes these PEMs; if absent at start the unit fails and
@@ -37,7 +38,6 @@ Environment=SLIPSTREAM_UI_SECURE=1
 ExecStart=/usr/bin/slipstream-web-server
 # `always`, not `on-failure`: a console that exits 0 has still stopped serving, and on-failure would
 # leave it down. An explicit `systemctl --user stop` is still honoured (Restart= never fights that).
-# Windows parity: web-run.cmd likewise relaunches bun on ANY exit.
 Restart=always
 RestartSec=2
 

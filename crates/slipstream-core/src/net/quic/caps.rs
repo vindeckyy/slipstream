@@ -59,7 +59,7 @@ pub const VIDEO_CAP_CHACHA20: u8 = 0x40;
 /// HEVC frames carrying several slice NALs (latency plan §7 LN1: the encoder splits frames so
 /// sub-frame readback can ship early slices while the tail encodes). Decoder-level, so the
 /// EMBEDDER sets it from what its decode stack actually handles: the desktop clients' FFmpeg/
-/// D3D11VA/Vulkan-video decoders are fine, but mobile/TV MediaCodec is per-SoC — Amlogic HEVC
+/// Vulkan-video decoders are fine, but mobile/TV MediaCodec is per-SoC. Amlogic HEVC
 /// decoders (Chromecast with Google TV, Fire TV) wedge the whole DEVICE on multi-slice frames
 /// (the 0.17.0 field regression: the 4-slice Linux default froze streams on first frame and
 /// watchdog-rebooted the CCwGTV), which is exactly why Moonlight requests 1 slice per frame for
@@ -86,8 +86,8 @@ pub const HOST_CAP_CLIPBOARD: u8 = 0x02;
 
 /// [`Welcome::host_caps`] bit: the host's active inject backend can type **committed text**
 /// ([`InputKind::TextInput`](crate::input::InputKind::TextInput) — one Unicode scalar per event):
-/// Windows (`KEYEVENTF_UNICODE`) and Linux wlroots (dynamic Unicode keymap on a dedicated virtual
-/// keyboard); the KWin/libei/gamescope backends can only press layout keycodes, so those sessions
+/// Linux wlroots (dynamic Unicode keymap on a dedicated virtual keyboard); the KWin/libei/
+/// gamescope backends can only press layout keycodes, so those sessions
 /// don't set it. A capable client routes its IME's committed text (autocorrect, gesture typing,
 /// non-Latin scripts, emoji) through `TextInput` instead of lossy VK synthesis; absent the bit it
 /// keeps the VK fallback. Packs into the existing trailing `host_caps` byte — no wire-layout
@@ -129,8 +129,8 @@ pub const HOST_CAP_AUDIO_FEC: u8 = 0x20;
 
 /// [`Welcome::host_caps`] bit: the host CAN forward the cursor out-of-band (it captures cursor
 /// metadata separately from the frame — the Linux portal `SPA_META_Cursor` path; NOT gamescope,
-/// whose capture carries no cursor, and NOT Windows yet, where DWM composites into the IDD
-/// frame). Set only when the client asked via [`CLIENT_CAP_CURSOR`]; when both bits agree the
+/// whose capture carries no cursor). Set only when the client asked via [`CLIENT_CAP_CURSOR`];
+/// when both bits agree the
 /// host stops blending and ships [`CursorShape`](super::control::CursorShape) +
 /// [`CursorState`](super::datagram::CursorState) instead. `0x08` — `0x04` is
 /// [`HOST_CAP_TEXT_INPUT`], `0x01`/`0x02` are gamepad-state / clipboard.
@@ -256,7 +256,7 @@ impl ColorInfo {
         full_range: 0,
     };
 
-    /// BT.2020 PQ (HDR10), limited range — what the Windows host's HEVC VUI emits.
+    /// BT.2020 PQ (HDR10), limited range for HEVC VUI output.
     pub const HDR10_BT2020_PQ: ColorInfo = ColorInfo {
         primaries: Self::CP_BT2020,
         transfer: Self::TRC_PQ,

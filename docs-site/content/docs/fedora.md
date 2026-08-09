@@ -118,10 +118,9 @@ journalctl --user -u slipstream-host -f      # watch a client connect
 Fedora runs **firewalld** by default and the package never edits your firewall, so the host stays
 unreachable until you allow it. The RPM installs the service definitions, enable them once.
 
-The packaged unit runs `serve --gamestream`, the RPM installs it as it ships and only rewrites the
-binary path, so a host you enabled with `systemctl --user enable --now slipstream-host` serves
-**both** the native `slipstream/1` plane and stock [Moonlight](/docs/moonlight) clients, and needs
-**both** services:
+The packaged unit runs native-only `serve`, so a host you enabled with `systemctl --user enable --now
+slipstream-host` serves the native `slipstream/1` plane. Add the GameStream service only after
+starting the host with `serve --gamestream`:
 
 ```sh
 sudo firewall-cmd --reload                                            # load the installed definitions

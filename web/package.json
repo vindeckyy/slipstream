@@ -2,6 +2,7 @@
   "name": "slipstream-web",
   "private": true,
   "type": "module",
+  "packageManager": "bun@1.3.14",
   "description": "Slipstream management console, TanStack Start, React Query, and Paraglide",
   "scripts": {
     "prepare": "bun run codegen",

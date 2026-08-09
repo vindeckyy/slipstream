@@ -910,7 +910,7 @@ impl SlipstreamHidOutput {
 /// Static HDR metadata for an HDR session ([`slipstream_connection_next_hdr_meta`]): SMPTE ST.2086
 /// mastering display colour volume + CEA-861.3 content light level. All fields are in the standard
 /// HDR10 SEI fixed-point units (primaries/white in 1/50000, luminance in 0.0001 cd/m²), ready for
-/// DXGI `DXGI_HDR_METADATA_HDR10` / Apple `CAEDRMetadata` / Android `KEY_HDR_STATIC_INFO`.
+/// Apple `CAEDRMetadata` / Android `KEY_HDR_STATIC_INFO`.
 #[cfg(feature = "quic")]
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -1227,7 +1227,7 @@ pub const SLIPSTREAM_GAMEPAD_AUTO: u32 = 0;
 pub const SLIPSTREAM_GAMEPAD_XBOX360: u32 = 1;
 /// UHID DualSense (kernel `hid-playstation`): adaptive triggers, lightbar, touchpad, motion —
 /// feedback arrives on the HID-output plane ([`slipstream_connection_next_hidout`]). Honored on
-/// Linux (UHID) and Windows (UMDF minidriver) hosts; otherwise the host falls back to X-Box 360.
+/// Linux (UHID) hosts; otherwise the host falls back to X-Box 360.
 pub const SLIPSTREAM_GAMEPAD_DUALSENSE: u32 = 2;
 /// uinput X-Box One / Series pad — the X-Box 360 backend with the One/Series USB identity, so
 /// games show One/Series glyphs. XInput-identical to `XBOX360` otherwise (no game-visible gain;
@@ -1236,19 +1236,19 @@ pub const SLIPSTREAM_GAMEPAD_DUALSENSE: u32 = 2;
 pub const SLIPSTREAM_GAMEPAD_XBOXONE: u32 = 3;
 /// UHID DualShock 4 (kernel `hid-playstation` ≥ 6.2): lightbar, touchpad, motion, rumble — the
 /// touchpad/motion arrive over the rich-input plane and lightbar over the HID-output plane, like
-/// DualSense (minus adaptive triggers / player LEDs / mute). Honored on Linux (UHID) and Windows
-/// (UMDF minidriver) hosts; otherwise the host falls back to X-Box 360.
+/// DualSense (minus adaptive triggers / player LEDs / mute). Honored on Linux (UHID) hosts;
+/// otherwise the host falls back to X-Box 360.
 pub const SLIPSTREAM_GAMEPAD_DUALSHOCK4: u32 = 4;
 /// UHID classic Steam Controller (Valve `28DE:1102`, kernel `hid-steam`): one stick + dual
 /// trackpads + two grip paddles. Honored only where available (Linux hosts); else Xbox 360.
 pub const SLIPSTREAM_GAMEPAD_STEAMCONTROLLER: u32 = 5;
 /// Steam Deck controller (Valve `28DE:1205`): full Deck gamepad incl. the four back grips, both
 /// trackpads, and the IMU; re-grabbed by Steam Input with native glyphs when Steam runs on the
-/// host. Honored on Linux AND Windows hosts; else folds to X-Box 360.
+/// host. Honored on Linux hosts; otherwise folds to X-Box 360.
 pub const SLIPSTREAM_GAMEPAD_STEAMDECK: u32 = 6;
 /// DualSense Edge (Sony `054C:0DF2`): the DualSense plus two back buttons + two Fn buttons, so a
-/// client's back paddles land on native slots. Honored on Linux (UHID `hid-playstation`) and
-/// Windows (UMDF) hosts; otherwise the host falls back to X-Box 360.
+/// client's back paddles land on native slots. Honored on Linux (UHID `hid-playstation`) hosts;
+/// otherwise the host falls back to X-Box 360.
 pub const SLIPSTREAM_GAMEPAD_DUALSENSEEDGE: u32 = 7;
 /// Nintendo Switch Pro Controller (Nintendo `057E:2009`, kernel `hid-nintendo`): Nintendo glyphs +
 /// positional layout, gyro/accel, HD rumble. Honored only where available (Linux hosts, UHID
@@ -4138,7 +4138,7 @@ pub unsafe extern "C" fn slipstream_connection_frames_dropped(
 
 /// Report one decoded frame's decode-stage latency, in microseconds: the wall-clock elapsed from
 /// the access unit leaving [`slipstream_connection_next_au`] to its decoded output becoming
-/// available (VideoToolbox/D3D11VA/… produced the frame). This feeds the "Automatic" bitrate
+/// available (VideoToolbox or Vulkan produced the frame). This feeds the "Automatic" bitrate
 /// controller's decode signal — the only one that sees the client's own decoder, so the rate is
 /// capped at the real decode limit instead of climbing to the network link ceiling and choking a
 /// slower hardware decoder (a fast LAN feeding a mobile-class decoder). Measure from the AU pull,
@@ -4387,7 +4387,7 @@ pub unsafe extern "C" fn slipstream_connection_close(c: *mut SlipstreamConnectio
 // ---- Post-loss re-anchor freeze gate ----
 //
 // The shared [`ReanchorGate`](crate::reanchor::ReanchorGate) exposed for the Swift client (Rust
-// embedders — Android/Windows/Linux — use the struct directly). After an unrecoverable reference
+// embedders on Android and Linux use the struct directly). After an unrecoverable reference
 // loss the decoder silently conceals the missing-reference deltas (gray/garbage picture, no error);
 // the client freezes on the last good frame and lifts only on a proven clean re-anchor. The gate
 // takes time internally (`Instant::now`) so no timestamps cross the boundary. Drive it per session:

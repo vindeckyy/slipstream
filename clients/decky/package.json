@@ -1,6 +1,7 @@
 {
   "name": "slipstream-decky",
   "version": "0.0.1",
+  "packageManager": "pnpm@10.12.4",
   "description": "SteamOS / Steam Deck Gaming-Mode launcher for the Slipstream streaming client.",
   "type": "module",
   "scripts": {

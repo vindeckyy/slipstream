@@ -94,7 +94,7 @@ pub(crate) struct Entry {
     /// Minimum host version this plugin supports (semver). Incompatible rows still list, greyed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min_host: Option<String>,
-    /// Host platforms this plugin works on (`linux`/`windows`/`macos`). Empty ⇒ all.
+    /// Host platforms this plugin works on (`linux`). Empty means all supported hosts.
     #[serde(default)]
     pub platforms: Vec<String>,
 }
@@ -225,8 +225,7 @@ impl Entry {
                 self.min_host = None; // unusable constraint ⇒ no constraint
             }
         }
-        self.platforms
-            .retain(|p| matches!(p.as_str(), "linux" | "windows" | "macos"));
+        self.platforms.retain(|p| p == "linux");
         self.platforms.truncate(4);
         Ok(())
     }
@@ -285,13 +284,7 @@ impl Advisory {
 // ---------------------------------------------------------------- small helpers
 
 /// This host's platform token, as used in [`Entry::platforms`].
-pub(crate) const HOST_PLATFORM: &str = if cfg!(target_os = "windows") {
-    "windows"
-} else if cfg!(target_os = "macos") {
-    "macos"
-} else {
-    "linux"
-};
+pub(crate) const HOST_PLATFORM: &str = "linux";
 
 /// The running host's version — the left-hand side of every `minHost` comparison.
 pub(crate) fn host_version() -> &'static str {
@@ -383,7 +376,7 @@ mod tests {
     const GOOD: &str = r#"{"id":"rom-manager","pkg":"@slipstream/plugin-rom-manager",
         "registry":"https://example.com/npm/","title":"ROM Manager",
         "description":"d","author":"slipstream","version":"0.2.1","integrity":"sha512-AAAA",
-        "verification":{"reviewedAt":"2026-07-19"},"platforms":["linux","windows"]}"#;
+        "verification":{"reviewedAt":"2026-07-19"},"platforms":["linux"]}"#;
 
     #[test]
     fn parses_a_good_entry() {
@@ -486,7 +479,7 @@ mod tests {
     fn the_published_seed_index_parses() {
         let bytes = include_bytes!("testdata/seed-index.json");
         let idx = Index::parse(bytes).expect("the published index must parse");
-        assert_eq!(idx.plugins.len(), 2, "no entry may be silently dropped");
+        assert_eq!(idx.plugins.len(), 1, "no entry may be silently dropped");
 
         let rom = idx
             .plugins
@@ -511,18 +504,6 @@ mod tests {
         );
         assert_eq!(scope_of(&rom.pkg).unwrap(), "@slipstream");
 
-        // A windows-only entry is listed everywhere but only *installable* where it can run.
-        let playnite = idx
-            .plugins
-            .iter()
-            .find(|e| e.id == "playnite")
-            .expect("playnite entry");
-        assert_eq!(playnite.platforms, vec!["windows"]);
-        if HOST_PLATFORM == "windows" {
-            assert!(playnite.incompatible_reason().is_none());
-        } else {
-            assert!(playnite.incompatible_reason().is_some());
-        }
     }
 
     #[test]

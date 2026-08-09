@@ -137,8 +137,9 @@ export default function BitrateCalculator() {
         }}
       >
         <div style={{ gridColumn: '1 / -1' }}>
-          <label style={label}>Resolution</label>
+          <label htmlFor="bitrate-resolution" style={label}>Resolution</label>
           <select
+            id="bitrate-resolution"
             style={field}
             value={custom ? 'custom' : String(presetIdx)}
             onChange={(e) => {
@@ -162,8 +163,9 @@ export default function BitrateCalculator() {
         {custom && (
           <>
             <div>
-              <label style={label}>Width</label>
+              <label htmlFor="bitrate-width" style={label}>Width</label>
               <input
+                id="bitrate-width"
                 style={field}
                 type="number"
                 min={128}
@@ -172,8 +174,9 @@ export default function BitrateCalculator() {
               />
             </div>
             <div>
-              <label style={label}>Height</label>
+              <label htmlFor="bitrate-height" style={label}>Height</label>
               <input
+                id="bitrate-height"
                 style={field}
                 type="number"
                 min={128}
@@ -185,8 +188,9 @@ export default function BitrateCalculator() {
         )}
 
         <div>
-          <label style={label}>Frame rate</label>
+          <label htmlFor="bitrate-frame-rate" style={label}>Frame rate</label>
           <select
+            id="bitrate-frame-rate"
             style={field}
             value={fps}
             onChange={(e) => setFps(Number(e.target.value))}
@@ -200,8 +204,8 @@ export default function BitrateCalculator() {
         </div>
 
         <div>
-          <label style={label}>Chroma</label>
-          <div style={{ display: 'flex', gap: '0.4rem' }}>
+          <span style={label} id="bitrate-chroma-label">Chroma</span>
+          <div style={{ display: 'flex', gap: '0.4rem' }} role="group" aria-labelledby="bitrate-chroma-label">
             <Toggle active={!chroma444} onClick={() => setChroma444(false)}>
               4:2:0
             </Toggle>
@@ -212,8 +216,8 @@ export default function BitrateCalculator() {
         </div>
 
         <div>
-          <label style={label}>Dynamic range</label>
-          <div style={{ display: 'flex', gap: '0.4rem' }}>
+          <span style={label} id="bitrate-range-label">Dynamic range</span>
+          <div style={{ display: 'flex', gap: '0.4rem' }} role="group" aria-labelledby="bitrate-range-label">
             <Toggle active={!hdr} onClick={() => setHdr(false)}>
               SDR (8-bit)
             </Toggle>

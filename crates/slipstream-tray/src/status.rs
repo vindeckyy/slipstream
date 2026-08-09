@@ -1,9 +1,8 @@
 //! Host status model + the poller thread feeding the platform tray implementations.
 //!
-//! Two sources, service manager FIRST: the SCM (Windows) / systemd user unit (Linux) decides
-//! stopped-vs-running — a malicious local process squatting the mgmt port while the service is
-//! down can never make the tray say Running. Only when the service manager reports Running does
-//! the poller consult the host's loopback-only `GET /api/v1/local/summary` for streaming detail.
+//! Two sources, service manager first: the systemd user unit decides stopped versus running. Only
+//! when it reports Running does the poller consult the host's loopback-only
+//! `GET /api/v1/local/summary` for streaming detail.
 
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
@@ -16,7 +15,7 @@ pub enum ServiceState {
     StartPending,
     StopPending,
     Running,
-    /// Linux `ActiveState=failed` (with the sub-state), or a Windows stop with a failure exit code.
+    /// systemd `ActiveState=failed` with the sub-state.
     Failed(String),
 }
 
@@ -266,11 +265,9 @@ fn fetch_summary(agent: &ureq::Agent, url: &str) -> Option<Summary> {
     serde_json::from_str(&body).ok()
 }
 
-/// The host identity cert's SHA-256, when `cert.pem` is readable (Linux: same-user file). On
-/// Windows the file is SYSTEM/Administrators-DACL'd, so the per-user tray can't pin — `None` =
-/// accept any cert. That is acceptable here: the connection is loopback, carries no credentials,
-/// and only *reads* non-sensitive data; stopped-vs-running is decided by the service manager, so
-/// a port-squatter gains nothing but a fake "streaming" tooltip on an already-compromised box.
+/// The host identity cert's SHA-256, when `cert.pem` is readable. `None` means
+/// accept any cert. The connection is loopback, carries no credentials, and only
+/// reads non-sensitive data.
 fn load_pin() -> Option<[u8; 32]> {
     use rustls::pki_types::pem::PemObject;
     let pem = std::fs::read(slipstream_config_dir()?.join("cert.pem")).ok()?;
@@ -279,29 +276,23 @@ fn load_pin() -> Option<[u8; 32]> {
 }
 
 /// The host's config dir, mirroring `gamestream::config_dir()` without linking the host crate:
-/// `SLIPSTREAM_CONFIG_DIR` override, else `$XDG_CONFIG_HOME`/`~/.config` + `slipstream` (Linux).
-/// `None` on Windows — everything the tray would read there is SYSTEM/Admins-DACL'd anyway.
+/// `SLIPSTREAM_CONFIG_DIR` override, else `$XDG_CONFIG_HOME`/`~/.config` + `slipstream`.
 pub fn slipstream_config_dir() -> Option<std::path::PathBuf> {
     if let Some(d) = std::env::var_os("SLIPSTREAM_CONFIG_DIR") {
         if !d.is_empty() {
             return Some(std::path::PathBuf::from(d));
         }
     }
-    #[cfg(target_os = "linux")]
-    {
-        if let Some(x) = std::env::var_os("XDG_CONFIG_HOME") {
-            if !x.is_empty() {
-                return Some(std::path::PathBuf::from(x).join("slipstream"));
-            }
+    if let Some(x) = std::env::var_os("XDG_CONFIG_HOME") {
+        if !x.is_empty() {
+            return Some(std::path::PathBuf::from(x).join("slipstream"));
         }
-        std::env::var_os("HOME").map(|h| {
-            std::path::PathBuf::from(h)
-                .join(".config")
-                .join("slipstream")
-        })
     }
-    #[cfg(not(target_os = "linux"))]
-    None
+    std::env::var_os("HOME").map(|h| {
+        std::path::PathBuf::from(h)
+            .join(".config")
+            .join("slipstream")
+    })
 }
 
 /// A sync HTTPS agent over the same rustls(ring) stack the rest of the workspace uses, with a
@@ -326,44 +317,6 @@ fn agent(pin: Option<[u8; 32]>) -> ureq::Agent {
 }
 
 // ── Service-manager probe ───────────────────────────────────────────────────────────────────────
-
-/// The SCM name registered by `slipstream-host service install` (windows/service.rs SERVICE_NAME).
-#[cfg(windows)]
-pub const SERVICE_NAME: &str = "SlipstreamHost";
-
-#[cfg(windows)]
-pub fn probe_service() -> ServiceState {
-    use windows_service::service::{ServiceAccess, ServiceExitCode, ServiceState as Scm};
-    use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
-    // CONNECT + QUERY_STATUS work unprivileged. Re-opened every poll on purpose: a reinstall
-    // (delete + create) invalidates old handles, and this picks the new service up within a poll.
-    let Ok(manager) = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
-    else {
-        return ServiceState::NotInstalled;
-    };
-    let Ok(svc) = manager.open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS) else {
-        return ServiceState::NotInstalled; // ERROR_SERVICE_DOES_NOT_EXIST et al.
-    };
-    let Ok(status) = svc.query_status() else {
-        return ServiceState::NotInstalled;
-    };
-    match status.current_state {
-        Scm::StartPending => ServiceState::StartPending,
-        Scm::StopPending => ServiceState::StopPending,
-        Scm::Running | Scm::ContinuePending | Scm::PausePending | Scm::Paused => {
-            ServiceState::Running
-        }
-        Scm::Stopped => match status.exit_code {
-            // 0 = clean; 1077 = never started since boot (ERROR_SERVICE_NEVER_HAS_BEEN_RUN? no —
-            // "no attempts to start have been made"): both are an ordinary Stopped, not a failure.
-            ServiceExitCode::Win32(0) | ServiceExitCode::Win32(1077) => ServiceState::Stopped,
-            ServiceExitCode::Win32(code) => ServiceState::Failed(format!("exit code {code}")),
-            ServiceExitCode::ServiceSpecific(code) => {
-                ServiceState::Failed(format!("service error {code}"))
-            }
-        },
-    }
-}
 
 /// The systemd user unit the Linux packages install (scripts/slipstream-host.service).
 #[cfg(target_os = "linux")]

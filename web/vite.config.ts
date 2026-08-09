@@ -232,7 +232,7 @@ function authDevMiddleware(): Plugin {
  * `@unom/ui/button` pulls in `sound/defaults.js`, which resolves two sprite sheets with
  * `new URL(…, import.meta.url)` at module scope — a 4.8 MB .wav and a 2.2 MB .mp3. Vite therefore
  * emits both into `.output/public/assets/`, where they were ~7 MB of an 8.2 MB asset payload, and
- * they ride along into the Windows installer and the .deb.
+ * they would ride along into every packaged build.
  *
  * The console never mounts `UnomProviders`, so no sound player is bundled and not one byte of that
  * can ever be played. Stub the two files to an empty URL instead of shipping them.
@@ -324,9 +324,9 @@ export default defineConfig(({ mode }) => {
 				// stock self-listening entry for ours (`nitro-entry/bun-https.mjs`), which calls
 				// `Bun.serve({ tls })` so the console is served over HTTPS (HTTP/1.1 over TLS) with the
 				// host's own identity cert. (No HTTP/2 — Bun.serve has no h2 server — and no HTTP/3, which a
-				// browser won't speak against this self-signed, no-SAN host cert.) Bun is the runtime
-				// everywhere now — the Windows installer already bundles it, and the slipstream-web .deb
-				// vendors it (it can't be `node`: `Bun.serve` is a bun API). (dev `vite dev` is unaffected.)
+				// browser won't speak against this self-signed, no-SAN host cert.) Bun is the runtime for
+				// this server output (it can't be `node`: `Bun.serve` is a Bun API). (dev `vite dev` is
+				// unaffected.)
 				preset: "bun",
 				entry: fileURLToPath(
 					new URL("./nitro-entry/bun-https.mjs", import.meta.url),
@@ -334,8 +334,8 @@ export default defineConfig(({ mode }) => {
 				// BUNDLE every dependency into the server output (no externalized node_modules). Three wins:
 				// (1) the .output tree drops from ~47k files / 730 MB (the whole untree-shaken @unom/ui dep
 				// tree — payload, lexical, date-fns…) to a handful of tree-shaken chunks; (2) the output is a
-				// self-contained ~75-file `.output` the bundled `bun` runs directly (the Windows installer
-				// ships bun + that `.output`, not node + a node_modules forest); (3) it removes the
+				// self-contained ~75-file `.output` the bundled `bun` runs directly with the Linux package,
+				// not node plus a node_modules forest; (3) it removes the
 				// bare external imports (`srvx`, `seroval`…) bun couldn't resolve at runtime — the reason we
 				// used to need node. node still runs the same self-contained output for the Linux .deb.
 				noExternals: true,

@@ -1,10 +1,6 @@
-//! The generic stateful virtual-pad manager ([`UhidManager`]) shared by the five backends that
-//! keep a full per-pad report state (Linux UHID DualSense / DualShock 4 / Steam Deck, Windows UMDF
-//! DualSense / DualShock 4): event routing, the frame merge, rich-input application, the silence
-//! heartbeat, and the feedback pump with rumble + hidout dedup are written once here; a backend
-//! supplies only its per-controller pieces via [`PadProto`]. The stateless backends (Linux uinput,
-//! Windows XUSB) write frames straight through with no state vec / heartbeat / rich plane, so they
-//! use [`PadSlots`] directly instead.
+//! The generic stateful virtual-pad manager ([`UhidManager`]) shared by the Linux UHID backends:
+//! event routing, frame merge, rich-input application, silence heartbeat, and feedback pump with
+//! rumble and hidout dedup live here. Stateless Linux uinput backends use [`PadSlots`] directly.
 
 use crate::hidout_dedup::HidoutDedup;
 use crate::pad_slots::PadSlots;
@@ -33,8 +29,7 @@ pub struct PadFeedback {
     /// The backend's driver-channel drain OVERFLOWED and dropped reports this poll — downstream
     /// feedback state is unknown. [`UhidManager::pump`] resyncs: it forwards a rumble stop
     /// (bounded and imperceptible — a game still rumbling re-asserts the level within a poll or
-    /// two) and re-arms the rich-plane dedup so the next LED/trigger state re-forwards. Only the
-    /// Windows ring drains can set it; Linux kernel channels drain losslessly.
+    /// two) and re-arms the rich-plane dedup so the next LED/trigger state re-forwards.
     pub resync: bool,
 }
 
@@ -45,17 +40,17 @@ pub struct PadFeedback {
 /// The `&mut self` receivers let a backend carry configuration (the Steam-paddle remap policy, a
 /// pad identity); most implementations are otherwise stateless.
 pub trait PadProto {
-    /// The per-pad transport (a UHID fd, a UMDF shared-memory channel, the Deck transport enum).
+    /// The per-pad transport and the Deck transport enum.
     type Pad;
     /// The pad's full report state (`DsState`, `SteamState`) — `Copy` like both of those, so the
     /// manager can hand a snapshot to [`write_state`](Self::write_state) without borrow gymnastics.
     type State: Copy;
 
-    /// Backend tag in the shared lifecycle log lines, e.g. `"DualSense/Windows"`.
+    /// Backend tag in the shared lifecycle log lines.
     const LABEL: &'static str;
     /// Device name in the create-failure line ("virtual `<DEVICE>` creation failed …").
     const DEVICE: &'static str;
-    /// Suffix for the create-failure line — empty on Linux, the driver-install hint on Windows.
+    /// Suffix for the create-failure line.
     const CREATE_HINT: &'static str;
 
     /// Open the virtual pad for wire index `idx`, logging its own success line (it knows the
@@ -81,8 +76,8 @@ pub trait PadProto {
     }
 }
 
-/// All virtual pads of one stateful backend, driven from decoded controller events — the shared
-/// skeleton of the five UHID/UMDF managers. Method surface (`new` / `handle` / `apply_rich` /
+/// All virtual pads of one stateful backend, driven from decoded controller events. The shared
+/// method surface (`new` / `handle` / `apply_rich` /
 /// `pump` / `heartbeat`) is exactly what the session input thread already drives, so each backend
 /// re-exports itself as a `pub type … = UhidManager<…Proto>;` alias.
 pub struct UhidManager<B: PadProto> {
@@ -157,15 +152,14 @@ impl OverflowWarn {
 /// INVARIANT: must stay comfortably above SDL's ~2 s internal rumble resend
 /// (`SDL_RUMBLE_RESEND_MS`) — SDL-class writers re-assert a held level on that cadence *because*
 /// real firmware decays, and that re-assert is what keeps a legitimately-held long rumble alive
-/// here. The XUSB path shares this window via [`rumble_idle_timeout`] (every XUSB write IS a
-/// rumble write, so its any-activity keying is already rumble-keyed by construction).
+/// here. The controller transport shares this window via [`rumble_idle_timeout`].
 const RUMBLE_IDLE_TIMEOUT: Duration = Duration::from_millis(2500);
 
 /// The abandoned-rumble force-off window, env-hatched: `SLIPSTREAM_RUMBLE_IDLE_MS` overrides
 /// [`RUMBLE_IDLE_TIMEOUT`]; `0` disables the watchdog entirely (the pre-watchdog behavior, for
 /// bisecting field reports). Non-zero overrides are floored just above SDL's ~2 s resend so the
-/// hatch cannot cut legitimately-held rumble (see the INVARIANT above). Shared by the UHID/UMDF
-/// pump, the Windows XUSB manager, and the Linux uinput FF mixer.
+/// hatch cannot cut legitimately-held rumble (see the INVARIANT above). Shared by the UHID
+/// pump and the Linux uinput FF mixer.
 pub(crate) fn rumble_idle_timeout() -> Option<Duration> {
     static VAL: std::sync::OnceLock<Option<Duration>> = std::sync::OnceLock::new();
     *VAL.get_or_init(|| match std::env::var("SLIPSTREAM_RUMBLE_IDLE_MS") {
@@ -254,7 +248,7 @@ impl<B: PadProto> UhidManager<B> {
     }
 
     /// Re-emit each live pad's CURRENT report if it's been silent for `max_gap` (or the backend
-    /// forces a write). The UHID/UMDF drivers treat a multi-second input silence — a held-steady
+    /// forces a write). The UHID driver treats a multi-second input silence — a held-steady
     /// stick produces no wire events — as an unplugged controller; re-sending the current state is
     /// idempotent (a stale-but-correct frame, never a phantom input).
     pub fn heartbeat(&mut self, max_gap: Duration) {

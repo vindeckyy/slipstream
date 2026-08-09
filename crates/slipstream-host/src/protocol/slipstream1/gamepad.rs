@@ -4,8 +4,7 @@
 //! Steam-conflict degrades. Pure selection ([`pick_gamepad`]) is separated from the env/logging
 //! shell ([`resolve_gamepad`]) and the per-pad variant ([`resolve_pad_kind`]); the platform degrades
 //! (`degrade_if_no_uhid`, `physical_steam_product_present`, `degrade_steam_on_conflict`) are
-//! cfg-split linux/other and MUST be re-verified on Windows when touched (Linux clippy can't see the
-//! non-linux copies).
+//! resolved against the live Linux input devices.
 
 use super::*;
 
@@ -38,8 +37,6 @@ pub(super) fn resolve_pad_kind(kind: GamepadPref) -> GamepadPref {
     let chosen = pick_gamepad(
         kind,
         None,
-        cfg!(target_os = "linux"),
-        cfg!(target_os = "windows"),
     );
     degrade_steam_on_conflict(degrade_if_no_uhid(chosen))
 }
@@ -47,12 +44,8 @@ pub(super) fn resolve_pad_kind(kind: GamepadPref) -> GamepadPref {
 /// Pure selection of the session's virtual-gamepad backend: the client's explicit `pref` wins,
 /// then the host's `SLIPSTREAM_GAMEPAD` env var (under a client `Auto`), then X-Box 360.
 ///
-/// `linux`/`windows` flag the host platform. DualSense and DualShock 4 each have both a Linux (UHID
-/// hid-playstation) and a Windows (UMDF minidriver) backend; on any other platform such a wish degrades
-/// to X-Box 360 (never an error: a session without rich pads still streams). X-Box One/Series is a
-/// distinct uinput *identity* on Linux, but XInput-identical to the 360 pad on Windows (the XUSB
-/// companion presents a 360 identity), so it degrades to `Xbox360` there.
-fn pick_gamepad(pref: GamepadPref, env: Option<&str>, linux: bool, windows: bool) -> GamepadPref {
+/// Unsupported requests degrade to X-Box 360, so a session without a rich pad still streams.
+fn pick_gamepad(pref: GamepadPref, env: Option<&str>) -> GamepadPref {
     let want = match pref {
         GamepadPref::Auto => env
             .and_then(GamepadPref::from_name)
@@ -60,42 +53,26 @@ fn pick_gamepad(pref: GamepadPref, env: Option<&str>, linux: bool, windows: bool
         explicit => explicit,
     };
     match want {
-        // DualSense / DualShock 4: Linux UHID hid-playstation, or the Windows UMDF minidriver backend.
-        GamepadPref::DualSense if linux || windows => GamepadPref::DualSense,
-        GamepadPref::DualShock4 if linux || windows => GamepadPref::DualShock4,
-        // One/Series: a real, distinct uinput identity on Linux; folded into the 360 backend on
-        // Windows (XInput can't tell them apart anyway).
-        GamepadPref::XboxOne if linux => GamepadPref::XboxOne,
-        // Steam Deck / classic Steam Controller: Linux UHID hid-steam (Windows Steam devices
-        // are the N4 spike).
-        GamepadPref::SteamDeck if linux => GamepadPref::SteamDeck,
-        GamepadPref::SteamController if linux => GamepadPref::SteamController,
-        // Windows virtual Deck: the UMDF device-type-3 identity, Steam-Input-promoted via the
-        // MI_02 hardware-id synthesis (gamepad-new-types N4) — native Deck glyphs + trackpads +
-        // gyro + back grips, replacing the old fold to DualSense.
-        GamepadPref::SteamDeck if windows => GamepadPref::SteamDeck,
-        // DualSense Edge: Linux UHID hid-playstation / Windows UMDF (device-type 2) — the plain
-        // DualSense plus native back/Fn buttons, so the wire paddles stop hitting the fold/drop
-        // policy. Degrades to Xbox360 elsewhere like its siblings.
-        GamepadPref::DualSenseEdge if linux || windows => GamepadPref::DualSenseEdge,
-        // Switch Pro: Linux UHID hid-nintendo (≥ 5.16) — correct Nintendo glyphs + positional
-        // layout + gyro + HD rumble. No Windows backend; folds to Xbox360 there.
-        GamepadPref::SwitchPro if linux => GamepadPref::SwitchPro,
+        GamepadPref::DualSense
+        | GamepadPref::DualShock4
+        | GamepadPref::XboxOne
+        | GamepadPref::SteamDeck
+        | GamepadPref::SteamController
+        | GamepadPref::DualSenseEdge
+        | GamepadPref::SwitchPro
+        | GamepadPref::SteamController2
+        | GamepadPref::SteamController2Puck => want,
         // New Steam Controller (2026, `28DE:1302`): passed through as-is on Linux — the Triton
         // UHID backend mirrors the client's raw reports under the real identity and Steam on
         // the host drives it over hidraw (no kernel driver binds the PID; Steam Input is the
         // consumer). No Windows backend; folds to Xbox360 there.
-        GamepadPref::SteamController2 if linux => GamepadPref::SteamController2,
-        GamepadPref::SteamController2Puck if linux => GamepadPref::SteamController2Puck,
         _ => GamepadPref::Xbox360,
     }
 }
 
 /// Runtime degrade for the Linux UHID backends (DualSense / DualShock 4 / Steam Deck): if
 /// `/dev/uhid` can't be opened for write *now*, fall back to the uinput X-Box 360 pad rather than a
-/// dead controller (the UHID device-create would just fail). Cheap — opens + drops the char device,
-/// no `UHID_CREATE2`, so no device is created. A no-op on non-Linux (those backends are UMDF/uinput).
-#[cfg(target_os = "linux")]
+/// dead controller. Cheap, opens and drops the character device, and creates no device.
 fn degrade_if_no_uhid(chosen: GamepadPref) -> GamepadPref {
     let needs_uhid = matches!(
         chosen,
@@ -123,16 +100,10 @@ fn degrade_if_no_uhid(chosen: GamepadPref) -> GamepadPref {
     chosen
 }
 
-#[cfg(not(target_os = "linux"))]
-fn degrade_if_no_uhid(chosen: GamepadPref) -> GamepadPref {
-    chosen
-}
-
 /// The Valve product id (`28DE:xxxx`) a virtual Steam backend enumerates as, or `None` for a
 /// non-Steam backend. This is the identity the conflict gate compares against the *physical* Valve
 /// devices attached to the host: only a genuine duplicate (same VID **and** PID) confuses Steam
 /// Input, so the gate keys on the PID, not on the `28DE` vendor alone.
-#[cfg(target_os = "linux")]
 fn steam_backend_product(pref: GamepadPref) -> Option<u16> {
     match pref {
         GamepadPref::SteamDeck => Some(0x1205), // built-in Deck controller identity
@@ -161,7 +132,6 @@ fn steam_backend_product(pref: GamepadPref) -> Option<u16> {
 /// live one — read as "physical" and degraded every back-to-back Deck session to DualSense
 /// (observed live on Bazzite 2026-07-04). Ours are recognizable by the `FVPF…` serial
 /// ([`steam_proto::deck_serial`]) in `HID_UNIQ`, with the vhci path as belt and braces.
-#[cfg(target_os = "linux")]
 fn physical_steam_product_present(product: u16) -> bool {
     let needle = format!(":28DE:{product:04X}");
     let Ok(entries) = std::fs::read_dir("/sys/bus/hid/devices") else {
@@ -194,7 +164,6 @@ fn physical_steam_product_present(product: u16) -> bool {
 /// Only a same-PID duplicate degrades: a physical Steam Controller 2 no longer blocks a virtual
 /// Steam Deck (and vice versa), so a Steam Machine with an SC2 plugged in streams the pad the client
 /// actually asked for.
-#[cfg(target_os = "linux")]
 fn degrade_steam_on_conflict(chosen: GamepadPref) -> GamepadPref {
     let Some(product) = steam_backend_product(chosen) else {
         return chosen; // not a virtual Steam (28DE) pad — nothing to gate
@@ -216,11 +185,6 @@ fn degrade_steam_on_conflict(chosen: GamepadPref) -> GamepadPref {
     chosen
 }
 
-#[cfg(not(target_os = "linux"))]
-fn degrade_steam_on_conflict(chosen: GamepadPref) -> GamepadPref {
-    chosen
-}
-
 /// Resolve the client's gamepad-backend preference (the env/logging shell around
 /// [`pick_gamepad`]). Always concrete — the `Welcome` reports what the session will drive.
 pub(super) fn resolve_gamepad(pref: GamepadPref) -> GamepadPref {
@@ -228,8 +192,6 @@ pub(super) fn resolve_gamepad(pref: GamepadPref) -> GamepadPref {
     let chosen = pick_gamepad(
         pref,
         env.as_deref(),
-        cfg!(target_os = "linux"),
-        cfg!(target_os = "windows"),
     );
     // Runtime degrade (separate from the compile-time platform check above): the Linux UHID
     // backends need `/dev/uhid` usable *now*, else creating the device just fails and the controller
@@ -303,109 +265,28 @@ mod tests {
     #[test]
     fn gamepad_resolution_precedence() {
         use GamepadPref::*;
-        // Trailing args are (linux, windows).
-        // An explicit client choice wins over the env var.
-        assert_eq!(
-            pick_gamepad(DualSense, Some("xbox360"), true, false),
-            DualSense
-        );
-        assert_eq!(
-            pick_gamepad(Xbox360, Some("dualsense"), true, false),
-            Xbox360
-        );
-        // Client Auto defers to the env var.
-        assert_eq!(
-            pick_gamepad(Auto, Some("dualsense"), true, false),
-            DualSense
-        );
-        assert_eq!(pick_gamepad(Auto, Some("xbox360"), true, false), Xbox360);
-        // Auto + no env (or an unparseable one) → X-Box 360.
-        assert_eq!(pick_gamepad(Auto, None, true, false), Xbox360);
-        assert_eq!(pick_gamepad(Auto, Some("bogus"), true, false), Xbox360);
-        // DualSense: honored on Linux (UHID) AND Windows (UMDF minidriver); degrades elsewhere.
-        assert_eq!(pick_gamepad(DualSense, None, false, true), DualSense);
-        assert_eq!(
-            pick_gamepad(Auto, Some("dualsense"), false, true),
-            DualSense
-        );
-        assert_eq!(pick_gamepad(DualSense, None, false, false), Xbox360);
-        assert_eq!(pick_gamepad(Auto, Some("dualsense"), false, false), Xbox360);
-        // DualShock 4: honored on Linux (UHID) AND Windows (UMDF minidriver); degrades elsewhere.
-        assert_eq!(pick_gamepad(DualShock4, None, true, false), DualShock4);
-        assert_eq!(pick_gamepad(Auto, Some("ps4"), true, false), DualShock4);
-        assert_eq!(pick_gamepad(DualShock4, None, false, true), DualShock4);
-        assert_eq!(pick_gamepad(DualShock4, None, false, false), Xbox360);
-        // X-Box One: a distinct uinput identity on Linux, folded into the 360 pad on Windows.
-        assert_eq!(pick_gamepad(XboxOne, None, true, false), XboxOne);
-        assert_eq!(pick_gamepad(Auto, Some("series"), true, false), XboxOne);
-        assert_eq!(pick_gamepad(XboxOne, None, false, true), Xbox360);
-
-        // Steam Deck: native on Linux (UHID/usbip/gadget) AND Windows (UMDF device-type 3,
-        // Steam-Input-promoted via MI_02 — gamepad-new-types N4); Xbox360 elsewhere.
-        assert_eq!(pick_gamepad(SteamDeck, None, true, false), SteamDeck);
-        assert_eq!(pick_gamepad(SteamDeck, None, false, true), SteamDeck);
-        assert_eq!(pick_gamepad(Auto, Some("deck"), false, true), SteamDeck);
-        assert_eq!(pick_gamepad(SteamDeck, None, false, false), Xbox360);
-        // Classic Steam Controller: native on Linux (UHID hid-steam); Xbox360 elsewhere.
-        assert_eq!(
-            pick_gamepad(SteamController, None, true, false),
-            SteamController
-        );
-        assert_eq!(
-            pick_gamepad(Auto, Some("steamcontroller"), true, false),
-            SteamController
-        );
-        assert_eq!(pick_gamepad(SteamController, None, false, true), Xbox360);
-
-        // DualSense Edge: native on Linux (UHID) AND Windows (UMDF device-type 2); Xbox360
-        // elsewhere.
-        assert_eq!(
-            pick_gamepad(DualSenseEdge, None, true, false),
-            DualSenseEdge
-        );
-        assert_eq!(
-            pick_gamepad(DualSenseEdge, None, false, true),
-            DualSenseEdge
-        );
-        assert_eq!(pick_gamepad(Auto, Some("edge"), true, false), DualSenseEdge);
-        assert_eq!(pick_gamepad(DualSenseEdge, None, false, false), Xbox360);
-        // Switch Pro: native on Linux (UHID hid-nintendo); Xbox360 on Windows and elsewhere.
-        assert_eq!(pick_gamepad(SwitchPro, None, true, false), SwitchPro);
-        assert_eq!(
-            pick_gamepad(Auto, Some("switchpro"), true, false),
-            SwitchPro
-        );
-        assert_eq!(pick_gamepad(Auto, Some("switch"), true, false), SwitchPro);
-        assert_eq!(pick_gamepad(SwitchPro, None, false, true), Xbox360);
-        assert_eq!(pick_gamepad(SwitchPro, None, false, false), Xbox360);
-        // New Steam Controller (as-is Triton passthrough): native on Linux (UHID, Steam-driven);
-        // Xbox360 on Windows and elsewhere.
-        assert_eq!(
-            pick_gamepad(SteamController2, None, true, false),
-            SteamController2
-        );
-        assert_eq!(
-            pick_gamepad(Auto, Some("sc2"), true, false),
-            SteamController2
-        );
-        assert_eq!(
-            pick_gamepad(Auto, Some("ibex"), true, false),
-            SteamController2
-        );
-        assert_eq!(pick_gamepad(SteamController2, None, false, true), Xbox360);
-        assert_eq!(pick_gamepad(SteamController2, None, false, false), Xbox360);
-        assert_eq!(
-            pick_gamepad(SteamController2Puck, None, true, false),
-            SteamController2Puck
-        );
-        assert_eq!(
-            pick_gamepad(Auto, Some("sc2puck"), true, false),
-            SteamController2Puck
-        );
-        assert_eq!(
-            pick_gamepad(SteamController2Puck, None, false, true),
-            Xbox360
-        );
+        assert_eq!(pick_gamepad(DualSense, Some("xbox360")), DualSense);
+        assert_eq!(pick_gamepad(Xbox360, Some("dualsense")), Xbox360);
+        assert_eq!(pick_gamepad(Auto, Some("dualsense")), DualSense);
+        assert_eq!(pick_gamepad(Auto, Some("xbox360")), Xbox360);
+        assert_eq!(pick_gamepad(Auto, None), Xbox360);
+        assert_eq!(pick_gamepad(Auto, Some("bogus")), Xbox360);
+        assert_eq!(pick_gamepad(DualShock4, None), DualShock4);
+        assert_eq!(pick_gamepad(Auto, Some("ps4")), DualShock4);
+        assert_eq!(pick_gamepad(XboxOne, None), XboxOne);
+        assert_eq!(pick_gamepad(Auto, Some("series")), XboxOne);
+        assert_eq!(pick_gamepad(SteamDeck, None), SteamDeck);
+        assert_eq!(pick_gamepad(Auto, Some("deck")), SteamDeck);
+        assert_eq!(pick_gamepad(SteamController, None), SteamController);
+        assert_eq!(pick_gamepad(Auto, Some("steamcontroller")), SteamController);
+        assert_eq!(pick_gamepad(DualSenseEdge, None), DualSenseEdge);
+        assert_eq!(pick_gamepad(Auto, Some("edge")), DualSenseEdge);
+        assert_eq!(pick_gamepad(SwitchPro, None), SwitchPro);
+        assert_eq!(pick_gamepad(Auto, Some("switch")), SwitchPro);
+        assert_eq!(pick_gamepad(SteamController2, None), SteamController2);
+        assert_eq!(pick_gamepad(Auto, Some("sc2")), SteamController2);
+        assert_eq!(pick_gamepad(SteamController2Puck, None), SteamController2Puck);
+        assert_eq!(pick_gamepad(Auto, Some("sc2puck")), SteamController2Puck);
     }
 
     // The conflict gate keys on the exact Valve PID, so a physical Steam Controller 2 (`28DE:1302`)

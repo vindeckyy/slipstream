@@ -52,7 +52,7 @@ pub struct SessionParams {
     /// stop compositing the pointer into the video. Only set when the embedder actually
     /// draws it (the SDL presenter in desktop mouse mode) — a session that advertises it
     /// without rendering streams with NO visible cursor. The host answers `HOST_CAP_CURSOR`
-    /// when its capture can forward (Linux portal, not gamescope/Windows).
+    /// when its Linux capture can forward it.
     pub cursor_forward: bool,
     /// Video decoder preference (Settings; `SLIPSTREAM_DECODER` overrides — see
     /// `video::Decoder::new`).
@@ -346,7 +346,7 @@ fn pump(
     // the plan-§3 contract: the host only ever picks PyroWave when the client names it.
     #[allow(unused_mut)]
     let mut preferred = params.preferred_codec;
-    #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+    #[cfg(all(target_os = "linux", feature = "pyrowave"))]
     if std::env::var("SLIPSTREAM_PREFER_PYROWAVE").as_deref() == Ok("1") {
         if params.vulkan.as_ref().is_some_and(|v| v.pyrowave_decode) {
             preferred = slipstream_core::quic::CODEC_PYROWAVE;
@@ -432,7 +432,7 @@ fn pump(
     // A negotiated PyroWave session decodes on the presenter's device, no FFmpeg —
     // reachable only through the explicit preference above (resolve_codec never
     // auto-picks the bit), so failing loudly here is failing an opted-in experiment.
-    #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+    #[cfg(all(target_os = "linux", feature = "pyrowave"))]
     let built = if connector.codec == slipstream_core::quic::CODEC_PYROWAVE {
         let mode = connector.mode();
         // The wavelet bitstream has no VUI: the negotiated Welcome colour signalling IS
@@ -461,7 +461,7 @@ fn pump(
     } else {
         Decoder::new(codec_id, &params.decoder, params.vulkan.as_ref())
     };
-    #[cfg(not(all(any(target_os = "linux", windows), feature = "pyrowave")))]
+    #[cfg(not(all(target_os = "linux", feature = "pyrowave")))]
     let built = Decoder::new(codec_id, &params.decoder, params.vulkan.as_ref());
     let mut decoder = match built {
         Ok(d) => d,
@@ -707,9 +707,7 @@ fn pump(
                             #[cfg(target_os = "linux")]
                             DecodedImage::Dmabuf(_) => "vaapi",
                             DecodedImage::VkFrame(_) => "vulkan",
-                            #[cfg(windows)]
-                            DecodedImage::D3d11(_) => "d3d11va",
-                            #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+                            #[cfg(all(target_os = "linux", feature = "pyrowave"))]
                             DecodedImage::PyroWave(_) => "pyrowave",
                         };
                         if total_frames == 1 {
@@ -718,12 +716,7 @@ fn pump(
                                 #[cfg(target_os = "linux")]
                                 DecodedImage::Dmabuf(d) => (d.width, d.height, "vaapi-dmabuf"),
                                 DecodedImage::VkFrame(v) => (v.width, v.height, "vulkan-video"),
-                                #[cfg(windows)]
-                                DecodedImage::D3d11(d) => (d.width, d.height, "d3d11va"),
-                                #[cfg(all(
-                                    any(target_os = "linux", windows),
-                                    feature = "pyrowave"
-                                ))]
+                                #[cfg(all(target_os = "linux", feature = "pyrowave"))]
                                 DecodedImage::PyroWave(f) => (f.width, f.height, "pyrowave"),
                             };
                             tracing::info!(width = w, height = h, path, "first frame decoded");
@@ -791,7 +784,7 @@ fn pump(
                         }
                         // Adaptive bitrate: feed the decoder-backlog signal every frame (the network
                         // signals can't see the client's decoder). Uses the CPU-side decoded stamp:
-                        // exact for the synchronous D3D11VA/software path; received→submit for the
+                        // exact for the synchronous software path; received→submit for the
                         // async Vulkan-Video path — still the decoder-input backpressure the rate
                         // controller needs, without the per-frame fence wait the HUD stat avoids.
                         if wants_decode {

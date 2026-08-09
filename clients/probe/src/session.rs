@@ -323,7 +323,7 @@ pub(crate) async fn session(args: Args) -> Result<()> {
         tokio::spawn(async move {
             use std::sync::atomic::Ordering::Relaxed;
             // Warm up the stream — and generate desktop activity while doing so. Damage-driven
-            // capture paths (Windows IDD-push, a static headless desktop anywhere) publish NO
+            // capture paths on a static headless desktop publish NO
             // frame until something composes, and the host's pipeline build waits for a first
             // frame — so an idle virtual display would time the whole speed test out. A ±2 px
             // cursor wiggle over the wire is injected host-side into the right session/desktop.
@@ -601,7 +601,7 @@ pub(crate) async fn session(args: Args) -> Result<()> {
     //   --mic-burst  — two 20 ms Opus frames back-to-back every 40 ms, replicating a real
     //                  client's input-tap cadence (the Mac client's AVAudioEngine tap yields
     //                  ~2048-frame buffers → two packets per ~42 ms). This is the arrival
-    //                  pattern that exposed the Windows host's missing jitter buffer (constant
+            //                  pattern that exposed a missing host jitter buffer (constant
     //                  crackle, 2026-07-03): a steady 5 ms stream never trips it. Record the
     //                  host mic and count silence gaps to regression-test host-side buffering.
     #[cfg(not(target_os = "linux"))]

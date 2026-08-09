@@ -2,22 +2,21 @@
 //! records that let an update **report its own outcome across its own restart** (design §4.2,
 //! plan U1.1):
 //!
-//! - the **intent record** (`update-intent.json`) — written just before anything irreversible
-//!   (spawning the installer). It is the only witness once the installer kills this process.
+//! - the **intent record** (`update-intent.json`) — written just before a helper or source rebuild
+//!   can restart the host.
 //! - the **result record** (`update-result.json`) — the durable outcome of the *last* apply,
 //!   written either by the failing stage itself or by boot-time reconciliation.
 //!
 //! Reconciliation ([`reconcile`]) runs once per boot: intent + running-the-target-version ⇒
-//! success; intent + still the old version after the grace window ⇒ failure with the installer
-//! log path attached; a fresh intent ⇒ the apply is still in flight (the installer may not have
-//! stopped us yet). Pure over its inputs so every branch is table-testable.
+//! success; intent + still the old version after the grace window ⇒ failure; a fresh intent ⇒ the
+//! apply is still in flight. Pure over its inputs so every branch is table-testable.
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 /// How long after intent-write we still call the apply "in flight" when the running version is
 /// unchanged. Beyond it, the host restarting *without* the new version is a failed apply
-/// (installer aborted, rolled back, or never ran) — surfaced, never silent.
+/// (the helper failed, rolled back, or never ran) — surfaced, never silent.
 pub(crate) const APPLY_GRACE_SECS: u64 = 10 * 60;
 
 /// Written immediately before the point of no return.
@@ -31,10 +30,6 @@ pub(crate) struct IntentRecord {
     pub serial: u64,
     /// Unix seconds at write.
     pub started_unix: u64,
-    /// SHA-256 of the verified installer (diagnostics — ties a result to exact bytes).
-    pub installer_sha256: String,
-    /// Where the installer was told to log (`/LOG=`).
-    pub log_path: String,
     /// A source rebuild (Steam Deck `update.sh`), where version equality proves nothing —
     /// the workspace version only moves on bumps. The flow's own ordering carries the
     /// proof instead: the script restarts the host ONLY after a successful build+install,
@@ -42,23 +37,6 @@ pub(crate) struct IntentRecord {
     /// intent with this flag still present at boot ⟹ the rebuild succeeded.
     #[serde(default)]
     pub source_build: bool,
-    /// A per-user status tray was running when we spawned the installer, so boot reconciliation
-    /// should put it back.
-    ///
-    /// The installer's `StopTrays` force-kills every session's `slipstream-tray.exe` (it is one of
-    /// the files being replaced), and its `[Run]` relaunch carries `skipifsilent` — which a
-    /// console-initiated update, spawned with `/VERYSILENT`, always trips. The tray therefore died
-    /// on every in-console update and stayed dead until the next sign-in. The installer cannot fix
-    /// this itself: spawned from the SYSTEM host service, its `runasoriginaluser` resolves to
-    /// SYSTEM, which would put a SYSTEM-owned tray in the user's session squatting the
-    /// `Local\SlipstreamTray` mutex and blocking the real one. The host relaunches it instead — it
-    /// already owns the `WTSQueryUserToken` primitive for landing a process in the interactive
-    /// session as the logged-in user.
-    ///
-    /// `#[serde(default)]`: an intent written by an older host reads as false (no relaunch), which
-    /// is the pre-existing behaviour.
-    #[serde(default)]
-    pub tray_was_running: bool,
 }
 
 /// The durable outcome of the most recent apply attempt.
@@ -74,9 +52,6 @@ pub(crate) struct ResultRecord {
     pub stage: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
-    /// The installer log, when one was in play by the time it failed (or succeeded).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub log_path: Option<String>,
     /// The update is applied but activates on the next reboot (rpm-ostree).
     #[serde(default)]
     pub staged: bool,
@@ -130,8 +105,8 @@ pub(crate) fn write_json_atomic<T: Serialize>(path: &Path, value: &T) -> std::io
 pub(crate) enum Reconciled {
     /// No intent on disk — nothing to close out.
     None,
-    /// Intent is fresh and we still run the old version: the installer likely hasn't stopped
-    /// us yet (or is mid-copy). Leave the intent in place; status shows the apply in flight.
+    /// Intent is fresh and we still run the old version: the helper or source rebuild is still
+    /// active. Leave the intent in place; status shows the apply in flight.
     StillApplying,
     /// We came back at the target version.
     Success(ResultRecord),
@@ -158,7 +133,6 @@ pub(crate) fn reconcile(
             finished_unix: now_unix,
             stage: None,
             error: None,
-            log_path: Some(intent.log_path),
             staged: false,
         });
     }
@@ -170,7 +144,6 @@ pub(crate) fn reconcile(
             finished_unix: now_unix,
             stage: None,
             error: None,
-            log_path: Some(intent.log_path),
             staged: false,
         });
     }
@@ -184,11 +157,10 @@ pub(crate) fn reconcile(
         finished_unix: now_unix,
         stage: Some("restarting".into()),
         error: Some(format!(
-            "the host restarted still running {} (expected {}) — the installer aborted or \
-             rolled back; see its log",
+            "the host restarted still running {} (expected {}) — the update helper did not \
+             complete",
             intent.from, intent.to
         )),
-        log_path: Some(intent.log_path),
         staged: false,
     })
 }
@@ -203,21 +175,15 @@ mod tests {
             to: "0.23.200".into(),
             serial: 42,
             started_unix: started,
-            installer_sha256: "ab".repeat(32),
-            log_path: "/logs/update-0.23.200.log".into(),
             source_build: false,
-            tray_was_running: false,
         }
     }
 
-    /// An intent written by a host from before the tray-relaunch field must still load, and read
-    /// as "no tray to put back" — the behaviour that shipped before it existed.
+    /// Older records with removed fields remain readable because serde ignores unknown keys.
     #[test]
     fn an_intent_without_the_tray_field_deserializes_as_false() {
-        let json = r#"{"from":"0.23.100","to":"0.23.200","serial":42,"started_unix":1000,
-            "installer_sha256":"ab","log_path":"/logs/x.log"}"#;
+        let json = r#"{"from":"0.23.100","to":"0.23.200","serial":42,"started_unix":1000}"#;
         let i: IntentRecord = serde_json::from_str(json).expect("older intent still parses");
-        assert!(!i.tray_was_running);
         assert!(!i.source_build);
     }
 
@@ -248,7 +214,6 @@ mod tests {
                 Reconciled::Success(r) => {
                     assert!(r.ok);
                     assert_eq!(r.to, "0.23.200");
-                    assert_eq!(r.log_path.as_deref(), Some("/logs/update-0.23.200.log"));
                 }
                 other => panic!("expected success, got {other:?}"),
             }
@@ -264,13 +229,12 @@ mod tests {
     }
 
     #[test]
-    fn stale_intent_old_version_is_failure_with_log() {
+    fn stale_intent_old_version_is_failure() {
         match reconcile(Some(intent(1000)), "0.23.100", 1000 + APPLY_GRACE_SECS) {
             Reconciled::Failed(r) => {
                 assert!(!r.ok);
                 assert_eq!(r.stage.as_deref(), Some("restarting"));
                 assert!(r.error.as_deref().unwrap().contains("0.23.200"));
-                assert!(r.log_path.is_some());
             }
             other => panic!("expected failure, got {other:?}"),
         }

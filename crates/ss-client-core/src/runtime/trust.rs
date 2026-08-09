@@ -1,13 +1,8 @@
 //! Client identity, the known-hosts (pinned fingerprint) store, and app settings.
 //!
-//! The identity shares `~/.config/slipstream/client-{cert,key}.pem` (Linux; on Windows
-//! `%APPDATA%\slipstream`, the WinUI shell's directory) with `slipstream-probe` so a box
-//! pairs once whichever client it uses. On Windows the session binary reads the SAME
-//! stores the WinUI shell writes — pairing there makes the session connect silently,
-//! mirroring the GTK-shell arrangement on Linux. The WinUI shell re-exports THIS module
-//! (`clients/windows/src/trust.rs`), so both processes share one `Settings` shape; the
-//! shell stays the settings file's only writer (the session only reads). Pre-unification
-//! shell files (≤ 0.8.4: `show_hud`, `engine`) still load — see the migration test below.
+//! The identity shares `~/.config/slipstream/client-{cert,key}.pem` with `slipstream-probe`, so a
+//! Linux host can be paired once from either tool. The shell stays the settings file's only writer;
+//! the session reads it. Pre-unification fields such as `show_hud` and `engine` still load.
 
 use crate::profiles::{ProfilesFile, Resolution, StreamProfile};
 use anyhow::{anyhow, Context, Result};
@@ -17,16 +12,8 @@ use slipstream_core::quic::endpoint;
 use std::path::{Path, PathBuf};
 
 pub fn config_dir() -> Result<PathBuf> {
-    #[cfg(windows)]
-    {
-        let appdata = std::env::var("APPDATA").context("APPDATA unset")?;
-        Ok(PathBuf::from(appdata).join("slipstream"))
-    }
-    #[cfg(not(windows))]
-    {
-        let home = std::env::var("HOME").context("HOME unset")?;
-        Ok(PathBuf::from(home).join(".config/slipstream"))
-    }
+    let home = std::env::var("HOME").context("HOME unset")?;
+    Ok(PathBuf::from(home).join(".config/slipstream"))
 }
 
 /// This client's persistent identity, generated on first use — presented on every connect
@@ -46,8 +33,7 @@ pub fn load_or_create_identity() -> Result<(String, String)> {
     std::fs::create_dir_all(&dir)?;
     // The private key authorizes this client for full remote control of a paired host, so it must
     // never be world-readable: lock the dir to the owner (0700) and create the key 0600 from the
-    // start (`fs::write` alone honors the umask → typically 0644). The certificate is public. On
-    // non-Unix the %APPDATA% profile ACL already scopes the dir to the user, so std perms suffice.
+    // start (`fs::write` alone honors the umask → typically 0644). The certificate is public.
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -61,7 +47,7 @@ pub fn load_or_create_identity() -> Result<(String, String)> {
 
 /// Write the client's mTLS private key owner-only. On Unix the file is created with mode 0600 from
 /// the outset — an `fs::write` + later `chmod` would briefly expose it at the umask default. On
-/// other platforms std's default perms plus the %APPDATA% profile ACL scope it to the user.
+/// Other targets use their standard per-user file permissions.
 fn write_private_key(path: &std::path::Path, bytes: &[u8]) -> Result<()> {
     #[cfg(unix)]
     {
@@ -93,9 +79,8 @@ fn lock_identity_perms(dir: &std::path::Path, key: &std::path::Path) {
 /// Write a config file the safe way: a sibling temp file, then a rename over the target. A
 /// plain `fs::write` truncates first, so a crash, a full disk or a power cut between truncate
 /// and the last byte leaves an empty/half file — and these stores are what a client needs to
-/// find its hosts at all. Rename is atomic within a directory on both Unix and Windows
-/// (`MoveFileEx` with replace), so a reader ever sees the old file or the new one, never a
-/// torn one. Same discipline as the host's `session_settings.rs`.
+/// find its hosts at all. Rename is atomic within the config directory, so a reader sees the old
+/// file or the new one, never a torn one. Same discipline as the host's `session_settings.rs`.
 pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let tmp = path.with_extension("json.tmp");
     std::fs::write(&tmp, bytes)?;
@@ -144,7 +129,7 @@ pub struct KnownHost {
     /// pre-existing stores load; empty until first learned.
     #[serde(default)]
     pub mac: Vec<String>,
-    /// The host's OS-identity chain (`windows` | `macos` | `linux[/<family>][/<id>]`) learned
+    /// The host's OS-identity chain (`macos` | `linux[/<family>][/<id>]`) learned
     /// from its mDNS `os` TXT while online, so the card's OS icon survives the host going to
     /// sleep. `default` (and elided when empty) so pre-existing stores load unchanged.
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -827,18 +812,17 @@ pub struct Settings {
     /// capture — today's behavior.
     #[serde(default = "default_mouse_mode")]
     pub mouse_mode: String,
-    /// Send system chords (Alt+Tab, Super / the Windows key) to the host while input is
+    /// Send system chords (Alt+Tab, Super, and other system keys) to the host while input is
     /// captured under the `capture` mouse model; off leaves them with the local shell.
     /// Read at connect into the presenter's session opts, which turns it into an SDL
-    /// keyboard grab (a low-level hook on Windows, shortcuts-inhibit or `XGrabKeyboard`
-    /// on Linux). The `desktop` mouse model never grabs, whatever this says.
+    /// keyboard grab (shortcuts-inhibit or `XGrabKeyboard` on Linux). The `desktop` mouse model
+    /// never grabs, whatever this says.
     pub inhibit_shortcuts: bool,
     /// Stream the default microphone to the host's virtual mic source.
     pub mic_enabled: bool,
     /// Run the mic uplink through the platform's echo cancellation (the Apple/Android clients'
     /// "Echo cancellation" toggle, same `echo_cancel` key). On Linux that means preferring an
-    /// echo-cancelled PipeWire source; on Windows, asking WASAPI for the Communications stream
-    /// category so the endpoint's own canceller engages. Default ON — without it, a laptop
+    /// echo-cancelled PipeWire source. Default ON - without it, a laptop
     /// speaker playing the host's audio is heard by this device's mic and sent straight back.
     /// Only meaningful while `mic_enabled`. `SLIPSTREAM_NO_AEC=1` overrides it off (see
     /// `audio::aec_enabled`). `default` so pre-existing stores load with it on.
@@ -855,8 +839,8 @@ pub struct Settings {
     /// `"vulkan"`, `"vaapi"`, `"software"`.
     /// The `SLIPSTREAM_DECODER` env var overrides this (see `video::Decoder::new`).
     pub decoder: String,
-    /// Decode/present GPU (multi-GPU boxes): the adapter's marketing name, as the WinUI
-    /// shell's GPU picker stores it; empty = automatic. The session maps it onto the
+    /// Decode/present GPU (multi-GPU boxes): the adapter's marketing name; empty = automatic.
+    /// The session maps it onto the
     /// presenter's device pick (`SLIPSTREAM_VK_ADAPTER`). `default` so pre-existing
     /// stores (and the Linux shells, which have no picker yet) load.
     #[serde(default)]
@@ -876,7 +860,7 @@ pub struct Settings {
     pub hdr_enabled: bool,
     /// Legacy on/off for the stats overlay — superseded by `stats_verbosity` but kept
     /// written in sync (`set_stats_verbosity`) so pre-tier binaries reading the same
-    /// file keep working. `alias`: the pre-unification WinUI shell (≤ 0.8.4) persisted
+    /// file keep working. `alias`: an older shell (up to 0.8.4) persisted
     /// this as `show_hud`.
     #[serde(alias = "show_hud")]
     pub show_stats: bool,
@@ -901,11 +885,9 @@ pub struct Settings {
     /// "Invert scroll direction"). Default off = the host scrolls the way this machine does.
     #[serde(default)]
     pub invert_scroll: bool,
-    /// Playback endpoint for stream audio — on Linux the PipeWire `node.name` the
-    /// playback stream targets (`target.object`); on Windows the WASAPI `IMMDevice`
-    /// endpoint id; empty = the OS default (the Apple client's Speaker picker). The
-    /// session maps it onto `SLIPSTREAM_AUDIO_SINK`. A picked endpoint that's gone
-    /// falls back to the default on both OSes.
+    /// Playback endpoint for stream audio. On Linux this is the PipeWire `node.name` the
+    /// playback stream targets (`target.object`); empty selects the system default. The
+    /// session maps it onto `SLIPSTREAM_AUDIO_SINK`.
     #[serde(default)]
     pub speaker_device: String,
     /// Capture endpoint for the mic uplink (same semantics as `speaker_device`;
@@ -1024,13 +1006,8 @@ impl Default for Settings {
 
 impl Settings {
     fn path() -> Result<PathBuf> {
-        // The shell's settings file on each OS: the GTK shell's on Linux, the WinUI
-        // shell's on Windows. The desktop shells AND the session binary's console
-        // settings screen write it (load-modify-save per change — Gaming Mode has no
-        // other editor); a plain `--connect` stream only ever reads.
-        #[cfg(windows)]
-        return Ok(config_dir()?.join("client-windows-settings.json"));
-        #[cfg(not(windows))]
+        // The GTK shell and the session console share this settings file. A plain `--connect`
+        // stream only reads it.
         Ok(config_dir()?.join("client-gtk-settings.json"))
     }
 
@@ -1155,13 +1132,13 @@ mod tests {
         assert_eq!(round.forward_pad, "");
     }
 
-    /// A pre-unification WinUI shell settings file (≤ 0.8.4, when the shell had its own
+    /// An older shell settings file (up to 0.8.4, when the shell had its own
     /// `Settings` struct) still loads: `show_hud` migrates onto `show_stats` via the serde
     /// alias, the dropped `engine` knob is ignored, fields that file never carried
-    /// (forward_pad, fullscreen_on_stream, …) default, and the D3D11VA-era
+    /// (forward_pad, fullscreen_on_stream, and other fields) default, and the legacy
     /// `decoder: "hardware"` survives as-is (video::Decoder::new reads it as auto).
     #[test]
-    fn settings_reads_winui_shell_shape() {
+    fn settings_reads_legacy_shell_shape() {
         let shell = r#"{
             "width": 2560, "height": 1440, "refresh_hz": 120, "bitrate_kbps": 20000,
             "gamepad": "dualsense", "compositor": "auto",
@@ -1214,10 +1191,9 @@ mod tests {
         assert!(serde_json::to_string(&s).unwrap().contains("\"detailed\""));
     }
 
-    /// The WinUI shell's known-hosts shape (no `last_used` field) loads losslessly — same
-    /// filename, same directory, so on Windows the two clients genuinely share the store.
+    /// A legacy known-hosts shape without `last_used` loads losslessly.
     #[test]
-    fn known_hosts_reads_winui_shell_shape() {
+    fn known_hosts_reads_legacy_shape() {
         let shell = r#"{"hosts":[{
             "name": "Gaming PC", "addr": "192.168.1.50", "port": 9777,
             "fp_hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -1363,7 +1339,7 @@ mod tests {
                 paired: true,
                 last_used: Some(1000),
                 mac: vec!["aa:bb:cc:dd:ee:ff".into()],
-                os: "windows".into(),
+                os: "linux".into(),
                 clipboard_sync: true,
                 profile_id: Some("aaaaaaaaaaaa".into()),
                 pinned_profiles: vec!["bbbbbbbbbbbb".into()],
@@ -1387,7 +1363,7 @@ mod tests {
         assert!(k.find_by_fp(&dead).is_none());
         // What describes the BOX rides along, so a reinstall doesn't cost the user their setup.
         assert_eq!(h.mac, vec!["aa:bb:cc:dd:ee:ff".to_string()]);
-        assert_eq!(h.os, "windows");
+        assert_eq!(h.os, "linux");
         assert_eq!(h.profile_id.as_deref(), Some("aaaaaaaaaaaa"));
         assert_eq!(h.pinned_profiles, vec!["bbbbbbbbbbbb".to_string()]);
         assert_eq!(h.last_used, Some(1000));
@@ -1573,8 +1549,8 @@ mod tests {
                 },
             ],
         };
-        learn_target(&mut k, &live, "127.0.0.1", 9777).unwrap().os = "windows".into();
-        assert_eq!(k.find_by_fp(&live).unwrap().os, "windows");
+        learn_target(&mut k, &live, "127.0.0.1", 9777).unwrap().os = "linux".into();
+        assert_eq!(k.find_by_fp(&live).unwrap().os, "linux");
         assert_eq!(k.find_by_fp(&dead).unwrap().os, "");
         // No fingerprint to go on (an advert that carries none) → the address's own answer.
         learn_target(&mut k, "", "127.0.0.1", 9777).unwrap().os = "linux".into();

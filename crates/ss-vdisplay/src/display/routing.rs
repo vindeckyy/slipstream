@@ -243,7 +243,7 @@ pub fn wants_dedicated_game_session(has_launch: bool) -> bool {
     }
     #[cfg(not(target_os = "linux"))]
     {
-        false // Windows: a launching session opens into the one desktop (no gamescope)
+        false // Non-Linux targets have no gamescope launcher.
     }
 }
 

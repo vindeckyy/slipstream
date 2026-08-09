@@ -10,7 +10,7 @@
 //! a flatpak rung exists at all, and what a user-owned binary means. The ladder itself is a
 //! pure function over a [`Probe`], so every rung is unit-testable without a box.
 
-use crate::version::{conf_channel, windows_channel_of, Channel};
+use crate::version::{conf_channel, Channel};
 use std::path::{Path, PathBuf};
 
 /// Which slipstream program is asking. The rungs differ (see the module docs), and mixing them
@@ -61,7 +61,6 @@ const SYSEXT_CONF: &str = "/etc/slipstream-sysext.conf";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InstallKind {
-    WindowsInstaller,
     /// Client only — the sandboxed GTK app (`io.slipstream`).
     Flatpak,
     Sysext,
@@ -77,7 +76,6 @@ pub enum InstallKind {
 impl InstallKind {
     pub fn as_str(self) -> &'static str {
         match self {
-            InstallKind::WindowsInstaller => "windows-installer",
             InstallKind::Flatpak => "flatpak",
             InstallKind::Sysext => "sysext",
             InstallKind::RpmOstree => "rpm-ostree",
@@ -94,8 +92,6 @@ impl InstallKind {
 /// The facts the ladder reads, gathered once by [`gather`] (tests build these directly).
 #[derive(Debug, Default)]
 pub struct Probe {
-    /// Running on Windows (cfg, not a file).
-    pub windows: bool,
     /// The running exe's path.
     pub exe: PathBuf,
     /// `$HOME`, if any.
@@ -110,7 +106,7 @@ pub struct Probe {
     pub sysext_conf: Option<String>,
     /// `/run/ostree-booted` exists (rpm-ostree / bootc family).
     pub ostree_booted: bool,
-    /// The asking binary's own version string, for the Windows channel heuristic.
+    /// The asking binary's own version string.
     pub version: String,
 }
 
@@ -118,7 +114,6 @@ pub struct Probe {
 /// cache the classification, not this.
 pub fn gather(product: Product, version: &str) -> Probe {
     Probe {
-        windows: cfg!(target_os = "windows"),
         exe: std::env::current_exe().unwrap_or_default(),
         home: std::env::var_os("HOME").map(PathBuf::from),
         // Both are set by flatpak inside the sandbox; the exe path is the belt to that
@@ -137,25 +132,6 @@ pub fn gather(product: Product, version: &str) -> Probe {
 /// flatpak sandbox > sysext overlay > Nix store path > dev/source tree > user-owned Deck
 /// build > package marker (flipped to rpm-ostree when the box is ostree-booted) > `source`.
 pub fn classify(p: &Probe, product: Product) -> (InstallKind, Channel) {
-    if p.windows {
-        // The installer is the only supported Windows delivery; a loose cargo build shows
-        // itself by not living under Program Files. Channel: canary installers carry the CI
-        // run as the third component (`M.m.<run>`), see `windows_channel_of`.
-        let installed = p
-            .exe
-            .to_string_lossy()
-            .to_ascii_lowercase()
-            .contains("\\program files\\slipstream");
-        return if installed {
-            (
-                InstallKind::WindowsInstaller,
-                windows_channel_of(&p.version),
-            )
-        } else {
-            (InstallKind::Source, Channel::Stable)
-        };
-    }
-
     // Inside the sandbox `/usr` is the runtime's, so every file rung below would read the
     // WRONG box's facts. This must stay first.
     if p.flatpak {
@@ -223,9 +199,6 @@ pub fn classify(p: &Probe, product: Product) -> (InstallKind, Channel) {
 pub fn update_command(kind: InstallKind, product: Product) -> String {
     let bin = product.binary();
     match (kind, product) {
-        (InstallKind::WindowsInstaller, _) => {
-            "winget upgrade vindeckyy.SlipstreamHost   (or re-run the newer installer)".into()
-        }
         (InstallKind::Flatpak, _) => "flatpak update --user io.slipstream".into(),
         // The signed sysext feed carries the HOST image only; a client sysext is the local
         // `packaging/arch/build-sysext.sh` wrapper, which has no feed to update from.
@@ -266,7 +239,6 @@ mod tests {
 
     fn probe(exe: &str) -> Probe {
         Probe {
-            windows: false,
             exe: PathBuf::from(exe),
             home: Some(PathBuf::from("/home/deck")),
             ..Default::default()
@@ -363,22 +335,6 @@ mod tests {
             classify(&p, Product::Client),
             (InstallKind::Flatpak, Channel::Stable)
         );
-    }
-
-    #[test]
-    fn windows_installed_vs_loose_build() {
-        let mut p = Probe {
-            windows: true,
-            exe: PathBuf::from("C:\\Program Files\\Slipstream\\slipstream-host.exe"),
-            version: "0.23.10118".into(),
-            ..Default::default()
-        };
-        assert_eq!(
-            classify(&p, Product::Host),
-            (InstallKind::WindowsInstaller, Channel::Canary)
-        );
-        p.exe = PathBuf::from("C:\\src\\slipstream\\target\\release\\slipstream-host.exe");
-        assert_eq!(classify(&p, Product::Host).0, InstallKind::Source);
     }
 
     /// Command hints are user-facing copy — they must name the right package per product.

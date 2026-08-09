@@ -558,7 +558,6 @@ mod tests {
             InstallKind::Nix,
             InstallKind::Source,
             InstallKind::SteamosSource,
-            InstallKind::WindowsInstaller,
         ] {
             assert_eq!(
                 apply_route(kind, ready()),

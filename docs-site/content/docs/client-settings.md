@@ -11,14 +11,15 @@ handshake, so a setting the host can't honor is usually a quiet downgrade rather
 
 ## Where the settings live
 
-The iPhone, Android and Steam Deck (Decky) clients group settings under **General**, **Display**,
+The Android and Steam Deck (Decky) clients group settings under **General**, **Display**,
 **Input**, **Audio**, and **Controllers**. A controller-driven launch (Steam Deck Gaming Mode, or
 Android with a pad attached) opens the client's **console home**, whose settings screen is one
 steppable list; the Decky plugin has a smaller section of its own. The console home is part of the
 client, it is not the host's [web console](/docs/web-console).
 
 On a Steam Deck, Decky writes into `~/.config/slipstream/` so a change in the plugin shows up the
-next time that client starts a stream. iPhone and Android use their own app stores.
+next time that client starts a stream. Android settings are stored in the app; the Decky plugin uses
+`~/.config/slipstream/`.
 
 Changes apply to the **next** session, a running stream keeps what it started with. (*Match window*
 is the exception in effect, not in reading: it too is read at connect, but once a session is running
@@ -31,8 +32,7 @@ differences that matter are noted per setting.
 
 **Resolution**, *default: Native display.* The host builds a virtual display at exactly this size
 and streams it; nothing is scaled. Native resolves at connect to the mode of the display your window
-is on. On iPhone the app may store an explicit size (1920 x 1080 out of the box) with a **Use this
-display's mode** control that fills in what you're looking at. If the host has been pinned to stream
+is on. If the host has been pinned to stream
 a *real* monitor rather than make one, your request is declined and your client scales what it gets,
 see [Virtual displays](/docs/virtual-displays#stream-a-real-monitor-instead).
 
@@ -41,8 +41,7 @@ renegotiates the host's display and encoder, so a windowed session stays pixel-e
 degenerates to the display's native mode. Offered where the client has a resizable window; not by
 Android or Decky.
 
-**Refresh rate**, *default: Native*, the refresh of the display your window is on. iPhone may store
-an explicit rate (60 Hz by default) from the rates the device can display.
+**Refresh rate**, *default: Native*, the refresh of the display your window is on.
 
 **Bitrate**, *default: Automatic.* For H.264, HEVC and AV1, Automatic means the host's own default,
 **20 Mbps**, and it turns on two things an explicit rate switches off: adaptive bitrate, and a short
@@ -66,7 +65,7 @@ also produce it, otherwise the best codec you both speak, in the order HEVC -> A
 **PyroWave** is never auto-picked, pick it explicitly where the client's decode probe passes;
 anywhere else it isn't offered, and asking for it lands on that same order. See
 [PyroWave](/docs/pyrowave). Android hides AV1 unless the device has a hardware AV1 decoder; Android
-never offers PyroWave. iPhone hides AV1 the same way when the device has no hardware AV1 decoder.
+never offers PyroWave.
 
 **10-bit HDR**, *default: on.* Off means "never send me 10-bit", and the host then never upgrades.
 On, the stream goes 10-bit BT.2020 PQ only when the host has HDR content *and* the encoder can do
@@ -76,8 +75,7 @@ Full detail: [HDR](/docs/hdr).
 **Full chroma (4:4:4)**, *default: off.* Crisp small text and thin lines, at more bandwidth. It
 needs HEVC or PyroWave, the host's own 4:4:4 policy left on, a capture path that delivers full
 chroma, and a GPU that can encode it; if any gate fails the host says 4:2:0 before your decoder is
-built. **Today only the iPhone app actually advertises 4:4:4**, and only when its hardware decode
-probe passes. Android, Decky and the console home don't offer it.
+built. Android, Decky and the console home don't offer 4:4:4 in the current release.
 
 **Host compositor**, *default: Automatic.* Which backend the Linux host uses to drive the virtual
 output. Advisory: a host without that backend quietly auto-detects instead.
@@ -89,26 +87,26 @@ stereo. The count the host will really send comes back in the handshake, and you
 decoder from *that*, never from the request. On Linux the host claims a sink advertising exactly that
 many channels, so applications produce real surround. Offered everywhere except the Decky plugin.
 
-**Microphone**, *default: off on Android, the console home and Decky; on in the iPhone app.* Sends
+**Microphone**, *default: off on Android, the console home and Decky.* Sends
 this device's microphone to the host's virtual mic.
 
 **Echo cancellation**, *default: on.* Stops the host's audio, playing out of this device's
 speakers, from being picked up by the microphone and sent straight back. It hands the microphone
-to the system's own canceller rather than doing the work itself: on **iPhone** and **Android** that
+to the system's own canceller rather than doing the work itself: on **Android** that
 is the platform's voice-processing mode. Turn it off if your microphone already runs its own
 processing, or if the canceller makes your voice sound thin. The row sits under the microphone
-toggle and greys out while the microphone is off. Offered by iPhone, Android and the console home;
+toggle and greys out while the microphone is off. Offered by Android and the console home;
 Decky has no toggle. What it can and can't fix is in [Why do I hear myself](/docs/echo).
 
-**Speaker** and **Microphone** device pickers are not offered on iPhone, Android, Decky or the
-console home; those clients use the system default endpoints.
+**Speaker** and **Microphone** device pickers are not offered on Android, Decky or the console home;
+those clients use the system default endpoints.
 
 ## Input
 
 Touch modes, mouse modes and the in-stream chords have their own page: [Input](/docs/input). Four
 more settings are worth naming here.
 
-**Gamepad type** (*Controller type* on iPhone, Android and the console home), *default: Automatic*,
+**Gamepad type** (*Controller type* on Android and the console home), *default: Automatic*,
 which matches each physical controller. The pickers offer Xbox 360, Xbox One, DualSense and
 DualShock 4 everywhere, plus Steam Deck on Android, the console home and Decky. Your client
 declares a type per pad as it connects, Automatic declares what that controller really is, an
@@ -116,12 +114,12 @@ explicit choice declares your choice, and the host builds each virtual pad from 
 host has no backend for degrades to an Xbox 360 pad rather than failing (for example any Sony pad on
 a host that can't open `/dev/uhid`).
 
-**Forwarded controller** (*Use controller* on iPhone and the console home), *default: Automatic*,
+**Forwarded controller** (*Use controller* on the console home), *default: Automatic*,
 which forwards *every* connected controller, each as its own player. Pinning one restricts the
 session to that controller alone, single-player. The Android app has no such picker.
 
-**Capture system shortcuts** is a desktop-client setting and is not part of the iPhone, Android or
-Decky product surface.
+**Capture system shortcuts** is a desktop-client setting and is not part of the Android or Decky
+product surface.
 
 **Invert scroll direction**, *default: off*, i.e. the host scrolls the way this machine does.
 
@@ -130,23 +128,22 @@ Decky product surface.
 **Auto-wake on connect**, *default: on.* Connecting to a saved host that looks offline sends
 Wake-on-LAN and waits for it to boot, only for a host whose MAC address this client has already
 learned. Turn it off for hosts you reach over a VPN, where "offline" usually means "not reachable by
-broadcast" and the wake only adds a delay. The iPhone and Android apps have this toggle. The console
+broadcast" and the wake only adds a delay. The Android app has this toggle. The console
 home has no toggle, it offers wake as an explicit action on an offline host instead, and the Decky
 plugin always sends a wake before a stream starts. See [Wake-on-LAN](/docs/wake-on-lan).
 
-**Show game library**, *default: on in the iPhone and Android apps.* Browse a paired host's games
+**Show game library**, *default: on in the Android app.* Browse a paired host's games
 and launch one directly. There is no toggle in the console home or in Decky (Decky uses its own
 **Games** / pin flow). See [Game library](/docs/game-library).
 
-**Start streams in fullscreen**, *default: on* where the client has a windowed mode. iPhone and
-Android have no equivalent toggle; Decky always launches fullscreen.
+**Start streams in fullscreen**, *default: on* where the client has a windowed mode. Android has no
+equivalent toggle; Decky always launches fullscreen.
 
 ## Overlay
 
 **Statistics overlay**, *default: Normal.* Four tiers, Off, Compact, Normal, Detailed, each a
 superset of the one before. This setting only picks the tier a session *starts* at, you can cycle
-them live in-stream, with a shortcut that differs by platform. The iPhone app additionally lets you
-choose which corner the overlay sits in (Top Left, Top Right, Bottom Left, Bottom Right). The Decky
+them live in-stream, with a shortcut that differs by platform. The Decky
 plugin has no stats setting. The shortcuts, and every number in the overlay, are in
 [Understanding the stats overlay](/docs/stats).
 
@@ -157,8 +154,7 @@ stay global and **cannot be put in a settings profile**:
 
 - **Video decoder** and **GPU**, where the client exposes them. Automatic is vendor-ordered and
   falls back on its own; change it only when debugging, and note that `SLIPSTREAM_DECODER` overrides
-  it ([Configuration](/docs/configuration#client-side-native-clients)). iPhone and Android have
-  neither picker.
+  it ([Configuration](/docs/configuration#client-side-native-clients)). Android has no picker.
 - **Speaker** and **Microphone** device pickers, this device's audio endpoints (where offered).
 - **Forwarded controller**, which physical pad is in your hands. The *type* the host creates is a
   preference and can live in a profile; which pad you hold cannot.

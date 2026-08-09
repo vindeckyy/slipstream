@@ -1,0 +1,34 @@
+name: Bug report
+description: Report a reproducible problem with Slipstream.
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Remove tokens, private addresses, and personal data before submitting logs.
+  - type: input
+    id: version
+    attributes:
+      label: Slipstream version
+      placeholder: v0.23.0 or commit
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include Linux distribution, compositor, GPU, client, and connection type.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Describe the smallest sequence that shows the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Include a redacted excerpt if it helps diagnose the issue.

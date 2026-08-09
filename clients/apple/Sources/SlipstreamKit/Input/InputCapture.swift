@@ -123,7 +123,7 @@ public final class InputCapture {
     /// absolute-vs-relative forwarding lives entirely in StreamLayerView. Main queue.
     public var onToggleMouseMode: (() -> Void)?
 
-    /// The cross-client combos (Windows/Linux parity: Ctrl+Alt+Shift+Q/D/S), fired from the macOS
+    /// The cross-client combos (Linux/Android parity: Ctrl+Alt+Shift+Q/D/S), fired from the macOS
     /// keyDown monitor only WHILE FORWARDING — that's the state in which the app's menu (which
     /// carries the same key equivalents for discoverability) can't see them, so the monitor is the
     /// captured-state delivery path; released, the events pass through and the menu handles them.

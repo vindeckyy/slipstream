@@ -15,33 +15,8 @@
 /// also a CPU hog and can deschedule our submit threads. `critical` → highest non-realtime class
 /// (the capture+encode loop); otherwise above-normal (the send/relay thread).
 pub fn boost_thread_priority(critical: bool) {
-    // Windows host-process/thread session tuning (timer 1ms, DWM MMCSS, HIGH class once; MMCSS +
-    // keep-display-awake per thread). No-op off Windows. Both stream threads call us, so this covers
-    // capture/encode (critical) and send (non-critical).
+    // Apply the shared session hook before adjusting the Linux worker's nice value.
     crate::session_tuning::on_hot_thread();
-    #[cfg(target_os = "windows")]
-    // SAFETY: `GetCurrentThread()` returns the constant pseudo-handle for the calling thread — always
-    // valid, thread-local in meaning, and never closed (no leak/double-close). `SetThreadPriority`
-    // takes that handle plus a `THREAD_PRIORITY_*` value the windows crate defines (HIGHEST or
-    // ABOVE_NORMAL here); it only reprioritizes this OS thread, borrows no Rust memory, and its
-    // `Result` is matched (a failure is logged, never UB). No pointers, lifetimes, or aliasing.
-    unsafe {
-        use windows::Win32::System::Threading::{
-            GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_ABOVE_NORMAL,
-            THREAD_PRIORITY_HIGHEST,
-        };
-        let prio = if critical {
-            THREAD_PRIORITY_HIGHEST
-        } else {
-            THREAD_PRIORITY_ABOVE_NORMAL
-        };
-        match SetThreadPriority(GetCurrentThread(), prio) {
-            Ok(()) => tracing::debug!(critical, "thread priority raised"),
-            Err(e) => {
-                tracing::debug!(critical, error = ?e, "SetThreadPriority failed")
-            }
-        }
-    }
     #[cfg(target_os = "linux")]
     {
         // Best-effort nice of the CALLING thread. On Linux `setpriority(PRIO_PROCESS, 0, …)` acts on
@@ -66,7 +41,7 @@ pub fn boost_thread_priority(critical: bool) {
             );
         }
     }
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    #[cfg(not(target_os = "linux"))]
     {
         let _ = critical;
     }

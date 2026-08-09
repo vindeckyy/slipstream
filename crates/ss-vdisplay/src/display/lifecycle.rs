@@ -3,13 +3,10 @@
 //! One virtual display's earned refcount + linger + pin state, with **no I/O and no OS-specific
 //! types** — the registry ([`super::registry`]) executes the side effects (backend create /
 //! teardown / linger timer) that this machine's transitions dictate. Extracted so the lifecycle
-//! logic is unit- and property-testable in isolation, and so the Linux registry and (later) the
-//! Windows manager share one audited machine instead of each re-deriving refcount+linger by hand.
-//!
-//! It is the platform-neutral distillation of the model the Windows `VirtualDisplayManager` already
-//! runs on glass: `Idle → Active{refs} → Lingering{until} → Idle`, plus a `Pinned` state for
-//! keep-alive-forever. The registry pairs one [`State`] with the owned backend resource; the machine
-//! only tracks the discriminant + refcount + deadline and reports what to do.
+//! logic is unit- and property-testable in isolation. It models `Idle → Active{refs} →
+//! Lingering{until} → Idle`, plus a `Pinned` state for keep-alive-forever. The registry pairs one
+//! [`State`] with the owned backend resource; the machine only tracks the discriminant, refcount,
+//! and deadline and reports what to do.
 
 use std::time::Instant;
 

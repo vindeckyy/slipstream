@@ -18,7 +18,7 @@
 #   PF_MGMT   management-API port for --browse       (optional; client defaults to 47990)
 #   PF_CONNECT_TIMEOUT  connect budget in seconds    (optional; the plugin stretches it after
 #                        firing Wake-on-LAN so the connect survives the host's resume)
-#   PF_APPID  flatpak app id                        (default io.slipstream)
+#   PF_APPID  flatpak app id                        (default io.slipstream.Slipstream)
 #   PF_FLATPAK  override the flatpak binary path     (default: `flatpak` on PATH)
 #   PF_CLIENT_BIN  absolute path of a NATIVE client  (optional; set by the plugin when it
 #                  resolved a non-flatpak install — then the client is exec'd directly and
@@ -38,7 +38,7 @@
 # chmod), so the launch path must never depend on +x. Keep this script POSIX-sh clean.
 set -u
 
-APPID="${PF_APPID:-io.slipstream}"
+APPID="${PF_APPID:-io.slipstream.Slipstream}"
 FLATPAK="${PF_FLATPAK:-flatpak}"
 
 # The client is not always the flatpak: a sysext, a .deb/.rpm, an AUR build or a nix profile

@@ -4,11 +4,32 @@ import { DocsLayout } from 'fumadocs-ui/layouts/docs'
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/layouts/docs/page'
 import browserCollections from 'collections/browser'
 import { useFumadocsLoader } from 'fumadocs-core/source/client'
+import type { Root as PageTreeRoot } from 'fumadocs-core/page-tree'
 import { baseOptions } from '@/lib/layout.shared'
 import { source } from '@/lib/source'
 import { useMDXComponents } from '@/components/mdx'
 
 export const Route = createFileRoute('/docs/$')({
+  head: ({ params }) => {
+    const slugs = (params._splat ?? '').split('/').filter(Boolean)
+    const page = source.getPage(slugs)
+    const title = page?.data.title ?? 'Documentation'
+    const description = page?.data.description ?? 'Slipstream documentation.'
+    const path = page?.path ?? `/docs/${slugs.join('/')}`
+    const canonical = `https://vindeckyy.github.io/slipstream${path}`
+    return {
+      meta: [
+        { title: `${title} | Slipstream` },
+        { name: 'description', content: description },
+        { property: 'og:title', content: `${title} | Slipstream` },
+        { property: 'og:description', content: description },
+        { property: 'og:type', content: 'article' },
+        { property: 'og:url', content: canonical },
+        { name: 'twitter:card', content: 'summary_large_image' },
+      ],
+      links: [{ rel: 'canonical', href: canonical }],
+    }
+  },
   component: Page,
   loader: async ({ params }) => {
     const slugs = (params._splat ?? '').split('/').filter(Boolean)
@@ -39,7 +60,10 @@ const clientLoader = browserCollections.docs.createClientLoader({
 })
 
 function Page() {
-  const data = useFumadocsLoader(Route.useLoaderData())
+  const data = useFumadocsLoader(Route.useLoaderData()) as {
+    path: string
+    pageTree: PageTreeRoot
+  }
 
   return (
     <DocsLayout {...baseOptions()} tree={data.pageTree}>

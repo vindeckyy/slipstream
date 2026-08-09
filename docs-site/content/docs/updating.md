@@ -114,8 +114,8 @@ lands in `~/.config/slipstream/logs/update-steamos.log`.
 
 ## Updating a client
 
-This page is about the host. Clients update on their own tracks: Google Play on Android and the
-Decky panel's own **Update** button on a Steam Deck. The per-platform table is in
+This page is about the host. The Android preview is updated by downloading the latest APK from
+GitHub Releases. The Decky panel has its own **Update** button on a Steam Deck. The per-platform table is in
 [Install a Client -> Keeping a client up to date](/docs/install-client#keeping-a-client-up-to-date).
 A host and a client don't have to be on the same version, but keeping them close is the least
 surprising.

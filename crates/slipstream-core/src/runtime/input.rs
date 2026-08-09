@@ -77,9 +77,9 @@ pub enum InputKind {
     ///
     /// The IME path: the layout-independent VK key events cannot express text an input method
     /// *commits* (autocorrect, gesture typing, non-Latin scripts, emoji), so a capable client
-    /// sends the committed characters verbatim and the host injects them directly (Windows
-    /// `KEYEVENTF_UNICODE`; Linux wlroots via a dynamically-grown Unicode keymap on a dedicated
-    /// virtual keyboard). A multi-character commit is consecutive events in order. Sent only when
+    /// sends the committed characters verbatim and the host injects them directly (Linux wlroots
+    /// via a dynamically-grown Unicode keymap on a dedicated virtual keyboard). A multi-character
+    /// commit is consecutive events in order. Sent only when
     /// the host advertised [`HOST_CAP_TEXT_INPUT`](crate::quic::HOST_CAP_TEXT_INPUT) — toward an
     /// older host (or one whose inject backend can't type text) clients keep the best-effort VK
     /// synthesis, and an older host ignores the unknown tag entirely.

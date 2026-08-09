@@ -14,7 +14,7 @@ import { actionButton } from "./ui";
 export function mutationError(r: MutationResult): string {
   switch (r.error) {
     case "client-unavailable":
-      return "The Slipstream client isn't installed (flatpak io.slipstream).";
+      return "The Slipstream client isn't installed (flatpak io.slipstream.Slipstream).";
     case "client-outdated":
       return "The installed client is too old for host management — update it from the About tab.";
     default:

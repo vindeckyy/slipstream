@@ -33,7 +33,7 @@ const APPLY_TIMEOUT_MS = 8 * 60 * 1000;
 
 /**
  * Container: the host update card. Check everywhere (U0) + one-click apply where the host
- * reports `apply: "full"` (U1 — Windows installer). The apply flow deliberately survives the
+ * reports `apply: "full"` (U1, a packaged update). The apply flow deliberately survives the
  * console's own backends dying: once an apply is accepted, the card renders from the LAST
  * status snapshot (React Query keeps data across failed polls) and treats poll errors as "the
  * host is restarting", not as failures — until the target version answers or a timeout.
@@ -133,7 +133,7 @@ export const UpdateCard: FC<{
 			<CardContent className="space-y-4">
 				<QueryState
 					isLoading={state.isLoading}
-					// While an apply restarts the host (and, on Windows, this console server),
+					// While an apply restarts the host and this console server,
 					// failed polls are EXPECTED — keep rendering the last snapshot instead of
 					// swapping the card for an error box.
 					error={inFlight ? undefined : state.error}

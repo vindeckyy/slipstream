@@ -9,8 +9,8 @@
 //! forwards to the client as [`slipstream_core::quic::HidOutput`].
 //!
 //! The transport-independent contract (report descriptor, feature blobs, [`DsState`], the `0x01`
-//! serializer and `0x02` parser) lives in [`super::dualsense_proto`], shared with the Windows
-//! UMDF-driver backend; this module is just the `/dev/uhid` plumbing around it.
+//! serializer and `0x02` parser) lives in [`super::dualsense_proto`]; this module is just the
+//! `/dev/uhid` plumbing around it.
 
 use super::dualsense_proto::{
     ds_pairing_reply, edge_paddle_bits, parse_ds_output, serialize_state, DsFeedback, DsState,
@@ -305,7 +305,7 @@ impl PadProto for DsLinuxProto {
             hidout: fb.hidout,
             // Rumble-plane liveness (arms the shared abandoned-rumble force-off). evdev-FF games
             // going through hid-playstation get their stops surfaced reliably, but Steam Input
-            // drives this pad over hidraw DIRECTLY  -  the same abandonment semantics as a Windows
+            // drives this pad over hidraw directly, using the same abandonment semantics as the
             // game, so the same watchdog applies. SDL-class writers re-assert a held level every
             // ~2 s (inside the idle window), and a writer that goes silent on a latched level is
             // cut exactly as real firmware decay would cut it on a physical pad.
@@ -399,7 +399,7 @@ impl PadProto for DsEdgeLinuxProto {
             hidout: fb.hidout,
             // Rumble-plane liveness (arms the shared abandoned-rumble force-off). evdev-FF games
             // going through hid-playstation get their stops surfaced reliably, but Steam Input
-            // drives this pad over hidraw DIRECTLY  -  the same abandonment semantics as a Windows
+            // drives this pad over hidraw directly, using the same abandonment semantics as the
             // game, so the same watchdog applies. SDL-class writers re-assert a held level every
             // ~2 s (inside the idle window), and a writer that goes silent on a latched level is
             // cut exactly as real firmware decay would cut it on a physical pad.

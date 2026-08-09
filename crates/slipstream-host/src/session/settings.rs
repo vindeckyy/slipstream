@@ -183,21 +183,13 @@ pub fn get() -> SessionSettings {
     store().get()
 }
 
-/// Which lifetime axes this build actually acts on, for the console to grey out the rest. Both
-/// directions need a launch path and a way to see processes; macOS has neither today.
+/// Which lifetime axes this Linux build enforces, for the console to grey out the rest.
 pub fn enforced() -> Vec<String> {
-    #[cfg(any(target_os = "linux", target_os = "windows"))]
-    {
-        vec![
-            "session_on_game_exit".to_string(),
-            "game_on_session_end".to_string(),
-            "disconnect_grace_seconds".to_string(),
-        ]
-    }
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-    {
-        Vec::new()
-    }
+    vec![
+        "session_on_game_exit".to_string(),
+        "game_on_session_end".to_string(),
+        "disconnect_grace_seconds".to_string(),
+    ]
 }
 
 #[cfg(test)]

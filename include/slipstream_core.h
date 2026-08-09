@@ -158,7 +158,7 @@
 
 // UHID DualSense (kernel `hid-playstation`): adaptive triggers, lightbar, touchpad, motion —
 // feedback arrives on the HID-output plane ([`slipstream_connection_next_hidout`]). Honored on
-// Linux (UHID) and Windows (UMDF minidriver) hosts; otherwise the host falls back to X-Box 360.
+// Linux (UHID) hosts; otherwise the host falls back to X-Box 360.
 #define SLIPSTREAM_GAMEPAD_DUALSENSE 2
 
 // uinput X-Box One / Series pad — the X-Box 360 backend with the One/Series USB identity, so
@@ -169,8 +169,8 @@
 
 // UHID DualShock 4 (kernel `hid-playstation` ≥ 6.2): lightbar, touchpad, motion, rumble — the
 // touchpad/motion arrive over the rich-input plane and lightbar over the HID-output plane, like
-// DualSense (minus adaptive triggers / player LEDs / mute). Honored on Linux (UHID) and Windows
-// (UMDF minidriver) hosts; otherwise the host falls back to X-Box 360.
+// DualSense (minus adaptive triggers / player LEDs / mute). Honored on Linux (UHID) hosts;
+// otherwise the host falls back to X-Box 360.
 #define SLIPSTREAM_GAMEPAD_DUALSHOCK4 4
 
 // UHID classic Steam Controller (Valve `28DE:1102`, kernel `hid-steam`): one stick + dual
@@ -179,12 +179,12 @@
 
 // Steam Deck controller (Valve `28DE:1205`): full Deck gamepad incl. the four back grips, both
 // trackpads, and the IMU; re-grabbed by Steam Input with native glyphs when Steam runs on the
-// host. Honored on Linux AND Windows hosts; else folds to X-Box 360.
+// host. Honored on Linux hosts; otherwise folds to X-Box 360.
 #define SLIPSTREAM_GAMEPAD_STEAMDECK 6
 
 // DualSense Edge (Sony `054C:0DF2`): the DualSense plus two back buttons + two Fn buttons, so a
-// client's back paddles land on native slots. Honored on Linux (UHID `hid-playstation`) and
-// Windows (UMDF) hosts; otherwise the host falls back to X-Box 360.
+// client's back paddles land on native slots. Honored on Linux (UHID `hid-playstation`) hosts;
+// otherwise the host falls back to X-Box 360.
 #define SLIPSTREAM_GAMEPAD_DUALSENSEEDGE 7
 
 // Nintendo Switch Pro Controller (Nintendo `057E:2009`, kernel `hid-nintendo`): Nintendo glyphs +
@@ -573,7 +573,7 @@
 // HEVC frames carrying several slice NALs (latency plan §7 LN1: the encoder splits frames so
 // sub-frame readback can ship early slices while the tail encodes). Decoder-level, so the
 // EMBEDDER sets it from what its decode stack actually handles: the desktop clients' FFmpeg/
-// D3D11VA/Vulkan-video decoders are fine, but mobile/TV MediaCodec is per-SoC — Amlogic HEVC
+// Vulkan-video decoders are fine, but mobile/TV MediaCodec is per-SoC. Amlogic HEVC
 // decoders (Chromecast with Google TV, Fire TV) wedge the whole DEVICE on multi-slice frames
 // (the 0.17.0 field regression: the 4-slice Linux default froze streams on first frame and
 // watchdog-rebooted the CCwGTV), which is exactly why Moonlight requests 1 slice per frame for
@@ -606,8 +606,8 @@
 #if defined(SLIPSTREAM_FEATURE_QUIC)
 // [`Welcome::host_caps`] bit: the host's active inject backend can type **committed text**
 // ([`InputKind::TextInput`](crate::input::InputKind::TextInput) — one Unicode scalar per event):
-// Windows (`KEYEVENTF_UNICODE`) and Linux wlroots (dynamic Unicode keymap on a dedicated virtual
-// keyboard); the KWin/libei/gamescope backends can only press layout keycodes, so those sessions
+// Linux wlroots (dynamic Unicode keymap on a dedicated virtual keyboard); the KWin/libei/
+// gamescope backends can only press layout keycodes, so those sessions
 // don't set it. A capable client routes its IME's committed text (autocorrect, gesture typing,
 // non-Latin scripts, emoji) through `TextInput` instead of lossy VK synthesis; absent the bit it
 // keeps the VK fallback. Packs into the existing trailing `host_caps` byte — no wire-layout
@@ -659,8 +659,8 @@
 #if defined(SLIPSTREAM_FEATURE_QUIC)
 // [`Welcome::host_caps`] bit: the host CAN forward the cursor out-of-band (it captures cursor
 // metadata separately from the frame — the Linux portal `SPA_META_Cursor` path; NOT gamescope,
-// whose capture carries no cursor, and NOT Windows yet, where DWM composites into the IDD
-// frame). Set only when the client asked via [`CLIENT_CAP_CURSOR`]; when both bits agree the
+// whose capture carries no cursor). Set only when the client asked via [`CLIENT_CAP_CURSOR`];
+// when both bits agree the
 // host stops blending and ships [`CursorShape`](super::control::CursorShape) +
 // [`CursorState`](super::datagram::CursorState) instead. `0x08` — `0x04` is
 // [`HOST_CAP_TEXT_INPUT`], `0x01`/`0x02` are gamepad-state / clipboard.
@@ -1415,9 +1415,9 @@ enum SlipstreamInputKind
     //
     // The IME path: the layout-independent VK key events cannot express text an input method
     // *commits* (autocorrect, gesture typing, non-Latin scripts, emoji), so a capable client
-    // sends the committed characters verbatim and the host injects them directly (Windows
-    // `KEYEVENTF_UNICODE`; Linux wlroots via a dynamically-grown Unicode keymap on a dedicated
-    // virtual keyboard). A multi-character commit is consecutive events in order. Sent only when
+    // sends the committed characters verbatim and the host injects them directly (Linux wlroots
+    // via a dynamically-grown Unicode keymap on a dedicated virtual keyboard). A multi-character
+    // commit is consecutive events in order. Sent only when
     // the host advertised [`HOST_CAP_TEXT_INPUT`](crate::quic::HOST_CAP_TEXT_INPUT) — toward an
     // older host (or one whose inject backend can't type text) clients keep the best-effort VK
     // synthesis, and an older host ignores the unknown tag entirely.
@@ -1599,7 +1599,7 @@ typedef struct {
 // Static HDR metadata for an HDR session ([`slipstream_connection_next_hdr_meta`]): SMPTE ST.2086
 // mastering display colour volume + CEA-861.3 content light level. All fields are in the standard
 // HDR10 SEI fixed-point units (primaries/white in 1/50000, luminance in 0.0001 cd/m²), ready for
-// DXGI `DXGI_HDR_METADATA_HDR10` / Apple `CAEDRMetadata` / Android `KEY_HDR_STATIC_INFO`.
+// Apple `CAEDRMetadata` / Android `KEY_HDR_STATIC_INFO`.
 typedef struct {
     // Display-primaries x-chromaticities in 1/50000 units, ST.2086 order [green, blue, red].
     uint16_t display_primaries_x[3];
@@ -2916,7 +2916,7 @@ SlipstreamStatus slipstream_connection_frames_dropped(const SlipstreamConnection
 #if defined(SLIPSTREAM_FEATURE_QUIC)
 // Report one decoded frame's decode-stage latency, in microseconds: the wall-clock elapsed from
 // the access unit leaving [`slipstream_connection_next_au`] to its decoded output becoming
-// available (VideoToolbox/D3D11VA/… produced the frame). This feeds the "Automatic" bitrate
+// available (VideoToolbox or Vulkan produced the frame). This feeds the "Automatic" bitrate
 // controller's decode signal — the only one that sees the client's own decoder, so the rate is
 // capped at the real decode limit instead of climbing to the network link ceiling and choking a
 // slower hardware decoder (a fast LAN feeding a mobile-class decoder). Measure from the AU pull,

@@ -1,7 +1,7 @@
 //! DDC/CI monitor panel power control on Linux — the EXPERIMENTAL `ddc_power_off` axis.
 //!
-//! Same intent as the Windows `display/ddc.rs` path: VCP 0xD6 DPMS-off (`0x04`) before an
-//! Exclusive topology drops physical heads, and DPMS-on (`0x01`) after restore. Implemented by
+//! VCP 0xD6 DPMS-off (`0x04`) before an Exclusive topology drops physical heads, and DPMS-on
+//! (`0x01`) after restore. Implemented by
 //! shelling out to `ddcutil` when it is on PATH (best-effort; missing binary or unsupported
 //! panels are skipped with an info log). Never on the frame path.
 
@@ -84,7 +84,7 @@ fn set_power(display_id: u32, value: &str) -> bool {
 }
 
 /// Command every DDC-capable panel off (VCP 0xD6 → DPMS off). `exclude` is unused on Linux
-/// (virtual outputs do not answer DDC); kept so call sites match the Windows signature.
+/// (virtual outputs do not answer DDC); kept so call sites share one signature.
 pub fn panel_off_except(_exclude: &str) -> u32 {
     if !ddcutil_available() {
         tracing::info!(

@@ -23,10 +23,6 @@ pub(crate) use utoipa::ToSchema;
 mod art;
 mod custom;
 mod detect;
-#[cfg(windows)]
-mod epic;
-#[cfg(windows)]
-mod gog;
 #[cfg(target_os = "linux")]
 mod heroic;
 mod launch;
@@ -34,16 +30,10 @@ mod launch;
 mod lutris;
 mod scanners;
 mod steam;
-#[cfg(windows)]
-mod xbox;
 
 pub use art::*;
 pub use custom::*;
 pub use detect::*;
-#[cfg(windows)]
-pub use epic::*;
-#[cfg(windows)]
-pub use gog::*;
 #[cfg(target_os = "linux")]
 pub use heroic::*;
 pub use launch::*;
@@ -51,8 +41,6 @@ pub use launch::*;
 pub use lutris::*;
 pub use scanners::*;
 pub use steam::*;
-#[cfg(windows)]
-pub use xbox::*;
 
 /// Cover art for a title. All fields are URLs (the Steam CDN for Steam titles, user-supplied for
 /// custom). The client prefers `portrait` for a grid and falls back to `header` when a title has
@@ -247,19 +235,6 @@ pub fn all_games() -> Vec<GameEntry> {
         }
         if on("heroic") {
             games.extend(HeroicProvider.list());
-        }
-    }
-    // Windows store providers (their launchers are Windows-only): Epic + GOG + Xbox/Game Pass.
-    #[cfg(windows)]
-    {
-        if on("epic") {
-            games.extend(EpicProvider.list());
-        }
-        if on("gog") {
-            games.extend(GogProvider.list());
-        }
-        if on("xbox") {
-            games.extend(XboxProvider.list());
         }
     }
     games.extend(load_custom().into_iter().map(GameEntry::from));

@@ -35,7 +35,7 @@ Capability detail: [Support matrix](/docs/support-matrix).
 | **Arch** | `cd packaging/arch && PF_SRCDIR="$(git rev-parse --show-toplevel)" makepkg -si` | [packaging/arch](https://github.com/vindeckyy/slipstream/blob/main/packaging/arch/README.md) |
 | **Bazzite** | `curl -fsSLO https://raw.githubusercontent.com/vindeckyy/slipstream/main/packaging/bazzite/slipstream-sysext.sh && sudo bash slipstream-sysext.sh install` | [packaging/bazzite](https://github.com/vindeckyy/slipstream/blob/main/packaging/bazzite/README.md) |
 | **SteamOS (host)** | Clone the repo, then `bash scripts/steamdeck/install.sh` | Script builds on-device |
-| **NixOS** | `nix run github:vindeckyy/slipstream#slipstream-host -- serve --gamestream` or the flake module | [packaging/nix](https://github.com/vindeckyy/slipstream/blob/main/packaging/nix/README.md) |
+| **NixOS** | `nix run github:vindeckyy/slipstream#slipstream-host -- serve` or the flake module | [packaging/nix](https://github.com/vindeckyy/slipstream/blob/main/packaging/nix/README.md) |
 
 On Arch, install `slipstream-web` yourself (`pacman` does not pull optional deps).
 
@@ -61,13 +61,13 @@ On Arch, install `slipstream-web` yourself (`pacman` does not pull optional deps
 
 3. Open `https://<host-ip>:47992` and set the console password. See [Console](/docs/web-console).
 
-Packaged units run `serve --gamestream` (native + Moonlight). For native-only:
+Packaged units run the secure native-only `serve` command. To enable Moonlight compatibility:
 
 ```ini
 # systemctl --user edit slipstream-host
 [Service]
 ExecStart=
-ExecStart=/usr/bin/slipstream-host serve
+ExecStart=/usr/bin/slipstream-host serve --gamestream
 ```
 
 ## Update and uninstall

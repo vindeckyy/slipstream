@@ -176,8 +176,8 @@ bandwidth**, not a broken host. Work this short list before changing display pre
 2. Raise bitrate until text stops looking muddy, then stop. If the VPN cannot carry more, drop
    refresh or resolution.
 3. Prefer **HEVC**; turn **HDR off** for SDR laptop panels; enable **4:4:4** only when the client
-   advertises it and the host can encode it (today that advertising path is Apple + capable host
-   GPUs - see [Picture quality → Soft text](/docs/picture-quality#soft-text-diagnosis)).
+   advertises it and the host can encode it (the current Android and Steam Deck clients do not
+   advertise full chroma; see [Picture quality](/docs/picture-quality#soft-text-diagnosis)).
 4. If text is sharp but the pointer fights you, that is **mouse mode**, not picture - switch to
    Desktop (`Ctrl+Alt+Shift+M`).
 
@@ -263,8 +263,8 @@ Call these out so Work expectations stay accurate:
   use a full desktop session for office work ([gamescope](/docs/gamescope), [input](/docs/input)).
 - **Wake-on-LAN** usually does **not** work across a VPN - wake the machine before you leave, leave
   it on, or use another wake path ([Wake-on-LAN](/docs/wake-on-lan)).
-- **4:4:4 advertising is iPhone-only today** on the client side; other clients may not negotiate
-  full chroma yet ([Picture quality](/docs/picture-quality#honest-limits)).
+- **4:4:4 is not available in the current Android or Steam Deck clients.** Keep it off for now;
+  the host will continue to negotiate 4:2:0 ([Picture quality](/docs/picture-quality#honest-limits)).
 
 ## Troubleshooting deeper
 

@@ -90,8 +90,7 @@ pub fn start(
     let _ = std::thread::Builder::new()
         .name("slipstream-video".into())
         .spawn(move || {
-            // Same scheduling posture as the native path's capture/encode thread (Linux nice -10 /
-            // Windows HIGHEST + session tuning) — GameStream previously ran unboosted on Linux.
+            // Match the native capture and encode thread scheduling posture.
             crate::native::boost_thread_priority(true);
             // A GameStream viewer may be video-only too — hold the suspend/idle inhibitor for
             // this stream's lifetime (plane parity with the native LiveSessionGuard).
@@ -123,11 +122,10 @@ pub fn start(
             crate::events::emit(crate::events::EventKind::ClientConnected {
                 client: event_client.clone(),
             });
-            // GPU clock pin (Linux, opt-in `SLIPSTREAM_PIN_CLOCKS`): hold the box-wide vendor clock
+            // GPU clock pin (opt-in `SLIPSTREAM_PIN_CLOCKS`): hold the box-wide vendor clock
             // floor while this compat-plane stream runs, refcounted with every other live session
-            // across both planes. Released when the closure exits (stream stopped) — so idle clocks
-            // aren't pinned between Moonlight sessions. No-op off Linux / when the flag is unset.
-            #[cfg(target_os = "linux")]
+            // across both planes. Released when the closure exits, so idle clocks aren't pinned
+            // between Moonlight sessions. No-op when the flag is unset.
             let _clock_pin = crate::gpuclocks::session_pin();
             let result = run(
                 cfg,
@@ -178,15 +176,14 @@ fn run(
     // The launched game's lifetime wiring (quit flag, launch owner, game-exit teardown).
     life: &GameLifetime,
 ) -> Result<()> {
-    // GameStream capture/encode thread: apply Windows session tuning (no-op off Windows).
+    // Keep the capture and encode thread setup aligned with the native plane.
     ss_frame::session_tuning::on_hot_thread();
     // Reject an out-of-range client mode before allocating capture/encode buffers.
     encode::validate_dimensions(cfg.codec, cfg.width, cfg.height)
         .context("client-requested video mode")?;
     let sock = UdpSocket::bind(("0.0.0.0", VIDEO_PORT)).context("bind video UDP")?;
     // Grow SO_SNDBUF/RCVBUF (avoid host-side ENOBUFS at high bitrate) like the native plane.
-    // The opt-in DSCP/QoS tag happens after connect below (Windows qWAVE derives the flow from
-    // the connected 5-tuple).
+    // Apply the media QoS tag after connecting the socket to the client endpoint.
     slipstream_core::transport::grow_socket_buffers(&sock);
     // The client pings the video port so we learn where to send; it re-pings until video
     // flows, so a missed early ping is fine.
@@ -201,8 +198,7 @@ fn run(
         .context("video: no client ping within 10s")?;
     sock.connect(client)
         .context("connect client video endpoint")?;
-    // Opt-in DSCP/QoS-tag this as the video class (SLIPSTREAM_DSCP=1); the guard keeps the
-    // Windows qWAVE flow alive for the whole stream (this function's scope IS the stream).
+    // Opt-in DSCP/QoS-tag this as the video class (SLIPSTREAM_DSCP=1) for the stream lifetime.
     let _qos_flow = slipstream_core::transport::set_media_qos(
         &sock,
         slipstream_core::transport::MediaClass::Video,
@@ -260,15 +256,10 @@ fn run(
         // Desktop<->Game switch.
         let (mut capturer, compositor, gamescope_route) =
             open_gs_virtual_source(cfg, app, target.as_ref(), &life.quit)?;
-        // Only the Linux `launch_is_nested` reads it; gamescope does not exist on Windows.
-        #[cfg(not(target_os = "linux"))]
-        let _ = &gamescope_route;
         // Register this session in the admission table. GameStream acquires a REAL display but
-        // never registered, so `admit`'s Windows budgets — `max_displays` and the NVENC session
-        // headroom — could not see it: both gate on `!live.is_empty()`, so a Moonlight-held display
-        // was invisible to them and a native connect could be admitted past a budget the box had
-        // already spent. Identity is `None` (the compat plane has no cert fingerprint), which is the
-        // same "anonymous" the conflict policy already handles. Dropped at the end of `run`.
+        // never registered, so the admission budget could not see it. Registering the live display
+        // keeps the native and compat planes under the same display and encoder limits. Identity is
+        // `None` because the compat plane has no client certificate. The guard drops at stream end.
         let _admission_guard = crate::vdisplay::admission::register(
             None,
             (cfg.width, cfg.height, cfg.fps),
@@ -282,32 +273,11 @@ fn run(
             h = cfg.height,
             "video source: virtual display (native client resolution)"
         );
-        // Launch the app's command now that capture is live, for the backends that DON'T nest it via
-        // set_launch_command above: Windows (no gamescope) and, on Linux, everything but gamescope's
-        // bare-spawn sub-mode (kwin/mutter/wlroots stream the existing desktop; a managed/attached
-        // gamescope is a running session to launch INTO — `launch_session_command` routes both).
-        // A library title (Steam/Epic/GOG/Xbox/custom, surfaced in /applist) carries its
-        // store-qualified id — resolved against the host's OWN library (the client can only pick an
-        // existing title, never inject a command). An apps.json entry instead carries an
-        // operator-typed `cmd`. Library id wins when both are set.
-        #[cfg(windows)]
-        if let Some(t) = target.as_ref() {
-            // A library title launches by its store-qualified id (the interactive-session spawner
-            // resolves the store's own recipe); an operator-typed command runs as itself.
-            let launched = match (t.game.id.as_deref(), t.command.as_deref()) {
-                (Some(id), _) => crate::library::launch_gamestream_library(id),
-                (None, Some(cmd)) => crate::library::launch_gamestream_command(cmd),
-                (None, None) => Ok(()),
-            };
-            if let Err(e) = launched {
-                tracing::warn!(title = %t.game.title, error = %e, "gamestream: could not launch app");
-            }
-        }
-        // Linux keeps the spawned child rather than dropping it: it is the primary liveness signal
+        // Launch the app's command now that capture is live. A gamescope bare spawn already nested
+        // the command through `set_launch_command`, so launching again would start it twice. The
+        // child remains owned by the lease and termination ladder for the session lifetime.
         // for a title whose store told us nothing else, and the handle the termination ladder
-        // signals. A gamescope bare spawn already nested the command (`set_launch_command` in the
-        // source open), so launching again would start it twice.
-        #[cfg(target_os = "linux")]
+        // signals.
         let spawned_launch = match target.as_ref().and_then(|t| t.command.as_deref()) {
             Some(_) if crate::vdisplay::launch_is_nested(compositor, gamescope_route.as_ref()) => {
                 None
@@ -332,14 +302,8 @@ fn run(
         //   a session, but the window still protects unsaved progress on a network blip, and a
         //   relaunch of the same title reclaims the game (above).
         let _game_life = target.as_ref().map(|t| {
-            #[cfg(target_os = "linux")]
             let nested = crate::vdisplay::launch_is_nested(compositor, gamescope_route.as_ref());
-            #[cfg(not(target_os = "linux"))]
-            let nested = false;
-            #[cfg(target_os = "linux")]
             let child = spawned_launch.map(|s| (s.child, s.group_leader));
-            #[cfg(not(target_os = "linux"))]
-            let child = None;
 
             let on_exit: crate::gamelease::OnExit = {
                 let on_game_exit = life.on_game_exit.clone();
@@ -584,8 +548,7 @@ fn open_gs_mirror_source(
 struct GsApp {
     game: crate::gamelease::GameRef,
     detect: crate::library::DetectSpec,
-    /// The resolved shell command. `Some` on Linux, which runs it itself; `None` for a Windows
-    /// library title, which launches by id through the interactive-session spawner instead.
+    /// The resolved shell command, if this entry has a launch recipe.
     command: Option<String>,
 }
 
@@ -650,16 +613,8 @@ fn resolve_gs_app(app: Option<&super::apps::AppEntry>) -> Option<GsApp> {
 /// zero-copy master switch). Shared by the monitor-mirror and virtual-output sources so their
 /// `set_hw_cursor` request and `stream_body`'s blend flag cannot drift.
 fn blend_capable_metadata_cursor(cfg: &StreamConfig) -> bool {
-    #[cfg(target_os = "linux")]
-    {
-        let cuda_planned = !crate::encode::linux_zero_copy_is_vaapi() && crate::zerocopy::enabled();
-        crate::encode::cursor_blend_capable(cfg.codec, cuda_planned, cfg.hdr)
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = cfg;
-        false
-    }
+    let cuda_planned = !crate::encode::linux_zero_copy_is_vaapi() && crate::zerocopy::enabled();
+    crate::encode::cursor_blend_capable(cfg.codec, cuda_planned, cfg.hdr)
 }
 
 fn open_gs_virtual_source(
@@ -682,41 +637,24 @@ fn open_gs_virtual_source(
         let r = crate::vdisplay::resolve_gamescope_route(c, false);
         (c, r)
     } else {
-        // Windows has a single virtual-display backend (ss-vdisplay); `vdisplay::open` ignores the
-        // compositor arg there, so short-circuit the Linux session-detection state machine with a
-        // placeholder — mirrors `native::resolve_compositor`. Without this, the Linux `detect()`
-        // below bails on Windows ("could not detect compositor … XDG_CURRENT_DESKTOP=''"), which
-        // killed the GameStream video thread → black screen (the native plane was already guarded).
-        #[cfg(target_os = "windows")]
-        {
-            (crate::vdisplay::Compositor::Kwin, None)
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            // A client is (re)connecting → cancel any pending TV-session restore (review #3).
-            crate::vdisplay::cancel_pending_tv_restore();
-            let active = crate::vdisplay::detect_active_session();
-            // A4: fold any compositor-instance change (idle-time Game↔Desktop switch) into the epoch
-            // before acquiring, so a GameStream reconnect never reuses a dead-instance node.
-            crate::vdisplay::observe_session_instance(&active);
-            crate::vdisplay::apply_session_env(&active);
-            // Dedicated game session (B0): a GameStream app whose launch RESOLVES to a command (library
-            // id / apps.json command), under `game_session=dedicated` with gamescope available, gets its
-            // own headless gamescope spawn at the client mode — same routing as the native plane. Gate on
-            // the resolved command so an unresolvable entry falls back to auto routing (review #9).
-            let has_launch = launch.and_then(|t| t.command.as_deref()).is_some();
-            if crate::vdisplay::wants_dedicated_game_session(has_launch) {
-                let r =
-                    crate::vdisplay::apply_input_env(crate::vdisplay::Compositor::Gamescope, true);
-                (crate::vdisplay::Compositor::Gamescope, r)
-            } else {
-                let c = crate::vdisplay::compositor_for_kind(active.kind)
-                    .map(Ok)
-                    .unwrap_or_else(crate::vdisplay::detect)
-                    .context("detect compositor")?;
-                let r = crate::vdisplay::apply_input_env(c, false);
-                (c, r)
-            }
+        // A client is reconnecting, so cancel any pending TV-session restore.
+        crate::vdisplay::cancel_pending_tv_restore();
+        let active = crate::vdisplay::detect_active_session();
+        // Fold compositor-instance changes into the epoch before acquiring a display.
+        crate::vdisplay::observe_session_instance(&active);
+        crate::vdisplay::apply_session_env(&active);
+        // A resolved launch command can use a dedicated gamescope session at the client mode.
+        let has_launch = launch.and_then(|t| t.command.as_deref()).is_some();
+        if crate::vdisplay::wants_dedicated_game_session(has_launch) {
+            let r = crate::vdisplay::apply_input_env(crate::vdisplay::Compositor::Gamescope, true);
+            (crate::vdisplay::Compositor::Gamescope, r)
+        } else {
+            let c = crate::vdisplay::compositor_for_kind(active.kind)
+                .map(Ok)
+                .unwrap_or_else(crate::vdisplay::detect)
+                .context("detect compositor")?;
+            let r = crate::vdisplay::apply_input_env(c, false);
+            (c, r)
         }
     };
     let mut vd = crate::vdisplay::open(compositor).context("open virtual display")?;
@@ -730,37 +668,15 @@ fn open_gs_virtual_source(
     vd.set_hw_cursor(
         compositor != crate::vdisplay::Compositor::Gamescope && blend_capable_metadata_cursor(&cfg),
     );
-    // Carry the resolved launch command on the backend instance (per-session) rather than a
-    // process-global env var, so concurrent sessions can't stomp each other's launch target. It is
-    // the RESOLVED command, so gamescope's bare spawn nests a library title exactly like an
-    // apps.json command (it previously nested only `cmd`, silently dropping library picks). Off
-    // Linux this is a no-op backend-side, and a library title resolves to no command at all — the
-    // interactive-session spawner launches it by id instead.
+    // Carry the resolved launch command on the backend instance rather than a process-global
+    // environment variable, so concurrent sessions cannot overwrite each other's launch target.
     vd.set_launch_command(launch.and_then(|t| t.command.clone()));
     // This plane's resolved gamescope sub-mode, on the instance for the same reason as the launch
     // command above — the GameStream and native planes both call `apply_input_env`, so publishing
     // through the process env let either retarget the other's `create`.
     vd.set_gamescope_route(gamescope_route.clone());
-    // Serialize with the slipstream/1 plane's IDD-push setup dance (Goal-1 §2.5). A GameStream
-    // connect used to skip it entirely, so it could ADD/reconfigure the shared monitor while a
-    // native session was mid-build (and vice versa), and its sealed-channel delivery would replace
-    // the native session's ring (newest-wins) — each plane could freeze the other. GameStream has
-    // no cooperative stop-flag plumbing, so it registers a flag nobody reads: a LATER session that
-    // preempts this one signals it, waits the 3 s release grace, then force-preempts the monitor —
-    // this session then fails on capture and tears down cleanly (the intended handover). GameStream
-    // is anonymous (no client cert), so it holds the ANONYMOUS slot (0) — GS stays single-display,
-    // and only a later slot-0 session (another GS/anonymous connect) preempts it.
-    #[cfg(target_os = "windows")]
-    let _idd_setup_guard = matches!(
-        crate::session_plan::CaptureBackend::resolve(),
-        crate::session_plan::CaptureBackend::IddPush
-    )
-    .then(|| {
-        crate::vdisplay::manager::vdm().begin_idd_setup(
-            0,
-            std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
-        )
-    });
+    // GameStream and the native plane share display admission, so both planes observe the same
+    // single-display handover and release behavior.
     let vout = crate::vdisplay::registry::acquire(
         &mut vd,
         slipstream_core::Mode {
@@ -776,12 +692,7 @@ fn open_gs_virtual_source(
         None, // fresh session — no display superseded
     )
     .context("create virtual output at client resolution")?;
-    // HDR: pass the negotiated `cfg.hdr` (client asked for HDR AND the host can deliver it). On the
-    // Windows IDD-push path this proactively enables advanced color on the virtual display so a Main10
-    // PQ stream flows even from an SDR desktop; an already-HDR desktop streams PQ regardless (the
-    // capturer follows the display). No-op on Linux: virtual-output capture is SDR-only upstream
-    // (Mutter RecordVirtual), and `host_hdr_capable` therefore keeps `cfg.hdr` false for this
-    // source — the Linux HDR path is the portal monitor mirror (`video_source=portal`).
+    // The negotiated HDR flag selects the capture format supported by the active Linux source.
     let mut capturer = capture::capture_virtual_output(
         vout,
         capture::OutputFormat::resolve(cfg.hdr, crate::encode::resolved_backend_is_gpu()),
@@ -792,15 +703,10 @@ fn open_gs_virtual_source(
     Ok((capturer, compositor, gamescope_route))
 }
 
-/// The encoder bit depth implied by the captured frame's pixel format: a 10-bit (HDR) source — the
-/// Windows IDD-push capturer's `P010`/`Rgb10a2` when the desktop is HDR — opens NVENC as HEVC Main10
-/// (BT.2020 PQ); everything else is 8-bit. The encoder backends already key the real profile off the
-/// `format`, so this just keeps the `bit_depth` argument honest (the old hard-coded `8` mislabeled an
-/// HDR stream that the format had already promoted to 10-bit).
+/// Return the encoder bit depth implied by the captured frame format.
 pub(super) fn gs_bit_depth(format: crate::capture::PixelFormat) -> u8 {
     use crate::capture::PixelFormat;
     match format {
-        // Windows IDD-push HDR formats, and the Linux GNOME 50+ portal HDR formats.
         PixelFormat::P010 | PixelFormat::Rgb10a2 | PixelFormat::X2Rgb10 | PixelFormat::X2Bgr10 => {
             10
         }

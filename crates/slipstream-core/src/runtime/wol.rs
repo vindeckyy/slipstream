@@ -2,7 +2,7 @@
 //!
 //! Runtime-free by design — a magic packet is one fire-and-forget UDP datagram, so this needs
 //! neither the `quic` feature nor an async runtime and links into every client (including the
-//! QUIC-less builds). The Rust clients (linux/windows/android) call these `pub fn`s directly;
+//! QUIC-less builds). The Rust clients (Linux and Android) call these `pub fn`s directly;
 //! Swift/iOS reach them through the `slipstream_wake_on_lan` C-ABI wrapper in [`crate::abi`].
 //!
 //! Reliability (this is the whole point — a sleeping host has no ARP entry, so a plain unicast
@@ -33,7 +33,7 @@ const BURST: usize = 3;
 
 /// Parse a MAC string — `aa:bb:cc:dd:ee:ff` or `aa-bb-...`, case-insensitive — into 6 bytes.
 /// Returns `None` for anything that isn't exactly six hex octets. Shared by the Rust clients
-/// (linux/windows) so MAC parsing lives in one place; the Swift/Apple client parses its own.
+/// (Linux and Android) so MAC parsing lives in one place; the Swift/Apple client parses its own.
 pub fn parse_mac(s: &str) -> Option<Mac> {
     let mut m = [0u8; 6];
     let mut n = 0;

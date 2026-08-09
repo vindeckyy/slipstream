@@ -99,21 +99,11 @@ const CODECS: [(&str, &str); 5] = [
     // selected when the host supports it too; anything else falls back to HEVC.
     ("pyrowave", "PyroWave (wired LAN)"),
 ];
-// Per-OS hardware rungs, like the shells' pickers: the console ships on Windows too
-// (`slipstream-session --browse`), where "vaapi" is a dead option that ALSO hid the real
-// hardware path (d3d11va) — `Decoder::new` has no VAAPI branch there.
-#[cfg(not(windows))]
+// Linux hardware decoder choices.
 const DECODERS: [(&str, &str); 4] = [
     ("auto", "Automatic"),
     ("vulkan", "Vulkan Video"),
     ("vaapi", "VAAPI"),
-    ("software", "Software"),
-];
-#[cfg(windows)]
-const DECODERS: [(&str, &str); 4] = [
-    ("auto", "Automatic"),
-    ("vulkan", "Vulkan Video"),
-    ("d3d11va", "Direct3D 11"),
     ("software", "Software"),
 ];
 const AUDIO: [(u8, &str); 3] = [(2, "Stereo"), (6, "5.1"), (8, "7.1")];

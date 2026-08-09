@@ -2,9 +2,7 @@
 //!
 //! Creates a client-sized virtual display, captures it via PipeWire, encodes with
 //! VAAPI/NVENC, and hands encoded access units to `slipstream_core` for FEC + packetization +
-//! pacing + send. Input flows back via libei/uinput. The platform backends are
-//! `#[cfg(target_os = "linux")]`; the crate compiles everywhere so the workspace builds
-//! on non-Linux dev machines — it just can't run the pipeline there.
+//! pacing + send. Input flows back via libei/uinput. The host and its platform backends are Linux-only.
 //!
 //! Subcommands: `serve` runs the native slipstream/1 host + management REST API by default, and —
 //! with `--gamestream` — the GameStream/Moonlight-compat planes too (opt-in, trusted-LAN only);
@@ -21,7 +19,7 @@
 // this lint needs no blocks at all — so an unproven FFI call could hide inside one and satisfy the
 // deny above. The workspace sets `unsafe_op_in_unsafe_fn` to `warn` (a ratchet across ~590 sites);
 // this crate is at zero, so it denies. Keep the marker only where a caller can actually violate
-// something — a raw pointer or a borrowed `HANDLE` parameter, as in `service::spawn_host`.
+// something such as a raw pointer or borrowed OS resource.
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod audio;
@@ -30,18 +28,13 @@ mod capture;
 mod detect;
 mod devtest;
 mod discovery;
-mod wol;
-// Goal-1 stage 6: top-level platform-only modules live under `src/linux/` and `src/windows/`; `#[path]`
-// keeps the `crate::*` module names flat (every existing path is unchanged).
-#[cfg(target_os = "windows")]
-#[path = "windows/crash.rs"]
-mod crash;
 #[cfg(target_os = "linux")]
 #[path = "linux/drm_sync.rs"]
 mod drm_sync;
-// The video encode backends live in the `ss-encode` leaf crate (plan §W6); this shim keeps every
+mod wol;
+// The video encode backends live in the `ss-encode` subsystem crate; this shim keeps every
 // existing `crate::encode::*` path valid (the host is the sole consumer, via the negotiator + the
-// GameStream/native/mgmt planes). Feature flags (nvenc/amf-qsv/vulkan-encode/pyrowave) forward to
+// GameStream/native/mgmt planes). Feature flags (nvenc/vulkan-encode/pyrowave) forward to
 // ss-encode from this crate's `[features]`.
 mod encode {
     pub(crate) use ss_encode::*;
@@ -54,10 +47,6 @@ mod session;
 mod gamelease {
     pub(crate) use crate::session::gamelease::*;
 }
-// The Win32 half of ending a game: WM_CLOSE onto the interactive desktop, then TerminateProcess.
-#[cfg(target_os = "windows")]
-#[path = "windows/game_term.rs"]
-mod game_term;
 /// Wire protocols (GameStream + slipstream/1). GameStream lives under `protocol::gamestream`;
 /// `mod gamestream` below is a compatibility re-export so existing `crate::gamestream::*` paths
 /// keep working during the structural divergence waves.
@@ -74,18 +63,12 @@ mod ops;
 mod hooks {
     pub(crate) use crate::ops::hooks::*;
 }
-// The input-injection backends live in the `ss-inject` subsystem crate (plan §W6); this shim keeps
+// The input-injection backends live in the `ss-inject` subsystem crate; this shim keeps
 // every existing `crate::inject::*` path valid (the native/gamestream input planes + devtest consume
 // the trait, factory, and per-device backends through it).
 mod inject {
     pub(crate) use ss_inject::*;
 }
-#[cfg(target_os = "windows")]
-#[path = "windows/install.rs"]
-mod install;
-#[cfg(target_os = "windows")]
-#[path = "windows/interactive.rs"]
-mod interactive;
 mod library;
 mod log_capture;
 mod mgmt;
@@ -108,9 +91,6 @@ mod power {
 // platform with neither (macOS, which has no launch path either) the module is an empty shell.
 mod procscan;
 mod send_pacing;
-#[cfg(target_os = "windows")]
-#[path = "windows/service.rs"]
-mod service;
 mod transport_state;
 mod session_plan {
     pub(crate) use crate::session::plan::*;
@@ -127,10 +107,6 @@ mod host_cursor;
 mod sleep_inhibit;
 mod spike;
 mod stats_recorder;
-// Start/stop/status for the per-user tray — the recovery path it has never had of its own.
-#[cfg(target_os = "windows")]
-#[path = "windows/tray.rs"]
-mod tray;
 // The plugin store: signed catalogs, tiered trust, and install/uninstall jobs that run through the
 // same runner CLI the `plugins` subcommand uses (design/plugin-store.md).
 mod store {
@@ -140,17 +116,13 @@ mod stream_marker;
 mod update {
     pub(crate) use crate::ops::update::*;
 }
-// `monitor_devnode::startup_recover()` (below) re-enables PnP monitor devnodes disabled by a prior
-// run; it lives in the `ss-win-display` leaf crate (plan §W6).
-#[cfg(target_os = "windows")]
-use ss_win_display::monitor_devnode;
-// Virtual-display orchestration lives in the `ss-vdisplay` subsystem crate (plan §W6); this shim
+// Virtual-display orchestration lives in the `ss-vdisplay` subsystem crate; this shim
 // keeps every existing `crate::vdisplay::*` path valid (serve/mgmt/native/capture consume the trait,
 // registry, and manager through it). The DDC panel control + the KWin zkde protocol moved with it.
 mod vdisplay {
     pub(crate) use ss_vdisplay::*;
 }
-// The zero-copy GPU plumbing lives in the `ss-zerocopy` leaf crate (plan §W6); this shim keeps
+// The zero-copy GPU plumbing lives in the `ss-zerocopy` leaf crate; this shim keeps
 // every existing `crate::zerocopy::*` path valid for the host's remaining callers (session_plan).
 #[cfg(target_os = "linux")]
 mod zerocopy {
@@ -165,38 +137,21 @@ use std::path::PathBuf;
 fn main() {
     let filter =
         tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
-    // `service run` is launched by the SCM with no console — log to a file instead of stderr.
-    #[cfg(target_os = "windows")]
-    let service_run = {
-        let a: Vec<String> = std::env::args().skip(1).take(2).collect();
-        a.first().map(String::as_str) == Some("service")
-            && a.get(1).map(String::as_str) == Some("run")
-    };
-    #[cfg(not(target_os = "windows"))]
-    let service_run = false;
-
-    if service_run {
-        #[cfg(target_os = "windows")]
-        service::init_file_logging(filter);
-    } else {
-        // Logs go to stderr so stdout stays machine-readable (`slipstream-host openapi > spec.json`).
-        // A second layer tees DEBUG-and-up into the in-memory ring served by GET /api/v1/logs —
-        // deliberately not gated by RUST_LOG, so console-side debugging never needs a restart.
-        use tracing_subscriber::layer::SubscriberExt;
-        use tracing_subscriber::Layer;
-        log_capture::install_global(
-            tracing_subscriber::registry()
-                .with(
-                    log_capture::RingLayer
-                        .with_filter(tracing_subscriber::filter::LevelFilter::DEBUG),
-                )
-                .with(
-                    tracing_subscriber::fmt::layer()
-                        .with_writer(std::io::stderr)
-                        .with_filter(filter),
-                ),
-        );
-    }
+    // Logs go to stderr so stdout stays machine-readable (`slipstream-host openapi > spec.json`).
+    // A second layer tees DEBUG-and-up into the in-memory ring served by GET /api/v1/logs.
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::Layer;
+    log_capture::install_global(
+        tracing_subscriber::registry()
+            .with(
+                log_capture::RingLayer.with_filter(tracing_subscriber::filter::LevelFilter::DEBUG),
+            )
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_writer(std::io::stderr)
+                    .with_filter(filter),
+            ),
+    );
 
     // Tee every panic through `tracing` BEFORE the default hook: a panicking thread otherwise
     // prints only to stderr — absent from the web console's Logs tab (the ring) and gone entirely
@@ -222,23 +177,14 @@ fn main() {
         );
         default_panic(info);
     }));
-    // Native crashes (an access violation inside a GPU runtime/driver DLL) are logged by a
-    // last-resort SEH filter for the same reason — they otherwise kill the host with no trace.
-    #[cfg(target_os = "windows")]
-    crash::install();
-
     if let Err(e) = real_main() {
         tracing::error!("{e:#}");
         std::process::exit(1);
     }
 }
 
-/// A lightweight management/CLI subcommand — package/service/driver ops, spec/library dumps — as
-/// opposed to a streaming/capture command. These never touch DXGI or run the host, so they skip the
-/// startup banner and (on Windows) the GPU-preference hook, whose DPI-awareness probe otherwise
-/// prints an alarming `SetProcessDpiAwarenessContext … "access denied"` WARN on a plain
-/// `plugins add`. `service run` is the SCM-launched host itself, so it is explicitly NOT lightweight
-/// (it must keep the hook — the hybrid-GPU ACCESS_LOST fix depends on it).
+/// A lightweight management/CLI subcommand, such as a plugin or API operation, skips streaming
+/// startup work.
 /// Resolve the effective monitor pin (env, else the stored policy) and aim absolute input at that
 /// head — then report it. Called at startup (an operator sets the pin in a `host.env` and then has
 /// no session to watch, so this is where a typo has to surface) and again whenever the console
@@ -313,9 +259,6 @@ pub(crate) fn refresh_capture_monitor_anchor(context: &str) {
 fn is_management_cli(args: &[String]) -> bool {
     match args.first().map(String::as_str) {
         Some("plugins")
-        | Some("driver")
-        | Some("web")
-        | Some("tray")
         | Some("openapi")
         | Some("library")
         | Some("detect-conflicts")
@@ -328,7 +271,6 @@ fn is_management_cli(args: &[String]) -> bool {
         | Some("--help")
         | Some("help")
         | None => true,
-        Some("service") => args.get(1).map(String::as_str) != Some("run"),
         _ => false,
     }
 }
@@ -378,18 +320,6 @@ fn real_main() -> Result<()> {
         }
     }));
 
-    // Install the win32u GPU-preference hook (same technique as Apollo, reimplemented — no GPL source
-    // copied) BEFORE anything touches DXGI (the virtual-display
-    // render-adapter selection creates a DXGI factory during virtual-display setup, well before
-    // capture). On a hybrid-GPU box this stops DXGI from reparenting the virtual output off the
-    // capture GPU — the ACCESS_LOST churn fix. Idempotent (Once); harmless on non-hybrid boxes.
-    // Skipped for lightweight CLI commands (`plugins`, `openapi`, …): they never touch DXGI, and the
-    // hook's DPI-awareness probe prints a misleading "access denied" WARN that looks like a failure.
-    #[cfg(target_os = "windows")]
-    if !management_cli {
-        crate::capture::dxgi::install_gpu_pref_hook();
-    }
-
     // NVIDIA clock hygiene (Linux, host subcommands only): install the P2-cap driver profile. The
     // vendor clock *pin* (SLIPSTREAM_PIN_CLOCKS) is no longer held for the host lifetime — it is
     // armed per live client via `gpuclocks::session_pin()` on both streaming planes, so idle clocks
@@ -407,16 +337,6 @@ fn real_main() -> Result<()> {
         // --gamestream — the GameStream/Moonlight-compat planes too (opt-in; #5/#9 trusted-LAN caveat).
         Some("serve") => {
             let (mgmt_opts, native, gamestream) = parse_serve(&args[1..])?;
-            // Claim the ss-vdisplay single-instance guard EAGERLY, before any client connects: the
-            // claim is first-comer-wins, and a lazily-claiming service could lose its own machine's
-            // driver to a stray second host started while the service sat idle.
-            #[cfg(target_os = "windows")]
-            vdisplay::manager::claim_instance_eagerly();
-            // Crash recovery for the experimental `pnp_disable_monitors` axis: re-enable any
-            // monitor leftovers a previous host silenced for a stream and never restored
-            // (crash/kill/power loss) — before any new session touches the topology.
-            #[cfg(target_os = "windows")]
-            monitor_devnode::startup_recover();
             #[cfg(target_os = "linux")]
             ss_vdisplay::drm_force::startup_recover();
             gamestream::serve(mgmt_opts, native, gamestream)
@@ -438,8 +358,7 @@ fn real_main() -> Result<()> {
         // management API, but this form works before the host is running.
         Some("doctor") => mgmt::diagnostics::run_cli(&args[1..]),
         // Install and run host plugins: `plugins add playnite`, `plugins enable`, … Package ops are
-        // forwarded to the bun runner; enable/disable/status drive the systemd unit (Linux) or the
-        // SlipstreamScripting scheduled task (Windows). See plugins.rs.
+        // forwarded to the bun runner; enable/disable/status drive the systemd unit. See plugins.rs.
         Some("plugins") => plugins::main(&args[1..]),
         // Print the management API's OpenAPI document (for client codegen).
         Some("openapi") => {
@@ -478,47 +397,6 @@ fn real_main() -> Result<()> {
         // `SLIPSTREAM_NV12` convert is colour-correct. Prints PASS/FAIL + max Y/U/V error.
         #[cfg(target_os = "linux")]
         Some("nv12-selftest") => zerocopy::nv12_selftest(),
-        // HDR P010 colour self-test (Windows; no display/capture needed): upload a known scRGB FP16
-        // pattern, run the `HdrP010Converter` shader → P010 on the GPU, read the Y/UV planes back, and
-        // compare against an f64 BT.2020-PQ limited-range reference. Validates the
-        // `SLIPSTREAM_HDR_SHADER_P010` colour math without green-screening a live HDR stream. Prints
-        // PASS/FAIL + max Y/Cb/Cr error.
-        #[cfg(target_os = "windows")]
-        Some("hdr-p010-selftest") => {
-            // Optional args: a `WxH` size (default 64x64 — pass the real capture size: heights
-            // like 1080 are NOT 16-aligned and exercise a different driver path) and a GPU
-            // vendor (`intel`|`nvidia`|`amd` — dual-GPU boxes otherwise test the default
-            // adapter, which may not be the one that encodes).
-            let mut size = (64u32, 64u32);
-            let mut vendor = None;
-            // `args` starts AT the subcommand (main builds it with `env::args().skip(1)`), so the
-            // optional arguments begin at index 1 — cf. `args.get(1)` in the `service` arm. This
-            // read `skip(2)` and so silently swallowed the first optional argument: the documented
-            // `hdr-p010-selftest 1920x1080 nvidia` picked up the vendor but ran at the 64x64
-            // DEFAULT, and a size-only invocation parsed nothing at all and still printed PASS.
-            // The size is the whole point of the flag — 1080 is not 16-aligned and takes a
-            // different driver path — so the self-test was passing on the one geometry that
-            // exercises the least.
-            for a in args.iter().skip(1) {
-                match a.as_str() {
-                    "intel" => vendor = Some(0x8086),
-                    "nvidia" => vendor = Some(0x10de),
-                    "amd" => vendor = Some(0x1002),
-                    s => {
-                        let parsed = s
-                            .split_once('x')
-                            .and_then(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)));
-                        match parsed {
-                            Some(wh) => size = wh,
-                            None => anyhow::bail!(
-                                "hdr-p010-selftest: unrecognized arg {s:?} (want WxH or intel|nvidia|amd)"
-                            ),
-                        }
-                    }
-                }
-            }
-            crate::capture::dxgi::hdr_p010_selftest_at(size.0, size.1, vendor)
-        }
         // Linux HDR readiness probe: prints, for BOTH Linux HDR sources, whether they can deliver
         // 10-bit PQ right now — the monitor mirror (is a monitor in BT.2100 colour mode?) and the
         // gamescope virtual output (is the resolved gamescope our `pipewire-hdr` build, and is the
@@ -683,21 +561,6 @@ fn real_main() -> Result<()> {
         // Create a virtual Switch Pro Controller via UHID and exercise it (validation, no session).
         #[cfg(target_os = "linux")]
         Some("switchpro-test") => devtest::switchpro_test(&args),
-        // Windows N4 SPIKE: hold a software-devnode HID Steam Deck and watch Steam Input promote it.
-        #[cfg(target_os = "windows")]
-        Some("deck-windows-spike") => devtest::deck_windows_spike(&args),
-        // Windows: hold the ss-mouse virtual HID pointer and sweep the real cursor via HID reports
-        // (validates the resident-mouse cursor-presence fix on-glass). `--seconds N`.
-        #[cfg(target_os = "windows")]
-        Some("vmouse-spike") => devtest::vmouse_spike(&args),
-        // Windows: ask a throwaway ss_mouse devnode for its channel proof and report which HID
-        // transport hidclass forwarded — the pad channel's v3 delivery gate, verified on glass.
-        #[cfg(target_os = "windows")]
-        Some("channel-proof-probe") => devtest::channel_proof_probe(&args),
-        // Windows: create a virtual DualSense (or --ds4/--edge/--deck/--xbox) via the UMDF driver and
-        // hold it, driving the real *WindowsManager end to end. `--index N`, `--seconds N`.
-        #[cfg(target_os = "windows")]
-        Some("dualsense-windows-test") => devtest::dualsense_windows_test(&args),
         // Capture→encode→file pipeline spike (dev tool).
         Some("spike") => spike::run(parse_spike(&args[1..])?),
         // Native slipstream/1 host (QUIC control plane + UDP data plane).
@@ -756,22 +619,6 @@ fn real_main() -> Result<()> {
                 mdns: !args.iter().any(|a| a == "--no-mdns") && discovery::mdns_enabled(),
             })
         }
-        // Windows service control: install/uninstall/start/stop/status + the SCM `run` entry point.
-        // Replaces the ad-hoc launch chain — `service install` registers an auto-start SYSTEM service
-        // that launches the host into the active interactive session.
-        #[cfg(target_os = "windows")]
-        Some("service") => service::main(&args[1..]),
-        // Install-time work the Windows installer delegates to the exe instead of locale-parsed
-        // PowerShell *files* (the ANSI-codepage parse-break root fix; see windows/install.rs).
-        #[cfg(target_os = "windows")]
-        Some("driver") => install::driver_main(&args[1..]),
-        #[cfg(target_os = "windows")]
-        Some("web") => install::web_main(&args[1..]),
-        // The tray's only recovery path: it is a per-user GUI process whose HKLM Run value fires
-        // solely at sign-in, so anything that kills one (an upgrade, a crash) otherwise left the
-        // operator iconless until the next logon.
-        #[cfg(target_os = "windows")]
-        Some("tray") => tray::main(&args[1..]),
         Some("-h") | Some("--help") | Some("help") | None => {
             print_usage();
             Ok(())
@@ -833,13 +680,8 @@ fn parse_serve(args: &[String]) -> Result<(mgmt::Options, native::NativeServe, b
             }
             "--mgmt-token" => {
                 let token = next()?;
-                // An empty token would satisfy the non-loopback "token required" guard
-                // while authenticating nobody (or, worse, everybody) — refuse it loudly
-                // rather than letting `--mgmt-token "$UNSET_VAR"` ship a dead credential.
-                if token.trim().is_empty() {
-                    bail!("--mgmt-token must not be empty");
-                }
-                opts.token = Some(token);
+                opts.token =
+                    Some(crate::mgmt_token::validate(&token).context("validate --mgmt-token")?);
             }
             // The native plane is now the DEFAULT (always runs in `serve`); `--native` is kept as an
             // accepted no-op for back-compat / explicitness.
@@ -1022,8 +864,6 @@ USAGE:
                                               (secure default; add --gamestream for Moonlight compat)
     slipstream-host plugins <CMD>              install/run host plugins (add, remove, list, enable,
                                               disable, status) — `plugins --help` for details
-    slipstream-host tray <CMD>                 status-tray lifecycle (start, stop, status) — Windows;
-                                              `start` is how you get the icon back without a re-logon
     slipstream-host openapi                    print the management API's OpenAPI document (codegen)
     slipstream-host doctor [--json]            check host readiness before starting a stream
     slipstream-host slipstream1-host [OPTIONS]  native slipstream/1 host (QUIC control + UDP data plane)
@@ -1099,16 +939,5 @@ NOTES:
     slipstream_core host→client loopback that reassembles and byte-verifies each one.
     Both 'serve' and 'slipstream1-host' advertise the native service over mDNS
     (_slipstream._udp) for client auto-discovery — 'slipstream-probe --discover' lists them."
-    );
-    #[cfg(target_os = "windows")]
-    eprintln!(
-        "\nWINDOWS SERVICE (end-user deployment — replaces a manual launch):\n\
-        \x20   slipstream-host service install    register an auto-start SYSTEM service + firewall rules\n\
-        \x20   slipstream-host service uninstall  remove the service + firewall rules\n\
-        \x20   slipstream-host service start|stop|restart|status\n\
-        \x20   config: %ProgramData%\\slipstream\\host.env\n\
-        \nWINDOWS DIAGNOSTICS:\n\
-        \x20   slipstream-host hdr-p010-selftest  GPU colour check for the SLIPSTREAM_HDR_SHADER_P010 path\n\
-        \x20                                     (scRGB FP16 -> P010 BT.2020 PQ shader vs an f64 reference)"
     );
 }

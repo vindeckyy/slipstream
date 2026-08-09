@@ -29,7 +29,7 @@ pub fn arm_after_topology(hold: &mut Hold, exclusive: bool) {
     if exclusive && prefs().ddc_power_off() {
         hold.ddc_armed = true;
     }
-    // Standby-TV selector: any topology, same as Windows `disable_connected_inactive`.
+    // Standby-TV selector: any topology.
     if prefs().pnp_disable_monitors() {
         let forced = crate::drm_force::force_off_connected_external();
         for n in forced {

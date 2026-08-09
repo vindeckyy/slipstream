@@ -732,7 +732,7 @@ impl Capturer for PortalCapturer {
     /// per-monitor one, and gamescope's PipeWire node carries no per-frame HDR metadata (the
     /// game's `VK_EXT_hdr_metadata` blob stops at the compositor — forwarding it needs the
     /// patch's v2 custom SPA meta). So this is the standard HDR10 default block (BT.2020
-    /// primaries, D65 white, 1000 / 0.005 cd/m², CLL unknown) — the same fallback Windows uses
+    /// primaries, D65 white, 1000 / 0.005 cd/m², CLL unknown) — the standard fallback
     /// when a display reports nothing. The native stream loop prefers the client display's own
     /// volume when the client sent one (`Hello::display_hdr`).
     fn hdr_meta(&self) -> Option<slipstream_core::quic::HdrMeta> {

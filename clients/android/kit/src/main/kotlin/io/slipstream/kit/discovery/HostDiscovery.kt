@@ -82,7 +82,7 @@ fun osIconTokens(chain: String): List<String> =
 
 /**
  * Browses `_slipstream._udp` for slipstream/1 hosts via the native `mdns-sd` core (the same browse the
- * Linux/Windows clients use), exposed over JNI — *not* `NsdManager`, whose per-OEM system daemon
+ * Linux client uses), exposed over JNI — *not* `NsdManager`, whose per-OEM system daemon
  * made discovery "mostly broken". [start] spins up the native browse and polls it ~1 Hz on the main
  * thread, pushing the live host set to [onChange] (also on the main thread, only when it changes);
  * [stop] tears it down.

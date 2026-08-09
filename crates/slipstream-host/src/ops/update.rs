@@ -3,8 +3,7 @@
 //! This module answers one question for the console: *does a newer host release exist for
 //! this box's channel* — by fetching the per-channel signed manifest and verifying it against
 //! the Ed25519 keys pinned below. It deliberately contains **no apply code**: U0 ships check
-//! everywhere; apply legs land per-channel (U1 Windows, U2 Linux helper) behind the same
-//! status surface.
+//! everywhere; Linux package and source-rebuild apply legs use the same status surface.
 //!
 //! Shape: a process-wide cache + a lazy refresh. `GET /update/status` returns the cache and,
 //! when it is older than [`AUTO_REFRESH_AFTER`], kicks a background refresh — the console
@@ -23,8 +22,6 @@ mod linux;
 // The signed manifest's schema + validation live in `ss-update-check` (shared with the
 // client's check). Re-exported so `manifest::…` call sites below are unchanged.
 pub(crate) use ss_update_check::manifest;
-#[cfg(target_os = "windows")]
-pub(crate) mod windows;
 
 use manifest::Manifest;
 use ss_update_check::{FeedError, PublicKey};
@@ -75,7 +72,6 @@ pub(crate) fn apply_support() -> &'static str {
     }
     let (kind, _) = detect::detect();
     match kind {
-        detect::InstallKind::WindowsInstaller => "full",
         #[cfg(target_os = "linux")]
         detect::InstallKind::Apt | detect::InstallKind::Dnf | detect::InstallKind::Sysext
             if linux::helper_installed() && linux::opted_in() =>
@@ -360,7 +356,7 @@ pub(crate) enum ForceError {
     TooSoon,
 }
 
-// ---------------------------------------------------------------- apply (U1: Windows)
+// ---------------------------------------------------------------- apply
 
 /// Why an apply request was refused (mapped to 409s by the API layer).
 pub(crate) enum ApplyError {
@@ -369,22 +365,21 @@ pub(crate) enum ApplyError {
     Unsupported,
     /// `SLIPSTREAM_UPDATE_APPLY=0`.
     Disabled,
-    /// An apply is already running (or a spawned installer hasn't resolved yet).
+    /// An apply is already running.
     JobRunning,
     /// A stream is live and the request didn't say `force`.
     SessionActive,
-    /// No verified manifest announcing something newer (or it lacks the Windows asset).
+    /// No verified manifest announces something newer.
     NothingToApply,
 }
 
-/// Start the (Windows) apply pipeline. The request carries **no version, url, or channel** —
-/// everything comes from the verified cached manifest (invariant §0.3 of the design).
+/// Start the Linux apply pipeline. The request carries no version, URL, or channel. Everything
+/// comes from the verified cached manifest.
 pub(crate) fn start_apply(force: bool, session_active: bool) -> Result<(), ApplyError> {
     if apply_disabled() {
         return Err(ApplyError::Disabled);
     }
     let (kind, channel) = detect::detect();
-    let windows_leg = kind == detect::InstallKind::WindowsInstaller;
     let linux_leg = matches!(
         kind,
         detect::InstallKind::Apt
@@ -394,7 +389,7 @@ pub(crate) fn start_apply(force: bool, session_active: bool) -> Result<(), Apply
             | detect::InstallKind::Pacman
             | detect::InstallKind::SteamosSource
     );
-    if !windows_leg && !linux_leg {
+    if !linux_leg {
         return Err(ApplyError::Unsupported);
     }
     #[cfg(target_os = "linux")]
@@ -410,21 +405,17 @@ pub(crate) fn start_apply(force: bool, session_active: bool) -> Result<(), Apply
             return Err(ApplyError::Unsupported);
         }
     }
-    #[cfg(not(target_os = "linux"))]
-    if linux_leg {
-        return Err(ApplyError::Unsupported);
-    }
     if session_active && !force {
         return Err(ApplyError::SessionActive);
     }
 
-    let (target_version, serial, asset) = {
+    let (target_version, serial) = {
         let mut rt = runtime().lock().unwrap();
         if rt.job.is_some() {
             return Err(ApplyError::JobRunning);
         }
-        // A spawned installer that hasn't resolved (fresh intent, old version) is still an
-        // apply in flight — reconcile owns it; don't start a second one under it.
+        // A fresh intent with the old version is still an apply in flight. Do not start a second
+        // one under it.
         if matches!(
             jobs::reconcile(
                 jobs::read_intent(&jobs::intent_path()),
@@ -447,26 +438,16 @@ pub(crate) fn start_apply(force: bool, session_active: bool) -> Result<(), Apply
         if !newer {
             return Err(ApplyError::NothingToApply);
         }
-        // Only the Windows leg needs the manifest's installer asset; the Linux legs resolve
-        // artifacts through the package manager.
-        let asset = checked.manifest.windows_host.clone();
-        if windows_leg && asset.is_none() {
-            return Err(ApplyError::NothingToApply);
-        }
         let version = checked.manifest.version.clone();
         let serial = checked.manifest.serial;
         rt.job = Some(jobs::JobSnapshot {
             target_version: version.clone(),
-            stage: if windows_leg {
-                "downloading"
-            } else {
-                "applying"
-            },
+            stage: "applying",
             received_bytes: 0,
             total_bytes: None,
             started_unix: now_unix(),
         });
-        (version, serial, asset)
+        (version, serial)
     };
 
     tokio::task::spawn_blocking(move || {
@@ -476,46 +457,13 @@ pub(crate) fn start_apply(force: bool, session_active: bool) -> Result<(), Apply
                 job.stage = s;
             }
         };
-        let outcome: Result<PostApply, (&'static str, String)> = {
-            #[cfg(target_os = "windows")]
-            {
-                let progress = |received: u64, total: Option<u64>| {
-                    let mut rt = runtime().lock().unwrap();
-                    if let Some(job) = rt.job.as_mut() {
-                        job.received_bytes = received;
-                        job.total_bytes = total;
-                    }
-                };
-                let asset = asset.expect("windows leg reserved with an asset");
-                windows::run_apply(&asset, &target_version, serial, &progress, &stage)
-                    .map(|()| PostApply::AwaitRestart)
-            }
-            #[cfg(target_os = "linux")]
-            {
-                let _ = &asset; // the Linux legs resolve through the package manager
-                let run = if detect::detect().0 == detect::InstallKind::SteamosSource {
-                    linux::run_apply_steamos(&target_version, serial, &stage)
-                } else {
-                    linux::run_apply(&target_version, serial, &stage)
-                };
-                run.map(|()| {
-                    // Staged / nothing-to-do wrote a durable result and this process lives
-                    // on; an in-place change wrote the intent and our restart is queued.
-                    // Either way the in-process job is finished.
-                    PostApply::Done
-                })
-            }
-            #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-            {
-                let _ = (&asset, &target_version, serial, &stage);
-                Err(("applying", "no apply leg for this platform".to_string()))
-            }
+        let run = if detect::detect().0 == detect::InstallKind::SteamosSource {
+            linux::run_apply_steamos(&target_version, serial, &stage)
+        } else {
+            linux::run_apply(&target_version, serial, &stage)
         };
+        let outcome = run.map(|()| PostApply::Done);
         match outcome {
-            Ok(PostApply::AwaitRestart) => {
-                // Stage stays `restarting`; the installer is about to stop the service and
-                // kill this process. Boot reconciliation writes the durable outcome.
-            }
             Ok(PostApply::Done) => {
                 runtime().lock().unwrap().job = None;
             }
@@ -527,7 +475,6 @@ pub(crate) fn start_apply(force: bool, session_active: bool) -> Result<(), Apply
                     finished_unix: now_unix(),
                     stage: Some(stage_name.into()),
                     error: Some(error),
-                    log_path: None,
                     staged: false,
                 };
                 let _ = jobs::write_json_atomic(&jobs::result_path(), &record);
@@ -538,13 +485,10 @@ pub(crate) fn start_apply(force: bool, session_active: bool) -> Result<(), Apply
     Ok(())
 }
 
-/// What an apply leg leaves behind for the spawn wrapper. (Each platform constructs only
-/// its own variant; the other is matched-but-never-built there.)
+/// What an apply leg leaves behind after the helper or source rebuild finishes.
 #[allow(dead_code)]
 enum PostApply {
-    /// The process is about to die (installer / self-restart); reconcile owns the outcome.
-    AwaitRestart,
-    /// The leg finished in-process (staged, nothing-to-do) — clear the job.
+    /// The leg finished in-process or queued the systemd restart.
     Done,
 }
 
@@ -553,10 +497,6 @@ enum PostApply {
 pub(crate) fn reconcile_at_boot() {
     let path = jobs::intent_path();
     let intent = jobs::read_intent(&path);
-    // Read off the intent BEFORE `reconcile` consumes it. Restored on both terminal outcomes: a
-    // rolled-back or aborted install killed the tray just as thoroughly as a successful one. NOT on
-    // StillApplying — the installer may still be running and would only kill it again.
-    let restore_tray = intent.as_ref().is_some_and(|i| i.tray_was_running);
     match jobs::reconcile(intent, env!("SLIPSTREAM_VERSION"), now_unix()) {
         jobs::Reconciled::None | jobs::Reconciled::StillApplying => {}
         jobs::Reconciled::Success(record) => {
@@ -579,12 +519,6 @@ pub(crate) fn reconcile_at_boot() {
             let _ = std::fs::remove_file(&path);
         }
     }
-    #[cfg(target_os = "windows")]
-    if restore_tray {
-        windows::relaunch_tray();
-    }
-    #[cfg(not(target_os = "windows"))]
-    let _ = restore_tray; // the Linux packages never kill a running tray
 }
 
 /// What status hands to the API layer.

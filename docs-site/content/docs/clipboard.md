@@ -65,7 +65,7 @@ no clipboard row, so there is nowhere to change it there. It stays on, which is 
 
 The setting is read when a session starts, so if you change it while streaming, reconnect.
 
-iPhone and the Steam Deck Decky plugin have no clipboard switch, see
+The Steam Deck Decky plugin has no clipboard switch, see
 [what each client does](#which-hosts-and-clients-support-it) below.
 
 ## Nothing crosses until something pastes
@@ -103,7 +103,7 @@ that has no backend. Neither does a [gamescope](/docs/gamescope) session.
 | Client | What crosses |
 |---|---|
 | Android, Android TV | **Plain text only** |
-| iPhone, Steam Deck | Not implemented |
+| Steam Deck | Not implemented |
 
 When the client has no clipboard bridge, turning a switch on (if one exists) is harmless but has no
 effect today. The Decky plugin on the Steam Deck has no switch at all.
@@ -127,8 +127,8 @@ it simply does nothing. Work through these in order:
   session whose Mutter doesn't expose the direct RemoteDesktop clipboard. Nothing on screen tells
   you this apart, the host log does.
 - **The host is older than the feature.** A host from before clipboard sync never advertises it.
-- **Your client doesn't implement it**, iPhone or Steam Deck. Nothing crosses regardless of what
-  the host allows.
+- **Your client doesn't implement it**, Steam Deck. Nothing crosses regardless of what the host
+  allows.
 - **You changed the switch while connected.** Reconnect.
 
 Still stuck? The host log records what it decided on each session, a `clipboard control` line with

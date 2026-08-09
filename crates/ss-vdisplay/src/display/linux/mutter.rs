@@ -1544,8 +1544,8 @@ mod tests {
         assert!(pick_virtual(&[], M).is_none());
     }
 
-    /// Live GNOME round trip  -  the on-glass lever for this backend, same convention as the Windows
-    /// backend's `live_create_drop`. Exercises the real four-step handshake end to end: create the
+    /// Live GNOME round trip - the on-glass lever for this backend. Exercises the real four-step
+    /// handshake end to end: create the
     /// virtual monitor, hold it, then drop the keepalive and let the RAII teardown revert it.
     ///
     /// Needs a running `gnome-shell` on the session bus. Run it as:

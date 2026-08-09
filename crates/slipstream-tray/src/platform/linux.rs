@@ -231,7 +231,7 @@ fn acquire_instance_lock() -> Option<std::fs::File> {
 
 pub fn run(args: crate::Args) -> anyhow::Result<()> {
     if args.quit {
-        // Windows-only convenience for the uninstaller; nothing to do here.
+        // The menu action is intentionally a no-op on Linux.
         return Ok(());
     }
     if args.autostart && !host_present() {

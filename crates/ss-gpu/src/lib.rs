@@ -1,43 +1,23 @@
 //! GPU inventory + operator GPU preference for multi-GPU hosts (web-console GPU selection).
 //!
 //! Three concerns, one module:
-//! - **Enumeration** ([`enumerate`]): the machine's hardware GPUs — DXGI adapters on Windows
-//!   (WARP/Basic-Render and indirect-display/display-only adapters filtered out — an IddCx
-//!   adapter like our own ss-vdisplay mirrors its render GPU's whole DXGI identity and would
-//!   list every GPU twice), `/dev/dri/renderD*` + sysfs PCI ids on Linux, empty elsewhere.
-//!   Compiled on every platform so the management endpoints (and the checked-in OpenAPI
-//!   document) are identical everywhere.
+//! - **Enumeration** ([`enumerate`]): Linux `/dev/dri/renderD*` nodes with sysfs PCI ids.
 //! - **Preference** ([`prefs`]): the operator's persisted auto/manual choice
 //!   (`<config>/gpu-settings.json`, written by the mgmt API). A manual preference is stored by
-//!   *stable identity* — PCI vendor:device + occurrence + name — NOT by LUID (Windows LUIDs are
-//!   reassigned every boot) or adapter index (enumeration order can change across driver updates).
+//!   stable PCI vendor, device, occurrence, and name.
 //! - **Selection** ([`selected_gpu`] / [`pick`]): the one place that turns (inventory, preference,
-//!   `SLIPSTREAM_RENDER_ADAPTER`) into the render/encode GPU. Precedence: **manual preference >
-//!   env substring > auto (max dedicated VRAM)**, with graceful fall-through — a preferred GPU
-//!   that vanished (unplugged eGPU, disabled iGPU) logs a warning and auto-selects so the host
-//!   keeps streaming, and the mgmt API surfaces the fallback instead of hiding it.
+//!   `SLIPSTREAM_RENDER_ADAPTER`) into the render/encode GPU. Precedence is manual preference,
+//!   environment substring, then automatic selection.
 //!
 //! A preference change applies to the **next session**: selection is read at capture/encode setup
-//! (`win_adapter::resolve_render_adapter_luid`, the encoder-backend dispatch, the codec probes), a
+//! (the encoder-backend dispatch and codec probes), a
 //! running session keeps the device it opened on. [`session_begin`]/[`active`] record which GPU a
 //! live session actually encodes on, for the console's "in use" display.
 
 // Unsafe-proof program: every `unsafe {}` in this leaf carries a `// SAFETY:` proof.
 #![deny(clippy::undocumented_unsafe_blocks)]
 
-/// Which kernel adapter types ([`D3DKMT_ADAPTERTYPE`] bit-field words) never belong in the GPU
-/// inventory. Pure bit math on every platform so the classification is unit-tested with words
-/// captured from real hardware; only the Windows [`enumerate`] consumes it at runtime.
-///
-/// [`D3DKMT_ADAPTERTYPE`]: https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmdt/ns-d3dkmdt-_d3dkmt_adaptertype
-#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-mod adapter_type;
 mod enumerate;
-/// Kernel-side adapter-type query (`D3DKMTQueryAdapterInfo(KMTQAITYPE_ADAPTERTYPE)`) via raw
-/// gdi32 FFI — the `windows` crate's `Wdk_*` bindings aren't enabled, and one 3-call query
-/// doesn't justify them.
-#[cfg(target_os = "windows")]
-mod kmt;
 mod prefs;
 mod select;
 mod types;
@@ -46,8 +26,6 @@ pub use enumerate::enumerate;
 pub use prefs::{prefs, GpuMode, GpuPrefStore, GpuPreference, PreferredGpu};
 #[cfg(target_os = "linux")]
 pub use select::linux_render_node;
-#[cfg(target_os = "windows")]
-pub use select::resolve_render_adapter_luid;
 pub use select::{
     active, find_preferred, manual_selection, pick, selected_gpu, selection_key, session_begin,
     ActiveGpu, ActiveSession, PickSource, SelectedGpu,
@@ -217,39 +195,4 @@ mod tests {
         assert_eq!(active().unwrap().1, 0); // idle, last-used retained
     }
 
-    /// `D3DKMT_ADAPTERTYPE` words captured on a real host (RTX 4090 + ss-vdisplay + Raphael
-    /// iGPU, 2026-07): the IDD ghost and Basic Render hide, the real GPUs stay.
-    #[test]
-    fn adapter_type_hides_idd_ghost_keeps_real_gpus() {
-        assert!(adapter_type::hidden(0x0342)); // ss-vdisplay ghost twin: indirect + display-only
-        assert!(!adapter_type::hidden(0x031b)); // NVIDIA GeForce RTX 4090
-        assert!(!adapter_type::hidden(0x2323)); // AMD Radeon(TM) Graphics (Raphael iGPU)
-        assert!(adapter_type::hidden(0x0105)); // Microsoft Basic Render Driver (software)
-    }
-
-    /// End-to-end smoke of the ghost-twin filter + the raw D3DKMT FFI (struct layout, linking)
-    /// on whatever GPUs this Windows machine has: nothing the filter would hide may survive
-    /// [`enumerate`]. On a host with ss-vdisplay installed this actively exercises ghost
-    /// exclusion; on a GPU-less CI runner it passes vacuously.
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn enumerate_excludes_non_render_adapters() {
-        for g in enumerate() {
-            let bits = kmt::adapter_type_bits(g.handle.luid_low, g.handle.luid_high);
-            eprintln!(
-                "enumerated: {} ({}) kmt_bits={}",
-                g.name,
-                g.id,
-                bits.map_or("<query failed>".into(), |b| format!("{b:#x}")),
-            );
-            if let Some(bits) = bits {
-                assert!(
-                    !adapter_type::hidden(bits),
-                    "{} ({}) should have been filtered (bits {bits:#x})",
-                    g.name,
-                    g.id
-                );
-            }
-        }
-    }
 }

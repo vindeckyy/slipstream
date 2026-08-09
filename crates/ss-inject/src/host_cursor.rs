@@ -1,6 +1,5 @@
 //! Hide the host's local OS cursor while clients stream, without blanking the stream overlay.
 //!
-//! - Windows: `ShowCursor(FALSE)` until the display count is negative; restore on Drop.
 //! - Linux X11: `XFixesHideCursor` on the root window.
 //! - Linux Wayland (GNOME): temporary invisible XCursor theme via gsettings; capture keeps the
 //!   last non-blank `SPA_META_Cursor` bitmap so the client still sees a pointer.
@@ -9,34 +8,17 @@ use ss_capture::host_cursor_flag;
 
 /// RAII hide of the host-local OS cursor. Restores on drop.
 pub struct PlatformHide {
-    #[cfg(target_os = "linux")]
     inner: linux::Inner,
-    #[cfg(target_os = "windows")]
-    inner: windows::Inner,
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-    _inner: (),
 }
 
 impl PlatformHide {
     /// Best-effort hide. Returns `None` when the platform cannot hide (caller still holds the
     /// refcount share; stream continues).
     pub fn acquire() -> Option<Self> {
-        #[cfg(target_os = "linux")]
         {
             let inner = linux::Inner::acquire()?;
             host_cursor_flag::set_hidden_for_stream(true);
             return Some(Self { inner });
-        }
-        #[cfg(target_os = "windows")]
-        {
-            let inner = windows::Inner::acquire()?;
-            host_cursor_flag::set_hidden_for_stream(true);
-            return Some(Self { inner });
-        }
-        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-        {
-            tracing::debug!("host cursor hide: unsupported on this platform");
-            None
         }
     }
 }
@@ -423,50 +405,6 @@ mod linux {
     }
 }
 
-#[cfg(target_os = "windows")]
-mod windows {
-    use windows::Win32::UI::WindowsAndMessaging::ShowCursor;
-
-    pub(super) struct Inner {
-        /// How many times we called ShowCursor(FALSE) successfully (restore with ShowCursor(TRUE)).
-        hides: i32,
-    }
-
-    impl Inner {
-        pub(super) fn acquire() -> Option<Self> {
-            // ShowCursor returns the display count; keep hiding until the cursor is not shown
-            // (count < 0), matching typical "force hide" loops.
-            let mut hides = 0i32;
-            // SAFETY: ShowCursor is a process-wide counter with no pointer args.
-            let mut count = unsafe { ShowCursor(false) };
-            hides += 1;
-            let mut guard = 0;
-            while count >= 0 && guard < 64 {
-                count = unsafe { ShowCursor(false) };
-                hides += 1;
-                guard += 1;
-            }
-            if count >= 0 {
-                tracing::warn!(
-                    count,
-                    "host cursor hide: ShowCursor could not drive the display count negative"
-                );
-            } else {
-                tracing::info!(hides, "host cursor hide: ShowCursor(FALSE)");
-            }
-            Some(Self { hides })
-        }
-    }
-
-    impl Drop for Inner {
-        fn drop(&mut self) {
-            for _ in 0..self.hides {
-                // SAFETY: paired ShowCursor(TRUE) for each FALSE above.
-                let _ = unsafe { ShowCursor(true) };
-            }
-        }
-    }
-}
 
 #[cfg(all(test, target_os = "linux"))]
 mod live_smoke {

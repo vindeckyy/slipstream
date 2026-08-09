@@ -1,17 +1,12 @@
 //! The brain layer: what a connect *is*, and the one implementation of how it runs
 //! (design/client-architecture-split.md §3).
 //!
-//! Wake-then-connect exists three times today — GTK's `WakeConnect`/`wake_fallback`, the
-//! WinUI shell's `wake_and_connect`, Apple's `HostWaker` (whose comment in the Windows copy
-//! literally says "mirrors the Apple HostWaker") — and the deep-link and profile work would
-//! have made it five. This module is where that collapses: a [`ConnectPlan`] is built from a
-//! card click, a CLI verb or a URL (one constructor each, one type out), and the orchestrator
-//! runs it. Front-ends render; they don't decide.
+//! Wake-then-connect is shared by the desktop shell, console client, command line, and deep
+//! link flows. This module builds one [`ConnectPlan`] from each entry point and runs it. The
+//! front-ends render the result; they do not make connection policy decisions.
 //!
-//! The split that keeps this honest is [`UiDelegate`]: prompts, progress and error surfaces
-//! stay in the front-end, because a GTK dialog, a WinUI page, a Skia console screen and a
-//! terminal prompt genuinely are different things — but *when* to prompt, *how long* to wait
-//! for a sleeping box and *what counts as a refusal* are decided here, once.
+//! The split is [`UiDelegate`]: prompts, progress, and error surfaces stay in the front-end,
+//! while prompt timing, wake behavior, and refusal handling are decided here.
 //!
 //! Wake timings are Apple's `HostWaker` verbatim, because it is the implementation that got
 //! them right: a magic packet is fire-and-forget and a cold box takes 20–60 s to POST, boot
@@ -228,12 +223,8 @@ impl ConnectPlan {
         if self.settings.fullscreen_on_stream {
             args.push("--fullscreen".into());
         }
-        // Deliberately NO `--window-pos` here. The Windows shell appends its own (its
-        // window's desktop coordinates place the session on the same monitor), but on
-        // Wayland neither GTK can read global window coordinates nor can SDL apply
-        // them — the compositor owns placement — so from the GTK/CLI spawners the flag
-        // would be a silent no-op everywhere it matters. X11 could carry it, but a
-        // Linux-only special case that most Linux sessions ignore isn't worth the drift.
+        // Deliberately omit `--window-pos`: Wayland owns placement, and a compositor-specific
+        // position passed by the spawner would be ignored by most sessions.
         args
     }
 }
@@ -402,8 +393,8 @@ pub const WAKE_TIMEOUT_SECS: u64 = 90;
 pub const WAKE_RESEND_SECS: u64 = 6;
 
 /// The wake-and-wait loop as a pure step function, so every front-end drives it from its own
-/// loop (relm4 messages, a WinUI thread, the console's service tick, a CLI's sleep) and they
-/// all still agree on the timings — and so the behavior is testable without waiting 90 s.
+/// loop (relm4 messages, the console service tick, or a CLI sleep) and they all agree on the
+/// timings. This also keeps the behavior testable without waiting 90 s.
 #[derive(Clone, Debug)]
 pub struct WakeWait {
     elapsed_secs: u64,
@@ -635,9 +626,6 @@ pub fn session_binary() -> std::path::PathBuf {
     SESSION_BIN.into()
 }
 
-#[cfg(windows)]
-const SESSION_BIN: &str = "slipstream-session.exe";
-#[cfg(not(windows))]
 const SESSION_BIN: &str = "slipstream-session";
 
 /// Kills the spawned session child — the Cancel button of a parked request-access connect,
@@ -715,7 +703,7 @@ pub fn spawn_session(
                 }
             }
             // The spec has done its job the moment the child has read it; a leftover temp file
-            // in %TEMP% is litter, and one per launch adds up.
+            // in the temporary directory is litter, and one per launch adds up.
             if let Some(path) = &spec_path {
                 let _ = std::fs::remove_file(path);
             }
@@ -736,10 +724,8 @@ pub fn spawn_session(
 }
 
 /// Become the session process (`--exec`): the CLI's gamescope-wrapper mode, where the launched
-/// process identity must be the streaming one — a supervising parent would break focus and
-/// lifecycle under gamescope. Never returns on success. Windows has no `exec`, so there this
-/// runs the child to completion and exits with its code, which is the same contract minus the
-/// pid.
+/// process identity must be the streaming one. A supervising parent would break focus and
+/// lifecycle under gamescope. Never returns on success.
 pub fn exec_session(plan: &ConnectPlan) -> std::io::Error {
     let mut cmd = Command::new(session_binary());
     cmd.args(plan.session_args());
@@ -747,13 +733,6 @@ pub fn exec_session(plan: &ConnectPlan) -> std::io::Error {
     {
         use std::os::unix::process::CommandExt as _;
         cmd.exec()
-    }
-    #[cfg(not(unix))]
-    {
-        match cmd.status() {
-            Ok(s) => std::process::exit(s.code().unwrap_or(1)),
-            Err(e) => e,
-        }
     }
 }
 

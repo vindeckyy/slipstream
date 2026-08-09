@@ -7,8 +7,8 @@ description: Connect from Android, Steam Deck, or Moonlight.
 
 | Client | Install | Protocol |
 |--------|---------|----------|
-| [**Android / Android TV**](https://github.com/vindeckyy/slipstream/releases/download/android-preview/slipstream-android.apk) | Invite-only Play test track or [download the Android APK](https://github.com/vindeckyy/slipstream/releases/download/android-preview/slipstream-android.apk) | `slipstream/1` |
-| **Steam Deck** | Decky plugin + Flatpak `slipstream-client` | `slipstream/1` |
+| [**Android / Android TV**](https://github.com/vindeckyy/slipstream/releases/download/android-preview/slipstream-android.apk) | [Download the Android preview APK](https://github.com/vindeckyy/slipstream/releases/download/android-preview/slipstream-android.apk) | `slipstream/1` |
+| **Steam Deck** | Decky plugin + Flatpak `io.slipstream.Slipstream` | `slipstream/1` |
 
 Native apps discover hosts on the LAN, pair with a PIN, reconnect on a pinned identity, and can
 browse the host game library.
@@ -17,15 +17,15 @@ browse the host game library.
 
 1. Install [Decky Loader](https://decky.xyz/).
 2. Install the Slipstream Decky plugin (adds a QAM panel in Gaming Mode).
-3. Install the Flatpak client the plugin drives (`slipstream-client`). Desktop Mode can run that Flatpak directly.
+3. Install the Flatpak client the plugin drives (`io.slipstream.Slipstream`). Desktop Mode can run that Flatpak directly.
 
 Deck controls forward as a Steam Deck pad when Steam Input is set for the client.
 
 ## Moonlight
 
-Any [Moonlight](https://moonlight-stream.org/) client works when the host runs with `--gamestream`
-(the default packaged unit). Prefer native apps when available. GameStream uses weaker control-plane
-crypto; keep it on trusted LAN, or turn it off for VPN-only hosts (see [Install](/docs/install)).
+Any [Moonlight](https://moonlight-stream.org/) client works when the host runs with `--gamestream`.
+Prefer native apps when available. GameStream uses weaker control-plane crypto; enable it only on a
+trusted LAN and keep it off for VPN-only hosts (see [Install](/docs/install)).
 
 ## Pairing
 

@@ -36,9 +36,8 @@ const HOLD_MAX: Duration = Duration::from_millis(30);
 const PAUSE_GAP: Duration = Duration::from_millis(250);
 
 /// The sliding jitter window: [`BUCKETS`] × [`BUCKET_LEN`] of per-bucket max inter-arrival gap.
-/// Long enough that the old bursty Mac cadence (~two 20 ms frames every ~42 ms — the 2026-07-03
-/// "crackling mic", see `wasapi_mic.rs`) is always represented; short enough that a one-off
-/// spike ages out in a few seconds.
+/// Long enough to represent a bursty client cadence; short enough that a one-off spike ages out
+/// in a few seconds.
 const BUCKETS: usize = 4;
 const BUCKET_LEN: Duration = Duration::from_millis(1000);
 

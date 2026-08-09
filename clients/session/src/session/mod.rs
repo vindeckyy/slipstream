@@ -137,8 +137,8 @@ pub(crate) fn connect_timeout() -> Duration {
 ///
 /// `settings` is what [`trust::effective_settings`] returned, never a raw
 /// `Settings::load()`: both callers resolve the host's profile first, so the two
-/// construction sites cannot drift (they historically did — touching one and not the
-/// other is a Windows-only build break). `profile` is that profile's name, for the
+/// construction sites cannot drift (they historically did, and touching one without the
+/// other caused a platform-specific build break). `profile` is that profile's name, for the
 /// stats overlay's first line.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn session_params(
@@ -228,7 +228,7 @@ pub(crate) fn session_params(
         preferred_codec: settings.preferred_codec(),
         // HDR off = don't advertise 10-bit/HDR at all; the host then never upgrades.
         // MULTI_SLICE is decoder truth for THIS embedder: every desktop decode stack
-        // (FFmpeg software, VAAPI, D3D11VA, Vulkan Video) handles AUs carrying several
+        // (FFmpeg software, VAAPI, Vulkan Video) handles AUs carrying several
         // slice NALs, so the host may keep its multi-slice low-latency default (§7 LN1).
         // The mobile/TV embedders must NOT copy this blindly — Amlogic MediaCodec wedges
         // on multi-slice AUs (see `VIDEO_CAP_MULTI_SLICE`), so they advertise per-decoder.
@@ -255,18 +255,8 @@ pub(crate) fn session_params(
                 0
             },
         // This panel's HDR colour volume → the host's virtual-display EDID, so host
-        // apps tone-map to the real glass. Windows reads it from DXGI (the
-        // `--window-pos` monitor; advanced-color outputs only) — gated on the HDR
-        // setting, since with 10-bit/HDR unadvertised above the volume is noise. No
-        // portable Wayland/X11 query exists yet, so Linux keeps the host's EDID
-        // defaults; `SLIPSTREAM_CLIENT_PEAK_NITS` (read in the session pump) pins one
-        // manually on either OS and wins over both.
-        #[cfg(windows)]
-        display_hdr: settings
-            .hdr_enabled
-            .then(|| ss_client_core::video_d3d11::display_hdr_volume(window_pos()))
-            .flatten(),
-        #[cfg(not(windows))]
+        // Linux keeps the host's EDID defaults. `SLIPSTREAM_CLIENT_PEAK_NITS` (read in the
+        // session pump) can pin a value for the stream.
         display_hdr: None,
         // The presenter renders the host cursor locally in desktop mouse mode (M2 cursor
         // channel); capture-mode sessions keep the composited cursor, so only advertise
@@ -441,14 +431,13 @@ pub fn run() -> u8 {
 
     // Before any Vulkan call: make RADV expose its video-decode queue + extensions so the
     // decoder's `auto` path prefers Vulkan Video over VAAPI (Steam Deck, and any gated RADV).
-    // Windows drivers (NVIDIA/AMD Adrenalin) expose theirs unconditionally.
     #[cfg(target_os = "linux")]
     enable_radv_video_decode();
 
     // The Settings device picks → env, unless the user already forced one by hand:
     // the GPU (the shells' pickers store the adapter's marketing name) for the
-    // presenter's device selection, and the audio endpoints (PipeWire node names /
-    // WASAPI endpoint ids) for the playback/mic streams. Before any Vulkan call,
+    // presenter's device selection, and the PipeWire node names for the playback/mic
+    // streams. Before any Vulkan call,
     // like the RADV knob (covers --connect and --browse).
     //
     // Spec mode takes them from the SPEC's settings — the spawner's resolve — which

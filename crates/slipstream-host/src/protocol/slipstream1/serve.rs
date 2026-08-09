@@ -272,8 +272,7 @@ pub(super) async fn serve_session(
     //     game-mode session, attach doesn't own the display — a resize must never relaunch the title
     //     (design/midstream-resolution-resize.md H1/D3). The client keeps scaling client-side.
     //   * an `identity: per-client-mode` policy: the mode is part of the display-identity slot key,
-    //     so a resize would resolve a DIFFERENT slot — on Windows a fresh monitor ADD instead of the
-    //     in-place reconfigure, on KWin a differently-named output — defeating the policy's
+    //     so a resize would resolve a DIFFERENT slot, defeating the policy's
     //     per-resolution identity. Honest downgrade: reject, client scales (H5).
     //   * a monitor MIRROR (a `capture_monitor` pin): a physical head runs at the mode its owner set
     //     and the mirror backend ignores the requested one, so a resize would restart the identical
@@ -288,14 +287,9 @@ pub(super) async fn serve_session(
             .is_some_and(|e| e.identity == crate::vdisplay::policy::Identity::PerClientMode);
         // Read once here, like the identity above: this session opened its display under whatever
         // the pin said at bring-up, so a console change mid-session must not retroactively change
-        // what THIS session answers a Reconfigure with. Linux-only because `vdisplay::open` only
-        // routes to the mirror there — a pin left in a Windows host's settings streams nothing
-        // different, and must not silently disable resize as a side effect.
-        #[cfg(target_os = "linux")]
+        // what THIS session answers a Reconfigure with.
         let mirrored =
             source == Slipstream1Source::Virtual && crate::vdisplay::capture_monitor().is_some();
-        #[cfg(not(target_os = "linux"))]
-        let mirrored = false;
         reconfig_allowed(compositor, per_client_mode_identity, mirrored)
     };
     // Negotiated codec (HEVC / H.264 / AV1), derived from the Welcome. `Copy`, so the control task's
@@ -321,7 +315,7 @@ pub(super) async fn serve_session(
     let (keyframe_tx, keyframe_rx) = std::sync::mpsc::channel::<()>();
     // Client LTR-RFI recovery: the control task forwards each `RfiRequest`'s lost-frame range here;
     // the encode loop prefers `Encoder::invalidate_ref_frames` (a clean re-anchor P-frame) over a
-    // full IDR when the encoder supports it (native-AMF LTR / Windows NVENC).
+    // full IDR when the encoder supports it.
     let (rfi_tx, rfi_rx) = std::sync::mpsc::channel::<(u32, u32)>();
     let (bitrate_tx, bitrate_rx) = std::sync::mpsc::channel::<u32>();
     // Encoder-truth bridge, data plane → control task (§ABR overdrive). The encode loop publishes
@@ -602,9 +596,8 @@ pub(super) async fn serve_session(
 
     // HDR static metadata (ST.2086 mastering + CEA-861.3 content light level), host → client, sent
     // once at session start when an HDR session was negotiated, as a generic HDR10 baseline. The
-    // virtual-source stream loop then sends the source display's REAL mastering metadata (Windows
-    // GetDesc1) as soon as capture starts and re-sends it on keyframes; the client applies the
-    // latest it receives. This baseline covers the synthetic source and the pre-capture gap.
+    // virtual-source stream loop then sends updated source metadata on keyframes; the client applies
+    // the latest it receives. This baseline covers the synthetic source and the pre-capture gap.
     if welcome.color.is_hdr() {
         // Prefer the CLIENT's own display volume (Hello::display_hdr): the virtual display's EDID
         // now advertises it, so host apps tone-map to exactly that volume — echoing it here keeps
@@ -673,15 +666,10 @@ pub(super) async fn serve_session(
     // GPU clock pin (Linux, opt-in `SLIPSTREAM_PIN_CLOCKS`): hold the box-wide vendor clock floor for
     // as long as THIS session streams, refcounted with every other live session across both planes.
     // RAII like the marker above — armed on the first live client, released when the last one
-    // disconnects, so idle clocks aren't pinned while nobody is connected. No-op off Linux / when
-    // the flag is unset.
-    #[cfg(target_os = "linux")]
+    // disconnects, so idle clocks aren't pinned while nobody is connected.
     let _clock_pin = crate::gpuclocks::session_pin();
-    // The session's launch, threaded into the data plane. Windows carries the store-qualified id
-    // (spawned into the interactive user session once capture is live); other hosts resolve the id
-    // to its shell command HERE against the host's own library — a client can only ever pick an
-    // existing title, never send a command — and the data plane runs it per-backend (nested into a
-    // bare-spawn gamescope, or spawned into the live session once capture is up).
+    // Resolve the requested library id against this host's library. A client can only pick an
+    // existing title, never send a command. The data plane runs the resulting command per backend.
     // ONE library lookup for the whole session: enumerating the installed stores touches every
     // launcher's on-disk metadata, and the data plane needs three things out of it — what to run, what
     // to call the title, and how to recognize its process once a launcher has handed off
@@ -708,9 +696,6 @@ pub(super) async fn serve_session(
                     None
                 }
             });
-    #[cfg(target_os = "windows")]
-    let launch_for_dp = launch_target.as_ref().and(hello.launch.clone());
-    #[cfg(not(target_os = "windows"))]
     let launch_for_dp = launch_target.as_ref().and_then(|t| t.command.clone());
     // A client reconnecting inside its game's reconnect window takes the game back: nothing is ended,
     // and this session adopts it. Matched on (this client, this title) so it can only ever reclaim its

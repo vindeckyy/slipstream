@@ -9,10 +9,9 @@
 //
 // Token precedence is deliberate: the host mints a capability-limited `plugin-token` for the
 // scripting runner (it cannot register hooks or administer pairing), and that is what a plugin's
-// zero-config connect() should hold — the full-admin `mgmt-token` is only a fallback for hosts
-// that predate the plugin token (and on Windows the runner's LocalService principal can't read it
-// at all). A script that legitimately needs the admin surface sets SLIPSTREAM_MGMT_TOKEN or passes
-// { token } explicitly.
+// zero-config connect() should hold. The full-admin `mgmt-token` is only a fallback for hosts that
+// predate the plugin token. A script that legitimately needs the admin surface sets
+// SLIPSTREAM_MGMT_TOKEN or passes { token } explicitly.
 //
 // The CA is the host's own identity certificate — trusting exactly it (not the system roots)
 // IS the pin for the loopback hop. Per-runtime plumbing differs: Bun takes `tls.ca` on fetch,
@@ -43,10 +42,6 @@ export interface ResolvedConfig {
 export const configDir = (): string => {
 	const explicit = process.env.SLIPSTREAM_CONFIG_DIR;
 	if (explicit) return explicit;
-	if (process.platform === "win32") {
-		const base = process.env.ProgramData ?? process.env.APPDATA ?? ".";
-		return path.join(base, "slipstream");
-	}
 	const base =
 		process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config");
 	return path.join(base, "slipstream");
@@ -56,16 +51,12 @@ export const configDir = (): string => {
  * The writable state directory a plugin should persist its config/cache into:
  * `<config_dir>/plugin-state[/<name>]`.
  *
- * WHY this and not `<config_dir>/<name>` directly: on Windows the managed runner is de-privileged
- * (runs as `NT AUTHORITY\LocalService`), and the config dir is locked to Users-read — so a plugin
- * writing straight under it fails with EPERM. `slipstream-host plugins enable` grants the runner
- * **Modify** on exactly `plugin-state` (the config dir and the plugin *code* stay read-only), so
- * this is the one place a supervised plugin can write. On Linux the runner is a `systemd --user`
- * unit owning the whole config dir, so the path is writable there too — same code, no branch.
+ * Keep plugin-owned state under its own tree instead of placing it beside host-managed files.
+ * The host prepares this directory with the permissions needed by the supervised runner.
  *
  * `name` is a plugin's own kebab-case id; omit it for the shared root. The directory is NOT created
  * here (the caller decides permissions/timing) — `fs.mkdirSync(pluginStateDir(name), {recursive:
- * true})` from the runner inherits the granted ACL on Windows.
+ * true})` from the runner creates the requested state directory.
  */
 export const pluginStateDir = (name?: string): string => {
 	const root = path.join(configDir(), "plugin-state");
@@ -76,17 +67,11 @@ export const pluginStateDir = (name?: string): string => {
  * The ingest inbox a plugin reads data DROPPED BY ANOTHER ACCOUNT from:
  * `<config_dir>/ingest[/<name>]`.
  *
- * The mirror of {@link pluginStateDir}, and the answer to a problem the de-privileging creates on
- * Windows: the LocalService runner can no longer traverse the interactive user's profile, so a
- * plugin can't read a file an app running as *you* produced (e.g. the Playnite exporter's library
- * JSON under your `%APPDATA%`). `slipstream-host plugins enable` grants `BUILTIN\Users` **write** on
- * exactly `ingest` — so your app drops `ingest/<plugin>/…` and the runner reads it there. On Linux
- * the runner is a `systemd --user` unit owning the config dir, so a same-user producer writes here
- * with no special step.
+ * Use this tree for data produced by another local application, so the producer and the supervised
+ * runner have an explicit handoff directory.
  *
- * The dir is NOT created here (a producer running as the interactive user creates its own
- * `ingest/<name>` subdir under the host-granted `ingest`). Treat anything read from it as
- * lower-trust than your own state: the inbox is writable by any local user.
+ * The dir is NOT created here. A producer creates its own `ingest/<name>` subdir. Treat anything
+ * read from it as lower-trust than your own state because another local process may write there.
  */
 export const pluginIngestDir = (name?: string): string => {
 	const root = path.join(configDir(), "ingest");

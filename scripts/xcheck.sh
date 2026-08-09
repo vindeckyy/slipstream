@@ -1,90 +1,50 @@
 #!/usr/bin/env bash
 #
-# Type-check and lint slipstream's PLATFORM-GATED Rust from a dev box that is neither platform.
+# Type-check and lint Slipstream's Linux-gated Rust from any development machine.
 #
-#   scripts/xcheck.sh                    # windows, clippy -D warnings — the default
-#   scripts/xcheck.sh linux              # the Linux backends instead
-#   scripts/xcheck.sh windows check      # cargo check instead of clippy
-#   scripts/xcheck.sh linux clippy --fix # extra args are passed through to cargo
+#   scripts/xcheck.sh                    # clippy with warnings denied
+#   scripts/xcheck.sh check              # cargo check
+#   scripts/xcheck.sh clippy --fix       # extra args are passed through to cargo
 #
-# (`scripts/wincheck.sh` is a compat shim for the windows half — this script's former name.)
+# CI compiles Linux-gated code on Linux, so an edit made on another OS is otherwise unverifiable
+# until that job runs. This script checks the working tree in a short-lived generated workspace.
 #
-# CI compiles each platform's `#[cfg(target_os = ...)]` code only on that platform, so a Windows- or
-# Linux-side edit made on a Mac is otherwise unverifiable until that CI job runs (minutes) or someone
-# tests on a real box. This gets the same answer in ~1 s warm, against the WORKING TREE — the
-# generated workspace symlinks each crate's real directory contents, so there is nothing to keep in
-# sync and no copies to go stale.
+# The generated workspace keeps the Linux display check independent of the full host dependency
+# graph. ss-capture is excluded because its Linux path requires a system PipeWire development package.
+# Path dependencies outside the generated members point at the real crates by absolute path, while
+# the lightweight stubs keep unrelated multimedia and transport dependencies out of the check.
 #
-# Coverage is deliberately asymmetric. Windows lints ss-frame, ss-win-display, ss-capture and
-# ss-vdisplay; Linux lints ss-vdisplay only, because ss-capture's Linux half needs `pipewire`, whose
-# build script wants libpipewire via pkg-config. ss-frame and ss-win-display stay generated MEMBERS
-# for both targets even when nothing lints them: demote either to a real path dep and its
-# slipstream-core dependency resolves to the REAL crate, dragging ring and opus back into the graph —
-# the exact thing the stub exists to prevent.
+# ss-encode is stubbed because ss-vdisplay's admission gate needs only one predicate from it, while
+# the real crate carries multimedia build dependencies. If the display path starts using another
+# encoder fact, mirror that fact here.
 #
-# WHY A SEPARATE WORKSPACE — the obvious in-tree command
-#
-#     cargo check --target x86_64-pc-windows-msvc -p ss-capture
-#
-# fails, and NOT because of the Windows code: it dies in build scripts that compile C for the
-# target. `audiopus_sys` first (cmake wants a Visual Studio generator), then `ring` (needs an MSVC C
-# compiler plus the Windows SDK headers; clang-cl and lld-link exist locally but there is no SDK).
-# Both enter the graph through `slipstream-core`'s `quic` feature. Stubbing opus with a fake
-# `opus.pc` gets past audiopus but not ring.
-#
-# The whole Windows capture stack uses exactly FOUR items from slipstream-core — `quic::HdrMeta`,
-# `Mode`, `CompositorPref` and its `as_str`, all plain data (re-verify with:
-# `grep -rho 'slipstream_core::[A-Za-z_:]*' crates/ss-{capture,frame,win-display,vdisplay}/src | sort -u`).
-# So this script generates a ~50-line stub core carrying just those, and rustls/ring/opus never
-# enter the graph at all. Every path dep that is NOT a generated member points at the REAL crate by
-# absolute path, so their own relative deps and `version.workspace` inheritance still resolve.
-#
-# ss-encode is stubbed for the same reason and needs the same care: ss-vdisplay's admission gate
-# calls exactly ONE item from it (`can_open_another_session`, admission.rs), but the real crate
-# drags ffmpeg-sys — whose build script wants a Windows FFmpeg tree this box does not have. The
-# stub is a `cfg(windows) -> bool`; if admission ever consults a second encoder fact, mirror it
-# here or the cross-check stops covering that call.
-#
-# Note: `cargo fmt` needs none of this — rustfmt follows `mod`/`#[path]` without evaluating cfg, so
-# it already reaches Windows-only files. Mechanical edits can be normalised with plain `cargo fmt`.
+# cargo fmt needs none of this. Rustfmt follows mod and path declarations without evaluating cfg.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 
-plat="${1:-windows}"
-case "$plat" in
-  windows | linux) shift || true ;;
-  # No platform given: the first arg (if any) is the cargo subcommand. Default to windows, which is
-  # what this script did under its former name.
-  *) plat=windows ;;
-esac
+# Accept the old explicit Linux argument while keeping the checker single-platform.
+if [ "${1:-}" = linux ]; then
+  shift
+fi
 
-case "$plat" in
-  windows)
-    TARGET=x86_64-pc-windows-msvc
-    LINT=(ss-frame ss-win-display ss-capture ss-vdisplay)
-    ;;
-  linux)
-    TARGET=x86_64-unknown-linux-gnu
-    # ss-capture is absent on purpose — see the header (libpipewire).
-    LINT=(ss-vdisplay)
-    ;;
-esac
-OUT="${XCHECK_DIR:-${WINCHECK_DIR:-$REPO/target/xcheck-$plat}}"
+TARGET=x86_64-unknown-linux-gnu
+LINT=(ss-vdisplay)
+OUT="${XCHECK_DIR:-$REPO/target/xcheck-linux}"
 
 # The generated members: every crate we lint on EITHER target, plus the two stubs they share. A path
 # dep naming one of these must stay RELATIVE (resolving to the generated member); anything else is
 # rewritten to the real crate. Getting that backwards silently drags the real slipstream-core — and
 # with it ring and opus — back in through ss-frame, which is the entire thing this avoids.
-MEMBERS_RE='slipstream-core|ss-encode|ss-frame|ss-win-display|ss-capture|ss-vdisplay'
-REAL_MEMBERS=(ss-frame ss-win-display ss-capture ss-vdisplay)
+MEMBERS_RE='slipstream-core|ss-encode|ss-frame|ss-vdisplay'
+REAL_MEMBERS=(ss-frame ss-vdisplay)
 
 cmd="${1:-clippy}"
 [ $# -gt 0 ] && shift
 case "$cmd" in
   check | clippy) ;;
   *)
-    echo "usage: $(basename "$0") [windows|linux] [check|clippy] [extra cargo args...]" >&2
+    echo "usage: $(basename "$0") [linux] [check|clippy] [extra cargo args...]" >&2
     exit 2
     ;;
 esac
@@ -107,7 +67,7 @@ mkdir -p "$OUT"
   echo '# GENERATED by scripts/xcheck.sh — do not edit; re-run the script.'
   echo '[workspace]'
   echo 'resolver = "2"'
-  echo 'members = ["slipstream-core", "ss-encode", "ss-frame", "ss-win-display", "ss-capture", "ss-vdisplay"]'
+  echo 'members = ["slipstream-core", "ss-encode", "ss-frame", "ss-vdisplay"]'
   echo
   echo '[workspace.package]'
   sed -n '/^\[workspace\.package\]/,/^$/p' "$REPO/Cargo.toml" | sed '1d;/^$/d'
@@ -139,9 +99,9 @@ EOF
 # Field layout and derives must match the real definitions, or the cross-check goes stale exactly
 # where it matters (the capture code builds HdrMeta literally and compares Modes).
 cat > "$OUT/slipstream-core/src/lib.rs" <<'EOF'
-//! GENERATED by scripts/xcheck.sh — a STUB of slipstream-core carrying only the two items the
-//! Windows capture stack uses. Mirrors crates/slipstream-core: `Mode` from config.rs, `HdrMeta`
-//! from quic/datagram.rs. If either grows a field, mirror it here.
+//! GENERATED by scripts/xcheck.sh - a STUB of slipstream-core carrying only the types used by the
+//! Linux display check. Mirrors crates/slipstream-core: `Mode` from config.rs, `HdrMeta` from
+//! quic/datagram.rs, and `CompositorPref` from config.rs. If any grows a field, mirror it here.
 
 /// Mirrors `slipstream_core::Mode`.
 #[repr(C)]
@@ -201,12 +161,11 @@ rust-version.workspace = true
 EOF
 
 cat > "$OUT/ss-encode/src/lib.rs" <<'EOF'
-//! GENERATED by scripts/xcheck.sh — a STUB of ss-encode carrying only the one item ss-vdisplay's
-//! admission gate uses. The real crate pulls ffmpeg-sys, whose build script needs a Windows FFmpeg
-//! tree; nothing in the display path needs the encoder itself, only this predicate.
+//! GENERATED by scripts/xcheck.sh - a STUB of ss-encode carrying only the one item ss-vdisplay's
+//! admission gate uses. The real crate carries multimedia build dependencies; the display path
+//! needs only this predicate.
 
-/// Mirrors `ss_encode::can_open_another_session` (lib.rs, `#[cfg(target_os = "windows")]`).
-#[cfg(target_os = "windows")]
+/// Mirrors `ss_encode::can_open_another_session` for the display check.
 pub fn can_open_another_session() -> bool {
     true
 }

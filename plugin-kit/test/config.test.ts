@@ -112,8 +112,7 @@ describe("ConfigService", () => {
 		expect(raw.ui).toEqual({ port: 5885 }); // verbatim — a save decides what survives
 	});
 
-	test("refuses a group/world-writable config file (POSIX)", async () => {
-		if (process.platform === "win32") return;
+	test("refuses a group/world-writable config file", async () => {
 		fs.mkdirSync(pluginStateDir(PLUGIN), { recursive: true, mode: 0o700 });
 		const file = path.join(pluginStateDir(PLUGIN), "config.json");
 		fs.writeFileSync(file, "{}");

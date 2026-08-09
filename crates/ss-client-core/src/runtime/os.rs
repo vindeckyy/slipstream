@@ -2,13 +2,12 @@
 //! host crate's `osinfo.rs` for the producer): sanitize the untrusted chain once, and turn it
 //! into the icon-lookup order every front-end walks.
 //!
-//! The chain is slash-separated, generic → specific (`windows`, `macos`,
+//! The chain is slash-separated, generic to specific (`macos`,
 //! `linux[/<family>][/<id>]`, e.g. `linux/fedora/bazzite`). A UI resolves an icon by walking
 //! [`os_icon_tokens`] (most-specific-first, brand aliases applied) and taking the first token it
 //! has art for — so a client with no Bazzite mark lands on `fedora`, then generic `linux`, and an
 //! unknown chain simply falls through to the UI's fallback glyph. Kept UI-agnostic here so the
-//! GTK, Windows and console shells (and the Swift/Kotlin ports, held to the same rules) resolve
-//! identically.
+//! GTK, console shells, and the Swift/Kotlin ports resolve identically.
 
 /// Reduce a raw `os` TXT value to the trusted grammar: lowercase slash-separated tokens of
 /// `[a-z0-9._-]` (each capped at 32 chars, at most 5 of them). mDNS is unauthenticated input —
@@ -55,7 +54,6 @@ mod tests {
 
     #[test]
     fn sanitize_passes_well_formed_chains() {
-        assert_eq!(sanitize_os("windows"), "windows");
         assert_eq!(sanitize_os("linux/fedora/bazzite"), "linux/fedora/bazzite");
         assert_eq!(
             sanitize_os("linux/opensuse/opensuse-tumbleweed"),
@@ -84,7 +82,6 @@ mod tests {
             os_icon_tokens("linux/fedora/bazzite"),
             ["bazzite", "fedora", "linux"]
         );
-        assert_eq!(os_icon_tokens("windows"), ["windows"]);
     }
 
     #[test]

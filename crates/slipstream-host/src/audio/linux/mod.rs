@@ -330,8 +330,8 @@ impl PwMicSource {
         let (quit_tx, quit_rx) = pipewire::channel::channel::<Terminate>();
         let alive = Arc::new(AtomicBool::new(true));
         let flush = Arc::new(AtomicBool::new(false));
-        // Bring-up handshake (mirrors the Windows backend): a PipeWire that isn't running (host
-        // service started before the user session) must surface as an open ERROR — engaging the
+        // Bring-up handshake: a PipeWire instance that isn't running (the host service started
+        // before the user session) must surface as an open ERROR — engaging the
         // pump's backoff — not as an instantly-dead instance the pump would churn on.
         let (ready_tx, ready_rx) = sync_channel::<Result<()>>(1);
         let ring = Arc::new(MicRingShared::default());
@@ -447,7 +447,7 @@ fn mic_pw_thread(
 
     // The PipeWire objects are lifetime-chained (guards borrow the mainloop/core), so setup and
     // the blocking run share one frame; the IIFE lets every setup `?` funnel through the ready
-    // handshake below (mirrors the Windows render_thread).
+    // handshake below.
     let result = (|| -> Result<()> {
         ss_capture::pwinit::ensure_init();
         let mainloop = pw::main_loop::MainLoopRc::new(None).context("pw mic MainLoop")?;
@@ -493,11 +493,10 @@ fn mic_pw_thread(
                 *pw::keys::NODE_DESCRIPTION  => "Slipstream Remote Microphone",
                 // ~5 ms quantum (one Opus frame) so recording apps get smooth low-latency chunks.
                 *pw::keys::NODE_LATENCY      => "240/48000",
-                // Win WirePlumber's default-source election. This fixes TWO failures (both diagnosed
+                // Set WirePlumber's default-source election. This fixes TWO failures (both diagnosed
                 // live on a Bazzite host, PipeWire 1.4.10):
                 //   1. Apps that record the *default* input (games, Discord, arecord) get the client's
-                //      mic — the Linux analogue of the Windows host forcing the default recording
-                //      endpoint (audio/windows/audio_control.rs). Without it the source is never the
+                //      mic. Without it the source is never the
                 //      default, so default-input recorders hear silence.
                 //   2. On PipeWire 1.4.x, a *non-default* Audio/Source recorded via `--target` never
                 //      gets a driver assigned — the {source, recorder} group stays orphaned (pw-top:

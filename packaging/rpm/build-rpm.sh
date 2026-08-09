@@ -9,7 +9,7 @@
 # Output: dist/slipstream-<version>-<release>.<arch>.rpm  (+ the -debuginfo/-debugsource subpkgs)
 set -euo pipefail
 
-PF_VERSION="${PF_VERSION:-0.5.0}"   # canary base; keep one minor ahead of the latest stable release
+PF_VERSION="${PF_VERSION:-0.23.0}"
 PF_RELEASE="${PF_RELEASE:-1}"
 # PF_WITH_WEB=1 builds the slipstream-web subpackage too (needs `bun` on PATH  -  present in the CI
 # builder image, not in a plain mock chroot). Default off so a bare `rpmbuild`/COPR still works.
@@ -31,11 +31,11 @@ TOP="$(mktemp -d)"
 trap 'rm -rf "$TOP"' EXIT
 mkdir -p "$TOP"/{SOURCES,SPECS,BUILD,BUILDROOT,RPMS,SRPMS}
 
-# Source tarball with the prefix %autosetup expects (slipstream-<version>/). From HEAD so the
-# build is reproducible from a commit (CI checks one out); the spec is read from the working
-# tree directly, so spec edits apply without a re-commit.
+# Source tarball with the prefix %autosetup expects (slipstream-<version>/). Both the source and
+# spec come from HEAD so an uncommitted working-tree change cannot enter a package by accident.
 git archive --format=tar.gz --prefix="slipstream-${PF_VERSION}/" \
   -o "$TOP/SOURCES/slipstream-${PF_VERSION}.tar.gz" HEAD
+git show HEAD:packaging/rpm/slipstream.spec > "$TOP/SPECS/slipstream.spec"
 
 # libcuda link stub (self-maintaining). The zerocopy FFI links the NVIDIA driver lib (-lcuda), but
 # the CI builder has no GPU and never RUNS CUDA. Synthesize a stub libcuda that DEFINES every cu*
@@ -65,7 +65,7 @@ rpmbuild -bb --nodeps "${WEB_OPT[@]}" "${SCRIPTING_OPT[@]}" "${HOST_OPT[@]}" \
   --define "ss_version ${PF_VERSION}" \
   --define "ss_release ${PF_RELEASE}" \
   --define "ss_channel $(case "${PF_RELEASE:-1}" in 0.ci*) echo canary ;; *) echo stable ;; esac)" \
-  packaging/rpm/slipstream.spec
+  "$TOP/SPECS/slipstream.spec"
 
 mkdir -p dist
 find "$TOP/RPMS" -name '*.rpm' -exec cp -v {} dist/ \;

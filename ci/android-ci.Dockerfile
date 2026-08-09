@@ -8,8 +8,8 @@
 #
 # Version pins mirror what android.yml installed via sdkmanager: AGP 9.3 wants JDK 17 - 21;
 # cmake;3.22.1 because kit/build.gradle.kts prepends $ANDROID_SDK/cmake/3.22.1/bin to PATH
-# for cargo-ndk's audiopus_sys (libopus) CMake build; platforms;android-37 is deliberately
-# absent (AGP auto-downloads it if a build ever needs it  -  same note as the old workflow).
+# for cargo-ndk's audiopus_sys (libopus) CMake build; platforms;android-37 is installed so builds
+# do not silently download an unreviewed SDK during a release.
 FROM ubuntu:26.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -32,7 +32,7 @@ RUN mkdir -p "$ANDROID_HOME/cmdline-tools" \
     && rm /tmp/clt.zip
 ENV PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
 RUN yes | sdkmanager --licenses >/dev/null \
-    && sdkmanager "platform-tools" "platforms;android-36" "build-tools;37.0.0" \
+    && sdkmanager "platform-tools" "platforms;android-37" "build-tools;37.0.0" \
         "ndk;30.0.14904198" "cmake;3.22.1" \
     && chmod -R a+rX "$ANDROID_HOME"
 

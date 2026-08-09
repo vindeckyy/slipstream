@@ -6,8 +6,9 @@ through public port forwarding.
 
 ## Supported versions
 
-The supported release is the newest stable version in the 0.23.x line and the current build from
-main. Please reproduce a report on one of those versions before reporting it.
+The supported release is the newest tagged release and the current build from `main`. At the time
+of writing, Android is distributed as a preview APK and the host release workflow publishes the
+Linux host artifact. Please include the exact tag or commit in every report.
 
 ## Reporting a vulnerability
 
@@ -28,7 +29,7 @@ In scope:
 
 - The Linux host, including slipstream-host, slipstream-core, capture, encode, display, input, and
   protocol code.
-- The native clients for iPhone, Android, and Steam Deck.
+- The native clients for Android and Steam Deck.
 - The web management console and management API.
 - The optional GameStream compatibility path.
 
@@ -45,10 +46,10 @@ The following are documented limits:
 
 ## Verifying releases
 
-Release artifacts published by this repository include SHA-256 checksums. Verify a downloaded file
-before installation:
+Release artifacts published by this repository include a SHA-256 manifest. Download the manifest
+with the artifact and verify it from the same directory:
 
-    sha256sum -c slipstream-<version>-<artifact>.sha256
+    sha256sum -c slipstream-<version>-SHA256SUMS
 
 A checksum detects transfer corruption. It does not establish who produced an artifact, so treat a
 failed checksum or an unexpected release signature as a security report.

@@ -1,8 +1,4 @@
-/// Create `dir` (and parents) owner-private — **0700** on Unix (so the host's secrets aren't readable
-/// by other local users via a traversable config path). On Windows, applies a restrictive DACL
-/// ([`crate::windows::restrict_dir_to_system_admins`]) so a local unprivileged user can't pre-create / plant files in
-/// the config tree (the default `%ProgramData%` ACL grants Users *create*; security-review
-/// 2026-06-28 #3/#11). Tightens (and re-owns) an already-existing dir too.
+/// Create `dir` and its parents owner-private at mode 0700. Tightens an already-existing dir too.
 pub fn create_private_dir(dir: &std::path::Path) -> std::io::Result<()> {
     #[cfg(unix)]
     {
@@ -17,20 +13,10 @@ pub fn create_private_dir(dir: &std::path::Path) -> std::io::Result<()> {
         }
         r
     }
-    #[cfg(not(unix))]
-    {
-        let r = std::fs::create_dir_all(dir);
-        #[cfg(windows)]
-        crate::windows::restrict_dir_to_system_admins(dir);
-        r
-    }
 }
 
-/// Write `contents` to `path` as an **owner-only secret**: created and re-chmod'd **0600** on Unix
-/// (never even briefly group/world-readable), and DACL-restricted to SYSTEM/Administrators/owner on
-/// Windows (the default `%ProgramData%` ACL is Users-readable). Mirrors the mgmt-token hardening; used
-/// for the host private key and the persisted trust stores so a local unprivileged user can neither
-/// read the key (impersonation) nor tamper with the paired allow-list (unauthorized pairing).
+/// Write `contents` to `path` as an owner-only secret, created and re-chmod'd at mode 0600. Mirrors
+/// the mgmt-token hardening for the host private key and persisted trust stores.
 pub fn write_secret_file(path: &std::path::Path, contents: &[u8]) -> std::io::Result<()> {
     use std::io::Write;
     let mut opts = std::fs::OpenOptions::new();
@@ -48,7 +34,5 @@ pub fn write_secret_file(path: &std::path::Path, contents: &[u8]) -> std::io::Re
         use std::os::unix::fs::PermissionsExt;
         let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
     }
-    #[cfg(windows)]
-    crate::windows::restrict_to_system_admins(path);
     Ok(())
 }

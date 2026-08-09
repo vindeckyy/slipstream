@@ -1,7 +1,6 @@
 //! DRM connector force-off — Linux stand-in for the EXPERIMENTAL `pnp_disable_monitors` axis.
 //!
-//! Windows disables monitor PnP devnodes so a standby TV's HPD / auto-input scan cannot wake the
-//! desktop stack. On Linux, Exclusive topology already drops physical outputs from the compositor;
+//! On Linux, Exclusive topology already drops physical outputs from the compositor;
 //! this module goes one step further by writing `off` to `/sys/class/drm/<connector>/status` for
 //! connected non-virtual connectors, so the kernel stops servicing link probes. Restore writes
 //! `detect` (or `on` as a fallback). Crash safety: connector names are journaled under the host

@@ -111,8 +111,7 @@ Every host keeps one library: scanned launchers (Steam, and on each OS the other
 hand-added custom titles, and plugin-synced entries. Clients browse posters and send only an **id**;
 the host runs what it already knows.
 
-- Enable **Show game library** on clients that default it off (on by default on iPhone and
-  Android).
+- Enable **Show game library** if it is off in your client settings.
 - Moonlight sees the same library when GameStream is enabled.
 - Deck clients can pin titles in the Decky plugin.
 

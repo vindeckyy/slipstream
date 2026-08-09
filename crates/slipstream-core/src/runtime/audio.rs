@@ -173,29 +173,6 @@ impl AudioGapTracker {
     }
 }
 
-// ---- per-platform channel-layout helpers (pure data; no platform deps) --------------------
-
-/// Windows `WAVEFORMATEXTENSIBLE.dwChannelMask` for the wire layout.
-///
-/// NB 7.1 == `0x63F` (FL FR FC LFE **BL BR SL SR**), NOT `0xFF` — `0xFF` selects the
-/// front-of-center pair FLC/FRC, the wrong speakers. WASAPI delivers channels in ascending
-/// mask-bit order, which equals the wire order, so the decoded PCM needs no permutation.
-pub const fn wasapi_channel_mask(channels: u8) -> u32 {
-    const FL: u32 = 0x1;
-    const FR: u32 = 0x2;
-    const FC: u32 = 0x4;
-    const LFE: u32 = 0x8;
-    const BL: u32 = 0x10; // back left  (wire RL)
-    const BR: u32 = 0x20; // back right (wire RR)
-    const SL: u32 = 0x200; // side left
-    const SR: u32 = 0x400; // side right
-    match channels {
-        6 => FL | FR | FC | LFE | BL | BR,           // 0x3F
-        8 => FL | FR | FC | LFE | BL | BR | SL | SR, // 0x63F
-        _ => FL | FR,                                // 0x3 (stereo)
-    }
-}
-
 /// PipeWire / SPA `enum spa_audio_channel` positions in wire order — identical to the host
 /// capture side (`slipstream-host` `audio::linux::spa_positions`): FL=3 FR=4 FC=5 LFE=6 SL=7
 /// SR=8 RL=12 RR=13. Identity routing: the client sets these on its playback node so PipeWire
@@ -284,17 +261,6 @@ mod tests {
         assert_eq!(t.missing_before(u32::MAX), 0, "in order at the edge");
         assert_eq!(t.missing_before(1), 1, "seq 0 lost across the wrap");
         assert_eq!(t.missing_before(0), 0, "pre-wrap reorder, not a 2^31 gap");
-    }
-
-    #[test]
-    fn wasapi_masks_are_correct() {
-        assert_eq!(wasapi_channel_mask(2), 0x3);
-        assert_eq!(wasapi_channel_mask(6), 0x3F);
-        assert_eq!(wasapi_channel_mask(8), 0x63F); // NOT 0xFF
-                                                   // Bit count must equal the channel count.
-        assert_eq!(wasapi_channel_mask(2).count_ones(), 2);
-        assert_eq!(wasapi_channel_mask(6).count_ones(), 6);
-        assert_eq!(wasapi_channel_mask(8).count_ones(), 8);
     }
 
     #[test]

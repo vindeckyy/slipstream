@@ -24,11 +24,6 @@ import kotlin.math.max
 private class OsGlyph(val viewportWidth: Float, val viewportHeight: Float, val d: String)
 
 private val GLYPHS: Map<String, OsGlyph> = mapOf(
-    "windows" to OsGlyph(
-        viewportWidth = 24f,
-        viewportHeight = 24f,
-        d = "M0 0h11.377v11.377H0zm12.623 0H24v11.377H12.623zM0 12.623h11.377V24H0zm12.623 0H24V24H12.623z",
-    ),
     "apple" to OsGlyph(
         viewportWidth = 384f,
         viewportHeight = 512f,

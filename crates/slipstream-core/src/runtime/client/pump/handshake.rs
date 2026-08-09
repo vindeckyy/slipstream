@@ -126,8 +126,8 @@ pub(super) async fn connect_and_handshake(args: &WorkerArgs) -> Result<Handshake
                 name: args.name.clone(),
                 // Library id to launch this session, if the embedder asked for one.
                 launch: launch.clone(),
-                // The embedder's decode/present caps (e.g. the Windows client advertises
-                // VIDEO_CAP_10BIT | VIDEO_CAP_HDR). The host only upgrades to a 10-bit / HDR encode
+                // The embedder's decode/present caps (for example VIDEO_CAP_10BIT | VIDEO_CAP_HDR).
+                // The host only upgrades to a 10-bit / HDR encode
                 // when the matching bit is set, so `0` stays an 8-bit BT.709 stream. HOST_TIMING is
                 // OR'd in unconditionally: every NativeClient build demuxes the 0xCF plane, and the
                 // bit only asks the host for observability datagrams (never changes the encode).

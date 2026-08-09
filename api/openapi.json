@@ -1003,7 +1003,7 @@
           "hooks"
         ],
         "summary": "Replace the hook configuration",
-        "description": "Validates and persists a full `hooks.json` document (this is a whole-document PUT, not a\npatch). Applies from the next event \u2014 no restart. Hook commands run as the host user\n(interactive user session on Windows): treat this configuration as operator-privileged.",
+        "description": "Validates and persists a full hooks.json document (this is a whole-document PUT, not a\npatch). Applies from the next event \u2014 no restart. Hook commands run as the host user (interactive user session): treat this configuration as operator-privileged.",
         "operationId": "setHooks",
         "requestBody": {
           "content": {
@@ -1750,7 +1750,7 @@
           "library"
         ],
         "summary": "List the library scanners",
-        "description": "The installed-store scanners this host supports \u2014 the list is platform-dependent (Steam\neverywhere; Lutris + Heroic on Linux; Epic, GOG, and Xbox/Game Pass on Windows), so the console\nrenders a toggle only for scanners that can do anything here. Scanners default to enabled;\ndisabling one hides its titles from every library surface from the next read. The user-curated\ncustom store is not a scanner and is always on.",
+        "description": "The installed-store scanners this host supports \u2014 the list is platform-dependent (Steam\neverywhere; Lutris + Heroic on Linux), so the console renders a toggle only for scanners that can do anything here. Scanners default to enabled;\ndisabling one hides its titles from every library surface from the next read. The user-curated\ncustom store is not a scanner and is always on.",
         "operationId": "listLibraryScanners",
         "responses": {
           "200": {
@@ -3888,7 +3888,7 @@
           "update"
         ],
         "summary": "Apply the available update",
-        "description": "Starts the one-click apply for install kinds that support it (Windows installer). The\nrequest carries no version or URL \u2014 the host installs exactly what its verified manifest\nannounced. Progress is polled via `GET /update/status` (`job`); the host restarts as part\nof the apply, and the outcome lands in `last_result` after it comes back.",
+        "description": "Starts the one-click apply for a verified package update. The request carries no version or URL \u2014 the host installs exactly what its verified manifest\nannounced. Progress is polled via GET /update/status (job); the host restarts as part\nof the apply, and the outcome lands in last_result after it comes back.",
         "operationId": "applyUpdate",
         "requestBody": {
           "content": {
@@ -5132,7 +5132,7 @@
           },
           "ddc_power_off": {
             "type": "boolean",
-            "description": "EXPERIMENTAL: command physical monitors' panels off over DDC/CI (VCP 0xD6 \u2192 DPMS off)\nright before an `Exclusive` isolate deactivates them, and back on at restore. Targets the\n\"connected-but-dark head\" periodic-stutter class (monitor standby auto-input-scan / DP link\nchurn while the virtual display is the sole active display) at the monitor-firmware level.\nLinux uses `ddcutil` when available; Windows uses the Win32 physical-monitor API.\nBest-effort - monitors without DDC/CI (or with it disabled in the OSD) are skipped.\nOrthogonal to `preset` (like `game_session`): preserved across preset changes;\n`#[serde(default)]` = off so existing `display-settings.json` files are untouched."
+            "description": "EXPERIMENTAL: command physical monitors' panels off over DDC/CI (VCP 0xD6 \u2192 DPMS off)\nright before an Exclusive isolate deactivates them, and back on at restore. Targets the\n\"connected-but-dark head\" periodic-stutter class (monitor standby auto-input-scan / DP link\nchurn while the virtual display is the sole active display) at the monitor-firmware level.\nLinux uses ddcutil when available. Best-effort - monitors without DDC/CI (or with it disabled in\nthe OSD) are skipped. Orthogonal to preset (like game_session): preserved across preset\nchanges; #[serde(default)] = off so existing display-settings.json files are untouched."
           },
           "game_session": {
             "$ref": "#/components/schemas/GameSession",
@@ -5158,7 +5158,7 @@
           },
           "pnp_disable_monitors": {
             "type": "boolean",
-            "description": "EXPERIMENTAL: silence idle / standby monitors for the stream's duration and restore them\nat teardown. On Linux this force-offs connected external DRM connectors via sysfs\n(`/sys/class/drm/*/status`); on Windows it disables monitor PnP device nodes. Targets the\nsame \"connected-but-dark head\" periodic-stutter class as [`Self::ddc_power_off`], but at the\nOS reaction level (HPD / auto-input scan no longer wakes the desktop stack). A crash-recovery\njournal restores leftovers on host startup. Orthogonal to `preset` (like `game_session`);\n`#[serde(default)]` = off."
+            "description": "EXPERIMENTAL: silence idle / standby monitors for the stream's duration and restore them\nat teardown. On Linux this force-offs connected external DRM connectors via sysfs\n(/sys/class/drm/*/status). Targets the same \"connected-but-dark head\" periodic-stutter class\nas Self::ddc_power_off, but at the OS reaction level (HPD / auto-input scan no longer wakes\nthe desktop stack). A crash-recovery journal restores leftovers on host startup. Orthogonal to\npreset (like game_session); #[serde(default)] = off."
           },
           "preset": {
             "$ref": "#/components/schemas/Preset"
@@ -5610,7 +5610,7 @@
               },
               "install_kind": {
                 "type": "string",
-                "description": "This host's install kind (`apt`, `windows-installer`, \u2026) \u2014 lets a hook or the\ntray render the right \"how to update\" hint without a second call."
+                "description": "This host's install kind (apt, sysext, rpm-ostree, rpm, dnf, pacman, steamos-source, nix, source) \u2014 lets a hook or the\ntray render the right \"how to update\" hint without a second call."
               },
               "kind": {
                 "type": "string",
@@ -5903,7 +5903,7 @@
       },
       "GameSession": {
         "type": "string",
-        "description": "How a session that **launches a game** (a library id on the Hello / apps.json / Decky pin) is\nserved (`design/gamemode-and-dedicated-sessions.md` \u00a75.2). Orthogonal to the preset/lifecycle axes\n\u2014 a top-level [`DisplayPolicy`] field, NOT part of [`EffectivePolicy`], so a preset never clobbers\nit. Linux-only in effect (a launching Windows session opens into the one desktop).",
+        "description": "How a session that launches a game (a library id on the Hello / apps.json / Decky pin) is\nserved (design/gamemode-and-dedicated-sessions.md \u00a75.2). Orthogonal to the preset/lifecycle axes\n\u2014 a top-level DisplayPolicy field, NOT part of EffectivePolicy, so a preset never clobbers\nit. Linux-only in effect.",
         "enum": [
           "auto",
           "dedicated"
@@ -6250,7 +6250,7 @@
         "properties": {
           "platform": {
             "type": "string",
-            "description": "`linux` / `windows` / `macos`."
+            "description": "`linux`."
           },
           "version": {
             "type": "string"
@@ -6309,12 +6309,12 @@
           },
           "os": {
             "type": "string",
-            "description": "OS identity chain, generic \u2192 most specific, slash-separated (`windows` | `macos` |\n`linux[/<family>][/<id>]`). A client walks it most-specific-first and shows the first\ntoken it has an icon for, so an unknown distro still degrades to its family's mark.",
+            "description": "Linux OS identity chain, generic \u2192 most specific, slash-separated\n(`linux[/<family>][/<id>]`). A client walks it most-specific-first and shows the first\ntoken it has an icon for, so an unknown distro still degrades to its family's mark.",
             "example": "linux/fedora/bazzite"
           },
           "os_name": {
             "type": "string",
-            "description": "Human-readable OS name (os-release `PRETTY_NAME`; `\"Windows\"`/`\"macOS\"` elsewhere).",
+            "description": "Human-readable OS name from os-release `PRETTY_NAME`.",
             "example": "Bazzite 42 (Kinoite)"
           },
           "ports": {
@@ -6543,7 +6543,7 @@
         "oneOf": [
           {
             "type": "object",
-            "description": "Tear the display down at session end (today's default on every backend but Windows, which\nlingers 10 s).",
+            "description": "Tear the display down at session end (today's default on Linux backends).",
             "required": [
               "mode"
             ],
@@ -6650,7 +6650,7 @@
       },
       "LocalSummary": {
         "type": "object",
-        "description": "Non-sensitive host status for the local tray icon: counts and booleans \u2014 no PIN values, no\nfingerprints. The ONE name exposed is `client_name`, the streaming client's display label\n(deliberate loosening for the tray's \"client connected\" toast: it tells the local user who is\non their machine, which is disclosure in the user's favor \u2014 and any local process could\nalready infer a session exists from the booleans here). Served unauthenticated to LOOPBACK\npeers only (see `require_auth`): the bearer-token file is SYSTEM/Administrators-DACL'd on\nWindows, so the per-user tray process cannot authenticate \u2014 this narrow read-only route is\nits status source.",
+        "description": "Non-sensitive host status for the local tray icon: counts and booleans \u2014 no PIN values, no\nfingerprints. The ONE name exposed is client_name, the streaming client's display label\n(deliberate loosening for the tray's \"client connected\" toast: it tells the local user who is\non their machine, which is disclosure in the user's favor \u2014 and any local process could\nalready infer a session exists from the booleans here). Served unauthenticated to LOOPBACK\npeers only (see require_auth): this narrow read-only route is the tray's status source.",
         "required": [
           "version",
           "video_streaming",
@@ -6841,7 +6841,7 @@
           },
           "pin_supported": {
             "type": "boolean",
-            "description": "Whether this build can actually STREAM one of these monitors.\n\nEnumeration and capture are separate capabilities, and on Windows only the first exists: the\nheads below are real and worth showing (they explain the topology, and `/display/state`\ncross-references them), but `ss-capture`'s sole Windows entry point is `open_idd_push` \u2014 a\nframe channel pushed by our OWN IddCx virtual display. There is no desktop-duplication\ncapturer to point at a chosen head (DXGI Desktop Duplication was deliberately removed), so\n`vdisplay::open` has no mirror arm outside Linux and a pin could not be honored.\n\nThe console renders the picker read-only on `false`. Reported as a capability rather than\nsniffed client-side from the OS so the answer comes from the build that would have to honor\nit \u2014 when a Windows mirror backend lands, this flips and the UI needs no change."
+            "description": "Whether this build can actually STREAM one of these monitors.\n\nEnumeration and capture are separate capabilities. Linux builds report true only for heads the\nselected compositor backend can mirror; the console renders the picker read-only on false.\nReported as a capability rather than sniffed client-side from the OS, so the answer comes from\nthe build that would have to honor it."
           },
           "pinned": {
             "type": [
@@ -7560,7 +7560,7 @@
               "string",
               "null"
             ],
-            "description": "Windows: the account the task runs as."
+            "description": "The account the host task runs as."
           },
           "running": {
             "type": "boolean"
@@ -7707,7 +7707,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Which fields this build actually enforces. Empty on a platform with no launch path (macOS),\nso the console can say so instead of offering a switch that does nothing."
+            "description": "Which fields this Linux build actually enforces."
           },
           "settings": {
             "$ref": "#/components/schemas/SessionSettings",
@@ -8448,7 +8448,7 @@
           },
           "install_kind": {
             "type": "string",
-            "description": "How this host was installed: `windows-installer` | `sysext` | `rpm-ostree` | `apt` |\n`dnf` | `pacman` | `steamos-source` | `nix` | `source`."
+            "description": "How this host was installed: sysext | rpm-ostree | apt |\ndnf | pacman | steamos-source | nix | source."
           },
           "job": {
             "oneOf": [

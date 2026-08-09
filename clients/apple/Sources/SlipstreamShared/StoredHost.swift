@@ -53,7 +53,7 @@ public struct StoredHost: Identifiable, Codable, Hashable, Sendable {
     /// appended last for the same widget-contract reason as the rest; hosts saved before it
     /// existed have none, and keep their stored order, which IS the order they were added in.
     public var addedAt: Date?
-    /// The host's OS-identity chain (`windows` | `linux/<family>/<id>`, ...) learned from its
+    /// The host's OS-identity chain (`linux/<family>/<id>`, ...) learned from its
     /// mDNS `os` TXT while online, so the card's OS mark survives the host going to sleep.
     /// Optional and appended last for the same widget-contract reason; nil until first learned.
     public var osChain: String?

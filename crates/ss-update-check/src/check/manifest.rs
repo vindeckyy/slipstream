@@ -5,10 +5,8 @@
 //! binary and verified by the exact code path the plugin store already trusts ([`crate::sig`]).
 //! TLS and the registry that serves the document are transport, never trust.
 //!
-//! The document describes a *release*, not a product: the host and the Linux client ship from
-//! one repo at one version, so both compare their own installed version against the same
-//! `version`/`ci_run` here. Only the per-product payload legs (today: `windows_host`) are
-//! product-specific, and a consumer that doesn't need one simply ignores it.
+//! The document describes a release shared by the Linux host and clients. Both compare
+//! their installed version against the same `version`/`ci_run` fields.
 //!
 //! Rules, all fail-closed (the sysext 303 lesson encoded):
 //! 1. **Signature before parse**  -  over the exact fetched bytes, then strict JSON. An HTML
@@ -57,28 +55,6 @@ pub struct Manifest {
     /// strings differ (`~ciN`, `0.ciN`, a padded pkgrel, `M.m.run`).
     #[serde(default)]
     pub ci_run: Option<u64>,
-    /// The Windows installer leg (design §6)  -  consumed by the host's Windows apply path and
-    /// ignored everywhere else.
-    #[serde(default)]
-    pub windows_host: Option<WindowsHostAsset>,
-}
-
-/// Where the Windows host installer for [`Manifest::version`] lives and how to verify it.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct WindowsHostAsset {
-    /// Immutable per-version download URL  -  never a mutable `latest/` alias, so the hash
-    /// below can't race an alias re-upload.
-    pub url: String,
-    /// SHA-256 (hex) of the installer bytes.
-    pub sha256: String,
-    /// Accepted Authenticode signing-leaf SHA-256 fingerprints. Living in the signed manifest
-    /// (not the binary) is what makes the self-signed → Trusted Signing migration a manifest
-    /// edit instead of a lockstep host release.
-    #[serde(default)]
-    pub authenticode_sha256: Vec<String>,
-    /// Minimum Windows build (display/preflight only).
-    #[serde(default)]
-    pub min_os: String,
 }
 
 /// Verify `sig_text` over the exact `bytes` against `keys`, then strictly parse and validate
@@ -121,14 +97,6 @@ pub fn parse_verified(bytes: &[u8], expected_channel: &str) -> Result<Manifest> 
     if !m.notes_url.is_empty() && !m.notes_url.starts_with(NOTES_ORIGIN) {
         bail!("manifest notes_url is not on {NOTES_ORIGIN}");
     }
-    if let Some(w) = &m.windows_host {
-        if !w.url.starts_with("https://") {
-            bail!("windows_host.url must be https");
-        }
-        if w.sha256.len() != 64 || !w.sha256.bytes().all(|b| b.is_ascii_hexdigit()) {
-            bail!("windows_host.sha256 is not a hex SHA-256");
-        }
-    }
     Ok(m)
 }
 
@@ -144,12 +112,6 @@ mod tests {
             "published_at": "2026-07-30T12:00:00Z",
             "version": "0.23.0",
             "notes_url": "https://github.com/vindeckyy/slipstream/releases/tag/v0.23.0",
-            "windows_host": {
-                "url": "https://github.com/vindeckyy/slipstream/releases/download/v0.23.0/slipstream-host-setup-0.23.0.exe",
-                "sha256": "aa".repeat(32),
-                "authenticode_sha256": ["bb".repeat(32)],
-                "min_os": "10.0.22621"
-            }
         })
     }
 
@@ -171,10 +133,6 @@ mod tests {
 
         let m = verify_and_parse(&body, &sig, &keys, "stable").unwrap();
         assert_eq!(m.version, "0.23.0");
-        assert_eq!(
-            m.windows_host.as_ref().unwrap().authenticode_sha256.len(),
-            1
-        );
 
         // One flipped byte ⇒ refused before parse.
         let mut tampered = body.clone();
@@ -217,20 +175,6 @@ mod tests {
         let mut v = doc();
         v["notes_url"] = serde_json::json!("https://evil.example/notes");
         assert!(parse_verified(&bytes(&v), "stable").is_err());
-    }
-
-    #[test]
-    fn windows_asset_validation() {
-        let mut v = doc();
-        v["windows_host"]["sha256"] = serde_json::json!("nothex");
-        assert!(parse_verified(&bytes(&v), "stable").is_err());
-        let mut v = doc();
-        v["windows_host"]["url"] = serde_json::json!("http://example.com/x.exe");
-        assert!(parse_verified(&bytes(&v), "stable").is_err());
-        // No windows leg at all is fine (PM channels don't need it).
-        let mut v = doc();
-        v.as_object_mut().unwrap().remove("windows_host");
-        assert!(parse_verified(&bytes(&v), "stable").is_ok());
     }
 
     #[test]

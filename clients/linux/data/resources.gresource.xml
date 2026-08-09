@@ -4,7 +4,6 @@
      Registered under the hicolor-style layout IconTheme::add_resource_path expects. -->
 <gresources>
   <gresource prefix="/io/slipstream">
-    <file>icons/scalable/actions/ss-os-windows-symbolic.svg</file>
     <file>icons/scalable/actions/ss-os-apple-symbolic.svg</file>
     <file>icons/scalable/actions/ss-os-linux-symbolic.svg</file>
     <file>icons/scalable/actions/ss-os-steam-symbolic.svg</file>

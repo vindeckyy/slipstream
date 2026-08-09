@@ -37,8 +37,8 @@ impl LibraryProvider for SteamProvider {
                     kind: "steam_appid".into(),
                     value: app.appid.to_string(),
                 }),
-                // The appid alone is authoritative on Linux (Steam's launch reaper); the install dir
-                // is what the Windows matcher — which has no reaper to watch — keys off instead.
+                // The appid is authoritative for Steam's launch reaper; the install dir is an
+                // additional process hint when available.
                 detect: match app.install_dir {
                     Some(dir) => DetectSpec::steam(app.appid).with_dir(dir),
                     None => DetectSpec::steam(app.appid),
@@ -190,7 +190,6 @@ fn grid_filenames(kind: ArtKind, appid: u32) -> Vec<String> {
 }
 
 /// Candidate Steam roots (classic, Flatpak, Deck) that actually exist, canonicalized + deduped.
-#[cfg(not(target_os = "windows"))]
 fn steam_roots() -> Vec<PathBuf> {
     let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
         return Vec::new();
@@ -201,20 +200,6 @@ fn steam_roots() -> Vec<PathBuf> {
         home.join(".steam/root"),
         home.join(".var/app/com.valvesoftware.Steam/.local/share/Steam"), // Flatpak Steam
     ];
-    steam_roots_existing(candidates)
-}
-
-/// Windows Steam roots: the default install dirs under Program Files. Games installed on other
-/// drives are still found via each root's `libraryfolders.vdf` (see [`steam_library_dirs`]). A
-/// non-default Steam install dir (registry `Valve\Steam\InstallPath`) isn't covered yet.
-#[cfg(target_os = "windows")]
-fn steam_roots() -> Vec<PathBuf> {
-    let mut candidates = Vec::new();
-    for var in ["ProgramFiles(x86)", "ProgramFiles", "ProgramW6432"] {
-        if let Some(pf) = std::env::var_os(var) {
-            candidates.push(PathBuf::from(pf).join("Steam"));
-        }
-    }
     steam_roots_existing(candidates)
 }
 
@@ -257,20 +242,12 @@ fn steam_library_dirs() -> Vec<PathBuf> {
 }
 
 /// Pull every `"path"  "<dir>"` value out of a `libraryfolders.vdf`. We don't need a full VDF
-/// parser for the two flat fields we read. On Windows the values are backslash-escaped
-/// (`D:\\SteamLibrary`), so unescape `\\` → `\`; Linux paths need no unescaping.
+/// parser for the two flat fields we read. Steam escapes separators in the VDF representation.
 fn vdf_paths(text: &str) -> Vec<String> {
     text.lines()
         .filter_map(|l| vdf_value(l.trim(), "path"))
         .map(|p| {
-            #[cfg(target_os = "windows")]
-            {
-                p.replace("\\\\", "\\")
-            }
-            #[cfg(not(target_os = "windows"))]
-            {
-                p.to_string()
-            }
+            p.to_string()
         })
         .collect()
 }

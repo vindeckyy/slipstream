@@ -1,24 +1,8 @@
 //! `SessionPlan` — the per-session capture / topology / encoder decision, resolved **once** from
 //! [`HostConfig`](crate::config) (+ the handshake-negotiated bit depth) into a typed, logged value.
 //!
-//! **Goal-1 stage 3** (`design/windows-host-rewrite.md` §2.2): before this, the Windows session decision was
-//! re-derived at three call sites — the capture backend inside `capture::capture_virtual_output`, the
-//! process topology in `native::should_use_helper`, and the encode backend in
-//! `encode::windows_resolved_backend` — each reading [`config`](crate::config) independently, with no
-//! single owner (the latent "capture and encode disagree on the backend" hazard, plan §2.4). `SessionPlan`
-//! resolves them together, once, so the deployed path reads one typed artifact.
-//!
-//! Stage 3 routes the **capture** and **topology** decisions through the plan (see
-//! `capture::capture_virtual_output` taking [`CaptureBackend`] in, and `virtual_stream` reading
-//! [`SessionTopology`]). The **encoder** is resolved by `encode::windows_resolved_backend` (config-backed
-//! and GPU-vendor cached since stage 2, so already a single source) and *recorded* here as
-//! [`EncoderBackend`]. Threading `encoder`/`input_format` into the encoder + capturer opens — which
-//! removes the `capture → encode::windows_resolved_backend()` back-reference recomputed in `dxgi.rs` —
-//! is **stage 5**.
-//!
-//! The type is platform-neutral so it threads through the shared `virtual_stream`/`build_pipeline`
-//! signatures. Linux virtual outputs still use the portal/PipeWire node, while existing-desktop
-//! sessions can resolve to portal, wlroots, KMS, X11, or NvFBC through the same pipeline record.
+//! The session plan resolves the Linux capture, topology, and encoder decisions once and passes
+//! one typed record through the capture and encode pipeline.
 
 /// Where a session's frames come from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -35,10 +19,8 @@ pub enum CaptureBackend {
     X11,
     /// Linux: NVIDIA NvFBC shared-CUDA capture.
     NvFbc,
-    /// Windows: IDD direct-push — frames pulled straight from the ss-vdisplay driver's shared ring
-    /// (in-process; the host runs as SYSTEM in the interactive console session, so it captures the
-    /// secure desktop too). The sole Windows capture path —
-    /// DXGI Desktop Duplication (DDA) and the WGC two-process relay were removed.
+    /// Legacy value retained so older diagnostic code can still deserialize its enum shape.
+    #[doc(hidden)]
     IddPush,
 }
 
@@ -54,7 +36,6 @@ impl CaptureBackend {
             "kms" => CaptureBackend::Kms,
             "x11" => CaptureBackend::X11,
             "nvfbc" => CaptureBackend::NvFbc,
-            "idd_push" | "idd-push" => CaptureBackend::IddPush,
             _ => return None,
         })
     }
@@ -126,19 +107,8 @@ impl CaptureBackend {
             CaptureBackend::Kms => "kms",
             CaptureBackend::X11 => "x11",
             CaptureBackend::NvFbc => "nvfbc",
-            CaptureBackend::IddPush => "idd_push",
+            _ => "unsupported",
         }
-    }
-
-    /// Windows: IDD direct-push is the sole capture path (DDA + the WGC two-process relay were removed).
-    #[cfg(target_os = "windows")]
-    pub fn resolve() -> Self {
-        CaptureBackend::IddPush
-    }
-
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-    pub fn resolve() -> Self {
-        CaptureBackend::Portal
     }
 }
 
@@ -213,21 +183,16 @@ impl LinuxDisplayPipeline {
 /// How a session is structured across processes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SessionTopology {
-    /// One process captures + encodes. The only topology: Linux (portal) and Windows (in-process
-    /// IDD-push, in the host's SYSTEM process in the interactive console session). The SYSTEM-host
-    /// + user-session WGC relay was removed with DDA/WGC.
+/// One process captures and encodes the stream.
     SingleProcess,
 }
 
-/// The resolved encode backend (recorded for logging / stages 4–5; the per-session encoder open still
-/// resolves via `encode::windows_resolved_backend`, which is config-backed + GPU-vendor cached).
+/// The resolved encode backend, recorded for logging and per-session pipeline stages.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EncoderBackend {
     /// Linux: NVENC vs VAAPI is auto-detected inside `encode::open_video` (not modeled here).
     PlatformAuto,
     Nvenc,
-    Amf,
-    Qsv,
     Software,
 }
 
@@ -248,9 +213,8 @@ pub struct SessionPlan {
     pub encoder: EncoderBackend,
     /// Handshake-negotiated encode bit depth (8, or 10 = HEVC Main10).
     pub bit_depth: u8,
-    /// The want-HDR flag handed to the capturer (`bit_depth >= 10`): on Windows the IDD-push
-    /// capturer proactively enables advanced colour on the virtual display; on Linux it runs the
-    /// 10-bit PQ/BT.2020 PipeWire offer. It is only ever set where the handshake's source-aware
+    /// The want-HDR flag handed to the capturer (`bit_depth >= 10`) runs the 10-bit PQ/BT.2020
+    /// PipeWire offer. It is only ever set where the handshake's source-aware
     /// gate said yes (`capture::capturer_supports_hdr_for`) — on Linux that means a gamescope
     /// output off our `pipewire-hdr` build, since Mutter's/KWin's/wlroots' virtual outputs are
     /// 8-bit upstream (GNOME 50's HDR is monitor-mirror only, which is the GameStream portal
@@ -278,8 +242,7 @@ pub struct SessionPlan {
     /// the pointer never silently vanishes from the stream.
     pub cursor_blend: bool,
     /// The session negotiated the cursor-forward channel (M2/M2c): the client draws the pointer
-    /// locally, so `cursor_blend` is off AND (on Windows) the capturer sets the driver's
-    /// hardware cursor up via [`OutputFormat::hw_cursor`](ss_frame::OutputFormat).
+    /// locally, so `cursor_blend` is off when the client owns the pointer.
     pub cursor_forward: bool,
     /// This gamescope session's cursor comes from the XFixes source, NOT the (absent)
     /// `SPA_META_Cursor` (remote-desktop-sweep Phase C). Distinct from `cursor_forward`: a stock
@@ -341,8 +304,7 @@ impl SessionPlan {
         // planar-YUV444 convert), so the session stays fully zero-copy at full chroma. Without
         // zero-copy the encoder swscales CPU RGB → YUV444P, which needs CPU-resident frames —
         // force the GPU capture off for that case only. (VAAPI 4:4:4, where the hardware supports
-        // it, keeps its dmabuf path via `scale_vaapi`; Windows NVENC ingests BGRA directly.)
-        #[cfg(target_os = "linux")]
+        // it, keeps its dmabuf path via `scale_vaapi`.)
         let gpu = {
             let force_cpu_for_nvenc_444 = self.chroma.is_444()
                 && !crate::encode::linux_zero_copy_is_vaapi()
@@ -370,13 +332,9 @@ impl SessionPlan {
             gpu,
             hdr: self.hdr,
             hw_cursor: self.cursor_forward,
-            // 4:4:4 needs a full-chroma source: on Windows this keeps the capturer on RGB (not the
-            // default NV12/P010 video-engine output) so NVENC can CSC to 4:4:4.
+            // 4:4:4 needs a full-chroma source so the encoder can preserve the format.
             chroma_444: self.chroma.is_444(),
-            // PyroWave: on Windows the IDD-push capturer makes its NV12 out-ring shareable + signals
-            // a shared fence so the wavelet encoder can zero-copy-import the texture into its own
-            // Vulkan device; on Linux the capture facade flips the zero-copy policy to the
-            // raw-dmabuf passthrough (see above).
+            // PyroWave uses the raw-dmabuf passthrough described above.
             pyrowave: self.codec == crate::encode::Codec::PyroWave,
             // Producer-native NV12 (gamescope) is consumable only by the Linux Vulkan Video
             // backend — resolved HERE from the plan's codec so the capturer never reaches back
@@ -388,17 +346,12 @@ impl SessionPlan {
             // that draws `frame.cursor`. Costs the RGB→NV12 CSC we'd otherwise skip; the
             // native-NV12 cursor blend is the perf-preserving follow-up. (`cursor_blend`
             // subsumes `gamescope_cursor` — see [`cursor_blend_for`].)
-            #[cfg(target_os = "linux")]
             nv12_native: crate::encode::linux_native_nv12_ok(self.codec) && !self.cursor_blend,
-            #[cfg(not(target_os = "linux"))]
-            nv12_native: false,
         }
     }
 }
 
-/// Process topology. Single-process is the only topology now: Linux (portal) and Windows (in-process
-/// IDD-push, in the host's SYSTEM process in the interactive console session). The Windows
-/// SYSTEM-host + user-session WGC relay was removed with DDA/WGC.
+/// Process topology. Single-process is the only topology now.
 pub(crate) fn resolve_topology() -> SessionTopology {
     SessionTopology::SingleProcess
 }
@@ -416,37 +369,22 @@ pub(crate) fn resolve_topology() -> SessionTopology {
 ///   `latched_mouse`) streamed cursorless. Metadata + host blend is the path that was
 ///   verified end-to-end; embedded remains only the can't-blend fallback (libav
 ///   VAAPI/NVENC, software).
-/// * **Windows**: never — the IDD capturer composites the pointer itself (`cursor_blend.rs` /
-///   DWM), and no Windows encode backend reads `frame.cursor`. Asking the encoder anyway made
-///   `open_video`'s blends-cursor backstop fire spuriously on every cursor-channel session.
 pub(crate) fn cursor_blend_for(
     cursor_forward: bool,
     gamescope: bool,
     codec: crate::encode::Codec,
     bit_depth: u8,
 ) -> bool {
-    #[cfg(target_os = "windows")]
-    {
-        let _ = (cursor_forward, gamescope, codec, bit_depth);
-        false
+    if gamescope {
+        // gamescope's capture carries no SPA_META_Cursor; the compositor may already paint the
+        // pointer into the node.
+        return gamescope_needs_host_cursor(true);
     }
-    #[cfg(not(target_os = "windows"))]
-    {
-        if gamescope {
-            // gamescope's capture carries no SPA_META_Cursor; the blend-capable term below
-            // must not apply, or a patch-2+ gamescope (composites its own pointer) would lose
-            // its native-NV12 zero-copy shape for a blend that can never receive an overlay.
-            return gamescope_needs_host_cursor(true);
-        }
-        if cursor_forward {
-            return true;
-        }
-        // No cursor channel: the same CUDA-payload prediction `handshake::cursor_forward` and
-        // the GameStream monitor mirror make — the NVIDIA resolution plus the zero-copy master
-        // switch — deciding direct-SDK NVENC (blends) vs libav NVENC (doesn't).
-        let cuda_planned = !crate::encode::linux_zero_copy_is_vaapi() && crate::zerocopy::enabled();
-        crate::encode::cursor_blend_capable(codec, cuda_planned, bit_depth == 10)
+    if cursor_forward {
+        return true;
     }
+    let cuda_planned = !crate::encode::linux_zero_copy_is_vaapi() && crate::zerocopy::enabled();
+    crate::encode::cursor_blend_capable(codec, cuda_planned, bit_depth == 10)
 }
 
 /// Does a gamescope session still need the HOST to composite its pointer?
@@ -460,7 +398,6 @@ pub(crate) fn cursor_blend_for(
 /// compute colour-conversion arm, because the zero-copy RGB-direct source hands the captured
 /// buffer to a fixed-function front end that has no blend stage. So a gamescope session with the
 /// cursor in the node is the first one that can be genuinely zero-copy end to end.
-#[cfg(not(target_os = "windows"))]
 fn gamescope_needs_host_cursor(gamescope: bool) -> bool {
     gamescope && !ss_vdisplay::gamescope_composites_cursor()
 }
@@ -471,25 +408,7 @@ fn gamescope_needs_host_cursor(gamescope: bool) -> bool {
 /// the reader without the blend wastes an X11 connection, and blending without it streams no
 /// pointer at all.
 pub(crate) fn gamescope_cursor_for(gamescope: bool) -> bool {
-    #[cfg(target_os = "windows")]
-    {
-        let _ = gamescope;
-        false
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        gamescope_needs_host_cursor(gamescope)
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn resolve_encoder() -> EncoderBackend {
-    match crate::encode::windows_resolved_backend() {
-        crate::encode::WindowsBackend::Nvenc => EncoderBackend::Nvenc,
-        crate::encode::WindowsBackend::Amf => EncoderBackend::Amf,
-        crate::encode::WindowsBackend::Qsv => EncoderBackend::Qsv,
-        crate::encode::WindowsBackend::Software => EncoderBackend::Software,
-    }
+    gamescope_needs_host_cursor(gamescope)
 }
 
 #[cfg(all(test, target_os = "linux"))]
@@ -531,7 +450,6 @@ mod tests {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
 fn resolve_encoder() -> EncoderBackend {
     // `SLIPSTREAM_ENCODER=software` forces the GPU-less openh264 path — which must take CPU-staged
     // capture (`EncoderBackend::Software.is_gpu() == false` → `output_format().gpu = false`), so the

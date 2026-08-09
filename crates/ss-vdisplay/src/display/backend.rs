@@ -1,4 +1,4 @@
-//! Virtual-display backend contract (plan §W3 — the trait facade carved out of [`super`]).
+//! Virtual-display backend contract, the trait facade carved out of [`super`].
 //! [`DisplayOwnership`] declares who owns an output's lifecycle, [`VirtualOutput`] is the created
 //! output (PipeWire node + RAII keepalive), and [`VirtualDisplay`] is the per-compositor backend
 //! trait `super::open` returns boxed. The per-backend `impl`s and the factory stay in `super`.
@@ -14,7 +14,7 @@ use super::*;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum DisplayOwnership {
     /// The registry owns the lifecycle: it may pool, linger, pin, and tear this display down (KWin,
-    /// Mutter, wlroots, gamescope **bare spawn**, and the Windows manager-delegated monitor). The
+    /// Mutter, wlroots, and gamescope **bare spawn**). The
     /// default — a backend that says nothing is registry-owned.
     #[default]
     Owned,
@@ -45,10 +45,6 @@ pub struct VirtualOutput {
     /// gamescope outputs are created at the exact size, so this just confirms it; **Mutter sizes
     /// its virtual monitor FROM the negotiation**, so here it's what makes the client's mode real.
     pub preferred_mode: Option<(u32, u32, u32)>,
-    /// Windows capture identity (DXGI adapter LUID + GDI output name) for the ss-vdisplay backend —
-    /// what the host `capture::capture_virtual_output` needs to duplicate the right output.
-    #[cfg(target_os = "windows")]
-    pub win_capture: Option<ss_frame::dxgi::WinCaptureTarget>,
     /// Keeps the output — and whatever connection/thread backs it — alive; dropped on teardown.
     pub keepalive: Box<dyn Send>,
     /// Who owns this display's lifecycle (`design/gamemode-and-dedicated-sessions.md` A1). The
@@ -79,8 +75,8 @@ pub struct VirtualOutput {
 }
 
 impl VirtualOutput {
-    /// A registry-[owned](DisplayOwnership::Owned) output — the common case (KWin/Mutter/wlroots,
-    /// gamescope bare-spawn, Windows). Fills `ownership: Owned`; the caller sets the platform fields.
+    /// A registry-[owned](DisplayOwnership::Owned) output - the common case for KWin, Mutter,
+    /// wlroots, and gamescope bare-spawn. Fills `ownership: Owned`; the caller sets platform fields.
     pub fn owned(
         node_id: u32,
         preferred_mode: Option<(u32, u32, u32)>,
@@ -91,8 +87,6 @@ impl VirtualOutput {
             #[cfg(target_os = "linux")]
             remote_fd: None,
             preferred_mode,
-            #[cfg(target_os = "windows")]
-            win_capture: None,
             keepalive,
             ownership: DisplayOwnership::Owned,
             #[cfg(target_os = "linux")]
@@ -126,19 +120,16 @@ pub trait VirtualDisplay: Send {
     fn set_gamescope_route(&mut self, _route: Option<crate::GamescopeRoute>) {}
     /// Set the connecting client's cert fingerprint so the backend can give that client a STABLE virtual
     /// monitor identity across reconnects and its saved per-monitor config (notably DPI scaling) is
-    /// reapplied — via the OS (Windows EDID serial), the compositor (KWin per-slot output name), or
-    /// host-side persistence (Mutter, whose virtual monitors can't carry a stable identity). Carried on
+    /// reapplied via the compositor (KWin per-slot output name) or host-side persistence (Mutter,
+    /// whose virtual monitors can't carry a stable identity). Carried on
     /// the backend instance; set once before [`create`](Self::create). Default: no-op (wlroots/gamescope
     /// have no per-client identity). `None` = anonymous/unpaired/GameStream → the backend's auto
     /// (slot-based/shared) identity.
     fn set_client_identity(&mut self, _fingerprint: Option<[u8; 32]>) {}
     /// Hand the backend the session's deliberate-quit flag (set when the client closes with the QUIT
-    /// application code — a user "stop", not a network drop) so the last lease's drop can tear the
-    /// display down IMMEDIATELY, skipping the keep-alive linger — the Windows analogue of the Linux
-    /// registry's `Linger::Immediate` path. Carried on the backend instance; set once before
-    /// [`create`](Self::create). Default: no-op — only the Windows ss-vdisplay backend needs it (its
-    /// leases live in the `VirtualDisplayManager`, which the registry's quit plumbing does not reach;
-    /// Linux backends get the flag through `registry::acquire`).
+    /// application code - a user "stop", not a network drop - so the last lease's drop can tear the
+    /// display down immediately, skipping the keep-alive linger. Carried on the backend instance;
+    /// set once before [`create`](Self::create). Default: no-op.
     fn set_quit_flag(&mut self, _quit: std::sync::Arc<std::sync::atomic::AtomicBool>) {}
     /// Hand the backend the CLIENT display's HDR colour volume (`Hello::display_hdr` — primaries /
     /// white point / luminance range as reported by the client OS), so a freshly created virtual
@@ -146,8 +137,7 @@ pub trait VirtualDisplay: Send {
     /// into the CTA-861.3 HDR static-metadata block) — host apps and the OS then tone-map to the
     /// panel the stream actually lands on instead of a built-in placeholder volume. Carried on the
     /// backend instance; set once before [`create`](Self::create). `None` = unknown/SDR client →
-    /// the backend's default EDID. Default: no-op — only the Windows ss-vdisplay backend can mint
-    /// per-monitor EDIDs today (the Linux compositors' virtual outputs take no EDID from us).
+    /// the backend's default EDID. Default: no-op; Linux compositors use their own output metadata.
     fn set_client_hdr(&mut self, _hdr: Option<slipstream_core::quic::HdrMeta>) {}
     /// Tell the backend THIS SESSION negotiated HDR — a 10-bit BT.2020/PQ stream (`bit_depth >=
     /// 10`, decided in the slipstream/1 Welcome before any display exists). Distinct from
@@ -171,9 +161,8 @@ pub trait VirtualDisplay: Send {
     /// before [`create`](Self::create) (both session paths pass `cursor_forward`). Off = the
     /// compositor EMBEDS the pointer into frames — zero host-side cursor work, the pre-channel
     /// path — which is what every session without the negotiated cursor cap gets (Moonlight /
-    /// GameStream / legacy clients / capture-mode starts), mirroring the Windows no-regression
-    /// gate. Implementations: Windows ss-vdisplay (IddCx hardware cursor, driver proto v5);
-    /// KWin (zkde `pointer` metadata vs embedded); Mutter (`cursor-mode` metadata vs embedded);
+    /// GameStream / legacy clients / capture-mode starts). Implementations: KWin (zkde `pointer`
+    /// metadata vs embedded); Mutter (`cursor-mode` metadata vs embedded);
     /// wlroots/hyprland (portal `CursorMode`). Default: no-op (gamescope has no cursor either
     /// way — see the Phase C source).
     fn set_hw_cursor(&mut self, _on: bool) {}

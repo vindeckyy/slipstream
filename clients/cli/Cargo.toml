@@ -15,9 +15,9 @@ name = "slipstream"
 path = "src/main.rs"
 
 # Console subsystem, no GUI toolkit: this links `ss-client-core` (the brain) and nothing else
-# UI-shaped, which is what lets it ship in every client package without dragging GTK, WinUI or
+# UI-shaped, which is what lets it ship in every client package without dragging GTK or
 # Skia along (design/client-architecture-split.md §4).
-[target.'cfg(any(target_os = "linux", windows))'.dependencies]
+[target.'cfg(target_os = "linux")'.dependencies]
 ss-client-core = { path = "../../crates/ss-client-core", default-features = false }
 slipstream-core = { path = "../../crates/slipstream-core", features = ["quic"] }
 serde_json = "1"

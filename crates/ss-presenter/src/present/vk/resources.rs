@@ -9,10 +9,7 @@ use ss_client_core::video::CpuFrame;
 impl Retired {
     pub(super) fn destroy(self, device: &ash::Device) {
         match self {
-            #[cfg(target_os = "linux")]
             Retired::Dmabuf(f) => f.destroy(device),
-            #[cfg(windows)]
-            Retired::D3d11(f) => f.destroy(device),
             Retired::Vk { frame, views } => {
                 // SAFETY: per the Vulkan contract above - the Vulkan handles used here are owned
                 // by this type and live for the call, and every builder struct is a local that

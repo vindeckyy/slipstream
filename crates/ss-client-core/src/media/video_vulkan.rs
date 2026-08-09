@@ -183,8 +183,7 @@ impl VulkanDecoder {
             (*hwctx).queue_family_decode_index = d;
             (*hwctx).nb_decode_queues = 1;
             const VIDEO_DECODE_BIT: u32 = 0x20; // VK_QUEUE_VIDEO_DECODE_BIT_KHR
-                                                // `flags`/`video_caps` are bindgen enum types: i32 under MSVC, u32 under
-                                                // Linux clang — the `as _` casts absorb the difference.
+                                                // Bindgen enum types are cast at this FFI boundary.
             if g == d {
                 (*hwctx).qf[0] = ss_ffvk::AVVulkanDeviceQueueFamily {
                     idx: g,
@@ -416,7 +415,7 @@ impl VulkanDecoder {
 
 /// One-time dump of the first decoded frame's layout — the forensics for a new GPU/driver.
 /// `pool_*` is the allocated decode surface (`>=` the frame); the gap is the alignment
-/// padding the presenter's UV scale excludes. The D3D11VA path logs the same pair.
+/// padding the presenter's UV scale excludes.
 fn log_layout_once(
     width: i32,
     height: i32,
@@ -497,7 +496,7 @@ unsafe extern "C" fn pick_vulkan(
         let fc = (*fr.as_ptr()).data as *mut ffi::AVHWFramesContext;
         let vkfc = (*fc).hwctx as *mut ss_ffvk::AVVulkanFramesContext;
         // MUTABLE_FORMAT: per-plane views (spec requirement); ALIAS is FFmpeg's default.
-        // (`as _`: the FlagBits constants are i32 under MSVC, the img_flags field u32.)
+        // (`as _` keeps the bindgen field representation explicit.)
         (*vkfc).img_flags = (ss_ffvk::VkImageCreateFlagBits_VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT
             | ss_ffvk::VkImageCreateFlagBits_VK_IMAGE_CREATE_ALIAS_BIT)
             as _;

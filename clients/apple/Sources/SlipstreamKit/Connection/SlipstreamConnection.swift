@@ -278,7 +278,7 @@ public final class SlipstreamConnection {
         // exist so the resolved type round-trips and name parsing matches the host.
         case steamController = 5
         case steamDeck = 6
-        /// DualSense Edge (Linux UHID / Windows UMDF hosts): the DualSense plus native back/Fn
+        /// DualSense Edge on Linux UHID hosts: the DualSense plus native back/Fn
         /// buttons. GameController exposes the Edge as a `GCDualSenseGamepad` with its own
         /// product category; paddle CAPTURE is still gated on G22, but the declared identity +
         /// rich planes match the physical pad.
@@ -388,7 +388,7 @@ public final class SlipstreamConnection {
     /// The host answered `HOST_CAP_CURSOR`: it stopped compositing the pointer and forwards
     /// shape/state on the cursor planes — the client MUST draw the cursor locally.
     /// `0x08` — the bit moved when `HOST_CAP_TEXT_INPUT` claimed `0x04` on main; testing the
-    /// old bit would mistake a text-input-capable host (e.g. Windows) for a cursor grant.
+    /// old bit would mistake a text-input-capable host for a cursor grant.
     public var hostSupportsCursor: Bool {
         hostCaps & 0x08 != 0
     }

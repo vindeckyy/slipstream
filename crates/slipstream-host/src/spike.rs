@@ -22,10 +22,7 @@ use std::time::Instant;
 pub enum Source {
     /// Deterministic moving BGRx test pattern — no capture session required.
     Synthetic,
-    /// Deterministic moving NV12 texture on the GPU (Windows only) — no capture session required.
-    /// Feeds the native AMF / D3D11 zero-copy encoders, which demand an NV12 GPU texture the CPU
-    /// `Synthetic` source can't give them. Used to validate GPU-encoder behaviour (e.g. AMF
-    /// intra-refresh) headlessly.
+    /// Legacy source name retained for command-line compatibility.
     SyntheticNv12,
     /// Live monitor via the xdg ScreenCast portal + PipeWire.
     Portal,
@@ -62,29 +59,7 @@ pub fn run(opts: Options) -> Result<()> {
             Box::new(SyntheticCapturer::new(opts.width, opts.height, opts.fps))
         }
         Source::SyntheticNv12 => {
-            #[cfg(target_os = "windows")]
-            {
-                tracing::info!(
-                    width = opts.width,
-                    height = opts.height,
-                    fps = opts.fps,
-                    "spike source: synthetic NV12 GPU texture (moving luma ramp)"
-                );
-                Box::new(
-                    capture::synthetic_nv12::SyntheticNv12Capturer::new(
-                        opts.width,
-                        opts.height,
-                        opts.fps,
-                    )
-                    .context("open synthetic NV12 capturer")?,
-                )
-            }
-            #[cfg(not(target_os = "windows"))]
-            {
-                anyhow::bail!(
-                    "--source synthetic-nv12 is Windows-only (native AMF / D3D11 encoders)"
-                );
-            }
+            anyhow::bail!("synthetic NV12 capture is unavailable in this build");
         }
         Source::Portal => {
             // SLIPSTREAM_SPIKE_HDR=1: run the GNOME 50+ HDR offer (10-bit PQ dmabufs) — the dev

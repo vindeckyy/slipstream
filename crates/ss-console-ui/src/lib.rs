@@ -17,39 +17,39 @@
 // Unsafe-proof program: every `unsafe {}` in the Skia/Vulkan overlay carries a `// SAFETY:` proof.
 #![deny(clippy::undocumented_unsafe_blocks)]
 
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 #[path = "ui/anim.rs"]
 mod anim;
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 #[path = "ui/glyphs.rs"]
 mod glyphs;
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 #[path = "ui/library.rs"]
 pub mod library;
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 #[path = "ui/model.rs"]
 pub mod model;
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 #[path = "ui/screens.rs"]
 mod screens;
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 #[path = "ui/shell.rs"]
 mod shell;
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 #[path = "ui/skia_overlay.rs"]
 mod skia_overlay;
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 #[path = "ui/theme.rs"]
 mod theme;
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 #[path = "ui/widgets.rs"]
 mod widgets;
 
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 pub use library::{LibraryGame, LibraryPhase, LibraryShared};
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 pub use model::{ConsoleBus, ConsoleCmd, ConsoleShared, HostRow, PairPhase, WakeStatus};
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 pub use shell::ConsoleOptions;
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 pub use skia_overlay::{ConsoleEntry, ConsoleHandles, SkiaOverlay};

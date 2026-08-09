@@ -37,17 +37,9 @@
     },
     {
       "type": "library",
-      "name": "libvpl",
-      "version": "2.17.0",
-      "description": "Intel oneVPL dispatcher, vendored at crates/libvpl-sys/vendor/libvpl",
-      "licenses": [{ "license": { "id": "MIT" } }],
-      "externalReferences": [{ "type": "vcs", "url": "https://github.com/intel/libvpl" }]
-    },
-    {
-      "type": "library",
       "name": "FFmpeg",
-      "version": "7.x/8.x (system-provided on Linux; replaceable DLLs bundled with the Windows packages)",
-      "description": "Dynamically linked libav* decode/encode; LGPL notice at packaging/windows/licenses/FFmpeg-LGPL-NOTICE.txt",
+      "version": "7.x/8.x (system-provided on Linux)",
+      "description": "Dynamically linked libav* decode/encode",
       "licenses": [{ "license": { "id": "LGPL-2.1-or-later" } }],
       "externalReferences": [{ "type": "website", "url": "https://ffmpeg.org" }]
     },
@@ -58,14 +50,6 @@
       "description": "Windowing/input layer for the desktop clients, dynamically linked",
       "licenses": [{ "license": { "id": "Zlib" } }],
       "externalReferences": [{ "type": "vcs", "url": "https://github.com/libsdl-org/SDL" }]
-    },
-    {
-      "type": "application",
-      "name": "VB-CABLE",
-      "version": "redistributed installer, see packaging/windows/install-vbcable.ps1",
-      "description": "Third-party kernel-mode virtual audio driver redistributed with the Windows host; notice at packaging/windows/licenses/VB-CABLE-NOTICE.txt. Planned to be replaced by an attestation-signed first-party driver.",
-      "licenses": [{ "license": { "name": "Proprietary freeware (VB-Audio Software, redistribution permitted per notice)" } }],
-      "externalReferences": [{ "type": "website", "url": "https://vb-audio.com/Cable/" }]
     },
     {
       "type": "application",

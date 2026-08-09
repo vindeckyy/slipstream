@@ -1,6 +1,6 @@
 //! SDL scancodes / mouse buttons → the slipstream input wire contract.
 //!
-//! Same VK codes as `ss_client_core::keymap` (the wire carries Windows Virtual-Keys, the
+//! Same VK codes as `ss_client_core::keymap` (the wire carries protocol virtual-key values,
 //! GameStream convention), keyed on SDL scancodes instead of evdev codes: SDL normalizes
 //! the platform keycode to its USB-HID-derived scancode table, so this stays
 //! layout-independent exactly like the evdev table. Coverage mirrors `keymap::evdev_to_vk`
@@ -9,7 +9,7 @@
 
 use sdl3::keyboard::Scancode;
 
-/// Map an SDL scancode to the Windows VK code the host expects.
+/// Map an SDL scancode to the protocol virtual-key code the host expects.
 pub fn scancode_to_vk(sc: Scancode) -> Option<u8> {
     use Scancode as S;
     Some(match sc {
@@ -155,9 +155,8 @@ pub fn mouse_button_to_gs(b: sdl3::mouse::MouseButton) -> Option<u32> {
     })
 }
 
-// Linux-only: the reference table it cross-checks (ss_client_core::keymap, evdev-keyed)
-// only exists there. The SDL table under test is itself cross-platform.
-#[cfg(all(test, target_os = "linux"))]
+// Keep the protocol table covered by unit tests.
+#[cfg(test)]
 mod tests {
     use super::*;
     use ss_client_core::keymap::evdev_to_vk;

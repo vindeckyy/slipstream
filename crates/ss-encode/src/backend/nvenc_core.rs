@@ -1,9 +1,6 @@
-//! Shared direct-SDK NVENC core — the platform-agnostic pieces of the two `nvEncodeAPI` backends,
-//! Windows D3D11 (`encode/windows/nvenc.rs`) and Linux CUDA (`encode/linux/nvenc_cuda.rs`), so the
-//! byte-identical glue lives once (plan §2.2, the direct-NVENC Tier-2). The per-platform parts —
-//! the entry-table load (`nvEncodeAPI64.dll` via `LoadLibrary` vs `libnvidia-encode.so` via
-//! `libloading`), the device binding (D3D11 vs CUDA), input-surface registration, and the
-//! Windows-only async retrieve — stay in their backends. Sibling of [`super::nvenc_status`].
+//! Shared direct-SDK NVENC core for the Linux CUDA backend. The entry-table load, CUDA device
+//! binding, input-surface registration, and retrieve loop remain in the backend. Sibling of
+//! [`super::nvenc_status`].
 
 // UNSAFE-LINT EXEMPTION (rationale + exit criteria: `unsafe_op_in_unsafe_fn` in the workspace
 // Cargo.toml). This body is raw `nvEncodeAPI` entry-table calls almost line for line; narrowing it
@@ -48,8 +45,8 @@ pub(super) fn codec_guid(codec: Codec) -> nv::GUID {
 /// `default_slices` — on Linux direct-NVENC the Phase-3 default of 4 CLAMPED to the session's
 /// negotiated client-decoder ceiling (`VIDEO_CAP_MULTI_SLICE` / GameStream's
 /// `videoEncoderSlicesPerFrame` — a client that never asked stays single-slice: Amlogic TV
-/// SoCs wedge on multi-slice AUs), 1 everywhere else (the Windows async path is deliberately
-/// untouched). H.264/HEVC only (AV1 partitions via tiles). ONE parse shared by the config
+/// SoCs wedge on multi-slice AUs), 1 everywhere else. H.264/HEVC only (AV1 partitions via tiles).
+/// ONE parse shared by the config
 /// author ([`apply_low_latency_config`] via [`LowLatencyConfig::slices`]) and the Linux
 /// backend's chunked-poll arming, so the two can never disagree about whether a session is
 /// multi-slice.
@@ -68,7 +65,7 @@ pub(super) fn resolve_slices(codec: Codec, default_slices: u32) -> u32 {
 /// only, see [`build_init_params`]): `SLIPSTREAM_NVENC_SUBFRAME` tri-state — `0` = never (the
 /// default-on escape), `1` = force (even where the caps probe says unsupported — an operator
 /// explicitly testing), unset = the backend's `default_on` (Linux direct-NVENC passes its
-/// SUBFRAME_READBACK caps-probe result since Phase 3; Windows passes `false`).
+/// SUBFRAME_READBACK caps-probe result since Phase 3).
 pub(super) fn resolve_subframe(default_on: bool) -> bool {
     match std::env::var("SLIPSTREAM_NVENC_SUBFRAME").as_deref() {
         Ok("0") => false,
@@ -77,9 +74,7 @@ pub(super) fn resolve_subframe(default_on: bool) -> bool {
     }
 }
 
-/// Resolved NVENC split-frame encode mode for a session — ONE selector shared by the Windows and
-/// Linux direct-SDK backends (they had drifted into byte-identical duplicates, one of which
-/// logged and one didn't). Precedence:
+/// Resolved NVENC split-frame encode mode for a Linux session. Precedence:
 /// 1. `SLIPSTREAM_SPLIT_ENCODE` = `0`/`disable` | `1`/`auto` (AUTO_FORCED) | `2` | `3` — operator
 ///    override, always wins.
 /// 2. 10-bit → DISABLE: 2-way split is measurably SLOWER on Ada for Main10 — at 5120×1440@240
@@ -117,11 +112,8 @@ pub(super) fn resolve_split_mode(bit_depth: u8, pixel_rate: u64) -> u32 {
 /// deserves a `warn`, a default being tuned an `info`. Callers LATCH this once next to their
 /// resolved subframe state (an env re-read at reconfigure would violate the "open and
 /// reconfigure present identical init params" invariant).
-/// Both direct-SDK backends latch it now: Linux at the `nvenc_cuda` query_caps latch, Windows at
-/// session init since sub-frame defaults on there too (it used to be env opt-in only, so
-/// `subframe == forced` held by construction and the item was Linux-cfg'd to avoid being dead
-/// code on the Windows leg — the recurring item-level `dead_code` trap).
-#[cfg(any(target_os = "linux", windows))]
+/// The Linux direct-SDK backend latches this at its capability probe.
+#[cfg(target_os = "linux")]
 pub(super) fn subframe_env_forced() -> bool {
     matches!(
         std::env::var("SLIPSTREAM_NVENC_SUBFRAME").as_deref(),
@@ -255,8 +247,7 @@ mod split_subframe_tests {
 /// sessions ACTUALLY opened with (a split session budgets per engine).
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) struct CeilingKey {
-    /// GPU identity — Linux: the process-global shared `CUcontext` pointer; Windows: the render
-    /// adapter LUID (0 when unresolved). Best effort: the cache is advisory (see
+    /// GPU identity: the process-global shared `CUcontext` pointer. Best effort: the cache is advisory (see
     /// [`cached_ceiling`]), so a colliding identity costs one failed open + re-search, never a
     /// wrong session.
     pub gpu: u64,
@@ -446,8 +437,8 @@ mod tests {
 pub(super) const RFI_DPB: u32 = 5;
 
 /// One loss event's recovery decision for the timestamp-range RFI both direct-NVENC backends run
-/// (the range half of WP7.2's policy extraction; the slot half — AMF/QSV/Vulkan — is
-/// `crate::rfi`). The mechanism (the per-timestamp `nvEncInvalidateRefFrames` loop, the
+/// (the range half of the policy extraction; the slot half for Vulkan is `crate::rfi`). The
+/// mechanism (the per-timestamp `nvEncInvalidateRefFrames` loop, the
 /// `last_rfi_range`/`pending_anchor` stores, the null-handle/`rfi_supported` gate) stays in each
 /// backend.
 pub(super) enum RangePlan {
@@ -460,9 +451,7 @@ pub(super) enum RangePlan {
     Invalidate { first: i64, last: i64 },
     /// Recovery without an IDR is impossible (nonsense range, loss older than the DPB, or a range
     /// entirely in the future) — the caller returns `false` and its (coalesced) keyframe path
-    /// recovers. Deliberately NOT paired with any state clearing: neither twin touches
-    /// `pending_anchor` on decline (matching Vulkan's decline, opposite of AMF/QSV's
-    /// `pending_force` clear — see `crate::rfi`'s module doc before "harmonizing").
+    /// recovers. The caller owns any pending-anchor state when recovery declines.
     Decline,
 }
 
@@ -593,10 +582,8 @@ mod range_policy_tests {
     }
 }
 
-/// The per-session knobs both direct-NVENC backends feed [`apply_low_latency_config`]. `Copy` so the
-/// backend fills it from `self` at the call. The two input-format fields bridge the only real
-/// divergence between the CUDA and D3D11 paths (which surface formats can carry full chroma / 10-bit
-/// input); everything else in the config is identical across platforms.
+/// The per-session knobs the Linux direct-NVENC backend feeds to [`apply_low_latency_config`].
+/// `Copy` lets the backend fill it from `self` at the call.
 #[derive(Clone, Copy)]
 pub(super) struct LowLatencyConfig {
     pub codec: Codec,
@@ -607,13 +594,13 @@ pub(super) struct LowLatencyConfig {
     pub custom_vbv: bool,
     /// A 4:4:4 session was negotiated (HEVC Range Extensions).
     pub chroma_444: bool,
-    /// The input surface can carry full chroma — Linux feeds a YUV444 surface, Windows a packed-RGB
-    /// surface NVENC CSCs internally. 4:4:4 engages only when this AND [`chroma_444`](Self::chroma_444).
+    /// The input surface can carry full chroma. 4:4:4 engages only when this AND
+    /// [`chroma_444`](Self::chroma_444).
     pub full_chroma_input: bool,
     /// Output bit depth (8 or 10).
     pub bit_depth: u8,
     /// AV1 `inputPixelBitDepthMinus8` — the encoder's view of the INPUT depth (Linux is 8-bit in
-    /// today, so 0; Windows derives it from the surface format). `u32` to match the SDK setter.
+    /// today, so 0. `u32` to match the SDK setter.
     pub av1_input_depth_minus8: u32,
     pub hdr: bool,
     /// This GPU supports reference-frame invalidation (a deeper DPB for graceful loss recovery).
@@ -627,11 +614,10 @@ pub(super) struct LowLatencyConfig {
 }
 
 /// Author the shared `NV_ENC_INITIALIZE_PARAMS` (P1/ULL preset, PTD, the session dimensions/rate)
-/// pointing at `cfg`. `enable_async` drives the Windows two-thread async retrieve — Linux is
-/// sync-only and passes `false`, leaving `enableEncodeAsync` at 0 as before. The returned struct
-/// borrows `cfg` as a raw pointer; the caller must keep `cfg` alive across the NVENC call it feeds
-/// this into. Used at open and at in-place reconfigure, which must present the SAME init params.
-#[allow(clippy::too_many_arguments)]
+/// pointing at `cfg`. Linux uses synchronous retrieval, so `enableEncodeAsync` remains zero. The
+/// returned struct borrows `cfg` as a raw pointer; the caller must keep `cfg` alive across the
+/// NVENC call it feeds this into. Used at open and in-place reconfigure, which must present the
+/// same init params.
 pub(super) fn build_init_params(
     codec_guid: nv::GUID,
     width: u32,
@@ -639,7 +625,6 @@ pub(super) fn build_init_params(
     fps: u32,
     cfg: &mut nv::NV_ENC_CONFIG,
     split_mode: u32,
-    enable_async: bool,
     subframe: bool,
 ) -> nv::NV_ENC_INITIALIZE_PARAMS {
     let mut init = nv::NV_ENC_INITIALIZE_PARAMS {
@@ -654,7 +639,7 @@ pub(super) fn build_init_params(
         frameRateNum: fps,
         frameRateDen: 1,
         enablePTD: 1,
-        enableEncodeAsync: enable_async as u32,
+        enableEncodeAsync: 0,
         encodeConfig: cfg,
         ..Default::default()
     };
@@ -664,9 +649,8 @@ pub(super) fn build_init_params(
     // the caller resolves `subframe` via [`resolve_subframe`] + its caps probe): the driver
     // writes each slice into the output buffer as it completes and reports per-slice offsets, so
     // a sync-mode consumer can read slices out while the frame is still encoding. Pair with
-    // multi-slice (a single-slice frame yields nothing to read early). `reportSliceOffsets`
-    // requires `enableEncodeAsync = 0`, so async (Windows) sessions never arm.
-    if !enable_async && subframe {
+    // multi-slice (a single-slice frame yields nothing to read early).
+    if subframe {
         init.set_enableSubFrameWrite(1);
         init.set_reportSliceOffsets(1);
     }
@@ -676,14 +660,14 @@ pub(super) fn build_init_params(
 /// Author the shared low-latency NVENC config onto a **preset-seeded** `cfg`: CBR + infinite GOP +
 /// P-only + ~1-frame VBV, per-codec tier/level, chroma + bit depth, unconditional colour signaling,
 /// and the RFI DPB. The caller seeds `cfg` from the P1/ULL preset first (that call needs the
-/// per-platform entry table) and passes the input-format specifics via [`LowLatencyConfig`]; the
-/// per-platform surface registration, device binding, and async retrieve stay in the backends.
+/// the Linux entry table and passes input-format specifics via [`LowLatencyConfig`]. Surface
+/// registration, device binding, and retrieval stay in the backend.
 ///
 /// # Safety
 /// Writes NVENC codec-config union fields on `cfg`, which must be a valid, preset-seeded
 /// `NV_ENC_CONFIG` whose active union arm matches [`LowLatencyConfig::codec`].
 pub(super) unsafe fn apply_low_latency_config(cfg: &mut nv::NV_ENC_CONFIG, c: LowLatencyConfig) {
-    // CBR, infinite GOP, P-only, ~1-frame VBV — mirrors the AMF/VAAPI/QSV libav RC config.
+    // CBR, infinite GOP, P-only, ~1-frame VBV — mirrors the VAAPI libav RC config.
     cfg.gopLength = nv::NVENC_INFINITE_GOPLENGTH;
     cfg.frameIntervalP = 1;
     cfg.rcParams.rateControlMode = nv::NV_ENC_PARAMS_RC_MODE::NV_ENC_PARAMS_RC_CBR;
@@ -698,7 +682,7 @@ pub(super) unsafe fn apply_low_latency_config(cfg: &mut nv::NV_ENC_CONFIG, c: Lo
     if c.custom_vbv {
         // ~1-frame VBV by default; `LatencyProfile::LowLatency` pins it to 1 frame, the
         // profile's env override (`SLIPSTREAM_VBV_FRAMES`) scales it on `Balanced` — parity
-        // with AMF/VAAPI/QSV.
+        // with VAAPI.
         let vbv = ((c.bitrate as f64 / c.fps.max(1) as f64) * c.vbv_frames)
             .clamp(1.0, u32::MAX as f64) as u32;
         cfg.rcParams.vbvBufferSize = vbv;

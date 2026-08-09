@@ -1,16 +1,13 @@
-//! Transport-independent DualSense HID contract — shared by the Linux UHID backend
-//! ([`super::dualsense`]) and the Windows UMDF-driver backend ([`super::dualsense_windows`]).
+//! Transport-independent DualSense HID contract for the Linux UHID backend.
 //!
 //! This is the pure logic: the report descriptor, feature blobs, the [`DsState`] controller model
 //! and its `GameStream`/XInput mapper, the input-report serializer (report `0x01`) and the
 //! output-report parser (report `0x02`, a game's rumble / lightbar / player-LED / adaptive-trigger
 //! feedback). Neither half depends on a transport — the Linux backend writes `0x01` to `/dev/uhid`
-//! and reads `0x02` via `UHID_OUTPUT`; the Windows backend pushes `0x01` to the UMDF driver and
-//! pulls `0x02` back over its control channel — but both build/parse the exact same bytes.
+//! and reads `0x02` via `UHID_OUTPUT`; the codec owns the exact report bytes.
 //!
 //! The descriptor + field layout are the canonical inputtino ones (games-on-whales/inputtino
-//! `src/uhid/include/uhid/ps5.hpp`), so `hid-playstation` (Linux) and `hidclass` (Windows) bind the
-//! same as a real USB DualSense.
+//! `src/uhid/include/uhid/ps5.hpp`), so `hid-playstation` binds the same as a real USB DualSense.
 
 use slipstream_core::quic::{HidOutput, RichInput};
 
@@ -21,9 +18,8 @@ use slipstream_core::quic::{HidOutput, RichInput};
 #[rustfmt::skip]
 // FIXME(cal-len): the descriptor declares report 0x05 as a 40-byte feature (id + 40 = 41 total),
 // but this blob is 42 bytes (one trailing pad byte too many). Linux `hid-playstation` tolerates it
-// (the backend is live-validated), and `hidclass` truncates to the declared length, so it is not
-// currently blocking; trim the trailing 0x00 to 41 once a physical DualSense is available to
-// re-verify motion calibration on both backends.
+// the backend is live-validated. Trim the trailing 0x00 to 41 once a physical DualSense is
+// available to re-verify motion calibration.
 pub const DS_FEATURE_CALIBRATION: &[u8] = &[ // report 0x05 (motion calibration)
     0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x27, 0xF0, 0xD8, 0x10, 0x27, 0xF0, 0xD8, 0x10,
     0x27, 0xF0, 0xD8, 0xF4, 0x01, 0xF4, 0x01, 0x10, 0x27, 0xF0, 0xD8, 0x10, 0x27, 0xF0, 0xD8, 0x10,
@@ -59,7 +55,7 @@ pub fn ds_pairing_reply(pad: u8) -> [u8; 20] {
 }
 
 /// Sony DualSense USB HID report descriptor (273 bytes), verbatim from inputtino — the exact
-/// descriptor `hid-playstation` (Linux) / `hidclass` (Windows) parses to bind a DualSense.
+/// descriptor the Linux `hid-playstation` driver parses to bind a DualSense.
 #[rustfmt::skip]
 pub const DUALSENSE_RDESC: &[u8] = &[
     0x05, 0x01, 0x09, 0x05, 0xA1, 0x01, 0x85, 0x01, 0x09, 0x30, 0x09, 0x31, 0x09, 0x32, 0x09, 0x35,
@@ -337,8 +333,8 @@ impl DsState {
     }
 
     /// Apply one rich client→host event (touchpad contact / motion sample) into this state —
-    /// the ONE mapping shared by every DualSense-family backend (Linux UHID, Windows UMDF,
-    /// DS4 both ways; `touch_w`/`touch_h` are the pad's advertised extents, 1920×1080 vs
+    /// the mapping shared by the DualSense-family codecs (`touch_w`/`touch_h` are the pad's
+    /// advertised extents, 1920×1080 vs
     /// 1920×942).
     ///
     /// Wire touch coordinates are screen convention (+x right, +y down) — same as the

@@ -13,9 +13,8 @@
 //! * **host paste of client content** — a backend [`ClipEvent::Paste`] triggers an *outbound* fetch to
 //!   the client, whose bytes are handed to the backend's [`PasteResponder`].
 //!
-//! The coordinator is backend-agnostic (Linux data-control / Mutter, Windows Win32); the control loop
-//! reaches it through the portable [`ClipCoordCmd`] channel so the host's native control loop
-//! compiles on every host platform.
+//! The coordinator is backend-agnostic (Linux data-control / Mutter); the control loop reaches it
+//! through the portable [`ClipCoordCmd`] channel.
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;

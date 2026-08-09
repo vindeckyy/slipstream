@@ -9,7 +9,7 @@
 //! per-axis ceiling so a connect can't request a size the encoder will reject.
 //!
 //! It is the Rust twin of the Apple client's `SlipstreamShared/RenderScale.swift` and is shared by
-//! the native (Linux/`clients/session`, Windows) clients and the Android JNI path — all of which
+//! the native Linux client and the Android JNI path - all of which
 //! reach `slipstream-core`. Kept dependency-free + side-effect-free so it is unit-tested here.
 
 /// Minimum supported multiplier (renders under native, upscaled on present).

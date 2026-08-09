@@ -11,7 +11,7 @@ links = "pyrowave"
 
 [build-dependencies]
 # Same CMake-from-vendored-source model as opus/audiopus_sys: reproducible
-# offline builds (CI, MSVC, flatpak — the flatpak builder has no network).
+# offline builds (CI and the flatpak builder have no network).
 cmake = "0.1"
 # Same bindgen configuration as ss-ffvk (runtime = dlopen libclang).
 bindgen = { version = "0.72", features = ["runtime"], default-features = false }

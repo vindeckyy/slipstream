@@ -1,4 +1,4 @@
-//! The `slipstream://` URL grammar — one parser/emitter for Linux, Windows, the session and
+//! The `slipstream://` URL grammar, one parser/emitter for Linux, the session, and
 //! the CLI (design/client-deep-links.md §2). Swift (`SlipstreamShared/DeepLink.swift`) and
 //! Kotlin keep their own ports; all three are held together by the shared vector file
 //! `clients/shared/deeplink-vectors.json`, which this module's tests consume verbatim.
@@ -16,8 +16,8 @@
 //! route and never will be; pairing stays an interactive ceremony.
 //!
 //! `pf://` parses as an alias so a hand-typed or legacy link still works, but nothing ever
-//! *emits* or registers it (§2: claiming a two-letter scheme on MSIX/Apple is unconditional
-//! squatting, and a link that resolves on one platform only is a trap).
+//! *emits* or registers it (§2: a short scheme can collide with another application, and a
+//! link that resolves on one supported client only is a trap).
 
 use crate::trust::{KnownHost, KnownHosts};
 

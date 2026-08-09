@@ -4,10 +4,10 @@
 //! environment before the host starts, and **for the knobs captured here the environment is constant for the
 //! process lifetime**, so a lazily-parsed global is equivalent to "parsed once at startup".
 //!
-//! **Goal-1 stages 1–2** (`design/windows-host-rewrite.md` §2.2): stage 1 stood this up; stage 2 migrated the
+//! **Goal-1 stages 1-2**: stage 1 stood this up; stage 2 migrated the
 //! genuinely-constant operator/dispatch knobs onto it (the dispatch-disagreement bug class:
-//! `encoder_pref`, `render_adapter`, the vdisplay backend select — plus the plan-named
-//! `idd_depth`/`zerocopy`/`ten_bit`/`four_four_four` and the multi-site `perf`/`compositor`/
+//! `encoder_pref`, `render_adapter`, plus the plan-named `ten_bit`/`four_four_four` and the multi-site
+//! `perf`/`compositor`/
 //! `video_source`/`gamepad`). `SessionPlan` (stage 3) consumes it as the single owner of the
 //! capture/topology/encoder decision.
 //!
@@ -21,16 +21,10 @@
 //! - **Single-use local tuning** read exactly where it is used (no resolve-once benefit, and a parse with a
 //!   call-site-local default/clamp): e.g. `FEC_PCT` (two *different* semantics — GameStream default-20 vs
 //!   slipstream/1 `Option`/clamp-90), `VIDEO_DROP`, `VBV_FRAMES`, `SPLIT_ENCODE`, `PACE_BURST_KB`, the
-//!   `capture/dxgi.rs` timing knobs, the `*_LIVE` test gates.
+//!   capture timing knobs, the `*_LIVE` test gates.
 //! - **Path / genuinely-dynamic reads**: the config-dir resolution, `PATH` executable search, the
 //!   env-forward-to-child loop, `SLIPSTREAM_MGMT_TOKEN`, `SLIPSTREAM_HOST_CMD`, `SLIPSTREAM_RENDER_NODE`.
 //!
-//! `SLIPSTREAM_ZEROCOPY` note: this field is a **tri-state override** (`None` = unset). Unset defers to
-//! the per-vendor default in `encode/ffmpeg_win.rs::zerocopy_enabled` (AMF on — on-glass validated
-//! 2026-07-06; QSV off until validated on Intel glass); an explicit value forces it (`0|false|off|no`
-//! = off, anything else = on, so the old presence-style `=1` keeps working). The Linux `zerocopy`
-//! module keeps its own *truthy* parser (`1|true|yes|on`) — the two are independent features that
-//! share a name; do NOT conflate them.
 #![forbid(unsafe_code)]
 
 mod config;

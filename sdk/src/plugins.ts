@@ -60,8 +60,7 @@ export const resolvePackage = (
 const isFirstParty = (pkg: string): boolean => pkg.startsWith("@slipstream/");
 
 /**
- * Create the plugins dir (and parents) if needed, and make it bun's install ROOT. On Windows the
- * ACL lockdown is the host's job.
+ * Create the plugins dir (and parents) if needed, and make it bun's install root.
  *
  * The `package.json` is load-bearing, not decoration: `bun add` installs into the nearest ancestor
  * `package.json`, not into its working directory. Without one here, a stray `~/package.json` — one
@@ -167,21 +166,11 @@ const runBun = (action: "add" | "remove", pkgs: string[], opts: PkgOpts): void =
 	const args = [process.execPath, action, ...pkgs];
 	if (action === "add") {
 		// NEVER run install lifecycle scripts. A plugin is code we chose to run under the runner,
-		// where it is supervised and (on Windows) de-privileged; a postinstall script runs
-		// immediately, as whoever is installing — which on a console-triggered install is the host
-		// service. bun already declines untrusted scripts by default; this makes it explicit and
-		// unconditional. A plugin that needs a native build step is a review rejection, not a case
-		// to support.
+		// and a postinstall script runs immediately with the installer's privileges. bun already
+		// declines untrusted scripts by default; this makes it explicit and unconditional. A plugin
+		// that needs a native build step is a review rejection, not a case to support.
 		args.push("--ignore-scripts");
 		if (opts.exact) args.push("--exact");
-	}
-	// Windows: install file COPIES, never bun's default hardlinks. A hardlinked file's canonical
-	// path resolves into the installing admin's per-user bun cache
-	// (C:\Users\<admin>\.bun\install\cache\…), which the de-privileged LocalService runner cannot
-	// traverse — imports die with EPERM even though the plugins-dir DACL grants read (seen live
-	// on-glass). copyfile keeps the plugins tree self-contained under %ProgramData%.
-	if (action === "add" && process.platform === "win32") {
-		args.push("--backend=copyfile");
 	}
 	const res = Bun.spawnSync(args, {
 		cwd: dir,

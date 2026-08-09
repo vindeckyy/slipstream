@@ -1,5 +1,4 @@
-// Connection/config resolution helpers. `pluginStateDir` is the writable location a supervised
-// plugin persists into — the one dir the de-privileged Windows runner may write.
+// Connection/config resolution helpers for the supervised runner's Linux state directories.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as path from "node:path";
 import { pluginIngestDir, pluginStateDir } from "../src/config.js";
@@ -44,7 +43,7 @@ describe("pluginIngestDir", () => {
 		expect(pluginIngestDir("playnite")).toBe(
 			path.join("/tmp", "ss-cfg3", "ingest", "playnite"),
 		);
-		// the inbox (Users-write) is a different tree from state (LocalService-write)
+		// The inbox is a different tree from plugin state.
 		expect(pluginIngestDir("playnite")).not.toBe(pluginStateDir("playnite"));
 	});
 });

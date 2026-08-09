@@ -10,6 +10,7 @@ import {
 } from "h3";
 import {
 	configureUiPassword,
+	isLoopbackAddress,
 	MIN_UI_PASSWORD_LENGTH,
 	peerAddress,
 	type SessionData,
@@ -32,6 +33,12 @@ export default defineEventHandler(async (event) => {
 	}
 
 	const ip = peerAddress(event);
+	if (!isLoopbackAddress(ip)) {
+		throw createError({
+			statusCode: 403,
+			statusMessage: "first-time setup must be completed from the host",
+		});
+	}
 	const wait = throttleRetryAfterMs(ip);
 	if (wait > 0) {
 		setResponseHeader(event, "Retry-After", Math.ceil(wait / 1000));

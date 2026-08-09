@@ -102,16 +102,15 @@ could sit in the middle of a pairing, or recover input from a session. It is saf
 fully trust. The native `slipstream/1` plane is unaffected and always on; GameStream is a second
 plane running beside it.
 
-**Check whether your host has it on. The default differs by install path, and most Linux installs
-have it on:**
+**Check whether your host has it on. The secure default is native-only:**
 
-- **Linux packages: on.** The bundled systemd user unit runs `serve --gamestream`, and the deb, rpm,
-  Arch and Bazzite sysext packages all install that unit as it ships. If you installed Slipstream from
-  a package and enabled the service, GameStream is on.
-- **SteamOS / Steam Deck installer: on**, unless you ran it with `--no-gamestream`.
-- **NixOS module: on**, `services.slipstream.host.gamestream` defaults to `true`.
-- **A host you started yourself** with `slipstream-host serve`: off. Only `serve --gamestream` (or
-  `--moonlight`) enables it.
+- **Linux packages:** the bundled unit runs `serve`, so GameStream is off unless you add
+  `--gamestream`.
+- **SteamOS / Steam Deck installer:** native-only by default; pass `--gamestream` for trusted-LAN
+  Moonlight compatibility.
+- **NixOS module:** `services.slipstream.host.gamestream` defaults to `false`.
+- **A host you started yourself:** `slipstream-host serve` is native-only. Only `serve --gamestream`
+  (or `--moonlight`) enables the compatibility plane.
 
 The host doesn't hide it: whenever the compat planes come up, it logs a warning at startup naming
 exactly this risk.
@@ -120,7 +119,7 @@ exactly this risk.
 
 - **Linux**, override the unit's `ExecStart` with a drop-in, so a package upgrade doesn't undo it:
   see [What the unit starts](/docs/running-as-a-service#what-the-unit-starts).
-- **SteamOS**, re-run the Deck installer with `--no-gamestream`.
+- **SteamOS**, the default is already native-only; remove `--gamestream` from the generated unit.
 - **NixOS**, set `services.slipstream.host.gamestream = false;` (this also drops the GameStream
   firewall ports).
 

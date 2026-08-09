@@ -1,7 +1,6 @@
 //! The Linux apply leg (design §7, plan U2.3): ask systemd to run the `ss-update` root
 //! oneshot, read its result record, and — when the on-disk binary actually changed — hand
-//! the outcome across our own restart via the same intent/reconcile machinery the Windows
-//! leg uses.
+//! the outcome across our own restart via the shared intent/reconcile machinery.
 //!
 //! Privilege model: this process is unprivileged; `systemctl start slipstream-update.service`
 //! is authorized by polkit for members of the `slipstream-update` group (an explicit,
@@ -137,12 +136,7 @@ pub(super) fn run_apply_steamos(
             to: target_version.into(),
             serial,
             started_unix: super::now_unix(),
-            installer_sha256: String::new(),
-            log_path: log.display().to_string(),
             source_build: true,
-            // Windows-only concern: no Linux package force-kills a running tray, and the desktop
-            // autostart entry owns bringing it up.
-            tray_was_running: false,
         },
     )
     .map_err(|e| ("applying", format!("write intent record: {e}")))?;
@@ -309,7 +303,6 @@ pub(super) fn run_apply(
                 finished_unix: super::now_unix(),
                 stage: None,
                 error: None,
-                log_path: None,
                 staged: true,
             },
         );
@@ -327,7 +320,6 @@ pub(super) fn run_apply(
                 finished_unix: super::now_unix(),
                 stage: None,
                 error: None,
-                log_path: None,
                 staged: false,
             },
         );
@@ -335,7 +327,7 @@ pub(super) fn run_apply(
     }
 
     // The on-disk binary changed (and the helper's run-the-binary gate already proved it
-    // runs). Cross the restart on the intent record, exactly like the Windows leg.
+    // runs). Cross the restart on the intent record.
     let to = result
         .after_version
         .split_whitespace()
@@ -349,10 +341,7 @@ pub(super) fn run_apply(
             to,
             serial,
             started_unix: super::now_unix(),
-            installer_sha256: String::new(),
-            log_path: "journalctl -u slipstream-update.service".into(),
             source_build: false,
-            tray_was_running: false, // Windows-only concern (see the source-build intent above)
         },
     )
     .map_err(|e| ("restarting", format!("write intent record: {e}")))?;

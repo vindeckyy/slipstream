@@ -1,6 +1,6 @@
 [package]
 name = "slipstream-tray"
-description = "System-tray status icon for the slipstream streaming host (Windows notification area / Linux StatusNotifierItem)"
+description = "System-tray status icon for the slipstream streaming host on Linux"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -14,12 +14,11 @@ path = "src/main.rs"
 
 # Deliberately does NOT depend on slipstream-host: the tray needs only the service name, the mgmt
 # port, and the summary JSON shape — a dependency would drag the whole host (FFmpeg, PipeWire, …)
-# into a 2 MB helper and make it un-buildable standalone. Non-Windows/non-Linux targets build a
-# stub main (same pattern as the platform-gated clients).
+# into a 2 MB helper and make it un-buildable standalone.
 [dependencies]
 anyhow = "1"
 
-[target.'cfg(any(windows, target_os = "linux"))'.dependencies]
+[target.'cfg(target_os = "linux")'.dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Loopback HTTPS poll of GET /api/v1/local/summary. Same sync ureq + rustls(ring) stack and
@@ -34,32 +33,11 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "logg
 # leaf (no C toolchain), unlike the host dependency ruled out above.
 slipstream-core = { path = "../slipstream-core", default-features = false, features = ["tls"] }
 
-[target.'cfg(windows)'.dependencies]
-# SCM QUERY_STATUS works unprivileged — the service-state probe. Same crate the host service uses.
-windows-service = "0.7"
-windows = { version = "0.62", features = [
-    "Win32_Foundation",
-    "Win32_Graphics_Gdi",
-    "Win32_Security", # CreateMutexW's SECURITY_ATTRIBUTES parameter type
-    "Win32_System_LibraryLoader",
-    "Win32_System_Registry", # AppsUseLightTheme — glyph color must match the themed menu
-    "Win32_System_Threading",
-    "Win32_UI_HiDpi",
-    "Win32_UI_Shell",
-    "Win32_UI_WindowsAndMessaging",
-] }
-
-[target.'cfg(target_os = "linux")'.dependencies]
 # StatusNotifierItem (pure Rust, zbus — the same zbus the host already pulls via ashpd). The tray
 # is a plain-threads poller, so the blocking API over the small async-io executor (`blocking`
 # alone is just the wrapper — zbus still needs an executor; no tokio runtime in a tray icon).
 ksni = { version = "0.3", default-features = false, features = ["async-io", "blocking"] }
 libc = "0.2"
-
-# Build-time icon embedding (exe icon + the status-variant tray icons), host-gated like the
-# Windows client's build.rs — cross-builds from Linux CI runners skip it.
-[target.'cfg(windows)'.build-dependencies]
-winresource = "0.1"
 
 [lints]
 workspace = true

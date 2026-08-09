@@ -464,7 +464,7 @@ object DeviceProfiles {
  * True when this device's display can actually present HDR10, so we should advertise HDR to the
  * host. On an SDR panel we advertise `0` instead — the host then sends a proper 8-bit BT.709 stream
  * rather than BT.2020 PQ the panel would mis-tone-map (the washed-out/dark failure). Mirrors the
- * capability gate the Apple/Windows clients apply.
+ * capability gate the Apple client applies.
  */
 fun displaySupportsHdr(context: Context): Boolean {
     val display = probeDisplay(context)

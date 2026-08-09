@@ -19,11 +19,11 @@
 
 #![forbid(unsafe_code)]
 
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 #[path = "cmd/mod.rs"]
 mod cli;
 
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 fn main() -> std::process::ExitCode {
     // Logs to stderr; stdout is the machine interface (TSV/JSON), exactly like the session
     // binary's contract.
@@ -38,8 +38,8 @@ fn main() -> std::process::ExitCode {
 }
 
 /// Keeps `cargo build --workspace` green on macOS, where the client is clients/apple.
-#[cfg(not(any(target_os = "linux", windows)))]
+#[cfg(not(target_os = "linux"))]
 fn main() {
-    eprintln!("slipstream runs on Linux and Windows — the macOS client lives in clients/apple");
+    eprintln!("slipstream CLI runs on Linux; the macOS client lives in clients/apple");
     std::process::exit(2);
 }

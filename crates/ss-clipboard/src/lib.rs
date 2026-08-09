@@ -5,10 +5,8 @@
 //! the per-OS backends in [`host`] and bridges it to the QUIC clipboard plane through the
 //! [`host::session`] coordinator.
 //!
-//! The orchestrator consumes only this portable facade — [`policy`] / [`enabled`] /
-//! [`cap_advertised`], the [`ClipCoordCmd`] channel vocabulary, [`start`], and
-//! [`spawn_decline_loop`] — so its control loop compiles unchanged on every host platform; the
-//! platform split lives entirely behind [`start`].
+//! The orchestrator consumes this facade: [`policy`], [`enabled`], [`cap_advertised`], the
+//! [`ClipCoordCmd`] channel vocabulary, [`start`], and [`spawn_decline_loop`].
 
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -16,12 +14,12 @@ use std::sync::Arc;
 use slipstream_core::quic::ClipOffer;
 
 /// Implementation tree under `backend/`; public path remains [`host`].
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(target_os = "linux")]
 mod backend;
 
-/// The per-OS backends (`ext-data-control-v1` / Mutter direct / Win32) behind one
-/// `HostClipboard`, plus the backend-agnostic [`host::session`] coordinator.
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+/// The Linux backends (`ext-data-control-v1` and Mutter direct) behind one `HostClipboard`, plus
+/// the backend-agnostic [`host::session`] coordinator.
+#[cfg(target_os = "linux")]
 pub mod host {
     pub use crate::backend::host::*;
 }
@@ -54,12 +52,11 @@ pub fn enabled() -> bool {
 }
 
 /// Whether the host should advertise `HOST_CAP_CLIPBOARD` in the `Welcome`: the operator policy
-/// enables it AND this platform has a backend (Linux data-control / Mutter, or the Win32
-/// clipboard) — the client greys the toggle out otherwise. A Linux host whose compositor lacks
-/// data-control still advertises it and answers a later enable with `BACKEND_UNAVAILABLE`, so the
-/// client can surface *why* it's unavailable.
+/// enables it and the Linux host has a backend. A host whose compositor lacks data-control still
+/// advertises it and answers a later enable with `BACKEND_UNAVAILABLE`, so the client can surface
+/// why it is unavailable.
 pub fn cap_advertised() -> bool {
-    enabled() && cfg!(any(target_os = "linux", target_os = "windows"))
+    enabled() && cfg!(target_os = "linux")
 }
 
 /// A command from the session control loop into the host clipboard coordinator
@@ -96,14 +93,14 @@ pub async fn start(
 ) -> ClipCoord {
     let (cmd_tx, cmd_rx) = tokio::sync::mpsc::unbounded_channel();
     let (offer_tx, offer_rx) = tokio::sync::mpsc::unbounded_channel();
-    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    #[cfg(target_os = "linux")]
     let available = if has_compositor && enabled() {
         host::session::start(conn, clip_enabled, cmd_rx, offer_tx).await
     } else {
         drop((conn, clip_enabled, cmd_rx, offer_tx));
         false
     };
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    #[cfg(not(target_os = "linux"))]
     let available = {
         let _ = (conn, clip_enabled, cmd_rx, offer_tx, has_compositor);
         false

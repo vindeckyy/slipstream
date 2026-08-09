@@ -132,46 +132,9 @@ pub(super) fn vkframe_acquire_barrier(
     }
 }
 
-/// Acquire an imported D3D11 texture from the EXTERNAL queue family as a copy source.
-/// The keyed mutex on the submit is the actual cross-API ordering; per the
-/// external-memory rules an UNDEFINED-old-layout transition on externally-bound memory
-/// preserves the contents (unlike ordinary images), so this is purely the
-/// layout/ownership hop.
-#[cfg(windows)]
-pub(super) fn external_acquire_barrier(
-    device: &ash::Device,
-    cmd: vk::CommandBuffer,
-    image: vk::Image,
-    qfi: u32,
-) {
-    let b = vk::ImageMemoryBarrier::default()
-        .src_access_mask(vk::AccessFlags::empty())
-        .dst_access_mask(vk::AccessFlags::TRANSFER_READ)
-        .old_layout(vk::ImageLayout::UNDEFINED)
-        .new_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
-        .src_queue_family_index(vk::QUEUE_FAMILY_EXTERNAL)
-        .dst_queue_family_index(qfi)
-        .image(image)
-        .subresource_range(subresource_range());
-    // SAFETY: per the Vulkan contract in lib.rs - recorded into a command buffer this code owns
-    // and has begun, referencing handles it also owns; nothing runs until submit.
-    unsafe {
-        device.cmd_pipeline_barrier(
-            cmd,
-            vk::PipelineStageFlags::TOP_OF_PIPE,
-            vk::PipelineStageFlags::TRANSFER,
-            vk::DependencyFlags::empty(),
-            &[],
-            &[],
-            &[b],
-        );
-    }
-}
-
 /// Acquire a dmabuf plane image from its foreign owner (the VAAPI decoder): queue-family
 /// transfer FOREIGN → ours, UNDEFINED → SHADER_READ_ONLY (content is preserved across
 /// the transfer regardless of the UNDEFINED old-layout, per the external-memory rules).
-#[cfg(target_os = "linux")]
 pub(super) fn foreign_acquire_barrier(
     device: &ash::Device,
     cmd: vk::CommandBuffer,

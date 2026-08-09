@@ -64,9 +64,8 @@ systemctl --user enable --now slipstream-host
 journalctl --user -u slipstream-host -f   # watch it come up and print its identity fingerprint
 ```
 
-This unit runs `serve --gamestream`, so it serves stock [Moonlight](/docs/moonlight) clients as well
-as the native ones. For a native-only host, see
-[What the unit starts](/docs/running-as-a-service#what-the-unit-starts).
+This unit runs native-only `serve`. To serve stock [Moonlight](/docs/moonlight) clients, add
+`--gamestream` to the unit after confirming the host is on a trusted LAN.
 
 A desktop-login host should also follow your session's lifetime, or restarting GNOME Shell leaves the
 host wired to a compositor that is gone, it keeps answering, and every session after that fails at

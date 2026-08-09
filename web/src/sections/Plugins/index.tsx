@@ -1,17 +1,13 @@
-// A plugin's UI, embedded in the console (plugin-ui-surface §5). We probe the plugin's liveness
-// first and only mount the iframe when it answers — otherwise the iframe would show the proxy's raw
-// 502. The iframe is same-origin (proxied through /plugin-ui), so the plugin can talk to its own
-// loopback REST with the operator's session and, optionally, keep the address bar in sync by posting
-// `{ type: "ss-ui:navigate", path }` to the parent.
+// A plugin UI runs in an opaque-origin sandbox. The parent probes liveness with a short-lived
+// capability, then keeps the console URL in sync through the narrow ss-ui:navigate message.
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import {
 	AlertTriangle,
 	CheckCircle2,
-	ExternalLink,
 	RefreshCw,
 } from "lucide-react";
-import { type FC, useEffect, useMemo, useRef } from "react";
+import { type FC, useEffect, useMemo, useRef, useState } from "react";
 import { pluginIcon, usePlugins } from "@/api/plugins";
 import { useInstalledPlugins } from "@/api/store";
 import { HelpTip } from "@/components/option-help";
@@ -29,6 +25,13 @@ export const SectionPlugin: FC = () => {
 	const { pluginId, _splat } = route.useParams();
 	const navigate = useNavigate();
 	const iframeRef = useRef<HTMLIFrameElement>(null);
+	const [embed, setEmbed] = useState<EmbedState | null>(null);
+
+	useEffect(() => {
+		setEmbed({ pluginId, capability: createEmbedCapability() });
+	}, [pluginId]);
+
+	const capability = embed?.pluginId === pluginId ? embed.capability : null;
 
 	// Header metadata (title/version/icon) from the directory; falls back to the id.
 	const { data: plugins } = usePlugins();
@@ -55,11 +58,14 @@ export const SectionPlugin: FC = () => {
 	//    whatever the operator had open in another plugin. Retry a few times, and keep probing on a
 	//    slower beat while down so it recovers on its own.
 	const health = useQuery({
-		queryKey: ["plugin-health", pluginId],
+		queryKey: ["plugin-health", pluginId, capability],
+		enabled: capability !== null,
 		queryFn: async () => {
 			const r = await fetch(`/plugin-ui/${pluginId}/__health`, {
 				credentials: "same-origin",
+				cache: "no-store",
 				redirect: "manual",
+				headers: { "x-slipstream-plugin-ui-capability": capability ?? "" },
 			});
 			// `type === "opaqueredirect"` is the gate bouncing us to /login, not the plugin answering.
 			if (r.type === "opaqueredirect") throw new Error("session expired");
@@ -74,8 +80,11 @@ export const SectionPlugin: FC = () => {
 	// the console URL via postMessage (below), never the src — so there's no reload loop.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: intentionally pinned to the initial path
 	const initialSrc = useMemo(
-		() => `/plugin-ui/${pluginId}/${_splat ?? ""}`,
-		[pluginId],
+		() =>
+			capability
+				? `/plugin-ui/${pluginId}/_embed/${capability}/${_splat ?? ""}`
+				: undefined,
+		[pluginId, capability],
 	);
 	const healthState: PluginHealthState = health.isError
 		? "offline"
@@ -87,11 +96,19 @@ export const SectionPlugin: FC = () => {
 	useEffect(() => {
 		const onMessage = (e: MessageEvent) => {
 			if (e.source !== iframeRef.current?.contentWindow) return;
+			if (e.origin !== "null") return;
 			const data = e.data as { type?: string; path?: string };
-			if (data?.type === "ss-ui:navigate" && typeof data.path === "string") {
+			if (
+				data?.type === "ss-ui:navigate" &&
+				typeof data.path === "string" &&
+				isPluginPath(data.path)
+			) {
 				navigate({
 					to: "/plugins/$pluginId/$",
-					params: { pluginId, _splat: data.path.replace(/^\//, "") },
+					params: {
+						pluginId,
+						_splat: data.path.replace(/^\/+/, ""),
+					},
 					replace: true,
 				});
 			}
@@ -145,25 +162,6 @@ export const SectionPlugin: FC = () => {
 							)}
 						</div>
 					</div>
-					<div className="flex shrink-0 items-center gap-1">
-						<a
-							href={initialSrc}
-							target="_blank"
-							rel="noopener noreferrer"
-							aria-label={`${m.plugin_open_new_tab()} ${title}`}
-							title="Open this plugin UI in a separate browser tab (same /plugin-ui proxy, no console chrome)."
-							className="inline-flex size-9 items-center justify-center rounded-md border border-border/70 bg-background/70 text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 sm:h-9 sm:w-auto sm:gap-1.5 sm:px-3"
-						>
-							<ExternalLink className="size-4" aria-hidden />
-							<span className="hidden text-sm font-medium sm:inline">
-								{m.plugin_open_new_tab()}
-							</span>
-						</a>
-						<HelpTip
-							label={m.plugin_open_new_tab()}
-							text="Opens the same proxied plugin page in its own tab. Useful when you want the plugin full-window or side-by-side with the console."
-						/>
-					</div>
 				</div>
 			</header>
 
@@ -175,9 +173,7 @@ export const SectionPlugin: FC = () => {
 					src={initialSrc}
 					title={title}
 					className="min-h-0 w-full flex-1 rounded-xl border border-border/70 bg-card shadow-sm"
-					// The plugin is operator-installed code on our own origin (no new trust boundary —
-					// plugin-ui-surface §7.4); allow it to run scripts, forms, popups, and full-window.
-					sandbox="allow-scripts allow-forms allow-popups allow-same-origin allow-modals"
+					sandbox="allow-scripts allow-forms allow-popups allow-modals"
 					allow="fullscreen"
 				/>
 			) : (
@@ -208,6 +204,28 @@ export const SectionPlugin: FC = () => {
 };
 
 type PluginHealthState = "loading" | "running" | "offline";
+
+type EmbedState = { pluginId: string; capability: string };
+
+function createEmbedCapability(): string {
+	const bytes = new Uint8Array(32);
+	globalThis.crypto.getRandomValues(bytes);
+	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function isPluginPath(path: string): boolean {
+	if (!path || /[\u0000\r\n]/.test(path)) return false;
+	try {
+		const url = new URL(path, window.location.origin);
+		return (
+			url.origin === window.location.origin &&
+			!url.pathname.startsWith("//") &&
+			!url.pathname.split("/").some((segment) => segment === "..")
+		);
+	} catch {
+		return false;
+	}
+}
 
 const healthHelp: Record<PluginHealthState, string> = {
 	loading:

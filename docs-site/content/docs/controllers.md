@@ -67,12 +67,12 @@ playable). See [SteamOS (Host)](/docs/steamos-host).
 
 Under **Controllers** (wording varies a little by app):
 
-- **Gamepad type** (*Controller type* on iPhone, Android, and the console home), *default:
-  Automatic*. Pickers offer Xbox 360, Xbox One, DualSense, and DualShock 4 everywhere, plus Steam
+- **Gamepad type** (*Controller type* on Android and the console home), *default: Automatic*.
+  Pickers offer Xbox 360, Xbox One, DualSense, and DualShock 4 everywhere, plus Steam
   Deck on Android, the console home, and Decky. Automatic declares what that controller
   really is; an explicit choice declares yours.
-- **Forwarded controller** (*Use controller* on iPhone and the console home), *default:
-  Automatic*, which forwards **every** connected controller as its own player. Pinning one
+- **Forwarded controller** (*Use controller* on the console home), *default: Automatic*, which
+  forwards **every** connected controller as its own player. Pinning one
   restricts the session to that pad alone. Android has no such picker.
 
 **Forwarded controller** is a fact about the device in your hands: it cannot live in a
@@ -87,8 +87,6 @@ forwards (rumble, gyro, DualSense HID) is tabulated in
 
 In short:
 
-- **iPhone.** Rich capture is gated to the DualSense / DualShock 4 family; other pads get rumble
-  only.
 - **Android.** Rumble uses the controller's own motor where the kernel exposes it (many phones do
   not). An opt-in setting can also play player 1's rumble on the phone's own motor for clip-on
   pads. Motion / touchpad / adaptive triggers need the pad claimed over **USB**; over Bluetooth
@@ -113,8 +111,6 @@ play, and gives it back afterwards.
 
 VirtualHere itself is a commercial USB-over-IP product **sold separately**; Slipstream does not
 bundle or download it. You need the USB Server on the couch and the USB Client on the host. There
-is no VirtualHere server for iOS, so iPhones cannot pass devices through.
-
 Install and configure from the [Plugins → VirtualHere](/docs/plugins#virtualhere-usb-passthrough)
 page. The console's **Diagnostics** tab (and `slipstream-plugin-virtualhere doctor`) walks the
 two-sided setup when nothing moves.
@@ -129,7 +125,6 @@ on an Xbox pad), held on any connected pad.
 
 - **Steam Deck**, a press releases capture only (Decky always launches fullscreen). Holding
   disconnects.
-- **iPhone**, holding about 1.5 seconds disconnects; there is no quick-press step.
 - **Android**, holding about a second disconnects; a quick press does nothing, and a **Hold to
   quit...** cue appears when the chord completes.
 

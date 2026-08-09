@@ -79,35 +79,13 @@ pub fn open_audio_capture(channels: u32) -> Result<Box<dyn AudioCapturer>> {
     linux::PwAudioCapturer::open(channels).map(|c| Box::new(c) as Box<dyn AudioCapturer>)
 }
 
-#[cfg(target_os = "windows")]
-pub fn open_audio_capture(channels: u32) -> Result<Box<dyn AudioCapturer>> {
-    // The capture thread runs the audio wiring plan itself (audio_control::wire_now) before
-    // resolving its endpoint — a fresh plan per open, because Windows endpoints churn — and
-    // parks the default playback device on the plan's loopback endpoint (a silent sink by
-    // default: audio plays on the client only) until the capturer is dropped.
-    wasapi_cap::WasapiLoopbackCapturer::open(channels)
-        .map(|c| Box::new(c) as Box<dyn AudioCapturer>)
-}
-
-#[cfg(not(any(target_os = "linux", target_os = "windows")))]
-pub fn open_audio_capture(_channels: u32) -> Result<Box<dyn AudioCapturer>> {
-    anyhow::bail!("audio capture requires Linux + PipeWire or Windows + WASAPI")
-}
-
 /// Park a capturer at session end. Linux: store it in the persistent slot so the next session
-/// reuses it (no PipeWire thread churn). Windows: DROP it instead — closing the capture restores
-/// the operator's default playback device (it was parked on the loopback sink for the stream's
-/// lifetime, silencing the host), and a WASAPI reopen at the next session start is cheap and
-/// re-runs the wiring plan against the then-current endpoints.
+/// reuses it (no PipeWire thread churn).
 pub fn park_audio_capture(
     slot: &std::sync::Mutex<Option<Box<dyn AudioCapturer>>>,
     cap: Box<dyn AudioCapturer>,
 ) {
-    if cfg!(target_os = "windows") {
-        drop(cap);
-    } else {
-        *slot.lock().unwrap() = Some(cap);
-    }
+    *slot.lock().unwrap() = Some(cap);
 }
 
 /// The inverse of [`AudioCapturer`]: a virtual microphone the host *produces*. It registers a
@@ -116,9 +94,9 @@ pub fn park_audio_capture(
 /// it to whichever app records the source — silence when no input is flowing. This is how the
 /// client's microphone reaches host applications (mic passthrough).
 ///
-/// **Liveness contract.** Both backends run a worker thread that CAN die under the host's feet
-/// (Linux: the PipeWire daemon restarts with the session; Windows: the audio endpoint is
-/// invalidated/removed). A dead backend must be observable — [`push`](Self::push) returns `false`
+/// **Liveness contract.** The backend runs a worker thread that CAN die under the host's feet
+/// when the PipeWire daemon restarts with the session. A dead backend must be observable —
+/// [`push`](Self::push) returns `false`
 /// and [`alive`](Self::alive) turns false — so the owning [`MicPump`] drops the instance and
 /// reopens. Before this contract existed, a single backend death left `push` feeding a dead
 /// queue for the rest of the host's life: the historical "mic passthrough works on no host" bug.
@@ -178,46 +156,21 @@ pub struct MicBackendStats {
 /// One-release escape hatch (docs: configuration → Audio / microphone):
 /// `SLIPSTREAM_MIC_LEGACY_BUFFER=1` keeps the pre-adaptive fixed mic buffering — the pump never
 /// drives the backend target (so the rings stay on their legacy constants: 48 ms prime /
-/// 120 ms cap on Windows, the 3-quanta clamp on Linux) and never creep-trims depth.
+/// 3-quanta clamp) and never creep-trims depth.
 pub(crate) fn mic_legacy_buffer() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| std::env::var_os("SLIPSTREAM_MIC_LEGACY_BUFFER").is_some_and(|v| v != "0"))
 }
 
-/// Open a virtual microphone with `channels` interleaved channels (1 or 2). Linux: a PipeWire
-/// `Audio/Source`. Windows: writes into an existing virtual audio device's render endpoint (whose
-/// capture endpoint apps see as a mic) — see [`wasapi_mic`].
+/// Open a virtual microphone with `channels` interleaved channels (1 or 2) as a PipeWire
+/// `Audio/Source`.
 #[cfg(target_os = "linux")]
 pub fn open_virtual_mic(channels: u32) -> Result<Box<dyn VirtualMic>> {
     linux::PwMicSource::open(channels).map(|m| Box::new(m) as Box<dyn VirtualMic>)
 }
 
-#[cfg(target_os = "windows")]
-pub fn open_virtual_mic(channels: u32) -> Result<Box<dyn VirtualMic>> {
-    // The render thread runs the wiring plan itself (audio_control::wire_now) to resolve — and,
-    // via the plan's default-device changes, to RESERVE — its target endpoint.
-    wasapi_mic::WasapiVirtualMic::open(channels).map(|m| Box::new(m) as Box<dyn VirtualMic>)
-}
-
-#[cfg(not(any(target_os = "linux", target_os = "windows")))]
-pub fn open_virtual_mic(_channels: u32) -> Result<Box<dyn VirtualMic>> {
-    anyhow::bail!("virtual mic requires Linux + PipeWire or Windows + a virtual audio device")
-}
-
-#[cfg(target_os = "windows")]
-#[path = "audio/windows/audio_control.rs"]
-mod audio_control;
 #[cfg(target_os = "linux")]
 mod linux;
-#[cfg(target_os = "windows")]
-#[path = "audio/windows/wasapi_cap.rs"]
-mod wasapi_cap;
-#[cfg(target_os = "windows")]
-#[path = "audio/windows/wasapi_mic.rs"]
-mod wasapi_mic;
-#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-#[path = "audio/wiring_plan.rs"]
-pub(crate) mod wiring_plan;
 
 mod mic_jitter;
 mod mic_pump;

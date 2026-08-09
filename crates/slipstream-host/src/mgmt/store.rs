@@ -40,7 +40,7 @@ where
 #[derive(Serialize, ToSchema)]
 pub(crate) struct HostFacts {
     pub version: String,
-    /// `linux` / `windows` / `macos`.
+    /// `linux`.
     pub platform: String,
 }
 
@@ -198,7 +198,6 @@ pub(crate) struct RuntimeView {
     pub running: bool,
     /// systemd unit or scheduled-task name.
     pub unit: String,
-    /// Windows: the account the task runs as.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub principal: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -537,8 +536,8 @@ pub(crate) async fn uninstall_plugin(ApiJson(req): ApiJson<UninstallRequest>) ->
     // The name shape is not enough. `@slipstream/plugin-kit` — the framework every kit-built plugin
     // *depends on* — matches `@scope/plugin-*` exactly, so a syntactic guard waves it through and
     // the store offers to uninstall a library out from under the plugins using it (accepted on
-    // Windows on-glass before this check existed). Only a package the operator actually installed
-    // may be removed, which is precisely what `installed_packages` reports: the plugins dir's
+    // before this check existed). Only a package the operator actually installed may be removed,
+    // which is precisely what `installed_packages` reports: the plugins dir's
     // top-level dependencies, transitive ones excluded.
     let pkg = req.pkg.clone();
     let known = match blocking(move || {

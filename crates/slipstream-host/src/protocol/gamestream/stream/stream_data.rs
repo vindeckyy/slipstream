@@ -39,7 +39,6 @@ pub(super) struct WireBatch {
 
 /// Send `pkts` with as few syscalls as possible (`sendmmsg`, up to 64 per call). The socket is
 /// connected, so no per-message address. Returns an error on the first send failure.
-#[cfg(target_os = "linux")]
 pub(super) fn sendmmsg_all(sock: &UdpSocket, pkts: &[Vec<u8>]) -> std::io::Result<()> {
     use std::os::fd::AsRawFd;
     const CHUNK: usize = 64;
@@ -82,31 +81,6 @@ pub(super) fn sendmmsg_all(sock: &UdpSocket, pkts: &[Vec<u8>]) -> std::io::Resul
             }
             off += n as usize;
         }
-    }
-    Ok(())
-}
-
-/// Windows: coalesce each paced burst's equal-size packets into `WSASendMsg(UDP_SEND_MSG_SIZE)`
-/// super-buffers (UDP Send Offload — the Windows analogue of Linux GSO), so a 16-packet burst is one
-/// syscall instead of 16. Reuses the proven core USO primitive; it returns how many leading packets
-/// it sent, and we send any remainder (USO off via `SLIPSTREAM_GSO=0`, a size-mixed burst, or a
-/// frame's short final packet) with a per-packet `send`. The socket is connected.
-#[cfg(target_os = "windows")]
-pub(super) fn sendmmsg_all(sock: &UdpSocket, pkts: &[Vec<u8>]) -> std::io::Result<()> {
-    let refs: Vec<&[u8]> = pkts.iter().map(|p| p.as_slice()).collect();
-    let n = slipstream_core::transport::send_uso_all(sock, &refs)?;
-    for p in &pkts[n..] {
-        sock.send(p)?;
-    }
-    Ok(())
-}
-
-/// Portable fallback (other non-Linux dev builds, e.g. macOS — GameStream hosting never ships there):
-/// one syscall per packet.
-#[cfg(not(any(target_os = "linux", target_os = "windows")))]
-pub(super) fn sendmmsg_all(sock: &UdpSocket, pkts: &[Vec<u8>]) -> std::io::Result<()> {
-    for p in pkts {
-        sock.send(p)?;
     }
     Ok(())
 }

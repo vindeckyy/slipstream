@@ -10,8 +10,8 @@
 # Run it on the Deck (Desktop Mode "Konsole", or over ssh). Idempotent — safe to re-run to update
 # config or pick up new options. To rebuild after pulling new source, use update.sh.
 #
-#   bash scripts/steamdeck/install.sh                 # PIN pairing required; Moonlight compat ON
-#   bash scripts/steamdeck/install.sh --no-gamestream # SECURE native-only (no Moonlight/#5/#9 surface)
+#   bash scripts/steamdeck/install.sh                 # PIN pairing required; native-only secure default
+#   bash scripts/steamdeck/install.sh --gamestream    # trusted LAN Moonlight compatibility
 #   bash scripts/steamdeck/install.sh --open          # trusted LAN: accept unpaired clients (TOFU)
 #   bash scripts/steamdeck/install.sh --no-web        # skip the management web console
 #   SLIPSTREAM_SRC=~/src/slipstream bash scripts/steamdeck/install.sh   # source elsewhere
@@ -32,11 +32,12 @@ MGMT_PORT="${SLIPSTREAM_MGMT_PORT:-47990}"
 WEB_PORT="${SLIPSTREAM_WEB_PORT:-47992}"
 OPEN=0
 WITH_WEB=1
-GAMESTREAM=1 # Moonlight/GameStream compat on by default; --no-gamestream for a secure native-only host
+GAMESTREAM=0 # Native-only secure default; --gamestream opts into Moonlight compatibility
 for arg in "$@"; do
     case "$arg" in
         --open) OPEN=1 ;;
         --no-web) WITH_WEB=0 ;;
+        --gamestream) GAMESTREAM=1 ;;
         --no-gamestream) GAMESTREAM=0 ;;
         --src=*) SRC="${arg#--src=}" ;;
         -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
@@ -305,8 +306,7 @@ fi
 log "Installing systemd user services"
 mkdir -p "$UNITS"
 # The native slipstream/1 plane is always on; --gamestream additionally enables the Moonlight-compat
-# planes (the Deck commonly streams to Moonlight too). --no-gamestream → secure native-only (no #5/#9
-# surface; native clients only).
+# planes. The default is native-only so legacy pairing is an explicit operator choice.
 SERVE_ARGS="serve --mgmt-bind 0.0.0.0:$MGMT_PORT"
 [ "$GAMESTREAM" = 1 ] && SERVE_ARGS="$SERVE_ARGS --gamestream"
 [ "$OPEN" = 1 ] && SERVE_ARGS="$SERVE_ARGS --open"

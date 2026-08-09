@@ -3,7 +3,7 @@
 // CROSS-CLIENT set every slipstream client reserves — Ctrl+Alt+Shift+Q (release the captured
 // mouse) / +D (disconnect) / +S (stats), plus +A (mute the microphone), the Apple clients'
 // addition to it — and the menu is their discoverable surface on macOS
-// (the Linux client has its GTK Shortcuts window, Windows its start-of-stream banner). While
+// (the Linux client has its GTK Shortcuts window and the start-of-stream banner). While
 // input is CAPTURED these key equivalents never reach the menu (the stream view swallows
 // keys); InputCapture's monitor detects the same combos there and performs the same actions —
 // the menu covers the released state and discoverability. The stats item cycles the shared

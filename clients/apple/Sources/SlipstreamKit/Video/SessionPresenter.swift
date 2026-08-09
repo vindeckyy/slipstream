@@ -224,8 +224,8 @@ final class SessionPresenter {
     /// `onDecodedSize` new-mode-IDR callback). Used for the aspect-fit in `layout` in preference to
     /// `connection.currentMode()`, which (a) lags a mid-stream resize — it only updates on the
     /// `Reconfigured` ack, and a resize-END produces no bounds change to re-run `layout` afterward —
-    /// and (b) can disagree with what the host actually DELIVERED (Windows corrective-ack falls back
-    /// to an advertised mode). The pixels we're drawing are the only correct aspect source; a wrong
+    /// and (b) can disagree with what the host actually DELIVERED (a corrective ack can fall back to
+    /// an advertised mode). The pixels we're drawing are the only correct aspect source; a wrong
     /// one here is the "black bars + stretched" resize artifact. nil until the first frame → `layout`
     /// falls back to `currentMode()`. Main-thread only.
     private var contentSize: CGSize?

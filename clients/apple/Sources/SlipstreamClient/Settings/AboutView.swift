@@ -24,7 +24,7 @@ struct AboutView: View {
     }
 
     private static let tagline =
-        "Low-latency desktop and game streaming with first-class Linux and Windows hosts."
+        "Low-latency desktop and game streaming with first-class Linux hosts."
 
     #if !os(tvOS)
     @State private var showAcknowledgements = false

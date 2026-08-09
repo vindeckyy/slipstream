@@ -1,0 +1,15 @@
+{
+  "name": "Slipstream documentation",
+  "short_name": "Slipstream",
+  "start_url": "/slipstream/",
+  "display": "browser",
+  "theme_color": "#060a0f",
+  "background_color": "#060a0f",
+  "icons": [
+    {
+      "src": "/slipstream/slipstream-mark.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

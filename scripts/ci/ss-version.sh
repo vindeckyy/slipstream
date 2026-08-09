@@ -1,10 +1,10 @@
 # shellcheck shell=bash
-# Single source of truth for slipstream release/canary version numbers (Linux + macOS runners).
+# Single source of truth for slipstream release/canary version numbers.
 #
 # WHY THIS EXISTS: every release workflow used to hardcode a canary base version
 # (`0.5.0`, `0.3`, …). Those magic numbers had to be hand-bumped on every stable release
 # and nobody did — so canary channels silently fell *behind* stable (a canary showed up on
-# TestFlight as 0.5.0 while 0.6.0 was already published). This script computes the base
+# a prerelease build as 0.5.0 while 0.6.0 was already published). This script computes the base
 # version DETERMINISTICALLY from the git tags instead, so there is nothing to hand-edit and
 # no future agent can get it wrong.
 #
@@ -26,10 +26,9 @@
 #     PF_CHANNEL     stable | canary
 #     PF_BASE        the base semver X.Y.Z (see THE RULE)
 #     PF_MAJOR/MINOR/PATCH   the components of PF_BASE (numeric-version channels build
-#                            `<MAJOR>.<MINOR>.<run>` from these — MSIX/decky need monotonic ints)
+#                            `<MAJOR>.<MINOR>.<run>` from these; Decky needs monotonic integers)
 #     PF_STABLE_TAG  the latest stable release version the canary base was derived from (for logs)
 #
-# The pwsh twin scripts/ci/ss-version.ps1 implements the identical rule for the Windows runners.
 set -euo pipefail
 
 _root="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../.." && pwd)"

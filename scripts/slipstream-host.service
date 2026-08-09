@@ -1,6 +1,5 @@
-# slipstream streaming host — systemd USER unit (`serve --gamestream` = native slipstream/1 + the
-# GameStream/Moonlight-compat planes). For a SECURE native-only host (no plain-HTTP pairing / legacy
-# GCM nonce reuse — security-review #5/#9; native clients only), drop `--gamestream` from ExecStart.
+# slipstream streaming host — systemd USER unit. The secure native plane is the default; add
+# `--gamestream` explicitly for trusted-LAN Moonlight compatibility.
 #
 # Install (against an already-running compositor session — the host auto-detects and follows it,
 # so host.env needs no backend config):
@@ -52,7 +51,7 @@ PartOf=slipstream-kde-session.service
 # `slipstream-host serve` by hand already does. Contrast slipstream-web.service, which marks
 # mgmt-token mandatory ON PURPOSE so Restart waits for the host to write it — this is not that.
 EnvironmentFile=-%h/.config/slipstream/host.env
-ExecStart=%h/slipstream/target/release/slipstream-host serve --gamestream
+ExecStart=%h/slipstream/target/release/slipstream-host serve
 Restart=on-failure
 RestartSec=2
 

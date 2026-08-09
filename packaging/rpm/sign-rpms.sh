@@ -10,7 +10,7 @@
 #  -  but NOT on a release. On refs/tags/v* a missing key is a hard failure: an org secret that got
 # rotated, renamed, or not inherited would otherwise publish an unsigned release into a repo whose
 # own instructions say gpgcheck=1, and every user's `dnf upgrade` would break on it. Better to fail
-# the build than to find out from users. (Same fail-closed rule as the Windows pack scripts.)
+# the build than to find out from users. This keeps release package signing fail-closed.
 #
 # Requires a DEDICATED, PASSPHRASE-LESS signing key (the one the runbook generates with
 # %no-protection), distinct from the GitHub instance's repo-metadata key  -  rpm's default signer

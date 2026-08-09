@@ -87,7 +87,7 @@ const RING_DEFAULT: usize = 2;
 /// Ceiling on any blocking GPU fence wait on the encode thread (5 s). Generous against a real
 /// encode (single-digit ms even on a loaded GPU) and against a driver hiccup, but finite: this is
 /// the thread the stall watchdog's `reset()` runs on, so an unbounded wait would deadlock the very
-/// path that recovers the session. Matches the Windows NVENC retrieve-thread budget.
+/// path that recovers the session. The timeout bounds the Vulkan fence wait used by recovery.
 const ENCODE_FENCE_TIMEOUT_NS: u64 = 5_000_000_000;
 /// AV1 base quantizer index (0..=255) seeded into every frame. CBR rate control overrides it per
 /// frame; it only matters as the starting point and for the (rate-control-ignored) constant-Q path.
@@ -472,7 +472,7 @@ fn trusted_refs(slot_wire: &[i64]) -> Vec<(usize, i64)> {
 /// signal (HEVC 8.3.2: any DPB picture absent from the current RPS is marked "unused for
 /// reference" and reclaimed) — an RPS naming only the active reference lets a conforming decoder
 /// evict the rest, and the RFI recovery anchor then references a picture the client already
-/// discarded: FFmpeg's HEVC parser (the Linux VAAPI/Vulkan and Windows D3D11VA clients) conceals
+/// discarded: FFmpeg's HEVC parser can conceal
 /// with a generated gray reference and every following frame chains off the corruption — exactly
 /// at the moment the anchor claims the picture is clean. Listing all residents (with
 /// `used_by_curr_pic` set only for the real reference) keeps the host and client DPBs in lockstep,
@@ -660,8 +660,8 @@ pub struct VulkanVideoEncoder {
     /// capability check at all): VBR when the driver advertises it, else CBR. Always paired with
     /// `average_bitrate == max_bitrate`, so VBR here is not "spend less on average" — it is CBR's
     /// exact ceiling minus the *stuffing*: CBR must keep the CPB from overflowing on underspent
-    /// frames and Vulkan exposes no filler-suppression control (AMF's `filler_data=false` /
-    /// NVENC's default-off have no VK equivalent), measured on the 780M as 97 % filler NALs under
+    /// frames and Vulkan exposes no filler-suppression control, measured on the 780M as 97 % filler
+    /// NALs under
     /// a tight CBR window. VBR permits the underspend, so a tight window only ever BOUNDS a
     /// complex frame (WP6.3).
     rc_mode: vk::VideoEncodeRateControlModeFlagsKHR,
@@ -3865,7 +3865,7 @@ impl VulkanVideoEncoder {
             // wedged GPU/driver therefore parks the one thread that could recover the session —
             // it never errors, never resets, and teardown blocks joining it. Surfacing expiry as
             // an error hands control back to the existing recovery path (same convention as the
-            // pyrowave and Windows NVENC backends).
+            // pyrowave and NVENC backends).
             match self.device.wait_for_fences(
                 &[self.frames[slot].fence],
                 true,
@@ -3922,13 +3922,12 @@ impl Encoder for VulkanVideoEncoder {
     }
 
     fn invalidate_ref_frames(&mut self, first_frame: i64, last_frame: i64) -> bool {
-        // Nonsense range → decline (same contract as the NVENC/AMF backends).
+        // Nonsense range → decline (same contract as the NVENC backend).
         if first_frame < 0 || first_frame > last_frame {
             return false;
         }
         // The taint-sweep + anchor-pick POLICY lives in `rfi::plan_slot_recovery` (one decision
-        // shared with AMF and QSV — the fecbec2d sweep reached those two a commit before this
-        // backend was carved out, and the hand-copy here shipped without it). Why the sweep:
+        // shared with the Vulkan backend's DPB bookkeeping. Why the sweep:
         // "resident and older than THIS loss" is not the same as "the client decoded it" — after
         // an earlier loss [a,b] was recovered at wire r, everything in [a, r-1] is undecodable at
         // the client, yet those wires stay anchor candidates until the 8-slot ring rolls them
@@ -3949,7 +3948,7 @@ impl Encoder for VulkanVideoEncoder {
         }
         // Can we anchor a clean P-frame to a resident slot strictly older than the loss?
         // (A sweep that empties every candidate yields `None` here and declines the RFI, matching
-        // `qsv_live_ltr_rfi_taint_sweep_declines`.)
+        // the taint-sweep test.)
         match plan.anchor {
             Some(_) => {
                 self.pending_loss = Some(first_frame);
@@ -3959,8 +3958,8 @@ impl Encoder for VulkanVideoEncoder {
                 // Decline WITHOUT self-arming an IDR: the caller owns the fallback, and its
                 // keyframe path is cooldown-coalesced — arming `force_kf` here would bypass that
                 // and turn a storm of hopeless RFI requests into one full IDR per request.
-                // `pending_loss` is DELIBERATELY left armed (unlike AMF/QSV's pending_force
-                // clear): a stale arm is re-resolved at frame-build, where a failed re-pick
+                // `pending_loss` is deliberately left armed: a stale arm is re-resolved at
+                // frame-build, where a failed re-pick
                 // forces the IDR that heals the stream — clearing it here would ship an untagged
                 // plain P during the caller's RFI-echo window instead.
                 tracing::debug!(
@@ -3980,7 +3979,7 @@ impl Encoder for VulkanVideoEncoder {
         // (`Capturer::pipeline_depth`: "capture → submit → poll-blocks", the convention the sync
         // NVENC backend's `lock_bitstream` follows): the pump polls right after submit and treats
         // `None` as "the backend holds the frame internally, re-poll next tick" (true only of the
-        // libav AMF/QSV wrappers). A `get_fence_status` probe here therefore deferred every AU to
+        // libav wrappers). A `get_fence_status` probe here therefore deferred every AU to
         // the NEXT tick — shipped a full frame period after the ASIC finished, so a ~5 ms VCN
         // encode read as `encode_us`≈interval (~17 ms at 60 Hz, the AMD field report) and cost one
         // frame of avoidable glass-to-glass latency. `None` now only means "nothing submitted".
@@ -4319,7 +4318,7 @@ impl Drop for VulkanVideoEncoder {
 }
 
 // Session/frame construction + parameter-set builders live in `vk_build.rs` (WP7.5) — the
-// amf_sys.rs shape: a #[path] child module sees this file's private items (Frame and
+// A #[path] child module sees this file's private items (Frame and
 // friends), so the split costs no visibility churn.
 #[path = "vk_build.rs"]
 mod build;
@@ -4380,6 +4379,7 @@ mod tests {
             format: PixelFormat::Bgrx,
             payload: FramePayload::Cpu(buf),
             cursor: None,
+            stage_ns: Default::default(),
         }
     }
 
@@ -4569,6 +4569,7 @@ mod tests {
             format: PixelFormat::X2Rgb10,
             payload: FramePayload::Cpu(buf),
             cursor: None,
+            stage_ns: Default::default(),
         }
     }
 
@@ -4687,6 +4688,7 @@ mod tests {
             format: fmt,
             payload: FramePayload::Cpu(buf),
             cursor: None,
+            stage_ns: Default::default(),
         }
     }
 

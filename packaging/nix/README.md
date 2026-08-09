@@ -36,7 +36,7 @@ nix build github:vindeckyy/slipstream#slipstream-host
 nix build github:vindeckyy/slipstream#slipstream-client
 
 # Run
-nix run github:vindeckyy/slipstream#slipstream-host -- serve --gamestream
+nix run github:vindeckyy/slipstream#slipstream-host -- serve
 nix run github:vindeckyy/slipstream#slipstream-client
 ```
 
@@ -97,7 +97,7 @@ systemctl --user enable --now slipstream-host
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `enable` | `false` | Install the host + wire udev/sysctl/kernel-modules/firewall and the user service. |
-| `gamestream` | `true` | `serve --gamestream` (Moonlight-compatible). `false` = native-only, more secure. |
+| `gamestream` | `false` | `serve --gamestream` (Moonlight-compatible). Enable only on a trusted LAN. |
 | `autoStart` | `false` | Add the user service to `default.target` (appliance mode - pair with lingering). |
 | `users` | `[ ]` | Users added to the `input` group (virtual gamepads). |
 | `settings` | `{ }` | `host.env` key/values (see `${package}/share/slipstream-host/host.env.example`). |
@@ -208,15 +208,12 @@ The shell exports `PF_FFVK_VULKAN_INCLUDE` (Vulkan headers for ss-ffvk bindgen) 
 
 ## Notes & caveats
 
-- **Build tool:** [crane](https://github.com/ipetkov/crane). The lockfile carries
-  `windows 0.62.2` from both crates.io *and* a pinned `microsoft/windows-rs` git rev (the Windows
-  client), which `rustPlatform.importCargoLock` can't vendor (colliding `name-version`); crane
-  vendors per-source and fetches the git rev via `builtins.fetchGit` (no output hash to maintain).
-  Those crates are `cfg(windows)`-gated - vendored, never compiled on Linux.
+- **Build tool:** [crane](https://github.com/ipetkov/crane). It fetches fixed git dependencies with
+  `builtins.fetchGit`, so the flake does not need a hand-maintained output hash for those sources.
 - **First build compiles from scratch** (no split dep cache - pyrowave-sys builds a CMake tree in
   its build.rs that a crane "dummy" source would drop) and has no public binary cache, so expect a
   long initial build. `nix develop` gives incremental rebuilds.
-- **The status tray is built in its own derivation, on purpose.** `slipstream-tray` uses `ksni`'s
+- **The status tray is built in its own derivation.** `slipstream-tray` uses `ksni`'s
   `async-io` zbus executor with no tokio runtime (by design - see `crates/slipstream-tray/Cargo.toml`).
   Cargo unifies features across everything in one `cargo build`, so co-building the tray with the
   host would pull the host's `ashpd → zbus/tokio` onto the tray's shared `zbus`, and the tray then

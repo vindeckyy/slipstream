@@ -74,9 +74,9 @@ public final class MatchWindowFollower {
     /// overlay clears when a decoded frame reaches this size (or on a timeout). Deduped per target.
     public var onResizeTarget: ((_ width: UInt32, _ height: UInt32) -> Void)?
 
-    /// `debounce` = quiet time after the last size event before requesting (Win32 gets
-    /// `WM_EXITSIZEMOVE` for free; we debounce). `minSpacing` = floor between accepted requests
-    /// (a full host pipeline rebuild each). Defaults match the other clients.
+    /// `debounce` = quiet time after the last size event before requesting, which avoids repeated
+    /// full host pipeline rebuilds. `minSpacing` = floor between accepted requests. Defaults match
+    /// the other clients.
     public init(
         connection: SlipstreamConnection,
         enabled: Bool,

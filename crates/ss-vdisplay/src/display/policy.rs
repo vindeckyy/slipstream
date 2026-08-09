@@ -6,8 +6,8 @@
 //! [`Preset`]s, persisted to `<config>/display-settings.json` and editable from the web console.
 //! The lifecycle/registry that *acts* on this policy lands in later stages; **Stage 0** (this file
 //! plus the mgmt endpoints) stands up the surface and wires the two behaviors the existing code can
-//! already express — the Windows monitor linger duration and the Linux "make the streamed output
-//! the sole desktop" topology — through it.
+//! already express - the Linux monitor linger and "make the streamed output the sole desktop"
+//! topology - through it.
 //!
 //! Precedence, mirroring the GPU preference (`console preference > env pin > default`): a present,
 //! valid `display-settings.json` (console-written) **wins**; when it is absent the host keeps its
@@ -37,8 +37,7 @@ use utoipa::ToSchema;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum KeepAlive {
-    /// Tear the display down at session end (today's default on every backend but Windows, which
-    /// lingers 10 s).
+    /// Tear the display down at session end.
     Off,
     /// Keep the display for `seconds` after the last session leaves, then tear it down; a reconnect
     /// inside the window reuses it.
@@ -53,8 +52,7 @@ pub enum KeepAlive {
 
 impl Default for KeepAlive {
     fn default() -> Self {
-        // The historical Windows behavior, made explicit; the Linux backends had no linger and map
-        // `Off`/short-duration onto their (nonexistent) keep-alive as a no-op until the lifecycle stage.
+        // A short default keeps reconnects fast while leaving the lifecycle choice explicit.
         KeepAlive::Duration { seconds: 10 }
     }
 }
@@ -85,9 +83,9 @@ impl KeepAlive {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Topology {
-    /// Today's behavior, resolved per host at acquire time (see [`super::effective_topology`]):
-    /// exclusive on Windows and the auto-detected Linux desktop path, extend under an explicit
-    /// `SLIPSTREAM_COMPOSITOR` pin.
+    /// Today's behavior, resolved at acquire time (see [`super::effective_topology`]): exclusive
+    /// on the auto-detected Linux desktop path, extend under an explicit `SLIPSTREAM_COMPOSITOR`
+    /// pin.
     #[default]
     Auto,
     /// Add the virtual display(s); touch nothing else.
@@ -122,7 +120,7 @@ pub enum ModeConflict {
 pub enum Identity {
     /// One identity for everything (today's Linux behavior).
     Shared,
-    /// One identity per paired client cert fingerprint (today's Windows behavior).
+    /// One identity per paired client cert fingerprint.
     #[default]
     PerClient,
     /// One identity per (client, resolution) — distinct scaling per resolution, at the cost of
@@ -161,8 +159,8 @@ pub struct Layout {
 
 /// How a session that **launches a game** (a library id on the Hello / apps.json / Decky pin) is
 /// served (`design/gamemode-and-dedicated-sessions.md` §5.2). Orthogonal to the preset/lifecycle axes
-/// — a top-level [`DisplayPolicy`] field, NOT part of [`EffectivePolicy`], so a preset never clobbers
-/// it. Linux-only in effect (a launching Windows session opens into the one desktop).
+/// - a top-level [`DisplayPolicy`] field, NOT part of [`EffectivePolicy`], so a preset never clobbers
+/// it. Linux-only in effect.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum GameSession {
@@ -191,7 +189,7 @@ pub enum Preset {
     SharedDesktop,
     /// One user at a time with fast reattach; a second user is told the box is busy.
     Hotdesk,
-    /// The multi-monitor daily driver: manual arrangement, per-client identity, exclusive.
+    /// The multi-monitor daily setup: manual arrangement, per-client identity, exclusive.
     Workstation,
 }
 
@@ -228,7 +226,7 @@ pub struct DisplayPolicy {
     /// right before an `Exclusive` isolate deactivates them, and back on at restore. Targets the
     /// "connected-but-dark head" periodic-stutter class (monitor standby auto-input-scan / DP link
     /// churn while the virtual display is the sole active display) at the monitor-firmware level.
-    /// Linux uses `ddcutil` when available; Windows uses the Win32 physical-monitor API.
+    /// Linux uses `ddcutil` when available.
     /// Best-effort - monitors without DDC/CI (or with it disabled in the OSD) are skipped.
     /// Orthogonal to `preset` (like `game_session`): preserved across preset changes;
     /// `#[serde(default)]` = off so existing `display-settings.json` files are untouched.
@@ -236,7 +234,7 @@ pub struct DisplayPolicy {
     pub ddc_power_off: bool,
     /// EXPERIMENTAL: silence idle / standby monitors for the stream's duration and restore them
     /// at teardown. On Linux this force-offs connected external DRM connectors via sysfs
-    /// (`/sys/class/drm/*/status`); on Windows it disables monitor PnP device nodes. Targets the
+    /// (`/sys/class/drm/*/status`). Targets the
     /// same "connected-but-dark head" periodic-stutter class as [`Self::ddc_power_off`], but at the
     /// OS reaction level (HPD / auto-input scan no longer wakes the desktop stack). A crash-recovery
     /// journal restores leftovers on host startup. Orthogonal to `preset` (like `game_session`);

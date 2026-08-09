@@ -16,10 +16,6 @@ use std::net::UdpSocket;
 mod apple;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 mod linux;
-#[cfg(target_os = "windows")]
-mod windows;
-#[cfg(target_os = "windows")]
-pub use windows::send_uso_all;
 
 /// Receive buffer size. `Config::validate` bounds `shard_payload` so a well-formed
 /// datagram (header + shard + crypto overhead) always fits in [`MAX_DATAGRAM_BYTES`];
@@ -45,14 +41,6 @@ const RECV_BUF: usize = MAX_DATAGRAM_BYTES + 1;
 ///   died at full rate over WiFi). Same lossy-drop contract as `WouldBlock`; FEC + the next frame
 ///   recover. Asynchronous network-path blips (`ENETUNREACH`/`EHOSTUNREACH`/`ENETDOWN`/`EHOSTDOWN`)
 ///   are droppable for the same reason a stale ICMP is.
-/// - Windows `WSAENOBUFS` (10055): the exact analogue of unix `ENOBUFS` — a high-bitrate keyframe
-///   burst (one `WSASendMsg` USO super-buffer is up to ~512 segments ≈ 700 KB) momentarily exhausts
-///   the socket send buffer / AFD non-paged pool, and Winsock reports `WSAENOBUFS`, which Rust maps
-///   to `ErrorKind::Uncategorized` (so the `WouldBlock` arm misses it, exactly like unix `ENOBUFS`).
-///   Without treating it as transient a Windows host tears the whole session down under load
-///   (observed live: `native::stream` "send failed — stopping stream" on a paced video burst). Same
-///   lossy-drop contract; FEC + the next frame recover. The `WSAENET*`/`WSAEHOST*` family is the
-///   Windows counterpart of the droppable unix network-path blips above.
 fn is_transient_io(e: &std::io::Error) -> bool {
     use std::io::ErrorKind::{ConnectionRefused, ConnectionReset, WouldBlock};
     if matches!(e.kind(), WouldBlock | ConnectionRefused | ConnectionReset) {
@@ -70,20 +58,7 @@ fn is_transient_io(e: &std::io::Error) -> bool {
                 | Some(libc::EHOSTDOWN)
         )
     }
-    // Windows Winsock codes (WSAE*), raw like the sibling `uso_unsupported`. WSAEWOULDBLOCK (10035)
-    // already maps to `ErrorKind::WouldBlock` above, so it isn't repeated here.
-    #[cfg(windows)]
-    {
-        matches!(
-            e.raw_os_error(),
-            Some(10055)   // WSAENOBUFS    — tx queue / send buffer full (the dominant high-bitrate drop)
-                | Some(10051) // WSAENETUNREACH
-                | Some(10065) // WSAEHOSTUNREACH
-                | Some(10050) // WSAENETDOWN
-                | Some(10064) // WSAEHOSTDOWN
-        )
-    }
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(not(unix))]
     {
         false
     }
@@ -132,8 +107,8 @@ pub fn spawn_data_punch(sock: UdpSocket, stop: std::sync::Arc<std::sync::atomic:
 }
 
 pub struct UdpTransport {
-    /// qWAVE flow guard (Windows, opt-in DSCP): declared before `socket` so drop order removes
-    /// the flow membership before the socket closes. Always `None` off-Windows.
+    /// QoS guard retained before `socket` so any platform-specific state would drop before the
+    /// socket closes.
     _qos_flow: Option<super::qos::QosFlow>,
     socket: UdpSocket,
     /// Per-session GSO scratch buffer (Phase 5): the GSO path concatenates ≤64 equal-size
@@ -151,7 +126,7 @@ pub struct UdpTransport {
 pub use linux::pacing_capabilities;
 
 /// Whether Linux UDP GSO is active for this process (the `SLIPSTREAM_GSO` gate, latched off
-/// permanently after a GSO error). `false` off-Linux and on Windows (USO has its own gate).
+/// permanently after a GSO error). `false` off-Linux.
 pub fn gso_enabled() -> bool {
     #[cfg(target_os = "linux")]
     {
@@ -183,8 +158,7 @@ impl UdpTransport {
         socket.connect(peer)?;
         super::qos::grow_socket_buffers(&socket);
         // The native data plane is video-dominant — tag it as the video class (opt-in via
-        // SLIPSTREAM_DSCP). Each end marks its own egress; the socket is connected by now, as
-        // the Windows qWAVE flow requires.
+        // SLIPSTREAM_DSCP). Each end marks its own egress; the socket is connected by now.
         let qos_flow = super::qos::set_media_qos(&socket, super::qos::MediaClass::Video);
         socket.set_nonblocking(true)?;
         Ok(UdpTransport {
@@ -380,17 +354,6 @@ impl Transport for UdpTransport {
         linux::send_gso(self, packets)
     }
 
-    /// UDP USO send (see [`Transport::send_gso`]) — Windows. Coalesces the frame's equal-size packets
-    /// and hands Winsock ≤512-segment super-buffers via `WSASendMsg(UDP_SEND_MSG_SIZE)` — one syscall
-    /// per chunk instead of one `send` per packet, the 1 Gbps+ lever (Windows analogue of Linux GSO).
-    /// On by default (kill: `SLIPSTREAM_GSO=0`); falls back to the scalar `send_batch` when off, when
-    /// packets aren't uniform-size, or on a USO-unsupported error (which latches it off for the
-    /// process). Same lossy short-count contract.
-    #[cfg(target_os = "windows")]
-    fn send_gso(&self, packets: &[&[u8]]) -> std::io::Result<usize> {
-        windows::send_gso(self, packets)
-    }
-
     fn recv(&self) -> std::io::Result<Option<Vec<u8>>> {
         let mut buf = vec![0u8; RECV_BUF];
         match self.socket.recv(&mut buf) {
@@ -475,10 +438,9 @@ mod tests {
     }
 
     /// The raw-errno tx-queue-full / network-blip codes have no stable `ErrorKind` (they surface as
-    /// `Uncategorized`), so they only get caught by the platform `raw_os_error()` arms. A burst that
-    /// momentarily exhausts the send buffer must stay a lossy drop, never a teardown — this is the
-    /// regression guard for the Windows `WSAENOBUFS` (10055) session crash and the unix `ENOBUFS`
-    /// wlan-driver case. Gated per platform because a code is only classified on its own OS.
+    /// `Uncategorized`), so they only get caught by the Unix `raw_os_error()` arm. A burst that
+    /// momentarily exhausts the send buffer must stay a lossy drop, never a teardown. The test uses
+    /// the errno definitions available on Unix.
     #[test]
     fn transient_io_covers_raw_tx_queue_and_path_codes() {
         use std::io::Error;
@@ -501,22 +463,6 @@ mod tests {
             assert!(
                 !is_transient_io(&Error::from_raw_os_error(libc::EACCES)),
                 "EACCES must stay fatal"
-            );
-        }
-
-        #[cfg(windows)]
-        {
-            // WSAENOBUFS / WSAENETUNREACH / WSAEHOSTUNREACH / WSAENETDOWN / WSAEHOSTDOWN.
-            for code in [10055, 10051, 10065, 10050, 10064] {
-                assert!(
-                    is_transient_io(&Error::from_raw_os_error(code)),
-                    "WSA code {code} should be transient"
-                );
-            }
-            // WSAEACCES (10013) — a real failure that must stay fatal.
-            assert!(
-                !is_transient_io(&Error::from_raw_os_error(10013)),
-                "WSAEACCES must stay fatal"
             );
         }
     }

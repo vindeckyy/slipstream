@@ -14,24 +14,20 @@ path = "src/main.rs"
 
 [features]
 default = ["ui", "pyrowave"]
-# PyroWave client decode (the wired-LAN wavelet codec) — enables the decode backend + the
+# PyroWave client decode (the wired-LAN wavelet codec) enables the decode backend and the
 # planar present path. ON by default; each session still opts in explicitly (the Settings
-# codec pick, or SLIPSTREAM_PREFER_PYROWAVE=1). The Windows ARM64 leg builds
-# --no-default-features and so skips it — note that also drops `ui` (the Skia console/OSD),
-# not just pyrowave; hardware video decode itself (D3D11VA / Vulkan Video) is unaffected.
+# codec pick, or SLIPSTREAM_PREFER_PYROWAVE=1).
 pyrowave = ["ss-client-core/pyrowave", "ss-presenter/pyrowave"]
 # The Skia console UI (stats OSD, capture HUD, later the gamepad library). Dropping it
 # (`--no-default-features`) is the ~15 MB-smaller power-user build: same streaming,
 # stats on stdout only.
 ui = ["dep:ss-console-ui", "dep:serde_json"]
 
-# Same Linux+Windows gating as the rest of the client stack; elsewhere this is a stub
-# binary.
-[target.'cfg(any(target_os = "linux", windows))'.dependencies]
+# The session binary is built for Linux; other platforms retain a small stub in `main.rs`.
+[target.'cfg(target_os = "linux")'.dependencies]
 # `default-features = false` on both: THIS crate's `pyrowave` feature (above) is the single
 # switch that turns the wavelet codec on, and it enables it explicitly on each. Inheriting their
-# defaults instead would make `--no-default-features` a lie — the Windows ARM64 leg builds that
-# way precisely to skip the vendored PyroWave C++, which has no ARM64 SIMD path.
+# defaults instead would make `--no-default-features` a lie.
 ss-presenter = { path = "../../crates/ss-presenter", default-features = false }
 ss-console-ui = { path = "../../crates/ss-console-ui", optional = true }
 ss-client-core = { path = "../../crates/ss-client-core", default-features = false }
@@ -47,11 +43,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # belong to `clients/linux` (the shell) and must never appear here — a stray copy of the shell's
 # modules landed in src/ once (b0ea1e6b) and dragging its dependencies in behind it is what let
 # the wrong `main.rs` build and ship as `slipstream-session`.
-
-# Embeds the app icon as an exe resource (build.rs) — Windows hosts only (rc.exe from
-# the SDK); same pattern as clients/windows.
-[target.'cfg(windows)'.build-dependencies]
-winresource = "0.1"
 
 [lints]
 workspace = true

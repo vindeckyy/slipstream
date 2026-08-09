@@ -40,12 +40,12 @@ pub(crate) struct HostInfo {
     app_version: String,
     /// GFE version advertised to Moonlight clients.
     gfe_version: String,
-    /// OS identity chain, generic → most specific, slash-separated (`windows` | `macos` |
-    /// `linux[/<family>][/<id>]`). A client walks it most-specific-first and shows the first
+    /// Linux OS identity chain, generic → most specific, slash-separated
+    /// (`linux[/<family>][/<id>]`). A client walks it most-specific-first and shows the first
     /// token it has an icon for, so an unknown distro still degrades to its family's mark.
     #[schema(example = "linux/fedora/bazzite")]
     os: String,
-    /// Human-readable OS name (os-release `PRETTY_NAME`; `"Windows"`/`"macOS"` elsewhere).
+    /// Human-readable OS name from os-release `PRETTY_NAME`.
     #[schema(example = "Bazzite 42 (Kinoite)")]
     os_name: String,
     /// Codecs the host can encode (NVENC).
@@ -193,9 +193,8 @@ pub(crate) struct StreamInfo {
 /// (deliberate loosening for the tray's "client connected" toast: it tells the local user who is
 /// on their machine, which is disclosure in the user's favor — and any local process could
 /// already infer a session exists from the booleans here). Served unauthenticated to LOOPBACK
-/// peers only (see `require_auth`): the bearer-token file is SYSTEM/Administrators-DACL'd on
-/// Windows, so the per-user tray process cannot authenticate — this narrow read-only route is
-/// its status source.
+/// peers only (see `require_auth`): this narrow read-only route is intended for local status
+/// displays.
 #[derive(Serialize, ToSchema)]
 pub(crate) struct LocalSummary {
     /// Host version (mirrors `/health`).
@@ -344,13 +343,6 @@ pub(crate) struct AvailableCompositor {
     )
 )]
 pub(crate) async fn list_compositors() -> Json<Vec<AvailableCompositor>> {
-    // Compositor backends are a Linux concept. On Windows the ss-vdisplay IddCx driver is the sole
-    // virtual-display backend and `vdisplay::open` ignores the compositor argument entirely, so the
-    // list could only ever be five Linux backends flagged unavailable with no default — which reads
-    // as broken detection rather than "not applicable here". Report none and let the console say so.
-    #[cfg(not(target_os = "linux"))]
-    let list = Vec::new();
-    #[cfg(target_os = "linux")]
     // One `/proc` scan backs BOTH columns (see `vdisplay::available`), so a backend can no longer
     // be the auto-detect default and "unavailable" on the same row — the contradiction that made
     // this list look broken on a box plainly running the compositor it called unavailable.

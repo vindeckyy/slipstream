@@ -17,11 +17,9 @@
 //! (expose/resize redraws).
 
 use crate::csc::CscPass;
-#[cfg(target_os = "linux")]
 use crate::dmabuf::HwFrame;
 use crate::overlay::SharedDevice;
 use ash::vk;
-#[cfg(target_os = "linux")]
 use ss_client_core::video::DmabufFrame;
 use ss_client_core::video::{CpuFrame, VkVideoFrame};
 
@@ -40,40 +38,25 @@ pub enum FrameInput<'a> {
     /// No new frame — re-composite the retained video image (expose/resize).
     Redraw,
     Cpu(&'a CpuFrame),
-    #[cfg(target_os = "linux")]
     Dmabuf(DmabufFrame),
     /// FFmpeg Vulkan Video output — a VkImage already on THIS device (zero copy).
     VkFrame(VkVideoFrame),
-    /// D3D11VA hand-off — a shareable NT-handle texture to import (`d3d11.rs`).
-    #[cfg(windows)]
-    D3d11(ss_client_core::video::D3d11Frame),
     /// PyroWave planar output — three R8 plane views already on THIS device, decode
     /// fence-complete, GENERAL layout (`ss_client_core::video_pyrowave`).
-    #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+    #[cfg(feature = "pyrowave")]
     PyroWave(ss_client_core::video_pyrowave::PyroWavePlanarFrame),
 }
 
 /// The dmabuf/CSC machinery, present only when the device carries the import extensions.
-#[cfg(target_os = "linux")]
 struct HwCtx {
     ext_mem_fd: ash::khr::external_memory_fd::Device,
-}
-
-/// The D3D11 shared-texture import machinery, present only when the device carries
-/// `VK_KHR_external_memory_win32` + `VK_KHR_win32_keyed_mutex`.
-#[cfg(windows)]
-struct HwCtxWin {
-    ext_mem_win32: ash::khr::external_memory_win32::Device,
 }
 
 /// A submitted hardware frame parked until the in-flight fence proves the GPU reads
 /// done: imported dmabuf planes, or a Vulkan-Video frame (FFmpeg's image — we own only
 /// the plane views; dropping the frame's guard releases the AVFrame back to the pool).
 enum Retired {
-    #[cfg(target_os = "linux")]
     Dmabuf(HwFrame),
-    #[cfg(windows)]
-    D3d11(crate::d3d11::HwFrame),
     Vk {
         frame: VkVideoFrame,
         views: [vk::ImageView; 2],
@@ -129,16 +112,11 @@ pub struct Presenter {
     qfi: u32,
     /// Dmabuf import — `None` when the device lacks the import extensions (the CSC
     /// pass itself is unconditional: Vulkan-Video frames need it everywhere).
-    #[cfg(target_os = "linux")]
     hw: Option<HwCtx>,
-    /// D3D11 shared-texture import — `None` when the device lacks the win32 external
-    /// memory / keyed-mutex extensions.
-    #[cfg(windows)]
-    hw_win: Option<HwCtxWin>,
     csc: CscPass,
     /// The planar (3-plane) CSC variant for PyroWave frames; built only when the device
     /// passed the pyrowave probe.
-    #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+    #[cfg(feature = "pyrowave")]
     csc_planar: Option<CscPass>,
     /// FFmpeg Vulkan Video decode handles — `None` when the stack can't do it.
     video_export: Option<ss_client_core::video::VulkanDecodeDevice>,
@@ -205,16 +183,8 @@ pub struct Presenter {
 impl Presenter {
     /// Whether the hardware (dmabuf) path exists on this device — callers keep the
     /// decoder on software when it doesn't.
-    #[cfg(target_os = "linux")]
     pub fn supports_dmabuf(&self) -> bool {
         self.hw.is_some()
-    }
-
-    /// Whether the D3D11 shared-texture path exists on this device — callers keep the
-    /// decoder on software when it doesn't.
-    #[cfg(windows)]
-    pub fn supports_d3d11(&self) -> bool {
-        self.hw_win.is_some()
     }
 
     /// The FFmpeg Vulkan Video decode handle bundle — `None` when this stack can't
@@ -307,10 +277,9 @@ impl Drop for Presenter {
                 self.device.destroy_image(v.image, None);
                 self.device.free_memory(v.memory, None);
             }
-            #[cfg(target_os = "linux")]
             self.hw.take();
             self.csc.destroy(&self.device);
-            #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+            #[cfg(feature = "pyrowave")]
             if let Some(p) = &self.csc_planar {
                 p.destroy(&self.device);
             }

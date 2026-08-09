@@ -2,7 +2,7 @@
 //! human-readable name.
 //!
 //! The chain is slash-separated, generic → specific, `family[/like][/id]`:
-//! `windows`, `macos`, `linux`, `linux/debian/ubuntu`, `linux/fedora/bazzite`,
+//! `linux`, `linux/debian/ubuntu`, `linux/fedora/bazzite`,
 //! `linux/arch/steamos`. Clients walk it most-specific-first and show the first token they have
 //! art for — a client with no Bazzite mark lands on `fedora`, then generic `linux` — so the host
 //! always emits the *full* chain and clients need zero distro→parent knowledge. On Linux the
@@ -19,9 +19,9 @@ use std::sync::OnceLock;
 
 /// The host's OS identity, detected once per process (os-release is static for its lifetime).
 pub struct OsInfo {
-    /// `windows` | `macos` | `linux[/<family>][/<id>]` — see the module doc for the grammar.
+    /// `linux[/<family>][/<id>]` — see the module doc for the grammar.
     pub chain: String,
-    /// Human-readable OS name (os-release `PRETTY_NAME`; `"Windows"`/`"macOS"` elsewhere).
+    /// Human-readable OS name from os-release `PRETTY_NAME`.
     pub pretty: String,
 }
 
@@ -29,20 +29,7 @@ pub struct OsInfo {
 pub fn detect() -> &'static OsInfo {
     static OS: OnceLock<OsInfo> = OnceLock::new();
     OS.get_or_init(|| {
-        if cfg!(target_os = "windows") {
-            OsInfo {
-                chain: "windows".into(),
-                pretty: "Windows".into(),
-            }
-        } else if cfg!(target_os = "macos") {
-            // The host only runs on Windows/Linux; macOS is the dev-build platform.
-            OsInfo {
-                chain: "macos".into(),
-                pretty: "macOS".into(),
-            }
-        } else {
-            linux_os_info()
-        }
+        linux_os_info()
     })
 }
 

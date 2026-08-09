@@ -15,17 +15,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-/** A Windows host wears the Windows mark. */
-export const WindowsHost: Story = {
-	args: {
-		host: {
-			data: { ...hostInfo, os: "windows", os_name: "Windows" },
-			isLoading: false,
-			error: null,
-		},
-	},
-};
-
 /** A gaming distro wears its OWN mark, not its family's: `cachyos` is resolved before the
  * `arch` it descends from, which is the whole point of shipping art for the leaf. */
 export const CachyOsHost: Story = {

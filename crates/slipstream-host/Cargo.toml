@@ -21,18 +21,14 @@ ss-gpu = { path = "../ss-gpu" }
 # Linux GPU zero-copy plumbing (CUDA/EGL/Vulkan dmabuf import + the isolated worker), extracted
 # to a leaf crate (plan §W6). Compiles empty on non-Linux, so it lives in the main deps.
 ss-zerocopy = { path = "../ss-zerocopy" }
-# Shared frame/format vocabulary (CapturedFrame/PixelFormat/…), HDR metadata, thread QoS, and the
-# Windows DXGI capture identity — the leaf both capture and encode speak (plan §W6).
+# Shared frame/format vocabulary (CapturedFrame/PixelFormat/…), HDR metadata, and thread QoS.
 ss-frame = { path = "../ss-frame" }
-# Windows display-topology helpers (CCD/GDI mode-set, PnP monitor devnodes, display-change watch),
-# extracted to a leaf crate (plan §W6). Empty on non-Windows, so it lives in the main deps.
-ss-win-display = { path = "../ss-win-display" }
-# Video encode backends (NVENC/VAAPI/AMF/QSV/Vulkan-Video/PyroWave/openh264) behind one Encoder
+# Video encode backends (NVENC/VAAPI/Vulkan-Video/PyroWave/openh264) behind one Encoder
 # trait, extracted to a subsystem crate (plan §W6). The host's nvenc/amf-qsv/vulkan-encode/pyrowave
 # features forward here (see [features]); the heavy encoder deps (ffmpeg-next, the NVENC SDK,
 # openh264, pyrowave-sys) moved with it.
 ss-encode = { path = "../ss-encode" }
-# Frame capture backends (Linux PipeWire portal + Windows IDD direct-push) behind one Capturer
+# Frame capture backends (Linux PipeWire portal) behind one Capturer
 # trait, extracted to a subsystem crate (plan §W6). The facade (src/capture.rs) hands it the
 # pre-resolved encode facts + the sealed-channel delivery closure so the edge stays one-way.
 ss-capture = { path = "../ss-capture" }
@@ -40,8 +36,8 @@ ss-capture = { path = "../ss-capture" }
 # subsystem crate (plan §W6). Consumes core::input; the heavy input deps (wayland/reis/xkbcommon/
 # usbip) moved with it.
 ss-inject = { path = "../ss-inject" }
-# Virtual-display orchestration (per-compositor Linux backends + the Windows IddCx driver backend),
-# extracted to a subsystem crate (plan §W6). The DDC panel control + KWin zkde protocol moved with it.
+# Virtual-display orchestration (per-compositor Linux backends), extracted to a subsystem crate.
+# The DDC panel control + KWin zkde protocol moved with it.
 ss-vdisplay = { path = "../ss-vdisplay" }
 # Shared clipboard (design/clipboard-and-file-transfer.md §4): the per-OS session-clipboard
 # backends + coordinator. Portable dep — the crate's facade (policy / ClipCoordCmd / start)
@@ -57,7 +53,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # `mdns_sd::…` instead of "log".
 tracing-log = "0.2"
 # `log::LevelFilter` for the bridge's max-level in `log_capture::install_global` (which inits the
-# tracing-log bridge with `ignore_crate("wasapi")`). Already in the tree transitively.
+# tracing-log bridge. Already in the tree transitively.
 log = "0.4"
 axum = "0.8"
 mdns-sd = "0.20"
@@ -75,12 +71,10 @@ cbc = { version = "0.1", features = ["alloc"] }
 rand = "0.8"
 hex = "0.4"
 # Cover-art delivery in the game library: encode Lutris's local JPEGs into `data:` URLs and decode
-# the Epic launcher's base64 `catcache.bin`. Cross-platform (Linux Lutris art + Windows Epic art).
+# the Epic launcher's base64 `catcache.bin`.
 base64 = "0.22"
-# Blocking HTTP for the library cover-art warmer (no-auth GOG api.gog.com + Xbox displaycatalog),
-# run on a background thread off the hot path. `ureq` is small + sync (no tokio here) and bundles
-# webpki roots (no system cert dependency). Cross-platform so the fetch/parse code is compiled +
-# checked everywhere even though only the Windows GOG/Xbox providers need it today.
+# Blocking HTTP for the library cover-art warmer, run on a background thread off the hot path.
+# `ureq` is small + sync (no tokio here) and bundles webpki roots (no system cert dependency).
 ureq = "2"
 rcgen = { version = "0.13", default-features = false, features = ["ring", "pem"] }
 x509-parser = "0.16"
@@ -88,8 +82,7 @@ x509-parser = "0.16"
 # tokio-rustls (axum-server can't surface the peer cert), so we do NOT enable `tls-rustls` — that
 # feature is what pulled the unmaintained `rustls-pemfile` (security-review dep hygiene).
 axum-server = "0.8"
-# Ring backend, NOT the (default) aws-lc-rs one — matches slipstream-core + the client so the whole
-# tree stays ring-only (no aws-lc-sys: a heavy C dep that fails to build on the Windows CI runner).
+# Ring backend, NOT the (default) aws-lc-rs one, matching slipstream-core and the client.
 # Keep `tls12` for GameStream/Moonlight clients that negotiate TLS 1.2.
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 # Manual HTTPS+mTLS serve loop for the mgmt API (axum-server can't surface the peer cert): a
@@ -114,7 +107,7 @@ serde_json = "1"
 # verbatim by the `openapi` subcommand. Control plane only — never the per-frame path.
 # Plugin-store index signatures: ed25519 verification of a catalog document before any field of
 # it is read (store/index.rs). Already in the tree via rustls — the workspace is ring-only, so this
-# is the one signature primitive available without pulling aws-lc-sys (which fails on Windows CI).
+# is the one signature primitive available without pulling aws-lc-sys.
 ring = "0.17"
 # Semver comparisons for the plugin store: `minHost` gating and the revocation list's version
 # ranges (`<0.3.2`). Already in the lockfile transitively.
@@ -130,21 +123,17 @@ http-body-util = "0.1"
 # Disposable directory fixtures for the Steam local-librarycache scan tests (library.rs).
 tempfile = "3"
 
-# Opus encode for the host->client audio plane — stereo (`opus::Encoder`) AND 5.1/7.1 surround
-# (`opus::MSEncoder`, the safe multistream API the crate exposes; no `audiopus_sys` needed). The
-# crate vendors libopus (cmake-built from source — no system lib, no vcpkg), so it builds on Windows
-# MSVC too (needs CMake + NASM, both on the box). Both platforms that have an audio-capture backend.
-[target.'cfg(any(target_os = "linux", target_os = "windows"))'.dependencies]
+# Opus encode for the host->client audio plane, including stereo and 5.1/7.1 surround. The crate
+# vendors libopus (cmake-built from source, no system lib or vcpkg).
+[target.'cfg(target_os = "linux")'.dependencies]
 opus = "0.3"
 
 [target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
 # Direct-SDK NVENC is part of every supported Linux host build. Its CUDA and NVENC entry points are
 # loaded at runtime, and encoder dispatch reaches it only for CUDA-backed NVIDIA capture, so the
 # same binary remains usable on AMD, Intel, and driverless systems. Keep this target-specific:
-# NVENC test binaries have an NVIDIA import-library requirement on Windows.
 ss-encode = { path = "../ss-encode", features = ["nvenc"] }
 
-[target.'cfg(target_os = "linux")'.dependencies]
 # `screencast` gates the ScreenCast portal module; `remote_desktop` adds the RemoteDesktop
 # portal we use for libei input on KWin/GNOME; `tokio` is the default runtime.
 # `open_pipe_wire_remote` is unconditional, so ashpd's own `pipewire` feature is not
@@ -200,120 +189,13 @@ libloading = "0.8"
 # virtual-Deck transport on non-SteamOS hosts (`inject/linux/steam_usbip.rs`). See the crate's NOTICE.
 usbip-sim = { path = "vendor/usbip-sim" }
 
-[target.'cfg(target_os = "windows")'.dependencies]
-# Windows host backends. `windows` covers the Win32/CCD APIs the SudoVDA virtual-display backend
-# drives (SetupAPI device enumeration, DeviceIoControl IOCTLs, QueryDisplayConfig name resolution);
-# capture/encode/input/audio backends extend the feature set as they land.
-windows = { version = "0.62", features = [
-    "Win32_Foundation",
-    "Win32_Security",
-    # WinVerifyTrust + WTHelper* — Authenticode verification of a downloaded host installer
-    # before the update apply spawns it (update/windows.rs). The WTHelper accessors are gated
-    # behind the Catalog+Sip features in windows-rs, hence the extra two.
-    "Win32_Security_WinTrust",
-    "Win32_Security_Cryptography_Catalog",
-    "Win32_Security_Cryptography_Sip",
-    # CERT_CONTEXT for the signing-leaf fingerprint pin (same file).
-    "Win32_Security_Cryptography",
-    # ConvertStringSecurityDescriptorToSecurityDescriptorW — the SDDL on the virtual-DualSense
-    # shared-memory section (inject/dualsense_windows.rs) so the UMDF host can open it.
-    "Win32_Security_Authorization",
-    "Win32_Devices_DeviceAndDriverInstallation",
-    # SwDeviceCreate/SwDeviceClose — the per-session virtual-DualSense devnode
-    # (inject/dualsense_windows.rs).
-    "Win32_Devices_Enumeration_Pnp",
-    "Win32_Devices_Display",
-    "Win32_Storage_FileSystem",
-    "Win32_System_IO",
-    "Win32_UI_Input_KeyboardAndMouse",
-    "Win32_UI_WindowsAndMessaging",
-    "Win32_System_StationsAndDesktops",
-    "Win32_Graphics_Dxgi",
-    "Win32_Graphics_Dxgi_Common",
-    "Win32_Graphics_Direct3D",
-    "Win32_Graphics_Direct3D11",
-    "Win32_Graphics_Direct3D_Fxc",
-    "Win32_Graphics_Gdi",
-    # Windows.Graphics.Capture (WGC) backend — composed-desktop capture (overlay/MPO-correct HDR).
-    "Foundation",
-    "Graphics",
-    "Graphics_Capture",
-    "Graphics_DirectX",
-    "Graphics_DirectX_Direct3D11",
-    "Win32_System_WinRT_Direct3D11",
-    "Win32_System_WinRT_Graphics_Capture",
-    # WGC runs under SYSTEM via interactive-user impersonation (WGC won't activate as SYSTEM).
-    "Win32_System_RemoteDesktop",
-    # Two-process secure-desktop design: the SYSTEM host spawns the WGC helper in the interactive
-    # user session (CreateProcessAsUserW) with stdout/stdin redirected to anonymous pipes.
-    "Win32_System_Threading",
-    "Win32_System_Pipes",
-    "Win32_System_Environment",
-    # Force-composed-flip overlay: a topmost layered window on the Winlogon desktop disqualifies the
-    # secure desktop's fullscreen independent-flip so Desktop Duplication can capture it.
-    "Win32_System_LibraryLoader",
-    # VirtualProtect — for the inline patch of the win32u GPU-preference shim (Apollo's MinHook port:
-    # the hybrid-GPU output-reparenting hook that keeps Desktop Duplication stable on a 4090+iGPU box).
-    # See capture/windows/dxgi.rs `install_gpu_pref_hook`. No trampoline (we fully replace the fn) → no detour
-    # crate / no C length-disassembler dep; a 12-byte absolute-jmp prologue patch suffices.
-    "Win32_System_Memory",
-    # Per-monitor-v2 DPI awareness — IDXGIOutput5::DuplicateOutput1 (the modern capture path Apollo
-    # uses; FP16/format-list, robust to overlay/format churn) requires the process to be DPI-aware.
-    "Win32_UI_HiDpi",
-    # Windows service supervisor (src/service.rs): a kill-on-close job object so a service crash never
-    # orphans the SYSTEM host it launched into the interactive session.
-    "Win32_System_JobObjects",
-    # CoCreateInstance(PolicyConfigClient) — set the default audio playback/recording endpoints via the
-    # undocumented IPolicyConfig (audio/windows/audio_control.rs) so mic + desktop audio auto-wire.
-    "Win32_System_Com",
-    # SetUnhandledExceptionFilter + EXCEPTION_POINTERS — the last-resort native-crash logger
-    # (src/windows/crash.rs); Kernel gates the CONTEXT type EXCEPTION_POINTERS embeds.
-    "Win32_System_Diagnostics_Debug",
-    "Win32_System_Kernel",
-    # CreateToolhelp32Snapshot/Process32*W — the conflicting-streaming-host process scan
-    # (src/detect/windows.rs): is Sunshine/Apollo/... running alongside us?
-    "Win32_System_Diagnostics_ToolHelp",
-] }
-# The SCM plumbing for the `service` subcommand (define_windows_service! / dispatcher / control
-# handler / ServiceManager install). Wraps the Win32 service API; the supervision loop itself uses
-# the `windows` crate above.
-windows-service = "0.7"
-# Read the GOG.com install registry (HKLM\SOFTWARE\WOW6432Node\GOG.com\Games) for the GOG store
-# provider — ergonomic + correct-by-construction vs. hand-rolled Reg* FFI for subkey enumeration.
-winreg = "0.56"
-# Parse each Xbox/Game-Pass game's MicrosoftGame.config (GDK manifest XML) for the Xbox store
-# provider — a small read-only DOM is all we need (Identity/Executable/ShellVisuals/StoreId).
-roxmltree = "0.21"
-# WASAPI loopback audio capture (default render endpoint -> 48 kHz stereo f32 for the Opus path).
-wasapi = "0.23"
-# Shared host<->driver wire contract for the ss-vdisplay IddCx virtual-display backend
-# (vdisplay/ss_vdisplay.rs): the control-plane IOCTL codes + `#[repr(C)] Pod` request/reply structs,
-# defined ONCE so host<->driver ABI drift is a compile error. `bytemuck` serializes those structs
-# to/from the DeviceIoControl byte buffers.
-ss-driver-proto = { path = "../ss-driver-proto" }
-bytemuck = { version = "1.19", features = ["derive"] }
-
-# The encode feature flags now FORWARD to the ss-encode subsystem crate (the heavy encoder deps —
-# ffmpeg-next, the NVENC SDK, openh264, pyrowave-sys — moved there, plan §W6). Selecting a feature
-# on the host turns on the matching backend inside ss-encode.
+# The encode feature flags forward to the ss-encode subsystem crate.
 [features]
 # PyroWave ships in every default build (the codec stays strictly opt-in per session; a client
 # must explicitly prefer CODEC_PYROWAVE, so normal HEVC/AV1 sessions do not change).
 default = ["pyrowave"]
-# NVENC hardware encode (Linux CUDA + Windows D3D11). The Linux target dependency below enables
-# the runtime-loaded backend for ordinary Linux builds. The named feature remains for Windows
-# release builds, whose test binaries need NVIDIA's import library when NVENC is selected.
+# NVENC hardware encode on Linux. The target dependency above enables the runtime-loaded backend.
 nvenc = ["ss-encode/nvenc"]
-# AMD/Intel hardware encode on Windows (AMF/QSV via ffmpeg-next). OFF by default: needs a `FFMPEG_DIR`
-# (BtbN lgpl-shared with `*_amf`/`*_qsv`) at build and bundles the FFmpeg DLLs at runtime. Build the
-# all-vendor GPU host with `--features nvenc,amf-qsv`.
-amf-qsv = ["ss-encode/amf-qsv"]
-# Native Intel QSV via the statically linked VPL dispatcher (Windows). OFF by default: needs
-# cmake + libclang at build (both already required by pyrowave); runtime GPU libs come from the
-# Intel driver store, so the same binary starts fine on NVIDIA/AMD boxes. Supersedes the ffmpeg
-# QSV path (design/native-qsv-encoder.md). ⚠ Like `nvenc`: hand builds for Intel boxes need
-# `--features qsv` or QSV falls back to ffmpeg (if `amf-qsv`) / software.
-qsv = ["ss-encode/qsv"]
 # Raw Vulkan Video HEVC/AV1 encode on Linux (AMD/Intel) — real reference-frame-invalidation loss
 # recovery via explicit DPB reference slots (design/linux-vulkan-video-encode.md). OFF by default;
 # reuses ss-encode's `ash` bindings (no new dep). Runtime-gated further by SLIPSTREAM_VULKAN_ENCODE.
@@ -322,11 +204,6 @@ vulkan-encode = ["ss-encode/vulkan-encode"]
 # the vendored codec from source in ss-encode. ON by default (see `default`); sessions reach it only
 # through explicit client opt-in.
 pyrowave = ["ss-encode/pyrowave"]
-
-# Build-time icon/version-info embedding (build.rs; Windows dev/CI hosts only — Linux packaging
-# builds of this crate never execute the winresource block).
-[target.'cfg(windows)'.build-dependencies]
-winresource = "0.1"
 
 [lints]
 workspace = true

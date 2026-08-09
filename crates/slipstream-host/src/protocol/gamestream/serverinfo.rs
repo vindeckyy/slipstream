@@ -90,10 +90,8 @@ fn base_codec_mode_support() -> u32 {
     // encoder emits H.264 only". `ss_encode::Codec::host_wire_caps` — the native plane's twin of
     // this function — has gated on exactly this since it was written; this one never did.
     //
-    // Deliberately a local gate rather than delegating wholesale to `host_wire_caps()`: that would
-    // be the drift-proof shape, but on Windows it re-runs the DXGI adapter enumeration several
-    // times per `/serverinfo` GET (the probe helpers each sample it), and this endpoint is polled.
-    // The software case is a plain config read, so it costs nothing here. (Follow-up worth doing:
+    // Deliberately a local gate rather than delegating wholesale to `host_wire_caps()`: the
+    // software case is a plain config read, so it costs nothing here. (Follow-up worth doing:
     // the static `MaxLumaPixelsHEVC` in the XML above still advertises an HEVC limit even when the
     // mask drops HEVC — harmless, since Moonlight gates on the mask, but it is a second and now
     // inconsistent advertisement.)
@@ -119,16 +117,6 @@ fn base_codec_mode_support() -> u32 {
             return m;
         }
     }
-    // Windows: advertise only what the GPU actually encodes (AV1 is narrow, an old iGPU might
-    // lack HEVC, a 1st-gen-Maxwell NVENC is H.264-only). AMF probes natively (no build feature
-    // needed); QSV needs the libavcodec or VPL build, NVENC the `nvenc` build. The GPU-less
-    // software path keeps the static superset.
-    #[cfg(target_os = "windows")]
-    if crate::encode::windows_backend_is_probed() {
-        if let Some(m) = probed_mask(crate::encode::windows_codec_support()) {
-            return m;
-        }
-    }
     SERVER_CODEC_MODE_SUPPORT
 }
 
@@ -136,7 +124,6 @@ fn base_codec_mode_support() -> u32 {
 /// or `None` if the probe found nothing — meaning the GPU wasn't usable at probe time (GPU-less CI,
 /// a misconfigured/wrong-vendor host), NOT that it encodes zero codecs; the caller then advertises
 /// the static superset (pre-probe behaviour) rather than claiming nothing.
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 fn probed_mask(caps: crate::encode::CodecSupport) -> Option<u32> {
     use super::{SCM_AV1_MAIN8, SCM_H264, SCM_HEVC};
     let mut m = 0;

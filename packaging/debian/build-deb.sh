@@ -163,8 +163,12 @@ License: MIT or Apache-2.0
  Dual-licensed. Full texts in /usr/share/doc/$PKG/LICENSE-MIT and
  /usr/share/doc/$PKG/LICENSE-APACHE.
 EOF
+CHANGELOG_DATE='Thu, 01 Jan 1970 00:00:00 +0000'
+if [ -n "${SOURCE_DATE_EPOCH:-}" ]; then
+  CHANGELOG_DATE="$(date -u -d "@${SOURCE_DATE_EPOCH}" -R)"
+fi
 printf '%s (%s) stable; urgency=medium\n\n  * Automated build %s.\n\n -- unom <packages@unom.io>  %s\n' \
-  "$PKG" "$VERSION" "$VERSION" "$(date -uR 2>/dev/null || echo 'Thu, 01 Jan 1970 00:00:00 +0000')" \
+  "$PKG" "$VERSION" "$VERSION" "$CHANGELOG_DATE" \
   | gzip -9n > "$DOCDIR/changelog.Debian.gz"
 
 # --- bundled FFmpeg (Ubuntu 24.04 LTS builds) --------------------------------

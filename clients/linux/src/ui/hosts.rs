@@ -588,8 +588,8 @@ const PROBE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(12);
 /// reading the card. Chains walk most-specific-first, so a distro without a mark of its own still
 /// lands on its family's and finally on plain Tux.
 const OS_ICON_TOKENS: &[&str] = &[
-    "windows", "apple", "linux", "steam", "ubuntu", "fedora", "arch", "debian", "nixos",
-    "opensuse", "bazzite", "cachyos", "nobara",
+    "apple", "linux", "steam", "ubuntu", "fedora", "arch", "debian", "nixos", "opensuse",
+    "bazzite", "cachyos", "nobara",
 ];
 
 /// The card's OS glyph for an advertised chain, or `None` (no widget) when the host doesn't
@@ -1212,7 +1212,7 @@ impl HostsPage {
     /// settings profile it defaults to.
     ///
     /// Linux had only "Rename" until now; the clipboard toggle in particular existed in the
-    /// store and on the Apple and Windows clients but had no Linux surface at all, so a Linux
+    /// store and on the Apple client but had no Linux surface at all, so a Linux
     /// user could not turn on a feature they were already paying the storage for.
     fn edit_host_dialog(&self, sender: &ComponentSender<Self>, fp_hex: &str, current: &str) {
         let stored = KnownHosts::load()

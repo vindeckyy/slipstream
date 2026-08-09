@@ -4,10 +4,8 @@
 //! cannot express (no avcodec option maps to `nvEncInvalidateRefFrames`). Design:
 //! `design/linux-direct-nvenc.md`; the recovery semantics it delivers: `encoder-recovery-hardening.md`.
 //!
-//! This is the CUDA sibling of `encode/windows/nvenc.rs`. It drives the same runtime-loaded entry
-//! table (`nvidia_video_codec_sdk::sys::nvEncodeAPI` `sys` types) but:
-//!   * loads `libnvidia-encode.so.1` via `dlopen` (the Linux analogue of the Windows System32 DLL
-//!     load, and of this crate's `zerocopy::cuda` libcuda loader) — never a link-time import, so
+//! It drives the runtime-loaded `nvidia_video_codec_sdk::sys::nvEncodeAPI` entry table and:
+//!   * loads `libnvidia-encode.so.1` via `dlopen` — never a link-time import, so
 //!     one binary still starts on AMD/Intel Linux boxes (no NVIDIA driver) and falls through to
 //!     VAAPI/software;
 //!   * opens the encode session on `NV_ENC_DEVICE_TYPE_CUDA` bound to the **shared process-wide
@@ -30,8 +28,7 @@
 //! [`Encoder::set_pipelined`] when depth-1 can't hold cadence; at depth-1 it costs ~one loop
 //! tick of latency, which is why it is not simply on. gpu-contention plan §5.B, latency plan
 //! T2.2/§7 LN3): NVENC *async mode*
-//! (`enableEncodeAsync` + completion events) is Windows-only, so the session here stays SYNC —
-//! but the NVENC guide's threading model still applies: the main thread should only *submit*
+//! The backend stays in synchronous NVENC mode. The main thread should only *submit*
 //! while a secondary thread does the (blocking) `nvEncLockBitstream`. With the flag set, an
 //! internal retrieve thread owns exactly that blocking lock (+ copy + unlock); `submit` returns
 //! after `encode_picture` and `poll` drains finished AUs without blocking, so under a
@@ -85,13 +82,11 @@ use std::sync::mpsc;
 use nvidia_video_codec_sdk::sys::nvEncodeAPI as nv;
 
 // ---------------------------------------------------------------------------------------------
-// Runtime-loaded NVENC entry table (Linux). Same shape as the Windows backend's `EncodeApi`, minus
-// the async-event entry points (Windows-only). Resolved once from `libnvidia-encode.so.1` — the two
+// Runtime-loaded NVENC entry table (Linux). Resolved once from `libnvidia-encode.so.1` — the two
 // real exports (`NvEncodeAPIGetMaxSupportedVersion`, `NvEncodeAPICreateInstance`) by name, the rest
 // through `NvEncodeAPICreateInstance`. NEVER a link-time import: the shipped binary compiles the
 // `nvenc` feature in unconditionally and a load-time `.so` dependency would refuse to start the
-// process on every AMD/Intel-only Linux box (the Linux analogue of the Windows nvEncodeAPI64.dll
-// problem, and of this crate's dlopen'd libcuda).
+// process on every AMD/Intel-only Linux box.
 // ---------------------------------------------------------------------------------------------
 
 /// The `NV_ENCODE_API_FUNCTION_LIST` entries this encoder uses. Field names mirror the sdk crate's
@@ -395,14 +390,14 @@ fn load_api() -> std::result::Result<EncodeApi, String> {
 /// bitstream/ring slot is never reused mid-encode.
 const POOL: usize = 8;
 
-/// The operator's `SLIPSTREAM_NVENC_ASYNC` intent (the SAME knob as the Windows backend):
+/// The operator's `SLIPSTREAM_NVENC_ASYNC` intent:
 /// `Some(true)` = force the two-thread retrieve from session open — note that at the Linux
 /// default pipeline depth of 1 this adds ~one loop tick of latency (the non-blocking poll's AU
 /// rides the next tick), so it only pays under GPU contention; `Some(false)` = never (also
 /// vetoes the session loop's contention escalation via [`Encoder::set_pipelined`]); `None`
 /// (unset) = adaptive — off until the session loop escalates on sustained cadence overrun.
-/// Unlike Windows this changes NO session parameter (Linux stays sync mode; only the blocking
-/// lock moves off the encode thread), so there is no async-rejecting config to fail the open.
+/// This changes no NVENC session parameter; only the blocking lock moves off the encode thread, so
+/// there is no async-rejecting config to fail the open.
 fn async_retrieve_env() -> Option<bool> {
     match std::env::var("SLIPSTREAM_NVENC_ASYNC") {
         Ok(v) if matches!(v.trim(), "1" | "true" | "yes" | "on") => Some(true),
@@ -418,7 +413,7 @@ fn async_retrieve_requested() -> bool {
 
 /// Max encodes in flight in two-thread mode (`SLIPSTREAM_NVENC_ASYNC_DEPTH`, default 4, clamped
 /// `2..=POOL-1` — a bitstream must never be reused mid-encode, and the input ring is the same
-/// depth). Mirrors the Windows knob exactly, memoization included: this is the backpressure
+/// depth). This is the backpressure
 /// **loop condition** in `submit`, so an engaged two-thread session re-read the environment once
 /// per spin. The default session never pays it (the condition short-circuits on `async_rt`), which
 /// is why the audit's severity ranking for this site was inverted — but an escalated one did.
@@ -591,8 +586,7 @@ fn buffer_format(buf: &cuda::DeviceBuffer, fmt: ss_frame::PixelFormat) -> nv::NV
             // `x:B:G:R` 2:10:10:10 LE — NVENC's `ABGR10` (R in the low 10 bits).
             ss_frame::PixelFormat::X2Bgr10 => nv::NV_ENC_BUFFER_FORMAT::NV_ENC_BUFFER_FORMAT_ABGR10,
             // Packed 4-byte BGRA-order (the `copy_device_to_device` fallback path); NVENC's `ARGB`
-            // ingests this layout + does the internal CSC, matching the proven Windows RGB-input
-            // path.
+            // ingests this layout and performs the internal CSC.
             _ => nv::NV_ENC_BUFFER_FORMAT::NV_ENC_BUFFER_FORMAT_ARGB,
         }
     }
@@ -707,8 +701,7 @@ pub struct NvencCudaEncoder {
     fps: u32,
     bitrate_bps: u64,
     buffer_fmt: nv::NV_ENC_BUFFER_FORMAT,
-    /// Encoded bit depth (8 on Linux until Phase 5.1 lands a P010 capture path). Kept for parity with
-    /// the Windows Main10 config, which is ported but inert until a 10-bit input exists.
+    /// Encoded bit depth. The Linux capture path currently supplies 8-bit input for this backend.
     bit_depth: u8,
     /// Full-chroma 4:4:4 (HEVC Range Extensions) — set when the capturer delivers a planar-YUV444
     /// `DeviceBuffer` on an HEVC session and the GPU supports YUV444 encode.
@@ -744,7 +737,7 @@ pub struct NvencCudaEncoder {
     /// A successful [`invalidate_ref_frames`](Encoder::invalidate_ref_frames) arms this; the next
     /// `submit` consumes it into `pending` so that AU ships as the recovery anchor (NVENC applies the
     /// invalidation at the next `encode_picture`, so that frame is by construction the first coded
-    /// against only-valid references — the F2 fix, identical to the Windows backend).
+    /// against only-valid references.
     pending_anchor: bool,
     inited: bool,
     /// GPU capabilities probed once via `nvEncGetEncodeCaps` before configuring.
@@ -835,7 +828,7 @@ pub struct NvencCudaEncoder {
 // raw NVENC bitstream/registered/mapped pointers in `bitstreams`/`ring`/`pending`. The encoder is
 // owned by exactly one thread: it is moved onto the host encode thread once at construction, and every
 // method (`submit`/`poll`/`invalidate_ref_frames`/`Drop`) runs there. There is no secondary thread
-// (unlike the Windows async retrieve) — this backend is sync-only. Moving the encoder across its one
+// This backend is sync-only. Moving the encoder across its one
 // ownership-transfer boundary is sound because no NVENC/CUDA call is in flight during the move, so
 // `Send` introduces no data race on the non-`Send` fields.
 unsafe impl Send for NvencCudaEncoder {}
@@ -1297,7 +1290,6 @@ impl NvencCudaEncoder {
             self.fps,
             &mut cfg,
             split_mode,
-            false,
             self.subframe_on,
         );
 
@@ -1643,7 +1635,7 @@ impl NvencCudaEncoder {
                 fmt = ?self.buffer_fmt,
                 // The FINAL split mode (post any rejection fallback) at INFO — journals run
                 // INFO+, and "did 4K120 actually split across engines?" was undiagnosable from
-                // a user log without it (Windows only had a debug! at selection time).
+                // a user log without it.
                 split_mode = self.split_mode,
                 "NVENC CUDA session ready"
             );
@@ -1753,7 +1745,7 @@ impl Encoder for NvencCudaEncoder {
             self.width = captured.width;
             self.height = captured.height;
             self.buffer_fmt = new_fmt;
-            // Depth + HDR follow the INPUT, like the Windows backend: a packed 10-bit PQ/BT.2020
+            // Depth + HDR follow the input: a packed 10-bit PQ/BT.2020
             // capture (an HDR gamescope output) selects Main10 / AV1 10-bit and the BT.2020 PQ
             // colour signalling; anything else is 8-bit SDR. Deriving it here rather than
             // trusting the negotiated depth is what keeps the label and the bitstream in step
@@ -2430,7 +2422,6 @@ impl Encoder for NvencCudaEncoder {
                     self.fps,
                     &mut cfg,
                     self.split_mode,
-                    false,
                     self.subframe_on,
                 ),
                 ..Default::default()

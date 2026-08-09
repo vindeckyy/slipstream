@@ -1,6 +1,6 @@
 //! Raw FFI bindings to the vendored PyroWave C API (`pyrowave.h`).
 //!
-//! Empty on targets other than Linux/Windows — see build.rs. The safe wrapper
+//! Empty on targets other than Linux — see build.rs. The safe wrapper
 //! lives with its consumer (`slipstream-host`'s encoder backend, and later the
 //! Rust clients' decoder backend); this crate is bindings only.
 
@@ -10,10 +10,10 @@
 // Bindgen output for a C API: u128 layout warnings and the like are upstream's concern.
 #![allow(improper_ctypes)]
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(target_os = "linux")]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-#[cfg(all(test, any(target_os = "linux", target_os = "windows")))]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
 

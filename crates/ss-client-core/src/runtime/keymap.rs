@@ -1,13 +1,13 @@
 //! Local key/button codes → the slipstream input wire contract.
 //!
-//! The wire carries Windows Virtual-Key codes (the GameStream convention; the host maps
-//! them back with `inject::vk_to_evdev`). GTK hands us the hardware keycode, which on
+//! The wire carries GameStream virtual-key codes; the host maps them back with
+//! `inject::vk_to_evdev`. GTK hands us the hardware keycode, which on
 //! Wayland (and X11) is the evdev code + 8 — so this table is the exact inverse of the
 //! host's, keyed on evdev codes. Layout-independent by construction: positional keys map
 //! positionally, exactly what a game expects.
 
-/// Map a Linux evdev key code to the Windows VK code the host expects. `None` = a key the
-/// wire contract doesn't cover (media keys etc.) — drop it rather than guess.
+/// Map a Linux evdev key code to the GameStream virtual-key code the host expects. `None` = a
+/// key the wire contract doesn't cover (media keys etc.), drop it rather than guess.
 pub fn evdev_to_vk(evdev: u16) -> Option<u8> {
     Some(match evdev {
         // --- Navigation / editing / whitespace ---
@@ -71,8 +71,8 @@ pub fn evdev_to_vk(evdev: u16) -> Option<u8> {
         44 => 0x5A, // Z
 
         // --- Meta / context-menu ---
-        125 => 0x5B, // KEY_LEFTMETA  -> VK_LWIN
-        126 => 0x5C, // KEY_RIGHTMETA -> VK_RWIN
+        125 => 0x5B, // KEY_LEFTMETA  -> left meta
+        126 => 0x5C, // KEY_RIGHTMETA -> right meta
         127 => 0x5D, // KEY_COMPOSE   -> VK_APPS
 
         // --- Numpad ---

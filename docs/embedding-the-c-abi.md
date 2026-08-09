@@ -3,7 +3,7 @@
 This guide is for developers who want to build their **own** slipstream client — on a platform we
 don't ship an app for — by linking `slipstream-core` through its stable C ABI. It covers what the
 core does (and, importantly, what it doesn't), how to build and link it, the full client lifecycle,
-and worked integration blueprints for **webOS**, **Xbox**, and **Tizen**.
+and worked integration blueprints for **webOS** and **Tizen**.
 
 The authoritative header is [`include/slipstream_core.h`](../include/slipstream_core.h) — it is
 generated from Rust by cbindgen and every symbol carries a doc comment. This guide is the narrative;
@@ -83,8 +83,8 @@ cargo build -p slipstream-core --features quic --release
 
 | Output      | File (per platform)                                             | Use when |
 |-------------|----------------------------------------------------------------|----------|
-| `cdylib`    | `libslipstream_core.so` / `.dylib` / `slipstream_core.dll`        | dynamic linking (most TV apps, sandboxed apps) |
-| `staticlib` | `libslipstream_core.a` / `slipstream_core.lib`                    | static embedding into a single binary |
+| `cdylib`    | `libslipstream_core.so` / `.dylib`                                 | dynamic linking (most TV apps, sandboxed apps) |
+| `staticlib` | `libslipstream_core.a`                                             | static embedding into a single binary |
 
 The header lands at `include/slipstream_core.h` (regenerated on build; also checked in).
 
@@ -95,7 +95,6 @@ Every target below is a standard Rust target. Add it and point Cargo at the plat
 ```sh
 rustup target add aarch64-unknown-linux-gnu    # most ARM Smart TVs (webOS, Tizen)
 rustup target add armv7-unknown-linux-gnueabihf # older 32-bit TV SoCs
-rustup target add x86_64-pc-windows-msvc        # Xbox (GDK consoles are x64)
 
 # Tell Cargo which cross-linker + sysroot to use (example: aarch64 TV NDK)
 export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
@@ -244,7 +243,7 @@ failure) and block up to `timeout_ms` for the handshake, so **call off your UI t
 |------------------|------|
 | `slipstream_connect`     | base: `width`, `height`, `refresh_hz`, pin, identity |
 | `slipstream_connect_ex`  | `compositor` preference (Linux hosts) |
-| `slipstream_connect_ex2` | `gamepad` backend (X-Box 360 / DualSense / …) |
+| `slipstream_connect_ex2` | `gamepad` backend (DualSense / Steam Deck / …) |
 | `slipstream_connect_ex3` | `bitrate_kbps` |
 | `slipstream_connect_ex4` | `launch_id` (auto-launch a library title) |
 | `slipstream_connect_ex5` | `video_caps` (10-bit / HDR / 4:4:4 / host-timing) |
@@ -260,7 +259,7 @@ SlipstreamConnection *c = slipstream_connect_ex7(
     "192.168.1.50", 9777,
     1920, 1080, 60,                        // mode
     SLIPSTREAM_COMPOSITOR_AUTO,
-    SLIPSTREAM_GAMEPAD_XBOX360,
+    SLIPSTREAM_GAMEPAD_DUALSENSE,
     /*bitrate_kbps=*/20000,
     caps,
     /*audio_channels=*/2,
@@ -488,8 +487,9 @@ Pull these on your feedback thread (or poll with `timeout_ms = 0`). Same
   lightbar RGB / player LEDs / adaptive-trigger effect / trackpad haptic. Replay on a real DualSense
   via the platform's controller API. Only a DualSense-backend session emits these.
 - **HDR metadata** — `slipstream_connection_next_hdr_meta(c, &meta, timeout)`. ST.2086 mastering
-  display + content light level, in HDR10 SEI fixed-point units — ready to hand to DXGI
-  `DXGI_HDR_METADATA_HDR10`, Apple `CAEDRMetadata`, or Android `KEY_HDR_STATIC_INFO`. Only an HDR
+  display + content light level, in HDR10 SEI fixed-point units. Pass it to the
+  display API used by the client, such as Apple `CAEDRMetadata` or Android
+  `KEY_HDR_STATIC_INFO`. Only an HDR
   session emits these; apply the latest to your display.
 - **Host timing** (optional, if you advertised `VIDEO_CAP_HOST_TIMING`) —
   `slipstream_connection_next_host_timing` gives the host's capture→sent µs per AU, so your stats HUD
@@ -571,7 +571,7 @@ ships SDL for NDK apps). Map remote keys to `KEY_DOWN/UP`, the pointer to `MOUSE
 ```c
 // 1. connect (HEVC, stereo, SDR to start)
 SlipstreamConnection *c = slipstream_connect_ex7(host, 9777, 1920,1080,60,
-    SLIPSTREAM_COMPOSITOR_AUTO, SLIPSTREAM_GAMEPAD_XBOX360, 20000,
+    SLIPSTREAM_COMPOSITOR_AUTO, SLIPSTREAM_GAMEPAD_DUALSENSE, 20000,
     /*caps=*/0, /*ch=*/2, SLIPSTREAM_CODEC_HEVC, SLIPSTREAM_CODEC_HEVC,
     NULL, host_fp, observed, cert, key, 8000);
 
@@ -594,73 +594,6 @@ while (running) {
 **Gotchas.** webOS app networking is permitted for UDP/QUIC, but background/suspend policy is
 aggressive — pull-loop `CLOSED` on backgrounding and reconnect on resume. Video-plane / graphics-plane
 z-order and scaling are set through the pipeline's display-window API, not by drawing pixels yourself.
-
----
-
-## 13. Xbox (GDK — Series X|S / One)
-
-**App model.** Use the **Microsoft GDK** (Game Development Kit) for consoles — a **C++** title with
-**Direct3D 12** and the **GameInput** API. Consoles are **x64**, so the core target is
-`x86_64-pc-windows-msvc`. (Requires an ID@Xbox / partner console in Developer Mode; UWP on retail is
-possible but GDK is the low-latency path.)
-
-**Build the core.** From an MSVC environment:
-
-```sh
-rustup target add x86_64-pc-windows-msvc
-cargo build -p slipstream-core --features quic --release --target x86_64-pc-windows-msvc
-```
-
-You get `slipstream_core.dll` (+ import lib) and `slipstream_core.lib` (static). Compile your C++ with
-`/DSLIPSTREAM_FEATURE_QUIC` and add `include/` to the include path. The header is `extern "C"`-clean
-for C++ (`__cplusplus` guards are in place).
-
-**Video decode + present.** Feed the AUs to **Media Foundation** with a **DXVA2 / D3D12
-hardware-accelerated decoder** (`IMFTransform` H.264/HEVC/AV1 decoder), or a D3D12 Video decode
-(`ID3D12VideoDecoder`) if you want to own the DPB. Output NV12/P010 textures and present with your
-D3D12 swapchain. For HDR, set the swapchain to `DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020` and pass
-`slipstream_connection_next_hdr_meta` straight into `IDXGISwapChain4::SetHDRMetaData` — the core's
-`SlipstreamHdrMeta` is already in `DXGI_HDR_METADATA_HDR10` units.
-
-**Audio.** `slipstream_connection_next_audio_pcm` (f32) → **XAudio2** source voice, or **WASAPI**
-shared-mode render. Request 6/8 channels at connect for surround.
-
-**Input.** **GameInput** (`IGameInput::GetCurrentReading`) gives you gamepad state; diff it per frame
-and emit `GAMEPAD_BUTTON`/`GAMEPAD_AXIS` events. Because a real Xbox pad drives this, connect with
-`SLIPSTREAM_GAMEPAD_XBOXONE` for matching glyphs. Rumble comes **back** from the host — feed
-`slipstream_connection_next_rumble2` into `IGameInputDevice::SetRumbleState` (map `low`→
-low-frequency, `high`→high-frequency motors).
-
-**Skeleton (C++):**
-
-```cpp
-auto* c = slipstream_connect_ex7(host, 9777, 3840,2160,60,
-    SLIPSTREAM_COMPOSITOR_AUTO, SLIPSTREAM_GAMEPAD_XBOXONE, /*bitrate=*/60000,
-    SLIPSTREAM_VIDEO_CAP_10BIT | SLIPSTREAM_VIDEO_CAP_HDR,      // 4K HDR
-    /*ch=*/6, SLIPSTREAM_CODEC_HEVC, SLIPSTREAM_CODEC_HEVC,
-    nullptr, hostFp, observed, cert, key, 8000);
-
-uint8_t trc; slipstream_connection_color_info(c, nullptr,&trc,nullptr,nullptr,nullptr);
-bool hdr = (trc == 16 || trc == 18);
-auto decoder = MakeMFHevcDecoder(d3d12Device, hdr /*P010*/);
-
-// video thread
-SlipstreamFrame f;
-while (running) {
-    if (slipstream_connection_next_au(c, &f, 20) != SLIPSTREAM_STATUS_OK) continue;
-    bool gap; slipstream_connection_note_frame_index(c, f.frame_index, &gap);
-    decoder.Decode(f.data, f.len, f.pts_ns);      // → NV12/P010 texture → D3D12 present
-}
-// feedback thread
-uint16_t pad, lo, hi; uint32_t ttl;
-while (slipstream_connection_next_rumble2(c,&pad,&lo,&hi,&ttl, 100) == SLIPSTREAM_STATUS_OK)
-    SetRumble(pad, lo, hi, ttl);
-// HDR: SlipstreamHdrMeta hm; next_hdr_meta(...) → swapChain4->SetHDRMetaData(HDR10, &hm-as-DXGI)
-```
-
-**Gotchas.** GDK console socket use is allowed but goes through the title's network stack — enable it
-in your MicrosoftGame.config and test in the console sandbox. Retail devices need proper cert; keep
-the DLL and header ABI versions locked (§2.5) in your CI.
 
 ---
 
@@ -699,7 +632,7 @@ Register key grabs (`elm_win_keygrab_set`) for the remote, translate D-pad/OK/ba
 
 ```c
 SlipstreamConnection *c = slipstream_connect_ex7(host, 9777, 1920,1080,60,
-    SLIPSTREAM_COMPOSITOR_AUTO, SLIPSTREAM_GAMEPAD_XBOX360, 20000,
+    SLIPSTREAM_COMPOSITOR_AUTO, SLIPSTREAM_GAMEPAD_DUALSENSE, 20000,
     /*caps=*/0, /*ch=*/2, SLIPSTREAM_CODEC_HEVC | SLIPSTREAM_CODEC_H264,
     SLIPSTREAM_CODEC_HEVC, NULL, host_fp, observed, cert, key, 8000);
 

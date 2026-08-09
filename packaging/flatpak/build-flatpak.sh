@@ -27,7 +27,7 @@ set -euo pipefail
 ROOTDIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOTDIR"
 
-APP_ID="io.slipstream"
+APP_ID="io.slipstream.Slipstream"
 MANIFEST="packaging/flatpak/io.slipstream.yml"
 VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo 0.0.1-dev)}"
 VERSION="${VERSION#v}"
@@ -70,15 +70,15 @@ else
   echo "==> generating offline cargo-sources.json from Cargo.lock"
   GEN=/tmp/flatpak-cargo-generator.py
   if [ ! -f "$GEN" ]; then
-    curl -fsSL -o "$GEN" \
-      https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/cargo/flatpak-cargo-generator.py
+    GEN_URL="https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/737c0085912f9f7dabf9341d4608e2a77a51a73a/cargo/flatpak-cargo-generator.py"
+    GEN_SHA256="b373c8ab1a05378ec5d8ed0645c7b127bcec7d2f7a1798694fbc627d570d856c"
+    curl -fsSL -o "${GEN}.download" "$GEN_URL"
+    printf '%s  %s\n' "$GEN_SHA256" "${GEN}.download" | sha256sum --check --status
+    mv "${GEN}.download" "$GEN"
   fi
   # Needs python3 + aiohttp + tomlkit. On a host that lacks them (e.g. the Deck), generate on the
   # Mac / a dev box instead and rsync the result next to the manifest (reused by the branch above).
-  # Prune the microsoft/windows-rs git crates first (slipstream-client-windows only)  -  otherwise
-  # flatpak-builder full-clones that multi-GB repo and fills the disk. See prune-windows-lock.py.
-  python3 packaging/flatpak/prune-windows-lock.py Cargo.lock /tmp/Cargo.flatpak.lock
-  python3 "$GEN" /tmp/Cargo.flatpak.lock -o packaging/flatpak/cargo-sources.json
+  python3 "$GEN" Cargo.lock -o packaging/flatpak/cargo-sources.json
 fi
 
 # --- build into a local ostree repo, then export a single-file bundle --------------------

@@ -164,10 +164,9 @@ pub enum GamepadPref {
     SteamController,
     /// Steam Deck controller (Valve `28DE:1205`) — full Deck gamepad incl. the four back grips
     /// (L4/L5/R4/R5), both trackpads, and the IMU; re-grabbed by Steam Input with native glyphs
-    /// when Steam runs on the host. Linux (kernel `hid-steam` via UHID/usbip/gadget) or Windows
-    /// (UMDF minidriver, Steam-Input-promoted).
+    /// when Steam runs on the host. Needs Linux support through UHID, usbip, or a gadget.
     SteamDeck,
-    /// DualSense Edge (Sony `054C:0DF2`, kernel `hid-playstation` ≥ 6.3 / Windows UMDF) — the
+    /// DualSense Edge (Sony `054C:0DF2`, kernel `hid-playstation` >= 6.3) - the
     /// DualSense plus two back buttons + two Fn buttons, so a client's back paddles (Deck grips,
     /// Elite P1–P4) land on a native slot instead of the fold/drop policy.
     DualSenseEdge,

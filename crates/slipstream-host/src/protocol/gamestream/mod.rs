@@ -118,13 +118,9 @@ pub const SERVER_CODEC_MODE_SUPPORT: u32 = SCM_H264 | SCM_HEVC | SCM_AV1_MAIN8;
 /// `dynamicRangeMode` request. Host-wide and codec-agnostic on purpose: the per-codec depth
 /// question belongs to whoever knows which codec is in play. Behind the host's `SLIPSTREAM_10BIT`
 /// policy gate — **default ON**, explicit-off grammar (`=0`/`false`/`off`/`no` disables), the same
-/// gate the native slipstream/1 plane honors — on both OSes.
+/// gate the native slipstream/1 plane honors.
 ///
-/// **Windows**: the IDD-push capturer streams HEVC Main10 PQ whenever the desktop is HDR, and a
-/// client HDR request proactively enables advanced color on the per-session virtual display so PQ
-/// flows even from an SDR desktop.
-///
-/// **Linux**: two sources can do it, and they are gated differently because they fail differently.
+/// Linux has two sources, and they are gated differently because they fail differently.
 /// The GNOME 50+ portal **monitor mirror** (`video_source=portal`) negotiates the 10-bit PQ
 /// formats only while the mirrored monitor is in HDR mode — a LIVE box-state fact, re-checked at
 /// RTSP honor time ([`ss_capture::gnome_hdr_monitor_active`]), so this fn can only make the static
@@ -138,32 +134,18 @@ pub fn host_hdr_capable() -> bool {
     if !ss_host_config::config().ten_bit {
         return false;
     }
-    #[cfg(target_os = "windows")]
-    {
-        true
-    }
-    #[cfg(target_os = "linux")]
-    {
-        let source_can_hdr = match ss_host_config::config().video_source.as_deref() {
-            Some("portal") => true,
-            // A virtual-output GameStream session drives the host's configured compositor; the
-            // gamescope arm is the only one that can be HDR. `detect()` is the same resolution
-            // the session itself will do, and it is cheap + cached downstream.
-            _ => crate::vdisplay::detect()
-                .ok()
-                .is_some_and(|c| crate::capture::capturer_supports_hdr_for(Some(c))),
-        };
-        // ANY 10-bit-capable codec makes the host HDR-capable; which BITS get advertised, and
-        // whether a given session's negotiated codec can carry it, are per-codec questions
-        // answered by `serverinfo::apply_hdr` and the RTSP honor respectively.
-        source_can_hdr
-            && (crate::encode::can_encode_10bit(crate::encode::Codec::H265)
-                || crate::encode::can_encode_10bit(crate::encode::Codec::Av1))
-    }
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-    {
-        false
-    }
+    let source_can_hdr = match ss_host_config::config().video_source.as_deref() {
+        Some("portal") => true,
+        // A virtual-output GameStream session drives the host's configured compositor; the
+        // gamescope arm is the only one that can be HDR. `detect()` is the same resolution
+        // the session itself will do, and it is cheap + cached downstream.
+        _ => crate::vdisplay::detect()
+            .ok()
+            .is_some_and(|c| crate::capture::capturer_supports_hdr_for(Some(c))),
+    };
+    source_can_hdr
+        && (crate::encode::can_encode_10bit(crate::encode::Codec::H265)
+            || crate::encode::can_encode_10bit(crate::encode::Codec::Av1))
 }
 
 /// Stable host identity + advertised capabilities, shared across control-plane handlers.
@@ -174,7 +156,7 @@ pub struct Host {
     pub local_ip: IpAddr,
     pub http_port: u16,
     pub https_port: u16,
-    /// OS identity chain (`windows` | `macos` | `linux[/<family>][/<id>]`), advertised in the
+    /// Linux OS identity chain (`linux[/<family>][/<id>]`), advertised in the
     /// mDNS `os=` TXT record and `HostInfo.os` so clients can show an OS icon.
     pub os_chain: String,
     /// Human-readable OS name (os-release `PRETTY_NAME`), surfaced as `HostInfo.os_name` only.
@@ -496,13 +478,6 @@ fn hostname_string() -> String {
     if let Some(n) = ss_host_config::config().host_name.as_deref() {
         return sanitize_display_name(n);
     }
-    #[cfg(target_os = "windows")]
-    if let Some(n) = std::env::var_os("COMPUTERNAME") {
-        let s = n.to_string_lossy().trim().to_string();
-        if !s.is_empty() {
-            return s;
-        }
-    }
     std::fs::read_to_string("/proc/sys/kernel/hostname")
         .ok()
         .map(|s| s.trim().to_string())
@@ -565,7 +540,7 @@ fn primary_local_ip() -> Option<IpAddr> {
 
 /// Where the paired-client allow-list persists (survives host restarts, like Sunshine).
 fn paired_path() -> Option<std::path::PathBuf> {
-    // Same dir as the host identity (HOME/.config/slipstream on Linux, %APPDATA%\slipstream on Windows).
+    // Same directory as the host identity.
     Some(ss_paths::config_dir().join("paired.json"))
 }
 
@@ -605,7 +580,7 @@ pub(crate) fn save_paired(paired: &[Vec<u8>]) {
         }
     };
     // Write to a sibling temp file (owner-only, so a local user can't tamper the allow-list), then
-    // rename over the target (atomic replace on Unix and Windows). Never write `path` in place.
+    // rename over the target atomically. Never write `path` in place.
     let tmp = path.with_extension("json.tmp");
     if let Err(e) = ss_paths::write_secret_file(&tmp, &bytes) {
         tracing::warn!(error = %e, "persisting pairings failed (temp write)");

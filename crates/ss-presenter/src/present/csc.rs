@@ -11,7 +11,7 @@ use anyhow::{Context as _, Result};
 use ash::vk;
 
 // The coefficient math lives in ss-client-core next to `ColorDesc` (one tested
-// implementation shared with the Windows client's D3D11 constant buffer and mirrored by the
+// implementation shared with the hardware decode path and mirrored by the
 // Apple client's Swift port); re-exported here so presenter callers keep their import path.
 pub use ss_client_core::video::csc_rows;
 

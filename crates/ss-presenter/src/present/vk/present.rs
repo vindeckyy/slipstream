@@ -3,7 +3,6 @@
 use super::gpu::*;
 use super::{FrameInput, Presenter, Retired};
 use crate::csc::csc_rows;
-#[cfg(target_os = "linux")]
 use crate::dmabuf::{self, HwFrame};
 use crate::overlay::OverlayFrame;
 use anyhow::{bail, Context as _, Result};
@@ -41,12 +40,9 @@ impl Presenter {
         let frame_pq = match &input {
             FrameInput::Redraw => None,
             FrameInput::Cpu(_) => Some(false),
-            #[cfg(target_os = "linux")]
             FrameInput::Dmabuf(d) => Some(d.color.is_pq()),
             FrameInput::VkFrame(v) => Some(v.color.is_pq()),
-            #[cfg(windows)]
-            FrameInput::D3d11(d) => Some(d.color.is_pq()),
-            #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+            #[cfg(feature = "pyrowave")]
             FrameInput::PyroWave(f) => Some(f.color.is_pq()),
         };
         if let Some(pq) = frame_pq {
@@ -71,17 +67,13 @@ impl Presenter {
         // Hardware frames prepare before anything touches the queue: an import/view the
         // driver rejects must fail out here, before this present consumed the acquire
         // semaphore.
-        #[cfg(target_os = "linux")]
         let mut hw_frame: Option<HwFrame> = None;
-        #[cfg(windows)]
-        let mut win_frame: Option<crate::d3d11::HwFrame> = None;
         let mut vk_frame: Option<(VkVideoFrame, [vk::ImageView; 2])> = None;
-        #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+        #[cfg(feature = "pyrowave")]
         let mut pyro_frame: Option<ss_client_core::video_pyrowave::PyroWavePlanarFrame> = None;
         let cpu_frame = match input {
             FrameInput::Redraw => None,
             FrameInput::Cpu(f) => Some(f),
-            #[cfg(target_os = "linux")]
             FrameInput::Dmabuf(d) => {
                 let hw = self
                     .hw
@@ -90,21 +82,12 @@ impl Presenter {
                 hw_frame = Some(dmabuf::import(&self.device, &hw.ext_mem_fd, d)?);
                 None
             }
-            #[cfg(windows)]
-            FrameInput::D3d11(d) => {
-                let hw = self
-                    .hw_win
-                    .as_ref()
-                    .context("D3D11 frame without win32 import support")?;
-                win_frame = Some(crate::d3d11::import(&self.device, &hw.ext_mem_win32, &d)?);
-                None
-            }
             FrameInput::VkFrame(v) => {
                 let views = self.vkframe_plane_views(&v)?;
                 vk_frame = Some((v, views));
                 None
             }
-            #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+            #[cfg(feature = "pyrowave")]
             FrameInput::PyroWave(f) => {
                 pyro_frame = Some(f);
                 None
@@ -129,7 +112,6 @@ impl Presenter {
         if let Some(f) = cpu_frame {
             self.stage_frame(f)?;
         }
-        #[cfg(target_os = "linux")]
         if let Some(f) = &hw_frame {
             if self
                 .video
@@ -143,17 +125,6 @@ impl Presenter {
             self.csc
                 .bind_planes(&self.device, f.luma_view, f.chroma_view);
         }
-        #[cfg(windows)]
-        if let Some(f) = &win_frame {
-            if self
-                .video
-                .as_ref()
-                .is_none_or(|v| v.width != f.width || v.height != f.height)
-            {
-                self.rebuild_video_image(f.width, f.height)?;
-                tracing::info!(width = f.width, height = f.height, "video image (re)built");
-            }
-        }
         if let Some((f, views)) = &vk_frame {
             if self
                 .video
@@ -165,7 +136,7 @@ impl Presenter {
             }
             self.csc.bind_planes(&self.device, views[0], views[1]);
         }
-        #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+        #[cfg(feature = "pyrowave")]
         if let Some(f) = &pyro_frame {
             if self
                 .video
@@ -210,12 +181,7 @@ impl Presenter {
             Ok(r) => r,
             Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
                 // Never submitted — the import (if any) dies here, GPU never saw it.
-                #[cfg(target_os = "linux")]
                 if let Some(f) = hw_frame {
-                    f.destroy(&self.device);
-                }
-                #[cfg(windows)]
-                if let Some(f) = win_frame {
                     f.destroy(&self.device);
                 }
                 self.recreate_swapchain(window)?;
@@ -238,7 +204,6 @@ impl Presenter {
             // Dmabuf frame: acquire the foreign planes, then the CSC pass renders
             // NV12→RGBA into the video image (render pass ends it in TRANSFER_SRC for
             // the blit below).
-            #[cfg(target_os = "linux")]
             if let (Some(f), Some(v)) = (&hw_frame, &self.video) {
                 for view_image in [f.luma_image(), f.chroma_image()] {
                     foreign_acquire_barrier(&self.device, self.cmd_buf, view_image, self.qfi);
@@ -257,50 +222,6 @@ impl Presenter {
                     f.color,
                     if ten_bit { 10 } else { 8 },
                     ten_bit,
-                );
-            }
-
-            // D3D11 frame: acquire the imported RGB texture from the external "queue
-            // family" (the keyed mutex on the submit is the actual cross-API sync) and
-            // blit it into the video image — the frame arrives as ready RGB from the
-            // decoder's VideoProcessor (sRGB BGRA8, or PQ RGB10A2 on the HDR ring —
-            // matching the HDR-mode video image), so there is no CSC pass; the blit
-            // converts component order. Same layout dance as the CPU staging path.
-            #[cfg(windows)]
-            if let (Some(f), Some(v)) = (&win_frame, &self.video) {
-                external_acquire_barrier(&self.device, self.cmd_buf, f.image(), self.qfi);
-                barrier(
-                    &self.device,
-                    self.cmd_buf,
-                    v.image,
-                    vk::ImageLayout::UNDEFINED,
-                    vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                );
-                let extent = vk::Offset3D {
-                    x: v.width as i32,
-                    y: v.height as i32,
-                    z: 1,
-                };
-                let blit = vk::ImageBlit::default()
-                    .src_subresource(subresource_layers())
-                    .src_offsets([vk::Offset3D::default(), extent])
-                    .dst_subresource(subresource_layers())
-                    .dst_offsets([vk::Offset3D::default(), extent]);
-                self.device.cmd_blit_image(
-                    self.cmd_buf,
-                    f.image(),
-                    vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                    v.image,
-                    vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                    &[blit],
-                    vk::Filter::NEAREST, // 1:1 — the composite blit below does the scaling
-                );
-                barrier(
-                    &self.device,
-                    self.cmd_buf,
-                    v.image,
-                    vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                    vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
                 );
             }
 
@@ -346,7 +267,7 @@ impl Presenter {
             // PyroWave frame: the planes are already on THIS device, decode
             // fence-complete and barriered to fragment sampling (GENERAL) by the
             // decoder — no acquire needed, just the planar CSC pass.
-            #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+            #[cfg(feature = "pyrowave")]
             if let (Some(f), Some(v)) = (&pyro_frame, &self.video) {
                 let extent = vk::Extent2D {
                     width: v.width,
@@ -533,33 +454,6 @@ impl Presenter {
             if vk_sync.is_some() {
                 submit = submit.push_next(&mut timeline);
             }
-            // D3D11 frame: bracket the submit in the shared texture's keyed mutex, key 0
-            // both ways (the decode side copies under acquire(0)/release(0) too) — the
-            // GPU-side acquire is what orders our sampling after the decoder's copy, and
-            // our completion release is what unblocks the ring slot's reuse.
-            #[cfg(windows)]
-            let keyed_mem;
-            #[cfg(windows)]
-            let keyed_keys = [0u64];
-            #[cfg(windows)]
-            let keyed_timeouts = [2000u32];
-            #[cfg(windows)]
-            let mut keyed_info;
-            #[cfg(windows)]
-            if let Some(f) = &win_frame {
-                // Bisect knob: SLIPSTREAM_D3D11_NO_MUTEX=1 skips the acquire/release pair
-                // (torn frames possible — debugging only).
-                if std::env::var_os("SLIPSTREAM_D3D11_NO_MUTEX").is_none() {
-                    keyed_mem = [f.memory()];
-                    keyed_info = vk::Win32KeyedMutexAcquireReleaseInfoKHR::default()
-                        .acquire_syncs(&keyed_mem)
-                        .acquire_keys(&keyed_keys)
-                        .acquire_timeouts(&keyed_timeouts)
-                        .release_syncs(&keyed_mem)
-                        .release_keys(&keyed_keys);
-                    submit = submit.push_next(&mut keyed_info);
-                }
-            }
             let submitted = {
                 // Queue external sync vs the pump's FFmpeg submits (see `queue_lock`).
                 let _q = self.queue_lock.guard();
@@ -587,13 +481,8 @@ impl Presenter {
             self.retired_hw = vk_frame
                 .take()
                 .map(|(frame, views)| Retired::Vk { frame, views });
-            #[cfg(target_os = "linux")]
             if let Some(f) = hw_frame.take() {
                 self.retired_hw = Some(Retired::Dmabuf(f));
-            }
-            #[cfg(windows)]
-            if let Some(f) = win_frame.take() {
-                self.retired_hw = Some(Retired::D3d11(f));
             }
 
             let swapchains = [self.swapchain];
@@ -735,7 +624,7 @@ impl Presenter {
     }
 
     /// [`record_csc`] over the planar (PyroWave) pass — always 8-bit, no MSB packing.
-    #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+    #[cfg(feature = "pyrowave")]
     unsafe fn record_csc_planar(
         &self,
         framebuffer: vk::Framebuffer,
@@ -934,8 +823,7 @@ struct VkFrameSync {
 
 /// Lock the frame and read its live sync state (the presenter's submit must wait
 /// `sem_value` and signal `sem_value + 1`). The lock is held until [`unlock_vkframe`].
-// bindgen's enum repr is target-dependent (u32 Linux/clang, i32 MSVC) — the layout cast
-// is required on one platform and a no-op on the other.
+// Bindgen's enum representation is cast at the FFI boundary.
 #[allow(clippy::unnecessary_cast)]
 fn lock_vkframe(f: &VkVideoFrame) -> VkFrameSync {
     // SAFETY: per the Vulkan contract above - the Vulkan handles used here are owned by this type

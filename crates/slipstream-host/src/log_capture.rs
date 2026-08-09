@@ -127,13 +127,12 @@ pub fn ring() -> &'static LogRing {
 
 /// Targets whose DEBUG/TRACE output is steady-state chatter, not diagnostics — left in, they evict
 /// the entire ring tail: `mdns_sd` DEBUG-logs every multicast packet it can't parse (one chatty
-/// AirPlay/HomePod device on the LAN floods thousands of entries per hour), `wasapi` DEBUG-logs
-/// the default audio device once a second (the device-watchdog poll), and `rustls`/`ureq` DEBUG
+/// AirPlay/HomePod device on the LAN floods thousands of entries per hour), and `rustls`/`ureq` DEBUG
 /// every management-API poll (the console's bearer-token HTTPS hits request optional mTLS, then
 /// log "client auth requested but no certificate supplied" + CloseNotify three times per request).
 /// The ring keeps their INFO-and-up; the file/stderr filter caps them separately (see `main`'s
 /// EnvFilter directives). Prefix-matched on module path boundaries.
-const NOISY_DEBUG_TARGETS: &[&str] = &["mdns_sd", "wasapi", "rustls", "ureq"];
+const NOISY_DEBUG_TARGETS: &[&str] = &["mdns_sd", "rustls", "ureq"];
 
 fn is_noisy_debug(target: &str) -> bool {
     NOISY_DEBUG_TARGETS.iter().any(|t| {
@@ -145,11 +144,11 @@ fn is_noisy_debug(target: &str) -> bool {
 
 /// Init the `log`→`tracing` bridge and install `subscriber` as the global default. Replaces
 /// `SubscriberInitExt::init()` (which auto-inits the bridge with no crate filtering) so we can
-/// **drop the `wasapi` crate's records at the bridge**: it polls the default audio device ~1×/s
-/// and `log::debug!`s it, and those bridged events carry the bridge shim target at *filter* time,
+/// **drop noisy dependency records at the bridge** before they become tracing events, and those
+/// bridged events carry the bridge shim target at *filter* time,
 /// so a downstream level/target filter on the file layer can't catch them (the ring can, in
-/// `on_event`, via `normalized_metadata` — but the fmt layer filters pre-event). `ignore_crate`
-/// stops them at the source, before they ever become tracing events, so neither sink sees them.
+/// `on_event`, via `normalized_metadata` — but the fmt layer filters pre-event). The bridge filter
+/// stops them at the source, so neither sink sees them.
 /// The bridge max-level stays DEBUG so every *other* `log`-crate dependency still reaches the ring.
 pub fn install_global<S>(subscriber: S)
 where
@@ -157,7 +156,6 @@ where
 {
     let _ = tracing_log::LogTracer::builder()
         .with_max_level(log::LevelFilter::Debug)
-        .ignore_crate("wasapi")
         .init();
     let _ = tracing::subscriber::set_global_default(subscriber);
 }

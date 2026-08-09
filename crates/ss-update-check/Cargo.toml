@@ -4,7 +4,7 @@
 # manifest, and a trust rule that lives in two places is a trust rule that will diverge.
 #
 # Deliberately check-only: no apply legs, no package managers, no privileged anything. The
-# host keeps its Windows/Linux apply code; the client keeps its own. What is shared here is
+# host and client keep their own apply code. What is shared here is
 # exactly the part where being wrong is a security bug: signature verification, manifest
 # validation, and the version comparison that decides whether to tell a user to update.
 [package]
@@ -22,8 +22,8 @@ publish = false
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# Ed25519 over the exact manifest bytes. The workspace is ring-only (no aws-lc-sys — it fails
-# on the Windows CI runner), and this is the same primitive the plugin-store index uses.
+# Ed25519 over the exact manifest bytes. The workspace is ring-only, and this is the same
+# primitive the plugin-store index uses.
 ring = "0.17"
 base64 = "0.22"
 # Small, sync, bundles webpki roots — no system cert store dependency, which matters on the

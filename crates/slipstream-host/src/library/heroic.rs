@@ -3,8 +3,7 @@
 use super::*;
 
 /// Reads Heroic Games Launcher's local library cache. One provider surfaces all three of Heroic's
-/// backends (legendary=Epic, gog=GOG, nile=Amazon). Linux-only for now (Heroic on Windows uses a
-/// different config path and the launch path isn't wired there yet).
+/// backends (legendary=Epic, gog=GOG, nile=Amazon) on Linux.
 #[cfg(target_os = "linux")]
 pub struct HeroicProvider;
 

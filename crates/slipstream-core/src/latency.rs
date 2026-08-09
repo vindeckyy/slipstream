@@ -28,7 +28,7 @@ pub struct FrameTimings {
     pub fence_wait_start_ns: u64,
     /// Import-fence wait end. Not measured in Phase 1a.
     pub fence_wait_end_ns: u64,
-    /// GPU import (dmabuf/DXGI texture) done. Not measured in Phase 1a.
+    /// GPU import (dmabuf or Vulkan image) done. Not measured in Phase 1a.
     pub import_end_ns: u64,
     /// Colour convert done. Not measured in Phase 1a.
     pub convert_end_ns: u64,

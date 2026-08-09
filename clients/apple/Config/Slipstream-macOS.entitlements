@@ -7,9 +7,9 @@
 	     iOS/tvOS keep the shared Config/Slipstream.entitlements. The single macOS app is
 	     sandboxed for BOTH channels — the Developer ID DMG is codesigned with this same
 	     file (App Sandbox is allowed, not just required, for Developer ID), so what we
-	     test locally (⌘R / DMG) is exactly what Mac App Store / TestFlight users get. -->
+	     test locally (⌘R / DMG) is exactly what store users get. -->
 
-	<!-- Required for Mac App Store / TestFlight distribution. -->
+	<!-- Required for Mac App Store distribution. -->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
 

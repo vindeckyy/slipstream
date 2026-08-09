@@ -1,8 +1,6 @@
-# Input injection (plan §W6): the per-OS injector backends (wlroots virtual-input, KWin fake_input,
-# libei/reis, gamescope-EI on Linux; SendInput on Windows) + the virtual-gamepad HID stack (DualSense/
-# DualShock4/Switch Pro/Steam Controller/Deck over uhid/usbip and the Windows UMDF drivers), extracted
-# into a subsystem crate. Consumes slipstream_core::input (the neutral GamepadEvent/InputEvent vocabulary,
-# moved to core in W5) and the ss-driver-proto wire contract; NEVER reaches the orchestrator (the one
+# Input injection: wlroots virtual-input, KWin fake_input, libei/reis, gamescope-EI, and the
+# virtual-gamepad HID stack on Linux, extracted into a subsystem crate. Consumes
+# slipstream_core::input (the neutral GamepadEvent/InputEvent vocabulary) and never reaches the
 # gamescope-EI socket path is the shared ss-paths contract, not a vdisplay reach-in).
 [package]
 name = "ss-inject"
@@ -15,13 +13,11 @@ publish = false
 
 [dependencies]
 slipstream-core = { path = "../slipstream-core", features = ["quic"] }
-ss-driver-proto = { path = "../ss-driver-proto" }
 ss-host-config = { path = "../ss-host-config" }
 ss-paths = { path = "../ss-paths" }
 # The shared frame vocabulary — `worker_qos` (Phase-7 opt-in worker scheduling) rides here.
 ss-frame = { path = "../ss-frame" }
-# The Windows gamepad-channel bootstrap reuses the IDD-push WUDFHost verification + the resident-mouse
-# compose-kick hook (both live in ss-capture).
+# The host cursor state is shared with the Linux capture path.
 ss-capture = { path = "../ss-capture" }
 anyhow = "1"
 tracing = "0.1"
@@ -50,35 +46,6 @@ tokio = { version = "1", features = ["rt", "rt-multi-thread", "net", "time"] }
 xkbcommon = "0.8"
 # Vendored + trimmed usbip server core — presents a virtual Steam Deck over USB/IP for Steam Input.
 usbip-sim = { path = "../slipstream-host/vendor/usbip-sim" }
-
-[target.'cfg(target_os = "windows")'.dependencies]
-# The streamed-output desktop rect (CCD source rect) absolute input maps into — the same
-# resolver the cursor-readback poller uses, so inject and readback always agree.
-ss-win-display = { path = "../ss-win-display" }
-windows = { version = "0.62", features = [
-    "Win32_Foundation",
-    "Win32_Security",
-    "Win32_Security_Authorization",
-    "Win32_Devices_DeviceAndDriverInstallation",
-    "Win32_Devices_Enumeration_Pnp",
-    # SwDeviceCreate's SW_DEVICE_CREATE_INFO references DEVPROPKEY (Properties).
-    "Win32_Devices_Properties",
-    # The channel proof: HidD_GetIndexedString + GUID_DEVINTERFACE_HID (the pads/mouse leg) and
-    # CreateFileW to open the device interface the proof is asked over.
-    "Win32_Devices_HumanInterfaceDevice",
-    "Win32_Storage_FileSystem",
-    "Win32_System_Memory",
-    "Win32_System_IO",
-    "Win32_System_StationsAndDesktops",
-    "Win32_System_Threading",
-    "Win32_UI_Input_KeyboardAndMouse",
-    # Synthetic pointer devices (PT_PEN / PT_TOUCH) — the pen/touch injectors. The device
-    # create/destroy + POINTER_TYPE_INFO live under Controls in this metadata layout;
-    # InjectSyntheticPointerInput + POINTER_*_INFO under Input_Pointer.
-    "Win32_UI_Controls",
-    "Win32_UI_Input_Pointer",
-    "Win32_UI_WindowsAndMessaging",
-] }
 
 [lints]
 workspace = true

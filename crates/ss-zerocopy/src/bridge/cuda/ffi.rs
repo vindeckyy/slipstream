@@ -137,14 +137,14 @@ const _: () = {
 };
 
 /// `CUDA_EXTERNAL_MEMORY_HANDLE_DESC` (cuda.h, 64-bit layout). `handle` is a union whose
-/// largest member is the win32 two-pointer struct (16 bytes, align 8); for the OPAQUE_FD type
+/// largest member is the native two-pointer handle struct (16 bytes, align 8); for the OPAQUE_FD type
 /// only the first 4 bytes (the `int fd`) are read.
 #[repr(C)]
 #[derive(Default)]
 pub struct CUDA_EXTERNAL_MEMORY_HANDLE_DESC {
     pub type_: c_uint, // CU_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD = 1
     pub(crate) _pad: u32,
-    pub handle: [u64; 2], // union { int fd; {void*,void*} win32; void* nvSciBufObject }
+    pub handle: [u64; 2], // union { int fd; native handle pair; void* nvSciBufObject }
     pub size: u64,
     pub flags: c_uint,
     pub(crate) reserved: [c_uint; 16],
@@ -165,7 +165,7 @@ pub struct CUDA_EXTERNAL_MEMORY_BUFFER_DESC {
 pub const CU_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD: c_uint = 1;
 
 /// `CUDA_EXTERNAL_SEMAPHORE_HANDLE_DESC` (cuda.h, 64-bit layout). Same union-flattening as the
-/// memory desc above: `handle` is a union whose largest member is the win32 two-pointer struct
+/// memory desc above: `handle` is a union whose largest member is the native two-pointer handle
 /// (16 bytes, align 8); for the fd-carrying types only the first 4 bytes (the `int fd`) are read.
 /// No `size` field — a semaphore has none.
 #[repr(C)]
@@ -173,7 +173,7 @@ pub const CU_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD: c_uint = 1;
 pub struct CUDA_EXTERNAL_SEMAPHORE_HANDLE_DESC {
     pub type_: c_uint, // CU_EXTERNAL_SEMAPHORE_HANDLE_TYPE_TIMELINE_SEMAPHORE_FD = 9
     pub(crate) _pad: u32,
-    pub handle: [u64; 2], // union { int fd; {void*,void*} win32; const void* nvSciSyncObj }
+    pub handle: [u64; 2], // union { int fd; native handle pair; const void* nvSciSyncObj }
     pub flags: c_uint,
     pub(crate) reserved: [c_uint; 16],
     pub(crate) _pad2: u32,

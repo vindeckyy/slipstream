@@ -121,8 +121,8 @@ Plus a real-world recipe:
 | Token | `{ token }` → `SLIPSTREAM_MGMT_TOKEN` → `SLIPSTREAM_PLUGIN_TOKEN` → `<config_dir>/plugin-token` → `<config_dir>/mgmt-token` |
 | TLS pin | `{ ca }` → `SLIPSTREAM_MGMT_CA` (path) → `<config_dir>/cert.pem` |
 
-`<config_dir>` is `~/.config/slipstream` (Linux/macOS) or `%ProgramData%\slipstream` (Windows) —
-so a script running on the host box needs **zero configuration**. The TLS pin trusts exactly
+`<config_dir>` is `~/.config/slipstream` by default, or the path set by
+`SLIPSTREAM_CONFIG_DIR`, so a script running on the host box needs **zero configuration**. The TLS pin trusts exactly
 the host's self-signed identity cert (chain-verified; the hostname check is waived — the cert
 is deliberately CN-only, native clients pin its fingerprint). Bun and Node are first-class;
 other runtimes fall back to system trust (point your runtime's CA option at `cert.pem`).
@@ -182,19 +182,13 @@ fs.mkdirSync(dir, { recursive: true });
 fs.writeFileSync(path.join(dir, "cache.json"), data);
 ```
 
-This matters on Windows: the managed runner is de-privileged (`NT AUTHORITY\LocalService`) and the
-config dir is locked read-only, so a write straight under it fails with `EPERM`. `slipstream-host
-plugins enable` grants the runner write on exactly `plugin-state` — the config dir and your plugin's
-*code* stay read-only. On Linux the runner owns the whole config dir, so the same path is writable
-with no special step.
+The separate state tree keeps plugin-owned files away from host-managed configuration. The host
+prepares it with the permissions needed by the supervised runner.
 
 ### Receiving data from an interactive-user app — `pluginIngestDir`
 
-If a plugin needs data produced by a **different account** — e.g. a desktop app running as the
-logged-in user, like the Playnite exporter — it can't read it from that user's profile: the
-de-privileged Windows runner can't traverse `C:\Users\<you>\…`. `pluginIngestDir("<your-name>")`
-resolves an inbox (`<config_dir>/ingest/<name>`) that `plugins enable` makes **user-writable**, so
-your app drops a file there and the runner reads it:
+If a plugin needs data produced by another local application, `pluginIngestDir("<your-name>")`
+resolves an explicit inbox (`<config_dir>/ingest/<name>`) for that handoff:
 
 ```ts
 import { pluginIngestDir } from "@slipstream/host";
@@ -258,8 +252,7 @@ bun src/runner-cli.ts remove playnite
 bun src/runner-cli.ts list              # installed plugin packages + versions
 ```
 
-On an installed host these are reached through the host CLI, which also drives the runner service
-and checks for elevation on Windows — that is the documented path for operators:
+On an installed host these are reached through the host CLI, which drives the runner service:
 
 ```sh
 slipstream-host plugins add playnite
@@ -311,11 +304,6 @@ RestartSec=5
 [Install]
 WantedBy=default.target
 ```
-
-Windows Task Scheduler: a task triggered *At log on* running
-`bun C:\Users\me\slipstream-scripts\myscript.ts` (the SDK reads
-`%ProgramData%\slipstream\plugin-token` — run the task as an account that can; the managed
-runner's `plugins enable` grants its LocalService principal exactly that read).
 
 ## Compatibility
 

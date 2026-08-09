@@ -3,8 +3,8 @@
 //
 // With NO subcommand it RUNS the runner: discover the operator's scripts + slipstream-plugin-*
 // packages and supervise them (see ./runner.ts). SIGINT/SIGTERM interrupt the whole tree
-// structurally, so every plugin's finalizers run before exit (the systemd-stop story). This bare
-// form is what the systemd unit / Windows scheduled task launch — do not change its behavior.
+// structurally, so every plugin's finalizers run before exit. This bare form is what the systemd
+// unit launches.
 //
 // With a subcommand it manages plugin packages (the host CLI forwards `slipstream-host plugins …`
 // here):

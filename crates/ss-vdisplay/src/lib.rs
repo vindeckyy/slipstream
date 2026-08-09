@@ -1,4 +1,4 @@
-//! Virtual display orchestration (plan §6 / §W6) — the project's differentiator.
+//! Virtual display orchestration (plan §6).
 //!
 //! A [`VirtualDisplay`] creates a *client-sized* output on demand, rendered natively and
 //! headless (no scaling), to be captured and streamed, then torn down on disconnect. There is
@@ -13,19 +13,12 @@
 //! owned keepalive whose `Drop` releases the output (RAII — no explicit `destroy`). Capture
 //! consumes the node via the host `capture::capture_virtual_output`.
 
-// `dead_code` is ENFORCED on Linux, where ~10k of this crate's ~17k lines live. Off elsewhere for
-// one structural reason: `proc`, `session`, `routing`, `monitors` and `lifecycle` are declared
-// unconditionally but exist to serve the Linux backends, so on Windows/macOS most of their surface
-// is legitimately unreferenced. Scoping it this way rather than crate-wide keeps the platform that
-// owns the code honest. (Was a bare crate-wide allow whose "scaffold, defined ahead of the target
-// that uses them" rationale had stopped being true.)
+// `dead_code` is enforced on the Linux implementation, where the display modules are active.
+// Keeping the allowance scoped makes unused support code visible during the Linux build.
 #![cfg_attr(not(target_os = "linux"), allow(dead_code))]
 // Every `unsafe` block in this file carries a `// SAFETY:` proof; enforce it (unsafe-proof program).
 #![deny(clippy::undocumented_unsafe_blocks)]
-// …and that program only covers a whole `unsafe fn` body once the body needs its own block: in
-// edition 2021 `unsafe_op_in_unsafe_fn` is allow-by-default, which exempted this crate's hardest
-// FFI from the deny above — every IOCTL wrapper, and `restore_displays_ccd`, the call the whole
-// Windows teardown path depends on to give the operator their physical panels back.
+// The explicit block requirement also covers the low-level display FFI in this crate.
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use anyhow::Result;
@@ -36,7 +29,7 @@ use std::os::fd::OwnedFd;
 /// A display-lifecycle event the registry emits when it creates or releases a managed virtual
 /// display. The host wires [`DISPLAY_EVENT_SINK`] to translate these into its SSE event bus
 /// (`crate::events` in the orchestrator), so this crate emits lifecycle signals without owning the
-/// bus type — the one reach into the orchestrator's event module, inverted to a leaf hook (plan §W6).
+/// bus type — the one reach into the orchestrator's event module, inverted to a leaf hook.
 pub enum DisplayEvent {
     /// A virtual display was created on `backend` at `width`×`height`@`refresh_hz`.
     Created {
@@ -62,7 +55,7 @@ pub(crate) fn emit_display_event(ev: DisplayEvent) {
 }
 
 /// The virtual-display backend contract — [`DisplayOwnership`], [`VirtualOutput`], and the
-/// [`VirtualDisplay`] trait (plan §W3). Re-exported so `crate::VirtualDisplay` etc. stay
+/// [`VirtualDisplay`] trait. Re-exported so `crate::VirtualDisplay` etc. stay
 /// stable for the ~30 external call sites.
 #[path = "display/backend.rs"]
 pub(crate) mod backend;
@@ -73,7 +66,7 @@ pub use backend::{DisplayOwnership, VirtualDisplay, VirtualOutput};
 #[path = "display/proc.rs"]
 pub(crate) mod proc;
 
-/// Live-session detection + session-epoch + env retargeting (plan §W3).
+/// Live-session detection, session-epoch, and env retargeting.
 #[path = "display/session.rs"]
 pub(crate) mod session;
 pub use session::{
@@ -83,7 +76,7 @@ pub use session::{
 #[cfg(target_os = "linux")]
 pub use session::{session_epoch, try_recover_session};
 
-/// Gamescope-session routing (plan §W3).
+/// Gamescope-session routing.
 #[path = "display/routing.rs"]
 pub(crate) mod routing;
 pub use routing::{
@@ -268,20 +261,6 @@ pub fn with_env_lock<R>(f: impl FnOnce() -> R) -> R {
 /// a backend for a test), else the **live session** ([`detect_active_session`] — so a Bazzite box
 /// follows Gaming↔Desktop switches), else a last-resort `XDG_CURRENT_DESKTOP` read.
 pub fn detect() -> Result<Compositor> {
-    // Compositor detection is a Linux question — the variants ARE the Linux backends. Asked
-    // anywhere else this used to fall through to the XDG sniff below and fail with advice about
-    // `XDG_CURRENT_DESKTOP` and `SLIPSTREAM_COMPOSITOR`, which `mgmt/display.rs` puts VERBATIM into
-    // the `/display/monitors` response — so on a Windows host the console's only explanation for an
-    // empty monitor picker was Linux troubleshooting (sweep §13.17). The operator pin is gated with
-    // it: naming a Wayland compositor on Windows cannot be honoured either.
-    #[cfg(not(target_os = "linux"))]
-    {
-        anyhow::bail!(
-            "compositor detection is Linux-only; on {} the host enumerates displays through the OS \
-             display API instead (`vdisplay::monitors::list_windows`)",
-            std::env::consts::OS
-        )
-    }
     #[cfg(target_os = "linux")]
     {
         if let Some(v) = ss_host_config::config().compositor.as_deref() {
@@ -360,7 +339,7 @@ pub fn capture_monitor() -> Option<String> {
     policy::prefs().get().capture_monitor
 }
 
-/// Open the virtual-display driver for `compositor`.
+/// Open the virtual-display backend for `compositor`.
 ///
 /// A [`capture_monitor`] pin routes to the **mirror** backend instead: the host streams that
 /// physical head and creates no virtual display at all. Deliberately resolved here, at the one place
@@ -402,25 +381,6 @@ pub fn open(compositor: Compositor) -> Result<Box<dyn VirtualDisplay>> {
             Compositor::Hyprland => Ok(Box::new(hyprland::HyprlandDisplay::new()?)),
         }
     }
-    #[cfg(target_os = "windows")]
-    {
-        // The ss-vdisplay all-Rust IddCx driver is the sole virtual-display backend (the legacy SudoVDA
-        // fallback was removed — its driver is no longer shipped). The compositor arg is moot on Windows.
-        let _ = compositor;
-        // `ensure_available` self-heals the hostless-zombie state a WUDFHost crash leaves (adapter
-        // devnode present, interface gone): one device cycle + re-probe before giving up.
-        anyhow::ensure!(
-            driver::ensure_available(),
-            "ss-vdisplay driver interface not found — the ss-vdisplay IddCx driver is not installed or \
-             not loaded (the host installer bundles it; reinstall or check the driver state)"
-        );
-        Ok(Box::new(driver::PfVdisplayDisplay::new()?))
-    }
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-    {
-        let _ = compositor;
-        anyhow::bail!("virtual displays require Linux or Windows")
-    }
 }
 
 /// Open the **mirror** backend for a specific monitor, bypassing the `SLIPSTREAM_CAPTURE_MONITOR`
@@ -455,16 +415,6 @@ pub fn probe(compositor: Compositor) -> Result<()> {
             Compositor::Gamescope | Compositor::Mutter | Compositor::Wlroots => Ok(()),
         }
     }
-    #[cfg(target_os = "windows")]
-    {
-        let _ = compositor;
-        driver::probe()
-    }
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-    {
-        let _ = compositor;
-        anyhow::bail!("virtual displays require Linux or Windows")
-    }
 }
 
 // The user-configurable management policy (keep-alive / topology / conflict / identity / layout),
@@ -493,8 +443,8 @@ mod mirror;
 #[path = "display/lifecycle.rs"]
 pub(crate) mod lifecycle;
 
-// The neutral snapshot/release facade over the per-OS lifecycle owners (Windows manager; Linux pool
-// later), for the management API's /display/state + /display/release.
+// The neutral snapshot/release facade over the Linux lifecycle owner, for the management API's
+// /display/state + /display/release.
 #[path = "display/registry.rs"]
 pub mod registry;
 
@@ -505,8 +455,8 @@ pub(crate) mod layout;
 
 /// Resolve a [`policy::Topology`] to a concrete value (never [`policy::Topology::Auto`]). `Auto`
 /// reproduces today's default: **extend** under an explicit `SLIPSTREAM_COMPOSITOR` pin (the CI/test
-/// posture, where the host isn't the sole desktop), else **exclusive** (Windows + the auto-detected
-/// Linux desktop path, where "stream this desktop" means promoting the virtual output to sole).
+/// posture, where the host isn't the sole desktop), else **exclusive** on the auto-detected Linux
+/// desktop path, where "stream this desktop" means promoting the virtual output to sole.
 pub fn resolve_topology(t: policy::Topology) -> policy::Topology {
     match t {
         policy::Topology::Auto => {
@@ -520,12 +470,12 @@ pub fn resolve_topology(t: policy::Topology) -> policy::Topology {
     }
 }
 
-/// The concrete display topology for the current session — what the per-compositor backends (and the
-/// Windows isolate gate) apply at create time. Precedence, mirroring the rest of the policy surface:
+/// The concrete display topology for the current session - what the per-compositor backends apply
+/// at create time. Precedence, mirroring the rest of the policy surface:
 /// the **console policy** when configured, else the legacy **`SLIPSTREAM_{KWIN,MUTTER}_VIRTUAL_PRIMARY`**
 /// env (an operator's explicit choice — `1`→exclusive, `0`→extend), else the **Auto** default
-/// ([`resolve_topology`]: exclusive on the auto-detected desktop / Windows, extend under a compositor
-/// pin). Always resolved (never [`policy::Topology::Auto`]). This is the Stage-2 replacement for the
+/// ([`resolve_topology`]: exclusive on the auto-detected desktop, extend under a compositor pin).
+/// Always resolved (never [`policy::Topology::Auto`]). This is the Stage-2 replacement for the
 /// `apply_session_env` boolean write — the backends read policy directly, so the `primary` level
 /// (distinct from `exclusive`) becomes expressible and one process-env mutation drops off the connect
 /// path.
@@ -548,8 +498,8 @@ pub fn effective_topology() -> policy::Topology {
     }
 }
 
-// Goal-1 stage 6: per-compositor Linux backends under `display/linux/`, the Windows IddCx/SudoVDA
-// backends under `display/windows/`; `#[path]` keeps the `crate::*` module names flat.
+// Goal-1 stage 6: per-compositor Linux backends under `display/linux/`; `#[path]` keeps the
+// `crate::*` module names flat.
 #[cfg(target_os = "linux")]
 #[path = "display/linux/gamescope.rs"]
 mod gamescope;
@@ -622,9 +572,8 @@ fn gamescope_ours_and(#[cfg(target_os = "linux")] probe: fn() -> bool) -> bool {
     false
 }
 
-// Platform-neutral per-client stable display-id map (Stage 3): Windows seeds the monitor EDID +
-// ConnectorIndex from the id; KWin names its output from it. `allow(dead_code)` because only Windows
-// consumes it in non-test code today — the KWin wiring is the next Stage-3 step.
+// Platform-neutral per-client stable display-id map (Stage 3): KWin names its output from it.
+// `allow(dead_code)` keeps the map available while the KWin wiring lands.
 #[allow(dead_code)]
 #[path = "display/identity.rs"]
 pub(crate) mod identity;
@@ -658,16 +607,6 @@ mod kwin;
 #[path = "display/linux/kwin_output_mgmt.rs"]
 mod kwin_output_mgmt;
 
-#[cfg(target_os = "windows")]
-#[path = "display/windows/manager.rs"]
-pub mod manager;
-
-// DDC/CI panel power control (physical monitors). Windows uses the Win32 physical-monitor API;
-// Linux shells out to `ddcutil` (see `display/linux/ddc.rs`).
-#[cfg(target_os = "windows")]
-#[path = "display/ddc.rs"]
-mod ddc;
-
 #[cfg(target_os = "linux")]
 #[path = "display/linux/ddc.rs"]
 mod ddc;
@@ -685,10 +624,6 @@ mod monitor_hold;
 #[cfg(target_os = "linux")]
 #[path = "display/linux/mutter.rs"]
 mod mutter;
-
-#[cfg(target_os = "windows")]
-#[path = "display/windows/ss_vdisplay.rs"]
-pub mod driver;
 
 #[cfg(target_os = "linux")]
 #[path = "display/linux/wlroots.rs"]
@@ -743,7 +678,7 @@ mod tests {
         // A pure probe of /proc + the runtime dir: it must not panic and must return promptly on
         // any box (CI has no graphical session → ActiveKind::None, with the runtime-dir anchor).
         let a = detect_active_session();
-        // The runtime-dir anchor is a Linux (XDG) concept; Windows has no equivalent.
+        // The runtime-dir anchor is a Linux (XDG) concept.
         #[cfg(target_os = "linux")]
         assert!(!a.env.xdg_runtime_dir.is_empty());
         // Wayland sockets are only resolved for the Wayland-protocol desktops.

@@ -23,9 +23,8 @@ pub(super) fn audio_fec_enabled(client_caps: u8) -> bool {
 /// Whether this session forwards the cursor out-of-band (design/remote-desktop-sweep.md M2):
 /// the client asked ([`CLIENT_CAP_CURSOR`](slipstream_core::quic::CLIENT_CAP_CURSOR)) AND the
 /// capture path can deliver cursor metadata separately from the frame — the Linux portal
-/// `SPA_META_Cursor` path (not gamescope, whose capture paints no cursor at all), or Windows
-/// with a proto-v5 ss-vdisplay driver (the IddCx hardware-cursor channel, M2c) — AND, on
-/// Linux, the encode backend this session resolves to can composite the pointer on demand
+/// `SPA_META_Cursor` path, not gamescope, whose capture paints no cursor at all — AND the
+/// encode backend this session resolves to can composite the pointer on demand
 /// (`encode::cursor_blend_capable`): the channel's capture-mouse flip (`CursorRenderMode`,
 /// `client_draws = false`) makes the HOST draw the pointer, and on Linux the encoder is that
 /// compositing stage — granting the channel over a backend that can't blend (libav
@@ -45,30 +44,9 @@ pub(super) fn cursor_forward(
     if client_caps & slipstream_core::quic::CLIENT_CAP_CURSOR == 0 {
         return false;
     }
-    #[cfg(target_os = "linux")]
-    {
-        // CUDA-payload prediction — the same one `SessionPlan` makes: the NVIDIA resolution
-        // plus the zero-copy master switch. It decides direct-SDK NVENC (blends) vs libav
-        // NVENC (doesn't) inside the capability mirror.
-        let cuda_planned = !crate::encode::linux_zero_copy_is_vaapi() && crate::zerocopy::enabled();
-        compositor.is_some_and(|c| c != crate::vdisplay::Compositor::Gamescope)
-            && crate::encode::cursor_blend_capable(codec, cuda_planned, bit_depth == 10)
-    }
-    #[cfg(target_os = "windows")]
-    {
-        // Windows (M2c): the ss-vdisplay driver must speak the v5 hardware-cursor channel —
-        // DWM composites the pointer into the IDD frame otherwise, and forwarding a second
-        // copy would double it. The probe latches by opening the control device once. The
-        // encoder is deliberately NOT consulted: the IDD capturer itself composites on the
-        // capture-mouse flip (`set_cursor_forward`), so no Windows encode backend blends.
-        let _ = (compositor, codec, bit_depth);
-        crate::vdisplay::manager::hw_cursor_capable()
-    }
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-    {
-        let _ = (compositor, codec, bit_depth);
-        false
-    }
+    let cuda_planned = !crate::encode::linux_zero_copy_is_vaapi() && crate::zerocopy::enabled();
+    compositor.is_some_and(|c| c != crate::vdisplay::Compositor::Gamescope)
+        && crate::encode::cursor_blend_capable(codec, cuda_planned, bit_depth == 10)
 }
 
 /// Run the Hello→Welcome→Start negotiation. Borrows the control streams (the caller keeps them for
@@ -221,19 +199,14 @@ pub(super) async fn negotiate(
             let pref = hello.compositor;
             // Dedicated game session (B0): a launching client under `game_session=dedicated`
             // (gamescope available) gets its own headless gamescope spawn at the client mode. Gate on
-            // whether the launch id actually RESOLVES to a command in the host's library — an unknown
-            // id must fall back to normal auto routing, not a blank "sleep infinity" gamescope
-            // (review #9). (dedicated is Linux-only, and only there does `resolve_launch` carry a
-            // command — on Windows the concrete process is resolved at launch time instead.)
-            #[cfg(not(target_os = "windows"))]
+            // whether the launch id actually resolves to a command in the host's library. An unknown
+            // id falls back to normal auto routing, not a blank gamescope session.
             let has_resolvable_launch = hello
                 .launch
                 .as_deref()
                 .and_then(crate::library::resolve_launch)
                 .and_then(|t| t.command)
                 .is_some();
-            #[cfg(target_os = "windows")]
-            let has_resolvable_launch = false;
             let dedicated = crate::vdisplay::wants_dedicated_game_session(has_resolvable_launch);
             Some(
                 tokio::task::spawn_blocking(move || resolve_compositor(pref, dedicated))
@@ -264,9 +237,8 @@ pub(super) async fn negotiate(
     // ~bpp pin scales with both — design/pyrowave-444-hdr.md §2.5.)
 
     // Resolve the audio channel count (client request → stereo / 5.1 / 7.1). The capturer opens
-    // at this count: PipeWire synthesizes the requested positions (padding with silence when the
-    // sink has fewer), WASAPI loopback up/downmixes via AUTOCONVERTPCM — so a client always gets
-    // the channels it asked for, and the Welcome echoes the value the audio thread will encode.
+    // at this count: PipeWire synthesizes the requested positions, padding with silence when the
+    // sink has fewer channels, so the Welcome echoes the value the audio thread will encode.
     let audio_channels = resolve_audio_channels(hello.audio_channels);
     tracing::info!(
         requested = hello.audio_channels,
@@ -287,10 +259,9 @@ pub(super) async fn negotiate(
     let client_supports_10bit = hello.video_caps & slipstream_core::quic::VIDEO_CAP_10BIT != 0;
     // The capture side must be able to deliver a 10-bit HDR source for the NATIVE plane's
     // virtual-output capture — the honest-downgrade gate, mirroring `capturer_supports_444`.
-    // SOURCE-AWARE, because on Linux the answer depends on which compositor we just resolved:
-    // Windows IDD-push always can (it proactively enables advanced colour); a gamescope output
-    // can when the host runs our `pipewire-hdr` gamescope build and the knob allows it; every
-    // other Linux virtual output is 8-bit upstream (Mutter's RecordVirtual streams, KWin's and
+    // SOURCE-AWARE: the answer depends on which compositor we just resolved. A gamescope output
+    // can use HDR when the host runs our `pipewire-hdr` gamescope build and the knob allows it; every
+    // other virtual output is 8-bit upstream (Mutter's RecordVirtual streams, KWin's and
     // wlroots' virtual outputs alike — GNOME 50 added HDR for *monitor* streams only, which is
     // the GameStream portal-mirror path, see `gamestream::host_hdr_capable`).
     //
@@ -337,19 +308,8 @@ pub(super) async fn negotiate(
     let host_wants_444 = ss_host_config::config().four_four_four;
     let client_supports_444 = hello.video_caps & slipstream_core::quic::VIDEO_CAP_444 != 0;
     // The active capturer must be able to deliver a full-chroma (RGB) source — the honest-downgrade
-    // gate. Linux's portal capturer always can (`capturer_supports_444` returns `true`
-    // unconditionally). On WINDOWS the IDD-push path CAN too, at either depth: an SDR session
-    // passes the BGRA ring slot straight through and an HDR one converts the FP16 desktop to
-    // packed 10-bit BT.2020 PQ RGB — both skip the subsampling converters. Only a backend that
-    // ingests RGB and CSCs it to 4:4:4 itself can consume that, so the Windows arm forwards
-    // `resolved_backend_ingests_rgb_444()` (today: direct-NVENC only; AMF can't 4:4:4 at all and
-    // the QSV/ffmpeg path has no RGB-input 4:4:4 wiring). HDR no longer costs the chroma: 10-bit
-    // 4:4:4 is HEVC Main 4:4:4 10, which is what this resolves to. (Replaces the old
-    // `single_process` gate — single-process is now the only topology, and 4:4:4 routed to DDA,
-    // which was removed.)
-    // PyroWave does its own RGB→YCbCr CSC and its capture mode always delivers a full-chroma
-    // (RGB/BGRA) source on both OSes — the capturer gate is inherently satisfied; the real
-    // gate is `can_encode_444` (the full-res-chroma CSC variant existing on this OS).
+    // gate. The portal capturer delivers RGB, and PyroWave performs its own RGB to YCbCr CSC.
+    // The real gate is `can_encode_444` for the selected encoder.
     let capture_supports_444 = codec == crate::encode::Codec::PyroWave
         || crate::capture::capturer_supports_444(crate::encode::resolved_backend_ingests_rgb_444());
     // The GPU probe opens a real (tiny) encoder on first use, so run it off the reactor like the
@@ -399,12 +359,10 @@ pub(super) async fn negotiate(
         "encode chroma"
     );
 
-    // Linux 4:4:4 rides the CPU swscale → 8-bit `YUV444P` path (see `encode/linux`) — there
+    // Linux 4:4:4 rides the CPU swscale to 8-bit `YUV444P` path (see `encode/linux`) — there
     // is no 10-bit 4:4:4 input there, so a 10-bit-negotiated session would silently encode
     // 8-bit. Resolve the depth DOWN before the Welcome so the wire never overstates what the
-    // stream carries. (Windows NVENC composes Main 4:4:4 10 from an RGB input, so it keeps
-    // the resolved depth — this clamp is Linux-only.)
-    #[cfg(target_os = "linux")]
+    // stream carries.
     let bit_depth: u8 = if chroma.is_444() && bit_depth == 10 {
         tracing::info!("4:4:4 on the Linux path encodes 8-bit YUV444P — resolving bit depth 8");
         8
@@ -530,10 +488,8 @@ pub(super) async fn negotiate(
             } else {
                 0
             }
-            // Committed-text injection (InputKind::TextInput): only where the session's inject
-            // backend can actually type text — Windows SendInput (KEYEVENTF_UNICODE) and the
-            // Linux wlroots virtual keyboard (dynamic Unicode keymap). Clients without the bit
-            // keep their VK-synthesis fallback for IME text.
+            // Committed-text injection (InputKind::TextInput), when the session's injector can
+            // actually type text. Clients without the bit keep their VK-synthesis fallback.
             | if crate::inject::text_input_supported() {
                 slipstream_core::quic::HOST_CAP_TEXT_INPUT
             } else {
@@ -579,80 +535,9 @@ pub(super) async fn negotiate(
     io::write_msg(send, &welcome.encode()).await?;
     bringup.mark("welcome");
 
-    // P1.1/P1.2 (latency plan): kick the display prep NOW — the negotiated mode is final in
-    // the Welcome just sent, and nothing in monitor create → activation → settle → capture
-    // attach → encoder open needs the client's Start or the punched socket. The prep thread
-    // BECOMES the stream thread: the data plane hands it the post-punch SessionContext and it
-    // runs `virtual_stream` on the warm pipeline, so the whole display bring-up hides behind
-    // the Start RTT + the (up to 2.5 s) hole-punch wait. If the session dies before its data
-    // plane comes up (handshake timeout, client vanished), the channel drops and the prep
-    // result is released — the monitor lands in the keep-alive machinery exactly like a
-    // normal session end (and `stop`, watched by the caller, aborts a still-running build
-    // retry). Windows native path only: the Linux backends bind launch semantics before create
-    // (gamescope nests the launch command), which must not run for a client that never sends
-    // Start; GameStream has neither a Start gate nor a punch.
-    #[cfg(target_os = "windows")]
-    let prep: Option<super::stream::PrepHandle> = match (source, compositor) {
-        (Slipstream1Source::Virtual, Some(comp)) => {
-            let (ctx_tx, ctx_rx) = std::sync::mpsc::sync_channel::<SessionContext>(1);
-            let client_identity = endpoint::peer_fingerprint(conn);
-            let client_hdr = hello.display_hdr;
-            // The bit the Welcome just advertised — read back rather than recomputed, so the
-            // prepared display and the session wiring cannot disagree with it.
-            let cursor_fw = welcome.host_caps & slipstream_core::quic::HOST_CAP_CURSOR != 0;
-            // Same bit the data plane's SessionContext reads — the prepared plan and the
-            // session wiring must agree on the slicing ceiling (an encoder rebuilt from the
-            // prepared plan with a DIFFERENT max_slices would change the wire shape mid-flow).
-            let multi_slice = hello.video_caps & slipstream_core::quic::VIDEO_CAP_MULTI_SLICE != 0;
-            let (mode, shard_payload) = (hello.mode, welcome.shard_payload);
-            // "Automatic" — `bitrate_kbps` above is the host's own answer for `mode`, so the build
-            // may re-resolve it if the source turns out to deliver a different size. Sampled here
-            // rather than in the thread body so the closure doesn't have to capture `hello`.
-            let bitrate_auto = hello.bitrate_kbps == 0;
-            let trace = bringup.clone();
-            std::thread::Builder::new()
-                .name("slipstream1-stream".into())
-                .spawn(move || -> Result<()> {
-                    let prepared = super::stream::prepare_display(
-                        comp,
-                        mode,
-                        client_identity,
-                        client_hdr,
-                        cursor_fw,
-                        multi_slice,
-                        bitrate_kbps,
-                        bitrate_auto,
-                        bit_depth,
-                        chroma,
-                        codec,
-                        shard_payload,
-                        &quit,
-                        &stop,
-                        &trace,
-                    );
-                    let Ok(ctx) = ctx_rx.recv() else {
-                        // No data plane ever came (handshake abort / punch failure): drop
-                        // `prepared` — its lease release hands the monitor to keep-alive
-                        // policy, exactly like a normal session end.
-                        return Ok(());
-                    };
-                    match prepared {
-                        Ok(p) => virtual_stream(ctx, Some(p)),
-                        Err(e) => Err(e),
-                    }
-                })
-                .map(|handle| (ctx_tx, handle))
-                .map_err(|e| {
-                    tracing::warn!(error = %e,
-                        "display-prep thread spawn failed — falling back to inline bring-up")
-                })
-                .ok()
-        }
-        _ => None,
-    };
-    #[cfg(not(target_os = "windows"))]
+    // Display preparation is started by the Linux data plane after Start. Keep this optional
+    // return slot for the serve layer, which also handles the managed-session path.
     let prep: Option<super::stream::PrepHandle> = None;
-    #[cfg(not(target_os = "windows"))]
     let _ = (quit, stop);
 
     let start =

@@ -1,17 +1,18 @@
-//! Hardware video encode (plan §7). Binds FFmpeg; never rewrites codecs. Low-latency preset,
-//! B-frames off. The backend is per-GPU: NVENC on NVIDIA (`*_nvenc`, accepts `bgr0` and does
-//! RGB→YUV on the GPU, so no host-side CSC) and VAAPI on AMD/Intel (`*_vaapi`; the CPU-input
-//! fallback swscales RGB→NV12, the zero-copy path imports the capture dmabuf straight into a
-//! VA surface). One [`Encoder`] trait, selected in [`open_video`]. Extracted into a subsystem crate
-//! (plan §W6): depends on the shared frame vocabulary (`ss-frame`) + zero-copy plumbing
-//! (`ss-zerocopy`), never on capture — the capture→encode edge is one-way.
+//! Linux hardware and software video encode. Binds FFmpeg; never rewrites codecs. Low-latency
+//! preset, B-frames off. The backend is per-GPU: NVENC on NVIDIA (`*_nvenc`, accepts `bgr0` and
+//! does RGB→YUV on the GPU, so no host-side CSC) and VAAPI on AMD/Intel (`*_vaapi`; the CPU-input
+//! fallback swscales RGB→NV12, the zero-copy path imports the capture dmabuf straight into a VA
+//! surface). Vulkan Video and PyroWave provide Linux-specific zero-copy paths. One [`Encoder`]
+//! trait, selected in [`open_video`]. The crate depends on the shared frame vocabulary (`ss-frame`)
+//! and zero-copy plumbing (`ss-zerocopy`), never on capture.
+#![cfg(target_os = "linux")]
 // NOTE: no crate-wide `#![allow(dead_code)]`. It was inherited from the pre-extraction host crate
 // root as scaffolding for backend paths defined ahead of the build that used them, but a census
-// across every feature combination on both platforms found it was hiding exactly two items — so it
+// across every feature combination found it was hiding exactly two items, so it
 // bought nothing and blinded the crate to future rot. Genuinely test-only helpers carry
 // `#[cfg(test)]` instead.
 // Every unsafe block in this module tree carries a `// SAFETY:` proof; enforce it (unsafe-proof
-// program). As a parent module this also covers the child modules (windows/linux backends).
+// program). As a parent module this also covers the child Linux backends.
 #![deny(clippy::undocumented_unsafe_blocks)]
 
 use anyhow::Result;
@@ -29,17 +30,16 @@ impl Codec {
     /// The `quic` codec bitfield the host can currently **emit** on the slipstream/1 native path,
     /// given the resolved encode backend — the same GPU-aware advertisement GameStream builds for
     /// Moonlight (the host `gamestream::serverinfo`), in `quic::CODEC_*` bits. The GPU-less software
-    /// encoder (openh264) produces H.264 only; the probed backends (Linux VAAPI, Windows AMF/QSV)
-    /// advertise exactly what the GPU encodes ([`vaapi_codec_support`] / [`windows_codec_support`] —
-    /// AV1 encode is narrow, an old iGPU might lack HEVC); NVENC keeps the Moonlight-validated
+    /// encoder (openh264) produces H.264 only; the probed Linux backends advertise exactly what the
+    /// GPU encodes ([`vaapi_codec_support`] / [`nvenc_codec_support`] where available; AV1 encode is
+    /// narrow, an old iGPU might lack HEVC); NVENC keeps the Moonlight-validated
     /// static superset. An empty probe means the GPU wasn't usable at probe time (GPU-less CI,
     /// wrong-vendor pref), not that it encodes nothing — fall back to the superset so `resolve_codec`
     /// still lands on HEVC for an auto client, exactly the pre-probe behaviour. Fed to
     /// [`slipstream_core::quic::resolve_codec`] against the client's advertised codecs.
     pub fn host_wire_caps() -> u8 {
-        // PyroWave rides ON TOP of whatever H.26x set resolves below: feature-gated, Linux-only
-        // for now (the Windows host encoder is future work), and inert in negotiation unless the
-        // client explicitly prefers it (resolve_codec ignores the bit in its ladder). Advertised
+        // PyroWave rides on top of whatever H.26x set resolves below: feature-gated and inert in
+        // negotiation unless the client explicitly prefers it (resolve_codec ignores the bit in its ladder). Advertised
         // whenever the backend could open: AMD/Intel capture hands raw dmabufs it imports
         // directly, and an NVIDIA-auto host's PyroWave sessions flip capture to CPU RGB
         // per-session instead (the host `session_plan::SessionPlan::output_format`) — the EGL→CUDA
@@ -57,19 +57,7 @@ impl Codec {
         } else {
             0u8
         };
-        // Windows: the wavelet encoder rides on top of whatever GPU backend the box has (NVENC/AMF/
-        // QSV) — it opens its OWN Vulkan device by the render GPU's vendor/device-id and
-        // zero-copy-imports the capturer's NV12 D3D11 texture, so the H.26x backend is irrelevant to
-        // it. Only a software/GPU-less host keeps the bit off (no Vulkan GPU to open). Whether the
-        // Session-0 external-memory import actually works is confirmed at encoder open
-        // (`pyrowave_device_confirm_interop_support`); a failed open renegotiates to HEVC.
-        #[cfg(all(target_os = "windows", feature = "pyrowave"))]
-        let pyro = if windows_resolved_backend() != WindowsBackend::Software {
-            slipstream_core::quic::CODEC_PYROWAVE
-        } else {
-            0u8
-        };
-        #[cfg(not(all(any(target_os = "linux", target_os = "windows"), feature = "pyrowave")))]
+        #[cfg(not(feature = "pyrowave"))]
         let pyro = 0u8;
         let base = (|| {
             /// The static GPU superset (H.264 | HEVC | AV1) — mirrors the GameStream
@@ -77,7 +65,6 @@ impl Codec {
             const GPU_SUPERSET: u8 = slipstream_core::quic::CODEC_H264
                 | slipstream_core::quic::CODEC_HEVC
                 | slipstream_core::quic::CODEC_AV1;
-            #[cfg(target_os = "linux")]
             {
                 if backend == LinuxBackend::Software {
                     return slipstream_core::quic::CODEC_H264;
@@ -129,36 +116,13 @@ impl Codec {
                 // probe (see above): the static superset, like GameStream.
                 GPU_SUPERSET & pref_ceiling
             }
-            #[cfg(target_os = "windows")]
-            {
-                if windows_resolved_backend() == WindowsBackend::Software {
-                    return slipstream_core::quic::CODEC_H264;
-                }
-                if windows_backend_is_probed() {
-                    if let Some(m) = windows_codec_support().wire_mask() {
-                        return m;
-                    }
-                }
-                // An unprobed backend (NVENC without the `nvenc` feature) — or an empty probe
-                // (see above): the static superset, like GameStream.
-                GPU_SUPERSET
-            }
-            // The macOS dev/test host has no GPU encode backend — keep the pre-probe advertisement.
-            #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-            {
-                let _ = GPU_SUPERSET;
-                match ss_host_config::config().encoder_pref.as_str() {
-                    "software" | "sw" | "openh264" => slipstream_core::quic::CODEC_H264,
-                    _ => slipstream_core::quic::CODEC_HEVC,
-                }
-            }
         })();
         base | pyro
     }
 }
 
-/// Open a hardware video encoder for frames of the given `format` and mode, selecting the GPU
-/// backend for this host: **NVENC** on NVIDIA (Linux/Windows), **VAAPI** on AMD/Intel (Linux).
+/// Open a video encoder for frames of the given `format` and mode, selecting the Linux GPU
+/// backend for this host: **NVENC** on NVIDIA or **VAAPI** on AMD/Intel.
 /// When `cuda` is true the encoder takes GPU frames (`AV_PIX_FMT_CUDA`) from the NVIDIA zero-copy
 /// path; otherwise it takes packed RGB/BGR CPU frames (and, on VAAPI, a future dmabuf payload).
 /// `format`/`bitrate_bps`/`codec`/mode come from session negotiation; the caller derives `cuda`
@@ -331,8 +295,7 @@ impl Encoder for TrackedEncoder {
 /// Ceiling applied to the negotiated bitrate before it reaches openh264: software H.264 realistically
 /// caps far below the rates a hardware session negotiates, and handing it the full figure just
 /// misconfigures its rate control. Module-scope so BOTH software arms share one value — the Linux
-/// arm was missing the clamp the Windows arm applied.
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+/// arm was missing the clamp the hardware path applied.
 const SW_BITRATE_CEIL: u64 = 100_000_000;
 
 /// The Linux half of [`open_video_backend`], with the pref INJECTED — the seam exists so the
@@ -467,9 +430,8 @@ fn open_video_backend_linux(
         )
         .map(|e| (e, "nvenc"))
     };
-    // WP7.6: the dispatch consumes the SAME resolver the capability mirrors consult (the
-    // Windows shape — `windows_resolved_backend` + `match backend` below) so the alias table
-    // exists once. Arm bodies and their open-site labels are untouched.
+    // The dispatch consumes the same resolver the capability mirrors consult, so the alias table
+    // exists once. Arm bodies and their open-site labels stay in sync.
     match resolve_linux_backend(pref, linux_auto_is_vaapi, cuda) {
         Some(LinuxBackend::Nvenc) => open_nvidia(),
         Some(LinuxBackend::AmdIntel) => open_amd_intel(),
@@ -564,8 +526,8 @@ fn open_video_backend_linux(
     }
 }
 
-/// Open the platform encoder backend. Returns the encoder together with the display label of the
-/// branch that ACTUALLY opened (`nvenc`/`vaapi`/`vulkan`/`amf`/`qsv`/`software`) — the label feeds
+/// Open the Linux encoder backend. Returns the encoder together with the display label of the
+/// branch that actually opened (`nvenc`/`vaapi`/`vulkan`/`software`) — the label feeds
 /// the mgmt API's live-session record, and only the open site knows which internal fallback won
 /// (e.g. Vulkan Video falling back to VAAPI).
 #[allow(clippy::too_many_arguments)]
@@ -582,9 +544,6 @@ fn open_video_backend(
     cursor_blend: bool,
     max_slices: u32,
 ) -> Result<(Box<dyn Encoder>, &'static str)> {
-    // Consumed only by the Linux vulkan-encode + direct-NVENC arms below (max_slices: the
-    // direct-NVENC arm — the one backend that splits frames).
-    let _ = (cursor_blend, max_slices);
     validate_dimensions(codec, width, height)?;
     // Refresh/fps must be positive and sane: fps feeds the encoder time_base (`Rational(1, fps)`)
     // and the pts→ns conversion (`pts * 1e9 / fps`), so 0 builds a 1/0 rational / divides by zero.
@@ -607,242 +566,20 @@ fn open_video_backend(
     } else {
         chroma
     };
-    #[cfg(target_os = "linux")]
-    {
-        open_video_backend_linux(
-            ss_host_config::config().encoder_pref.as_str(),
-            codec,
-            format,
-            width,
-            height,
-            fps,
-            bitrate_bps,
-            cuda,
-            bit_depth,
-            chroma,
-            cursor_blend,
-            max_slices,
-        )
-    }
-    #[cfg(target_os = "windows")]
-    {
-        // A NEGOTIATED PyroWave session (client advertised + preferred it) routes straight to the
-        // NV12 zero-copy wavelet backend (design/pyrowave-windows-host-zerocopy.md) — placed FIRST,
-        // like the Linux branch. It opens its own Vulkan device by the render GPU's vendor/device-id
-        // and imports the capturer's shared NV12 texture; the H.26x backend selection below is moot.
-        if codec == Codec::PyroWave {
-            #[cfg(feature = "pyrowave")]
-            {
-                let _ = (format, cuda);
-                return pyrowave::PyroWaveEncoder::open(
-                    width,
-                    height,
-                    fps,
-                    bitrate_bps,
-                    chroma,
-                    bit_depth,
-                )
-                .map(|e| (Box::new(e) as Box<dyn Encoder>, "pyrowave"));
-            }
-            #[cfg(not(feature = "pyrowave"))]
-            anyhow::bail!(
-                "session negotiated PyroWave but this host was built without --features \
-                 slipstream-host/pyrowave (the advertisement bit should not have been set)"
-            );
-        }
-        let _ = cuda; // always false on Windows (no Cuda payload)
-                      // NVIDIA → NVENC (direct SDK), AMD → AMF, Intel → QSV (both libavcodec), else → software
-                      // H.264. `auto` (the default) resolves from the selected render adapter's vendor.
-        let backend = windows_resolved_backend();
-        // An explicit SLIPSTREAM_ENCODER pin contradicting the selected GPU's vendor was just
-        // overridden by the adapter-derived backend (`resolve_windows_backend`) — honoring it
-        // could only fail, and used to feed the reset ladder five futile rebuilds per connect
-        // (an unrecoverable session + client reconnect loop on hybrid boxes). Warn per session
-        // open so the stale pin gets removed from host.env.
-        if windows_pinned_backend().is_some_and(|pin| pin != backend) {
-            tracing::warn!(
-                adapter = ss_gpu::selected_gpu()
-                    .map(|s| s.info.name)
-                    .as_deref()
-                    .unwrap_or("?"),
-                pinned = %ss_host_config::config().encoder_pref,
-                using = ?backend,
-                "explicit SLIPSTREAM_ENCODER pin does not match the selected GPU's vendor — the \
-                 pin is overridden (remove it from host.env, or point the GPU preference at the \
-                 pinned vendor's adapter)"
-            );
-        }
-        match backend {
-            WindowsBackend::Nvenc => {
-                // Hardware path: NVENC over D3D11. The DXGI capturer switches to its zero-copy
-                // FramePayload::D3d11 output under the same env var so capture + encode share textures.
-                #[cfg(feature = "nvenc")]
-                {
-                    nvenc::NvencD3d11Encoder::open(
-                        codec,
-                        format,
-                        width,
-                        height,
-                        fps,
-                        bitrate_bps,
-                        bit_depth,
-                        chroma,
-                        max_slices,
-                    )
-                    .map(|e| (Box::new(e) as Box<dyn Encoder>, "nvenc"))
-                }
-                #[cfg(not(feature = "nvenc"))]
-                {
-                    anyhow::bail!(
-                        "NVENC requested/detected but this host was built without it — rebuild \
-                         with `--features nvenc`"
-                    )
-                }
-            }
-            WindowsBackend::Amf => {
-                // AMD: the native AMF SDK encoder, unconditionally (design/native-amf-encoder.md
-                // Phase 3). The libavcodec AMF fallback and the `SLIPSTREAM_AMF_FFMPEG` hatch were
-                // removed once the native path was validated — two permanently-maintained AMF
-                // paths double the driver-matrix burden, and the one kept "for safety" is exactly
-                // the one with the wedge/latency pathology. No build feature: amfrt64.dll resolves
-                // at runtime like NVENC's DLL. A missing/ancient runtime fails HERE with the
-                // "install/update the AMD driver" message `AmfEncoder::open` raises (§6), rather
-                // than silently degrading — FFmpeg now serves QSV only.
-                amf::AmfEncoder::open(
-                    codec,
-                    format,
-                    width,
-                    height,
-                    fps,
-                    bitrate_bps,
-                    bit_depth,
-                    chroma,
-                )
-                .map(|e| (Box::new(e) as Box<dyn Encoder>, "amf"))
-                .map_err(|e| {
-                    e.context(
-                        "native AMF encode failed to open (update the AMD driver / amfrt64.dll \
-                         runtime)",
-                    )
-                })
-            }
-            WindowsBackend::Qsv => {
-                // Intel: native VPL first (design/native-qsv-encoder.md — supersedes the
-                // native-amf-encoder.md §2 "QSV stays on FFmpeg" decision). During bring-up the
-                // ffmpeg path remains as an automatic open-failure fallback plus the explicit
-                // `SLIPSTREAM_QSV_FFMPEG=1` escape hatch (the AMF §7 pattern); both go away in
-                // Phase 4 after the field-silence gate.
-                #[cfg(feature = "qsv")]
-                {
-                    // Trimmed like every sibling knob, so `"1 "` from a shell script or a `.env`
-                    // line takes effect instead of silently doing nothing. Case-insensitivity is
-                    // kept deliberately — this knob already accepted `TRUE` via
-                    // `eq_ignore_ascii_case`, and the bare house `matches!` would have dropped
-                    // that spelling; widening to `yes`/`on` only adds accepted values.
-                    let ffmpeg_forced = std::env::var("SLIPSTREAM_QSV_FFMPEG").is_ok_and(|v| {
-                        matches!(
-                            v.trim().to_ascii_lowercase().as_str(),
-                            "1" | "true" | "yes" | "on"
-                        )
-                    });
-                    if !ffmpeg_forced {
-                        match qsv::QsvEncoder::open(
-                            codec,
-                            format,
-                            width,
-                            height,
-                            fps,
-                            bitrate_bps,
-                            bit_depth,
-                            chroma,
-                        ) {
-                            Ok(e) => return Ok((Box::new(e) as Box<dyn Encoder>, "qsv")),
-                            Err(e) => {
-                                #[cfg(feature = "amf-qsv")]
-                                tracing::warn!(
-                                    error = %format!("{e:#}"),
-                                    "native QSV open failed — falling back to the ffmpeg QSV path"
-                                );
-                                #[cfg(not(feature = "amf-qsv"))]
-                                return Err(e.context(
-                                    "native QSV encode failed to open (update the Intel driver / \
-                                     no VPL runtime on this box)",
-                                ));
-                            }
-                        }
-                    } else {
-                        tracing::warn!(
-                            "SLIPSTREAM_QSV_FFMPEG=1 — skipping native QSV (bring-up escape hatch)"
-                        );
-                    }
-                }
-                // The libavcodec path: the pre-native default, the native open-failure fallback,
-                // and the `SLIPSTREAM_QSV_FFMPEG` hatch (async_depth=1 + low_power VDEnc).
-                #[cfg(feature = "amf-qsv")]
-                {
-                    ffmpeg_win::FfmpegWinEncoder::open(
-                        ffmpeg_win::WinVendor::Qsv,
-                        codec,
-                        format,
-                        width,
-                        height,
-                        fps,
-                        bitrate_bps,
-                        bit_depth,
-                        chroma,
-                    )
-                    .map(|e| (Box::new(e) as Box<dyn Encoder>, "qsv"))
-                }
-                #[cfg(all(not(feature = "amf-qsv"), not(feature = "qsv")))]
-                {
-                    anyhow::bail!(
-                        "Intel (QSV) encode requested/detected but this host was built without \
-                         it — rebuild with `--features qsv` (native VPL) or `--features amf-qsv` \
-                         (libavcodec)"
-                    )
-                }
-                #[cfg(all(not(feature = "amf-qsv"), feature = "qsv"))]
-                {
-                    anyhow::bail!(
-                        "native QSV was skipped via SLIPSTREAM_QSV_FFMPEG but this host was built \
-                         without the ffmpeg fallback (`amf-qsv`)"
-                    )
-                }
-            }
-            WindowsBackend::Software => {
-                anyhow::ensure!(
-                    codec == Codec::H264,
-                    "the Windows software encoder supports H.264 only; client negotiated {codec:?} \
-                     (build a GPU backend: --features nvenc or amf-qsv, or request H264)"
-                );
-                let _ = (bit_depth, chroma); // the software H.264 path is 8-bit 4:2:0 only
-                sw::OpenH264Encoder::open(
-                    format,
-                    width,
-                    height,
-                    fps,
-                    bitrate_bps.min(SW_BITRATE_CEIL),
-                )
-                .map(|e| (Box::new(e) as Box<dyn Encoder>, "software"))
-            }
-        }
-    }
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-    {
-        let _ = (
-            codec,
-            format,
-            width,
-            height,
-            fps,
-            bitrate_bps,
-            cuda,
-            bit_depth,
-            chroma,
-            max_slices,
-        );
-        anyhow::bail!("video encode requires Linux or Windows")
-    }
+    open_video_backend_linux(
+        ss_host_config::config().encoder_pref.as_str(),
+        codec,
+        format,
+        width,
+        height,
+        fps,
+        bitrate_bps,
+        cuda,
+        bit_depth,
+        chroma,
+        cursor_blend,
+        max_slices,
+    )
 }
 
 /// Open NVENC, probing this GPU's real max bitrate. NVENC rejects `avcodec_open2` with EINVAL
@@ -1250,8 +987,8 @@ fn linux_auto_is_vaapi() -> bool {
     !nvidia_present()
 }
 
-/// The resolved Linux encode backend — the Linux twin of [`WindowsBackend`] (WP7.6). ONE alias
-/// table, consumed by BOTH [`open_video_backend`]'s dispatch and every capability/advertisement
+/// The resolved Linux encode backend. ONE alias table is consumed by [`open_video_backend`]'s
+/// dispatch and every capability/advertisement
 /// mirror below, so the two can never drift again (the audit counted five partial hand-copies of
 /// this decision). Labels still come from the open sites (the mgmt-record convention) — this
 /// resolves which ARM runs, never what actually opened.
@@ -1349,7 +1086,6 @@ fn linux_zero_copy_is_vaapi_for(backend: LinuxBackend) -> bool {
 /// Which codecs the active GPU can actually ENCODE. Used to build the GameStream codec
 /// advertisement so a client never negotiates a codec the GPU can't do (AV1 encode is narrow —
 /// Intel Arc/Xe2+, AMD RDNA3+/RDNA4 — so it must be probed, not assumed).
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 #[derive(Clone, Copy, Debug)]
 pub struct CodecSupport {
     pub h264: bool,
@@ -1357,7 +1093,6 @@ pub struct CodecSupport {
     pub av1: bool,
 }
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 impl CodecSupport {
     /// The probed codecs as a `quic::CODEC_*` bitfield, or `None` when the probe found nothing —
     /// meaning the GPU wasn't usable at probe time (GPU-less CI, a wrong-vendor pref), NOT that it
@@ -1426,17 +1161,15 @@ pub fn vaapi_codec_support() -> CodecSupport {
 /// Whether the active GPU encode backend can actually produce a full-chroma **4:4:4** HEVC stream.
 /// Resolved (and cached, once) *before* the Welcome so the host advertises the chroma it will really
 /// encode — the honest-downgrade channel. 4:4:4 is HEVC-only; the probe opens a tiny encoder on the
-/// active backend (NVENC FREXT is broad on NVIDIA, but VAAPI / AMF / QSV 4:4:4 is hardware-specific,
-/// so it must be probed, never assumed). Non-HEVC codecs are always `false`.
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+/// active backend (NVENC FREXT is broad on NVIDIA, but VAAPI 4:4:4 is hardware-specific, so it
+/// must be probed, never assumed). Non-HEVC codecs are always `false`.
 pub fn can_encode_444(codec: Codec) -> bool {
     use std::collections::HashMap;
     use std::sync::{Mutex, OnceLock};
     if codec == Codec::PyroWave {
         // PyroWave does its own RGB→YCbCr CSC (capture always hands it a full-chroma source),
         // so 4:4:4 needs no GPU encode probe — only the full-res-chroma CSC variant:
-        // `rgb2yuv444.comp` on Linux (Phase 2) and the mode-aware `BgraToYuvPlanes` on
-        // Windows (Phase 3) — both landed (design/pyrowave-444-hdr.md).
+        // `rgb2yuv444.comp` supplies the full-resolution chroma conversion.
         return true;
     }
     if codec != Codec::H265 {
@@ -1450,78 +1183,30 @@ pub fn can_encode_444(codec: Codec) -> bool {
     if let Some(v) = cache.lock().unwrap().get(&key) {
         return *v;
     }
-    let supported = {
-        #[cfg(target_os = "linux")]
+    let supported = if linux_zero_copy_is_vaapi() {
+        vaapi::probe_can_encode_444(codec)
+    } else {
+        // NVIDIA. On a direct-SDK host the answer comes from the driver's caps bit over the
+        // direct SDK ([`nvenc_cuda::probe_support`]) — the same
+        // `NV_ENC_CAPS_SUPPORT_YUV444_ENCODE` the live session re-checks at open
+        // (`query_caps` → `yuv444_supported`). It must not fall back to the libav open-probe
+        // when direct NVENC is active, because that can poison later direct sessions.
+        #[cfg(feature = "nvenc")]
         {
-            // Mirror open_video's backend dispatch: VAAPI (AMD/Intel) vs NVENC (NVIDIA).
-            if linux_zero_copy_is_vaapi() {
-                vaapi::probe_can_encode_444(codec)
+            if nvenc_direct_enabled() {
+                nvenc_cuda::probe_support().hevc_444
             } else {
-                // NVIDIA. On a direct-SDK host the answer comes from the driver's caps bit over
-                // the direct SDK ([`nvenc_cuda::probe_support`]) — the same
-                // `NV_ENC_CAPS_SUPPORT_YUV444_ENCODE` the live session re-checks at open
-                // (`query_caps` → `yuv444_supported`), and the same shape the Windows NVENC arm
-                // uses (`nvenc::probe_can_encode_444`). It must NOT fall back to the libav
-                // open-probe: one ffmpeg `hevc_nvenc` FREXT open in a direct-SDK process is the
-                // LOG-3 field bug — it wedged every later NVENC open process-wide
-                // (`NV_ENC_ERR_INVALID_VERSION`) until a host restart. Only a host that will
-                // really serve the session over libav (SLIPSTREAM_NVENC_DIRECT=0, or a build
-                // without `--features nvenc`) keeps the ffmpeg probe — there it validates the
-                // actual session path, and ffmpeg's NVENC client runs in that process anyway.
-                #[cfg(feature = "nvenc")]
-                {
-                    if nvenc_direct_enabled() {
-                        nvenc_cuda::probe_support().hevc_444
-                    } else {
-                        linux::probe_can_encode_444(codec)
-                    }
-                }
-                #[cfg(not(feature = "nvenc"))]
-                {
-                    linux::probe_can_encode_444(codec)
-                }
+                linux::probe_can_encode_444(codec)
             }
         }
-        #[cfg(target_os = "windows")]
+        #[cfg(not(feature = "nvenc"))]
         {
-            match windows_resolved_backend() {
-                WindowsBackend::Nvenc => {
-                    #[cfg(feature = "nvenc")]
-                    {
-                        nvenc::probe_can_encode_444(codec)
-                    }
-                    #[cfg(not(feature = "nvenc"))]
-                    {
-                        false
-                    }
-                }
-                // AMD: native AMF never encodes 4:4:4 — VCN hardware limit, permanent, no probe
-                // needed (design/native-amf-encoder.md §3.5, Phase 3).
-                WindowsBackend::Amf => false,
-                WindowsBackend::Qsv => {
-                    #[cfg(feature = "amf-qsv")]
-                    {
-                        ffmpeg_win::probe_can_encode_444(ffmpeg_win::WinVendor::Qsv, codec)
-                    }
-                    #[cfg(not(feature = "amf-qsv"))]
-                    {
-                        false
-                    }
-                }
-                WindowsBackend::Software => false,
-            }
+            linux::probe_can_encode_444(codec)
         }
     };
     tracing::info!(supported, "HEVC 4:4:4 encode capability probed");
     cache.lock().unwrap().insert(key, supported);
     supported
-}
-
-/// Non-Linux/Windows (the macOS dev/test build of the host — synthetic-source loopback only):
-/// no GPU encode backend exists here, so 4:4:4 is never advertised.
-#[cfg(not(any(target_os = "linux", target_os = "windows")))]
-pub fn can_encode_444(_codec: Codec) -> bool {
-    false
 }
 
 /// Whether the active GPU encode backend can actually produce a **10-bit** stream for `codec`
@@ -1531,14 +1216,9 @@ pub fn can_encode_444(_codec: Codec) -> bool {
 /// gate a default-on `SLIPSTREAM_10BIT` would negotiate 10-bit on a GPU/backend that then silently
 /// falls back to 8-bit post-Welcome (label HDR / stream SDR).
 ///
-/// Backend truth: Windows **NVENC** queries the per-codec `NV_ENC_CAPS_SUPPORT_10BIT_ENCODE` cap;
-/// native **AMF** `Init`s a tiny P010 encoder with the 10-bit profile props (the driver rejects
-/// what the VCN can't do). **QSV** stays `false` until validated on Intel glass — the libavcodec
-/// Main10 incantation can silently encode 8-bit, the same stance as its 4:4:4 probe. **Linux**
-/// probes a tiny real Main10 open on the auto-resolved backend — libav NVENC (the HDR X2RGB10→
-/// P010 swscale path) or VAAPI (P010 pool + Main10) — for the GNOME 50+ HDR portal capture;
-/// the direct-SDK CUDA path and Vulkan-video stay 8-bit and a 10-bit session routes around them.
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+/// Backend truth: Linux probes a tiny real Main10 open on the resolved backend, using libav NVENC
+/// or VAAPI for the HDR X2RGB10 to P010 path. The direct-SDK CUDA path and Vulkan Video stay 8-bit
+/// and a 10-bit session routes around them.
 pub fn can_encode_10bit(codec: Codec) -> bool {
     use std::collections::HashMap;
     use std::sync::{Mutex, OnceLock};
@@ -1546,10 +1226,8 @@ pub fn can_encode_10bit(codec: Codec) -> bool {
         return false;
     }
     if codec == Codec::PyroWave {
-        // PyroWave needs no GPU encode probe (the wavelet is depth-agnostic) — only the HDR
-        // capture CSC (scRGB FP16 → 16-bit studio-code planes), which exists on the Windows
-        // IDD-push path only (design/pyrowave-444-hdr.md Phase 3; Linux capture has no HDR).
-        return cfg!(target_os = "windows");
+        // PyroWave is depth-agnostic, but the Linux capture path does not expose HDR input for it.
+        return false;
     }
     // Cached per (selected GPU, codec) — a web-console preference change re-probes on the newly
     // selected adapter before the next Welcome, mirroring `can_encode_444`.
@@ -1560,82 +1238,28 @@ pub fn can_encode_10bit(codec: Codec) -> bool {
         return *v;
     }
     let supported = {
-        #[cfg(target_os = "linux")]
-        {
-            // NVENC (libav, the HDR P010 swscale path — the direct-SDK CUDA path encodes the
-            // same GPU's Main10, so this is a truthful proxy for it too) or, on AMD/Intel, VAAPI
-            // OR Vulkan Video. Both of the latter are asked because either can serve the session:
-            // `open_amd_intel` tries Vulkan first and falls back to VAAPI, so 10-bit is available
-            // if EITHER says yes, and answering `false` when only one does would strand a
-            // perfectly encodable HDR session at 8 bits. NOTE: encode capability is only half the
-            // Linux gate — the capture side (a gamescope HDR output, or a GNOME 50+ portal
-            // monitor in HDR mode) is resolved separately by the host
-            // (`capture::capturer_supports_hdr_for` / the GameStream RTSP honor), since this
-            // probe can't know what the compositor will negotiate.
-            // Resolve through the SAME helper `can_encode_444` uses (and which mirrors
-            // `open_video`'s dispatch): `linux_auto_is_vaapi` ignores `encoder_pref`, so on a box
-            // that forces a backend — e.g. `encoder_pref = "vaapi"` on an NVIDIA host — this probe
-            // would answer for NVENC while the session actually opens VAAPI, and the negotiated bit
-            // depth (plus the HDR/SDR colour label derived from it) would describe a backend that
-            // never runs. That is exactly the dishonesty this probe exists to prevent.
-            if linux_zero_copy_is_vaapi() {
-                let vulkan10 = {
-                    #[cfg(feature = "vulkan-encode")]
-                    {
-                        vulkan_encode_enabled() && vulkan_encode_available_at(codec, true)
-                    }
-                    #[cfg(not(feature = "vulkan-encode"))]
-                    {
-                        false
-                    }
-                };
-                vulkan10 || vaapi::probe_can_encode_10bit(codec)
-            } else {
-                linux::probe_can_encode_10bit(codec)
-            }
-        }
-        #[cfg(target_os = "windows")]
-        {
-            match windows_resolved_backend() {
-                WindowsBackend::Nvenc => {
-                    #[cfg(feature = "nvenc")]
-                    {
-                        nvenc::probe_can_encode_10bit(codec)
-                    }
-                    #[cfg(not(feature = "nvenc"))]
-                    {
-                        false
-                    }
+        // NVENC (libav, the HDR P010 swscale path) or, on AMD/Intel, VAAPI or Vulkan Video can
+        // serve the session. Both AMD/Intel paths are checked because the Vulkan opener falls back
+        // to VAAPI when needed. Capture-side HDR support is resolved separately by the host.
+        if linux_zero_copy_is_vaapi() {
+            let vulkan10 = {
+                #[cfg(feature = "vulkan-encode")]
+                {
+                    vulkan_encode_enabled() && vulkan_encode_available_at(codec, true)
                 }
-                WindowsBackend::Amf => amf::probe_can_encode_10bit(codec),
-                // QSV: the native VPL probe (`MFXVideoENCODE_Query` with the Main10/P010 or
-                // 10-bit-AV1 parameter block) — the driver clears/errors what the silicon can't
-                // do. The ffmpeg path stays unprobed (its Main10 incantation can silently
-                // encode 8-bit), so without the `qsv` feature this remains an honest `false`.
-                WindowsBackend::Qsv => {
-                    #[cfg(feature = "qsv")]
-                    {
-                        qsv::probe_can_encode_10bit(codec)
-                    }
-                    #[cfg(not(feature = "qsv"))]
-                    {
-                        false
-                    }
+                #[cfg(not(feature = "vulkan-encode"))]
+                {
+                    false
                 }
-                WindowsBackend::Software => false,
-            }
+            };
+            vulkan10 || vaapi::probe_can_encode_10bit(codec)
+        } else {
+            linux::probe_can_encode_10bit(codec)
         }
     };
     tracing::info!(codec = ?codec, supported, "10-bit encode capability probed");
     cache.lock().unwrap().insert(key, supported);
     supported
-}
-
-/// Non-Linux/Windows (the macOS dev/test build of the host — synthetic-source loopback only):
-/// no GPU encode backend exists here, so 10-bit is never negotiated.
-#[cfg(not(any(target_os = "linux", target_os = "windows")))]
-pub fn can_encode_10bit(_codec: Codec) -> bool {
-    false
 }
 
 /// Marker in an encoder error's `anyhow` context chain: the failure is a deterministic
@@ -1655,349 +1279,49 @@ impl std::fmt::Display for TerminalEncoderError {
 
 impl std::error::Error for TerminalEncoderError {}
 
-// ---------------------------------------------------------------------------------------------
-// Windows backend selection (the analogue of the Linux nvidia_present / linux_zero_copy_is_vaapi
-// logic). NVIDIA → NVENC, AMD → AMF, Intel → QSV; `auto` (default) reads the vendor of the
-// SELECTED render adapter (ss_gpu — web-console preference / env pin / max VRAM), so the
-// backend always matches the GPU the capture ring and virtual display sit on.
-// ---------------------------------------------------------------------------------------------
-
-// Un-gated (unlike everything else in this section): the pure reconciliation half below is
-// platform-agnostic so its decision table is unit-tested on every CI leg, not just Windows.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum WindowsBackend {
-    Nvenc,
-    Amf,
-    Qsv,
-    Software,
-}
-
-#[cfg(target_os = "windows")]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum GpuVendor {
-    Nvidia,
-    Amd,
-    Intel,
-}
-
-/// The PCI vendor a Windows hardware backend can open on (`None` for the vendor-agnostic
-/// software encoder). Capture ring, virtual display, and encoder share ONE adapter, so a backend
-/// whose vendor differs from the selected GPU's can never open — the table the pin-vs-preference
-/// reconciliation in [`resolve_windows_backend`] stands on.
-pub fn windows_backend_vendor_id(backend: WindowsBackend) -> Option<u32> {
-    match backend {
-        WindowsBackend::Nvenc => Some(ss_gpu::VENDOR_NVIDIA),
-        WindowsBackend::Amf => Some(ss_gpu::VENDOR_AMD),
-        WindowsBackend::Qsv => Some(ss_gpu::VENDOR_INTEL),
-        WindowsBackend::Software => None,
-    }
-}
-
-/// Pure half of [`windows_resolved_backend`]: reconcile an explicit `SLIPSTREAM_ENCODER` pin with
-/// the selected render adapter. A hardware pin whose vendor contradicts the selected GPU is
-/// OVERRIDDEN by the adapter-derived backend (`derived`, evaluated lazily) — honoring it can only
-/// produce a deterministically-failing session, observed on a hybrid box as a stale `qsv` pin vs.
-/// a console NVIDIA preference: five futile in-place rebuilds, session end, client reconnect,
-/// forever. The console preference is the newer, user-visible, per-box intent; the pin is usually
-/// a stale provisioning artifact — [`open_video`] warns loudly whenever a pin loses. The software
-/// pin has no vendor and is always honored; with no selected GPU there is nothing to reconcile
-/// against, so a pin is trusted as-is.
-pub fn resolve_windows_backend(
-    pinned: Option<WindowsBackend>,
-    selected_vendor_id: Option<u32>,
-    derived: impl FnOnce() -> WindowsBackend,
-) -> WindowsBackend {
-    match (pinned, selected_vendor_id) {
-        (None, _) => derived(),
-        (Some(pin), Some(vendor)) => match windows_backend_vendor_id(pin) {
-            Some(required) if required != vendor => derived(),
-            _ => pin,
-        },
-        (Some(pin), None) => pin,
-    }
-}
-
-/// The explicit `SLIPSTREAM_ENCODER` pin as a backend — `None` for `auto`, unset, and unknown
-/// spellings (which all mean "derive from the selected adapter's vendor").
-#[cfg(target_os = "windows")]
-fn windows_pinned_backend() -> Option<WindowsBackend> {
-    // Resolved ONCE in HostConfig (Goal-1) — was re-read from SLIPSTREAM_ENCODER on every call.
-    match ss_host_config::config().encoder_pref.as_str() {
-        "nvenc" | "hw" | "nvidia" | "cuda" => Some(WindowsBackend::Nvenc),
-        "amf" | "amd" => Some(WindowsBackend::Amf),
-        "qsv" | "intel" => Some(WindowsBackend::Qsv),
-        "sw" | "software" | "openh264" => Some(WindowsBackend::Software),
-        _ => None,
-    }
-}
-
-/// Resolve the active Windows encode backend from `SLIPSTREAM_ENCODER` (`auto` → the selected
-/// render adapter's vendor; an explicit pin contradicting that vendor is overridden — see
-/// [`resolve_windows_backend`]). Shared by [`open_video`] and the GameStream codec advertisement
-/// so both agree.
-#[cfg(target_os = "windows")]
-pub fn windows_resolved_backend() -> WindowsBackend {
-    let pinned = windows_pinned_backend();
-    // The selected vendor is only consulted to reconcile a pin — skipping the query keeps the
-    // common auto path at ONE inventory walk (the one inside `windows_gpu_vendor`).
-    let selected = if pinned.is_some() {
-        ss_gpu::selected_gpu().map(|s| s.info.vendor_id)
-    } else {
-        None
-    };
-    resolve_windows_backend(pinned, selected, || match windows_gpu_vendor() {
-        Some(GpuVendor::Nvidia) => WindowsBackend::Nvenc,
-        Some(GpuVendor::Amd) => WindowsBackend::Amf,
-        Some(GpuVendor::Intel) => WindowsBackend::Qsv,
-        None => WindowsBackend::Software,
-    })
-}
-
-/// True if the session's resolved encode backend produces GPU-resident frames (so the capturer should
-/// hand GPU surfaces straight through rather than CPU-stage them) — only the GPU-less software encoder
-/// wants CPU staging. This is the single source for [`ss_frame::OutputFormat`]'s `gpu` bit:
-/// resolving it in `encode` and threading it *into* the capturer (rather than having `capture` re-derive
-/// the backend) keeps the capture→encode dependency one-way, so the two can never disagree on whether
-/// frames are GPU-resident (plan §2.4 / §W4).
-#[cfg(target_os = "windows")]
-pub fn resolved_backend_is_gpu() -> bool {
-    !matches!(windows_resolved_backend(), WindowsBackend::Software)
-}
-/// Linux: every backend but the GPU-less software encoder (openh264) is GPU-resident. Resolver-
-/// backed (WP7.6); cross-crate mirrors still exist in `session_plan::resolve_encoder` and
-/// `gamestream/serverinfo.rs` — out of this crate's reach, listed in the WP7.6 design doc.
+/// True if the resolved Linux encode backend produces GPU-resident frames.
+/// The software encoder is the only path that requires CPU staging.
 #[cfg(target_os = "linux")]
 pub fn resolved_backend_is_gpu() -> bool {
     linux_resolved_backend() != LinuxBackend::Software
 }
-/// Other non-Windows targets (the macOS dev host): keep the string gate — no resolver exists
-/// there. `not(any(...))`, NEVER a target list, so no exotic target loses the fn (the
-/// `can_encode_444`/`can_encode_10bit` shape).
-#[cfg(not(any(target_os = "windows", target_os = "linux")))]
-pub fn resolved_backend_is_gpu() -> bool {
-    !matches!(
-        ss_host_config::config().encoder_pref.as_str(),
-        "software" | "sw" | "openh264"
-    )
-}
 
-/// True if the resolved encode backend can ingest a full-chroma (RGB) source and CSC it to 4:4:4 itself —
-/// the *encoder* half of the 4:4:4 capture gate (the host capture `capturer_supports_444`). Only Windows
-/// direct-NVENC does (measured on-glass: ARGB + `chromaFormatIDC=3` → true 4:4:4); AMF/QSV can't. On Linux
-/// the 4:4:4 source is the capturer's own (portal RGB → `yuv444p`), independent of the auto-detected
-/// backend, so the gate never consults this there.
-#[cfg(target_os = "windows")]
-pub fn resolved_backend_ingests_rgb_444() -> bool {
-    windows_resolved_backend() == WindowsBackend::Nvenc
-}
-#[cfg(not(target_os = "windows"))]
+/// Linux capture does not expose a packed RGB source for an encoder-side 4:4:4 CSC.
+#[cfg(target_os = "linux")]
 pub fn resolved_backend_ingests_rgb_444() -> bool {
     false
 }
 
-/// True if the active Windows backend's codec advertisement comes from a **real GPU probe**
-/// ([`windows_codec_support`]) rather than the static superset. AMF always qualifies — the
-/// native factory probe (`amf::probe_can_encode`) needs no build feature — while QSV qualifies
-/// with either the native VPL build (`qsv`, the authoritative Query probe) or the `amf-qsv`
-/// (libavcodec) build, and NVENC with the `nvenc` build (the direct-SDK GUID-list probe,
-/// `nvenc::probe_codec_support` — the Windows twin of the Linux probe that ended the
-/// advertise-HEVC-on-a-GM107 dead sessions). Formerly `windows_backend_is_ffmpeg`, renamed when
-/// the native AMF probe replaced the ffmpeg open-probe (design/native-amf-encoder.md §4, Phase 2).
-#[cfg(target_os = "windows")]
-pub fn windows_backend_is_probed() -> bool {
-    match windows_resolved_backend() {
-        WindowsBackend::Amf => true,
-        WindowsBackend::Qsv => cfg!(feature = "qsv") || cfg!(feature = "amf-qsv"),
-        WindowsBackend::Nvenc => cfg!(feature = "nvenc"),
-        WindowsBackend::Software => false,
-    }
-}
-
-/// Detect the encode-GPU vendor from the **selected render adapter** ([`ss_gpu::selected_gpu`]:
-/// web-console preference > `SLIPSTREAM_RENDER_ADAPTER` > max VRAM) — the same adapter the capture
-/// ring and the IddCx render pin sit on, so the encoder backend can never disagree with where the
-/// captured frames live. The old first-DXGI-adapter scan did exactly that on hybrid boxes: adapter
-/// 0 is often the iGPU (e.g. Intel Arc) while capture/encode pin the dGPU — resolving QSV for a
-/// pipeline whose textures sit on the NVIDIA card. Uncached: selection is preference-dependent and
-/// only consulted at session setup / serverinfo time, never per-frame. Falls back to the first
-/// known-vendor adapter when the selected one is an unknown vendor.
-#[cfg(target_os = "windows")]
-fn windows_gpu_vendor() -> Option<GpuVendor> {
-    fn by_id(vendor_id: u32) -> Option<GpuVendor> {
-        match vendor_id {
-            ss_gpu::VENDOR_NVIDIA => Some(GpuVendor::Nvidia),
-            ss_gpu::VENDOR_AMD => Some(GpuVendor::Amd),
-            ss_gpu::VENDOR_INTEL => Some(GpuVendor::Intel),
-            _ => None,
-        }
-    }
-    let sel = ss_gpu::selected_gpu()?;
-    by_id(sel.info.vendor_id)
-        .or_else(|| ss_gpu::enumerate().iter().find_map(|g| by_id(g.vendor_id)))
-}
-
-/// Probe the active Windows GPU backend for its encodable codecs (cached **per (backend,
-/// selected GPU)** — a web-console preference change re-probes on the newly selected adapter
-/// instead of serving the old GPU's answer for the process lifetime). Mirrors
-/// [`vaapi_codec_support`]/[`nvenc_codec_support`]; called only when [`windows_backend_is_probed`]
-/// is true. AV1 is narrow (NVIDIA Ada+, AMD RDNA3+, Intel Arc/Xe2+) and HEVC needs 2nd-gen
-/// Maxwell+ on NVIDIA, so both must be probed, not assumed.
-///
-/// Mirrors the session dispatch (design/native-amf-encoder.md Phase 3): **AMD advertises from the
-/// native AMF factory probe alone** (`amf::probe_can_encode`, on the selected adapter — the same
-/// path the session opens, so the advertisement can never claim a codec the session can't emit);
-/// **Intel/QSV advertises from the native VPL Query probe** (`qsv::probe_can_encode`,
-/// design/native-qsv-encoder.md §4), falling back to the libavcodec probe on builds without the
-/// `qsv` feature (all-`false` without either feature, matching a build that cannot open QSV);
-/// **NVIDIA advertises from the driver's own encode-GUID list** (`nvenc::probe_codec_support`,
-/// one throwaway direct-SDK session on the selected adapter — NEVER an ffmpeg open-probe, see the
-/// Linux `nvenc_cuda::probe_support` doc for why).
-#[cfg(target_os = "windows")]
-pub fn windows_codec_support() -> CodecSupport {
-    use std::collections::HashMap;
-    use std::sync::{Mutex, OnceLock};
-    static CACHE: OnceLock<Mutex<HashMap<String, CodecSupport>>> = OnceLock::new();
-    let backend = windows_resolved_backend();
-    let key = format!("{backend:?}:{}", ss_gpu::selection_key());
-    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-    if let Some(c) = cache.lock().unwrap().get(&key) {
-        return *c;
-    }
-    let probe_one = |codec: Codec| -> bool {
-        match backend {
-            // AMD: the native factory probe is authoritative — it opens exactly the component the
-            // session will, so the advertisement matches what the encoder can emit by construction.
-            WindowsBackend::Amf => amf::probe_can_encode(codec),
-            WindowsBackend::Qsv => {
-                // Native VPL Query probe first (the same parameter block the session opens, so
-                // the advertisement matches what the encoder can emit by construction); the
-                // libavcodec probe only answers on builds without the native backend.
-                #[cfg(feature = "qsv")]
-                {
-                    qsv::probe_can_encode(codec)
-                }
-                #[cfg(all(not(feature = "qsv"), feature = "amf-qsv"))]
-                {
-                    ffmpeg_win::probe_can_encode(ffmpeg_win::WinVendor::Qsv, codec)
-                }
-                #[cfg(all(not(feature = "qsv"), not(feature = "amf-qsv")))]
-                {
-                    false
-                }
-            }
-            // NVENC answers below from ONE GUID-list session, not per-codec probes; Software is
-            // never probed. Callers gate on `windows_backend_is_probed` — defensively answer
-            // "nothing probed" (the advertisement then falls back to the static superset).
-            WindowsBackend::Nvenc | WindowsBackend::Software => false,
-        }
-    };
-    let caps = match backend {
-        // NVIDIA: one throwaway session lists every encode GUID at once — no reason to open
-        // three sessions through `probe_one`. Featureless builds fall through to `probe_one`'s
-        // defensive all-false (= "nothing probed" → static superset), matching
-        // `windows_backend_is_probed`.
-        #[cfg(feature = "nvenc")]
-        WindowsBackend::Nvenc => nvenc::probe_codec_support(),
-        _ => CodecSupport {
-            h264: probe_one(Codec::H264),
-            h265: probe_one(Codec::H265),
-            av1: probe_one(Codec::Av1),
-        },
-    };
-    tracing::info!(
-        ?backend,
-        h264 = caps.h264,
-        h265 = caps.h265,
-        av1 = caps.av1,
-        "Windows encode capabilities probed"
-    );
-    // A concurrent first call may double-probe; both arrive at the same answer, last insert wins.
-    cache.lock().unwrap().insert(key, caps);
-    caps
-}
-
-/// Stage-W3 encoder session-budget seam (`design/windows-parallel-virtual-displays.md` §4.5):
-/// whether one more encode session fits the hardware budget — consulted by the display admission
-/// before admitting a parallel display, so an unaffordable display is DECLINED instead of silently
-/// degrading a live sibling's encode. NVENC is the only backend with hard session caps today
-/// (GeForce consumer limit); AMF/QSV equivalents follow the same seam when they grow accounting.
-#[cfg(target_os = "windows")]
-pub fn can_open_another_session() -> bool {
-    #[cfg(feature = "nvenc")]
-    {
-        nvenc::can_open_another_session()
-    }
-    #[cfg(not(feature = "nvenc"))]
-    {
-        true
-    }
-}
-
-// Goal-1 stage 6: GPU/CPU encoders confined to `backend/windows/` (NVENC, native AMF, AMF/QSV
-// ffmpeg, software) and `backend/linux/` (NVENC/CUDA + VAAPI); `#[path]` keeps the
-// `crate::*` module names flat.
-// Native AMF (direct SDK, design/native-amf-encoder.md): compiled unconditionally on Windows —
-// no build feature, the driver-installed amfrt64.dll resolves at runtime like NVENC's DLL.
-#[cfg(target_os = "windows")]
-#[path = "backend/windows/amf.rs"]
-mod amf;
-#[cfg(all(target_os = "windows", feature = "amf-qsv"))]
-#[path = "backend/windows/ffmpeg_win.rs"]
-mod ffmpeg_win;
-// Native Intel QSV (VPL, design/native-qsv-encoder.md): behind the `qsv` feature — the vendored
-// dispatcher is statically linked (libvpl-sys, cmake+bindgen at build), the GPU runtime resolves
-// from the Intel driver store at run time.
+// Linux backends. `#[path]` keeps the `crate::*` module names flat.
 #[cfg(target_os = "linux")]
 #[path = "backend/linux/mod.rs"]
 mod linux;
-#[cfg(all(target_os = "windows", feature = "qsv"))]
-#[path = "backend/windows/qsv.rs"]
-mod qsv;
 // Direct-SDK NVENC on Linux (CUDA input; design/linux-direct-nvenc.md) — real RFI + recovery anchor
 // + reset() lever the libavcodec `linux::NvencEncoder` can't express. Opt-in behind
-// `SLIPSTREAM_NVENC_DIRECT` until on-glass validated; the `.so` resolves at runtime like the Windows
-// path, so `--features nvenc` stays safe on a driver-less/AMD Linux box.
-#[cfg(all(target_os = "windows", feature = "nvenc"))]
-#[path = "backend/windows/nvenc.rs"]
-mod nvenc;
+// `SLIPSTREAM_NVENC_DIRECT`; the `.so` resolves at runtime, so `--features nvenc` stays safe on a
+// driver-less or AMD Linux box.
 #[cfg(all(target_os = "linux", feature = "nvenc"))]
 #[path = "backend/linux/nvenc_cuda.rs"]
 mod nvenc_cuda;
-// Actionable `NVENCSTATUS` → cause mapping shared by both direct-NVENC backends, so a failed
-// session open names its real cause instead of the old misleading "(no NVIDIA GPU?)" — including
-// splitting the two opposite failures the driver reports as the SAME `INVALID_VERSION` (a genuine
-// driver skew vs. this process's driver state going bad after a session already opened).
-#[cfg(all(any(target_os = "linux", target_os = "windows"), feature = "nvenc"))]
+// Actionable `NVENCSTATUS` → cause mapping, so a failed session open names its real cause instead
+// of the old misleading "(no NVIDIA GPU?)".
+#[cfg(all(target_os = "linux", feature = "nvenc"))]
 #[path = "backend/nvenc_status.rs"]
 mod nvenc_status;
-// Platform-agnostic direct-SDK NVENC glue (`NvStatusExt`/`nv_ok`, `codec_guid`) shared by both
-// `nvEncodeAPI` backends — the byte-identical Tier-2 leaves (plan §2.2). Sibling of `nvenc_status`.
-#[cfg(all(any(target_os = "linux", target_os = "windows"), feature = "nvenc"))]
+// Direct-SDK NVENC glue (`NvStatusExt`/`nv_ok`, `codec_guid`) shared by the Linux backend.
+#[cfg(all(target_os = "linux", feature = "nvenc"))]
 #[path = "backend/nvenc_core.rs"]
 mod nvenc_core;
-// The slot-family RFI recovery policy (WP7.2) shared by native AMF, native QSV and Vulkan Video —
-// the taint sweep + pre-loss anchor pick extracted from three hand-copies that had already
-// diverged once (the fecbec2d sweep predates the Vulkan backend's carve-out and was never ported
-// to it until a later fix). Policy only: every mechanism (LTR bitfield, RefListCtrl, DPB slot
-// table) stays in its backend. cfg = the union of the callers': amf.rs is featureless on Windows,
-// vulkan_video needs `vulkan-encode` on Linux — and each ITEM inside is live under the module's
-// whole cfg because `plan_slot_recovery` delegates to `pick_anchor` (dead_code is an item lint;
-// module-granular reasoning is how a Windows-dead helper reaches main).
-#[cfg(any(
-    target_os = "windows",
-    all(target_os = "linux", feature = "vulkan-encode")
-))]
+// Slot-family RFI policy used by the Linux Vulkan Video backend.
+#[cfg(all(target_os = "linux", feature = "vulkan-encode"))]
 #[path = "backend/rfi.rs"]
 mod rfi;
-// Shared libavcodec glue (`pixel_to_av`, swscale consts) for the three libav backends — Linux
-// NVENC + VAAPI and Windows AMF/QSV — so the byte-identical pieces live once (plan §2.2, Tier 2).
-#[cfg(any(target_os = "linux", all(target_os = "windows", feature = "amf-qsv")))]
+// Shared libavcodec glue (`pixel_to_av`, swscale consts) for Linux NVENC and VAAPI.
+#[cfg(target_os = "linux")]
 #[path = "backend/libav.rs"]
 mod libav;
-// Software (openh264) H.264 encoder — the GPU-less path on BOTH Windows and Linux (a headless /
-// GPU-less test box, or a fallback when no hardware encoder is available). Platform-agnostic: it
-// consumes CPU RGB `CapturedFrame`s and the statically-bundled openh264 build.
-#[cfg(any(target_os = "windows", target_os = "linux"))]
+// Software (openh264) H.264 encoder for headless and GPU-less Linux hosts.
+#[cfg(target_os = "linux")]
 #[path = "backend/sw.rs"]
 mod sw;
 #[cfg(target_os = "linux")]
@@ -2037,26 +1361,19 @@ mod vk_util;
 #[cfg(all(target_os = "linux", feature = "pyrowave"))]
 #[path = "backend/linux/pyrowave.rs"]
 mod pyrowave;
-// The Windows PyroWave encoder — NV12 zero-copy D3D11→Vulkan via pyrowave's own compat device
-// (design/pyrowave-windows-host-zerocopy.md). Same module name as the Linux one (per-platform
-// `#[path]`, mutually-exclusive cfg) so `crate::pyrowave::*` is flat on both.
-#[cfg(all(target_os = "windows", feature = "pyrowave"))]
-#[path = "backend/windows/pyrowave.rs"]
-mod pyrowave;
-// Shared PyroWave AU wire-framing (§4.4) — the single source of truth both platform backends emit,
-// so the on-wire access-unit layout the clients parse can never drift between Linux and Windows.
-#[cfg(all(any(target_os = "linux", target_os = "windows"), feature = "pyrowave"))]
+// Shared PyroWave AU wire-framing (§4.4) for the Linux backend.
+#[cfg(all(target_os = "linux", feature = "pyrowave"))]
 #[path = "backend/pyrowave_wire.rs"]
 mod pyrowave_wire;
 
 /// Whether a PyroWave mode fits the vendored rate controller's packed 16-bit block index
 /// (`patches/0002-rdo-saving-clamp.patch` note): false ≈ 8K-class 4:4:4. The negotiator
 /// downgrades such a session to 4:2:0 before the Welcome; the encoders also refuse outright.
-#[cfg(all(any(target_os = "linux", target_os = "windows"), feature = "pyrowave"))]
+#[cfg(all(target_os = "linux", feature = "pyrowave"))]
 pub fn pyrowave_mode_fits_rdo(width: u32, height: u32, chroma444: bool) -> bool {
     pyrowave_wire::block_count_32x32(width, height, chroma444) <= u16::MAX as u32
 }
-#[cfg(not(all(any(target_os = "linux", target_os = "windows"), feature = "pyrowave")))]
+#[cfg(not(all(target_os = "linux", feature = "pyrowave")))]
 pub fn pyrowave_mode_fits_rdo(_width: u32, _height: u32, _chroma444: bool) -> bool {
     false
 }
@@ -2065,65 +1382,7 @@ pub fn pyrowave_mode_fits_rdo(_width: u32, _height: u32, _chroma444: bool) -> bo
 mod tests {
     use super::*;
 
-    /// The pin-vs-adapter reconciliation table (`resolve_windows_backend`): an explicit
-    /// `SLIPSTREAM_ENCODER` pin whose vendor contradicts the selected GPU must be overridden by
-    /// the adapter-derived backend — never "pin + proceed", which fed the reset ladder a
-    /// deterministic failure (the hybrid-box `qsv` pin × console NVIDIA preference loop).
-    #[test]
-    fn encoder_pin_reconciles_against_the_selected_adapter() {
-        use WindowsBackend::*;
-        let derived = |b: WindowsBackend| move || b;
-        let unreachable = || -> WindowsBackend { panic!("derived must not be consulted") };
-        // The repro: pinned qsv, console-selected NVIDIA → NVENC (the un-pinned path's answer).
-        assert_eq!(
-            resolve_windows_backend(Some(Qsv), Some(ss_gpu::VENDOR_NVIDIA), derived(Nvenc)),
-            Nvenc
-        );
-        // A pin matching the selected vendor is honored without deriving.
-        assert_eq!(
-            resolve_windows_backend(Some(Qsv), Some(ss_gpu::VENDOR_INTEL), unreachable),
-            Qsv
-        );
-        // No selected GPU → nothing to reconcile against; the pin is trusted as-is.
-        assert_eq!(
-            resolve_windows_backend(Some(Nvenc), None, unreachable),
-            Nvenc
-        );
-        // The software pin has no vendor: honored on any adapter.
-        assert_eq!(
-            resolve_windows_backend(Some(Software), Some(ss_gpu::VENDOR_NVIDIA), unreachable),
-            Software
-        );
-        // No pin (`auto`/unset) → always the adapter-derived backend.
-        assert_eq!(
-            resolve_windows_backend(None, Some(ss_gpu::VENDOR_AMD), derived(Amf)),
-            Amf
-        );
-        assert_eq!(
-            resolve_windows_backend(None, None, derived(Software)),
-            Software
-        );
-    }
-
-    /// The terminal-marker contract the stream loop's reset ladder relies on: a
-    /// [`TerminalEncoderError`] attached at the failure site must stay downcastable through the
-    /// context layers added on the way up (a `format!`/stringify on any layer would break it).
-    #[test]
-    fn terminal_encoder_error_survives_the_context_chain() {
-        use anyhow::Context as _;
-        let site: anyhow::Error = anyhow::Error::new(TerminalEncoderError)
-            .context("capture device's adapter is not an Intel VPL implementation");
-        let bubbled = Err::<(), _>(site)
-            .context("QSV lazy bring-up")
-            .context("encoder submit")
-            .unwrap_err();
-        assert!(bubbled.downcast_ref::<TerminalEncoderError>().is_some());
-        // The operator-facing rendering leads with the actual cause, not the marker.
-        assert!(format!("{bubbled:#}").contains("not an Intel VPL implementation"));
-    }
-
     /// The probed-capability → wire-bitfield mapping the native codec advertisement is built from.
-    #[cfg(any(target_os = "linux", target_os = "windows"))]
     #[test]
     fn codec_support_wire_mask() {
         use slipstream_core::quic::{CODEC_AV1, CODEC_H264, CODEC_HEVC};

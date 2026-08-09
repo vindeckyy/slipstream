@@ -21,8 +21,8 @@ cd "$ROOTDIR"
 DEB_ARCH="${DEB_ARCH:-$(dpkg --print-architecture)}"
 BUN_VERSION="${BUN_VERSION:-1.3.14}" # pinned bun build vendored into the package
 case "$DEB_ARCH" in
-  amd64) BUN_ARCH=x64 ;;
-  arm64) BUN_ARCH=aarch64 ;;
+  amd64) BUN_ARCH=x64; BUN_SHA256=951ee2aee855f08595aeec6225226a298d3fea83a3dcd6465c09cbccdf7e848f ;;
+  arm64) BUN_ARCH=aarch64; BUN_SHA256=a27ffb63a8310375836e0d6f668ae17fa8d8d18b88c37c821c65331973a19a3b ;;
   *) echo "ERROR: unsupported DEB_ARCH=$DEB_ARCH (want amd64 or arm64)" >&2; exit 1 ;;
 esac
 
@@ -54,6 +54,7 @@ else
   echo "==> downloading bun $BUN_VERSION ($BUN_ARCH) from $url"
   tmp="$(mktemp -d)"
   curl -fsSL "$url" -o "$tmp/bun.zip"
+  printf '%s  %s\n' "$BUN_SHA256" "$tmp/bun.zip" | sha256sum --check --status
   unzip -q "$tmp/bun.zip" -d "$tmp"
   install -m0755 "$tmp/bun-linux-${BUN_ARCH}/bun" "$LIBDIR/bun"
   rm -rf "$tmp"
@@ -92,8 +93,12 @@ License: MIT or Apache-2.0
  Dual-licensed. Full texts in /usr/share/doc/$PKG/LICENSE-MIT and
  /usr/share/doc/$PKG/LICENSE-APACHE.
 EOF
+CHANGELOG_DATE='Thu, 01 Jan 1970 00:00:00 +0000'
+if [ -n "${SOURCE_DATE_EPOCH:-}" ]; then
+  CHANGELOG_DATE="$(date -u -d "@${SOURCE_DATE_EPOCH}" -R)"
+fi
 printf '%s (%s) stable; urgency=medium\n\n  * Automated build %s.\n\n -- unom <packages@unom.io>  %s\n' \
-  "$PKG" "$VERSION" "$VERSION" "$(date -uR 2>/dev/null || echo 'Thu, 01 Jan 1970 00:00:00 +0000')" \
+  "$PKG" "$VERSION" "$VERSION" "$CHANGELOG_DATE" \
   | gzip -9n > "$DOCDIR/changelog.Debian.gz"
 
 INSTALLED_KB="$(du -k -s "$STAGE" | cut -f1)"

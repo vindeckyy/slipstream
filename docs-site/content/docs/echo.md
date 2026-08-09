@@ -16,7 +16,7 @@ hear yourself whenever anything routes the mic back.
 
 **Fix: use headphones on the device you're streaming on.** Clients also try to cancel it for
 you: **Echo cancellation** in [client settings](/docs/client-settings#audio) is on by default on
-iPhone, Android and the console home, and hands the microphone to the system's own canceller. How
+Android and the console home, and hands the microphone to the system's own canceller. How
 much it removes depends on the device, so headphones remain the reliable fix everywhere.
 
 If you just need to stop talking for a moment, turn **Stream microphone** off in client settings,

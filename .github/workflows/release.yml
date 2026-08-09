@@ -5,39 +5,99 @@ on:
     tags:
       - "v*.*.*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing semantic-version tag to publish
+        required: true
+        type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   linux-host:
     name: Linux host release
     runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Validate release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$(git tag --points-at HEAD "$RELEASE_TAG")" = "$RELEASE_TAG"
+          version="${RELEASE_TAG#v}"
+          cargo_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "slipstream-host") | .version' | head -n1)"
+          test "$cargo_version" = "$version"
 
       - name: Install native dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential clang libclang-dev pkg-config cmake             libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libavfilter-dev             libavdevice-dev libpipewire-0.3-dev libopus-dev libwayland-dev libxkbcommon-dev             libgl-dev libegl-dev libgbm-dev libvulkan-dev
+          sudo apt-get install -y build-essential clang libclang-dev pkg-config cmake \
+            libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libavfilter-dev \
+            libavdevice-dev libpipewire-0.3-dev libopus-dev libwayland-dev libxkbcommon-dev \
+            libgl-dev libegl-dev libgbm-dev libvulkan-dev jq
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master, pinned
         with:
           toolchain: 1.82.0
 
       - name: Build host
         run: cargo build --release -p slipstream-host --locked
 
-      - name: Package and checksum
+      - name: Prepare release files
+        shell: bash
         run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
           mkdir -p release
-          cp target/release/slipstream-host release/slipstream-host-linux-x86_64
-          tar -C release -czf slipstream-host-${GITHUB_REF_NAME}-linux-x86_64.tar.gz slipstream-host-linux-x86_64
-          sha256sum slipstream-host-${GITHUB_REF_NAME}-linux-x86_64.tar.gz             > slipstream-host-${GITHUB_REF_NAME}-linux-x86_64.tar.gz.sha256
+          cp target/release/slipstream-host "release/slipstream-host-${version}-linux-x86_64"
+          tar -C release -czf "release/slipstream-host-${version}-linux-x86_64.tar.gz" \
+            "slipstream-host-${version}-linux-x86_64"
+          python3 scripts/gen-third-party-notices.py \
+            --out "release/slipstream-${version}-THIRD-PARTY-NOTICES.txt"
+          (cd release && sha256sum -- *) > "release/slipstream-${version}-SHA256SUMS"
 
-      - uses: softprops/action-gh-release@v2
+      - name: Generate SBOM
+        uses: anchore/sbom-action@d94f46e13c6c62f59525ac9a1e147a99dc0b9bf5 # v0.17.0
         with:
+          path: .
+          format: cyclonedx-json
+          output-file: release/slipstream-${{ env.RELEASE_TAG }}.cdx.json
+          artifact-name: slipstream-${{ env.RELEASE_TAG }}.cdx.json
+
+      - name: Refresh checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          rm -f "release/slipstream-${version}-SHA256SUMS"
+          (cd release && sha256sum -- *) > "release/slipstream-${version}-SHA256SUMS"
+
+      - name: Attest release files
+        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        with:
+          subject-path: release/*
+
+      - name: Publish release
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2.2.2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
           generate_release_notes: true
-          files: |
-            slipstream-host-${{ github.ref_name }}-linux-x86_64.tar.gz
-            slipstream-host-${{ github.ref_name }}-linux-x86_64.tar.gz.sha256
+          fail_on_unmatched_files: true
+          files: release/*

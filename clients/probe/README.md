@@ -3,8 +3,8 @@
 `slipstream-probe` is the **headless reference client** for the `slipstream/1` protocol - a
 command-line tool for testing, latency measurement, and validating host behavior. It's not a
 streaming app you'd watch on; it connects, exercises a plane, and reports numbers. If you want to
-actually stream, use the [Linux](../linux/README.md), [Windows](../windows/README.md),
-[Apple](../apple/README.md), or [Android](../android/README.md) clients.
+actually stream, use the [Linux](../linux/README.md), [Apple](../apple/README.md), or
+[Android](../android/README.md) clients.
 
 Because it links the same **`slipstream-core`** as every other client, it's also the canonical
 example of driving the protocol end to end: QUIC control plane, UDP data plane, and the side planes

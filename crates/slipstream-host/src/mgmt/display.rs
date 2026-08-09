@@ -78,20 +78,10 @@ pub(crate) fn display_settings_state() -> DisplaySettingsState {
         "identity".into(),
         "layout".into(),
         "game_session".into(),
-        // EXPERIMENTAL, Windows-only in effect: acted on at the `exclusive` isolate
-        // (`vdisplay/windows/manager.rs`); stored-but-inert elsewhere.
         "ddc_power_off".into(),
         "pnp_disable_monitors".into(),
     ];
-    // `capture_monitor` routes every session to the MIRROR backend, and that backend exists only on
-    // Linux — `vdisplay::open`'s mirror arm is `#[cfg(target_os = "linux")]`, because `ss-capture`
-    // has no Windows entry point that can capture an arbitrary head. This list is precisely the
-    // "which controls are live vs. coming soon" contract, so claiming it unconditionally is what let
-    // the Windows console offer a picker that saved and then did nothing
-    // (`design/per-monitor-portal-capture.md` §5.3).
-    if cfg!(target_os = "linux") {
-        enforced.push("capture_monitor".into());
-    }
+    enforced.push("capture_monitor".into());
     DisplaySettingsState {
         effective: settings.effective(),
         settings,
@@ -142,26 +132,9 @@ pub(crate) async fn get_display_settings() -> Json<DisplaySettingsState> {
 pub(crate) async fn set_display_settings(
     ApiJson(policy): ApiJson<crate::vdisplay::policy::DisplayPolicy>,
 ) -> Response {
-    #[cfg_attr(target_os = "linux", allow(unused_mut))]
     let mut policy = policy;
-    // A pin nothing can honor must not be STORED as though it were. Off Linux there is no mirror
-    // backend (`MonitorsResponse::pin_supported`), so drop the field rather than persisting a
-    // setting whose only effect would be to mislead: the console re-reads this state after the PUT
-    // and would otherwise render a screen as "streamed" while every session kept creating a virtual
-    // display. Coerced rather than rejected with a 400 on purpose — this PUT is WHOLE-OBJECT, so a
-    // host that already stored a pin (before this build) would have every later settings save
-    // rejected over a field the operator cannot even see, taking the other axes down with it. This
-    // way such a policy self-heals on the next write, and the response body shows the truth
-    // immediately.
-    #[cfg(not(target_os = "linux"))]
-    if let Some(dropped) = policy.capture_monitor.take() {
-        tracing::warn!(
-            "management API: ignoring capture_monitor={dropped:?} — streaming a chosen physical \
-             monitor is Linux-only (no Windows mirror backend); the pin was NOT stored"
-        );
-    }
-    // `keep_alive: forever` (the gaming-rig preset) is now honored: the display is Pinned (Linux
-    // registry + Windows `MgrState::Pinned`) and freed via `POST /display/release` (the escape hatch).
+    // `keep_alive: forever` (the gaming-rig preset) is honored by the Linux display registry and
+    // freed via `POST /display/release`.
     if let Err(e) = crate::vdisplay::policy::prefs().set(policy) {
         return api_error(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -173,7 +146,6 @@ pub(crate) async fn set_display_settings(
     // rather than at the next host restart — and must clear the anchor when the pin is cleared.
     // Enumeration (Mutter/wlroots/…) builds a short-lived Tokio runtime + D-Bus/Wayland round-trip,
     // so it must not run on an async worker — same reason `get_display_monitors` uses spawn_blocking.
-    #[cfg(target_os = "linux")]
     if let Err(e) = tokio::task::spawn_blocking(|| {
         crate::refresh_capture_monitor_anchor("display policy updated");
     })
@@ -260,16 +232,7 @@ pub(crate) struct MonitorsResponse {
     pinned: Option<String>,
     /// Whether this build can actually STREAM one of these monitors.
     ///
-    /// Enumeration and capture are separate capabilities, and on Windows only the first exists: the
-    /// heads below are real and worth showing (they explain the topology, and `/display/state`
-    /// cross-references them), but `ss-capture`'s sole Windows entry point is `open_idd_push` — a
-    /// frame channel pushed by our OWN IddCx virtual display. There is no desktop-duplication
-    /// capturer to point at a chosen head (DXGI Desktop Duplication was deliberately removed), so
-    /// `vdisplay::open` has no mirror arm outside Linux and a pin could not be honored.
-    ///
-    /// The console renders the picker read-only on `false`. Reported as a capability rather than
-    /// sniffed client-side from the OS so the answer comes from the build that would have to honor
-    /// it — when a Windows mirror backend lands, this flips and the UI needs no change.
+    /// Linux can enumerate and capture one of these monitors through the selected compositor.
     pin_supported: bool,
     /// Why the list is empty, when enumeration failed (compositor unreachable, unsupported
     /// platform). `None` with an empty list means "asked, and there are none".
@@ -293,33 +256,13 @@ pub(crate) struct MonitorsResponse {
     )
 )]
 pub(crate) async fn get_display_monitors() -> Json<MonitorsResponse> {
-    // The EFFECTIVE pin (env override, else the stored policy) — so the picker highlights what
-    // sessions will actually mirror, not just what the console last wrote.
-    #[cfg(target_os = "linux")]
+    // The effective pin, from the environment override or stored policy, highlights the monitor
+    // sessions will actually mirror.
     let pinned = crate::vdisplay::capture_monitor();
-    // Off Linux there is no mirror backend, so there is nothing a pin could aim (see
-    // `MonitorsResponse::pin_supported`). Kept `None` DELIBERATELY rather than reporting the stored
-    // value: `pinned` is what the console highlights as "this is the screen sessions stream", and a
-    // highlight on a head nothing will ever capture is precisely the lie this endpoint is here to
-    // stop telling. `pin_supported: false` is how the unsupportedness is reported instead.
-    #[cfg(not(target_os = "linux"))]
-    let pinned: Option<String> = None;
-    // Enumeration works on Windows; capture of an enumerated head does not.
-    let pin_supported = cfg!(target_os = "linux");
-    // Enumeration shells out / round-trips D-Bus + Wayland (and on Windows walks the CCD
-    // database, which can serialize on the display-config lock), so keep it off the async worker.
+    let pin_supported = true;
+    // Enumeration shells out and may round-trip through D-Bus or Wayland, so keep it off the async
+    // worker.
     let (compositor, listed) = tokio::task::spawn_blocking(|| {
-        // Windows has no compositor to detect — asking used to fail with Linux advice about
-        // XDG_CURRENT_DESKTOP, which landed verbatim in `error` below and was the console's only
-        // explanation for an empty picker. Report the display API we actually used instead.
-        #[cfg(windows)]
-        {
-            (
-                Some("windows".to_string()),
-                crate::vdisplay::monitors::list_windows(),
-            )
-        }
-        #[cfg(not(windows))]
         match crate::vdisplay::detect() {
             Ok(c) => (Some(c.id().to_string()), crate::vdisplay::monitors::list(c)),
             Err(e) => (None, Err(e)),

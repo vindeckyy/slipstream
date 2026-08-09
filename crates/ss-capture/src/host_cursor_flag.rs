@@ -1,6 +1,6 @@
 //! Process-wide flag: the host OS cursor is hidden for streaming (see slipstream-host
 //! `host_cursor` + ss-inject platform hide). Capture/encode paths use this to keep publishing
-//! a stream cursor overlay even when Win32 `CURSOR_SHOWING` is clear or Mutter's theme-blank
+//! a stream cursor overlay even when the compositor's cursor visibility flag is clear or Mutter's theme-blank
 //! sprite would otherwise empty `SPA_META_Cursor`.
 
 use std::sync::atomic::{AtomicBool, Ordering};

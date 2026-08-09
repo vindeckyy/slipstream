@@ -10,12 +10,12 @@
 //!
 //! This module proactively detects such a host (installed and/or running) so we can surface it as
 //! early as possible: at host startup (a `warn!` into the log ring + tray/console summary) and via
-//! the `detect-conflicts` subcommand the installers/support run.
+//! the `detect-conflicts` support subcommand.
 //!
 //! Detection is **fingerprint-first by name**: a small table of the known products (extend
-//! [`KNOWN`] as new forks appear) matched against running processes, registered OS services/units,
-//! and on-disk install markers. The platform back-ends (`detect/windows.rs`, `detect/linux.rs`)
-//! provide the raw facts; the matching + rendering here is portable and unit-tested.
+//! [`KNOWN`] as new forks appear) matched against running processes, systemd units, and on-disk
+//! install markers. The Linux backend provides the raw facts; the matching and rendering here are
+//! unit-tested.
 
 use std::sync::OnceLock;
 
@@ -27,23 +27,9 @@ pub(crate) fn running_process_names() -> Vec<String> {
     platform::running_processes()
 }
 
-#[cfg(target_os = "windows")]
-#[path = "detect/windows.rs"]
-mod platform;
 #[cfg(target_os = "linux")]
 #[path = "detect/linux.rs"]
 mod platform;
-#[cfg(not(any(target_os = "windows", target_os = "linux")))]
-mod platform {
-    //! The host only runs on Windows/Linux; the crate still compiles on macOS (dev) — nothing to
-    //! scan there.
-    pub fn running_processes() -> Vec<String> {
-        Vec::new()
-    }
-    pub fn static_evidence(_known: &super::Known) -> Vec<super::Evidence> {
-        Vec::new()
-    }
-}
 
 /// A known competing GameStream/Moonlight host.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -75,7 +61,7 @@ pub enum Evidence {
     Running { process: String },
     /// An OS service / systemd unit for the product is registered (installed; may be stopped).
     Service { name: String },
-    /// Installed on disk — a Program Files directory, a flatpak app id, or a binary on `PATH`.
+    /// Installed on disk — a Flatpak app id or a binary on `PATH`.
     Installed { at: String },
 }
 
@@ -123,10 +109,6 @@ pub struct Known {
     pub product: Product,
     /// Process / executable basenames (lowercase, no extension) that identify this host.
     pub processes: &'static [&'static str],
-    /// Windows service names (SCM keys under `HKLM\SYSTEM\CurrentControlSet\Services`).
-    pub win_services: &'static [&'static str],
-    /// Windows install-dir basenames under `%ProgramFiles%` / `%ProgramFiles(x86)%`.
-    pub win_dirs: &'static [&'static str],
     /// Linux systemd unit basenames (without `.service`), checked in the standard unit dirs.
     pub linux_units: &'static [&'static str],
     /// Linux flatpak application ids.
@@ -139,46 +121,36 @@ pub const KNOWN: &[Known] = &[
     Known {
         product: Product::Sunshine,
         processes: &["sunshine"],
-        win_services: &["SunshineService"],
-        win_dirs: &["Sunshine"],
         linux_units: &["sunshine"],
         flatpaks: &["dev.lizardbyte.app.Sunshine"],
     },
     Known {
         product: Product::Apollo,
         processes: &["apollo"],
-        win_services: &["ApolloService"],
-        win_dirs: &["Apollo"],
         linux_units: &["apollo"],
         flatpaks: &["dev.lizardbyte.app.Apollo"],
     },
     Known {
         product: Product::Vibeshine,
         processes: &["vibeshine"],
-        win_services: &["VibeshineService"],
-        win_dirs: &["Vibeshine"],
         linux_units: &["vibeshine"],
         flatpaks: &[],
     },
     Known {
         product: Product::Vibepollo,
         processes: &["vibepollo"],
-        win_services: &["VibepolloService"],
-        win_dirs: &["Vibepollo"],
         linux_units: &["vibepollo"],
         flatpaks: &[],
     },
     Known {
         product: Product::Luminalshine,
         processes: &["luminalshine"],
-        win_services: &["LuminalShineService"],
-        win_dirs: &["LuminalShine"],
         linux_units: &["luminalshine"],
         flatpaks: &[],
     },
 ];
 
-/// Why running side-by-side breaks — shared by every surface (log, subcommand, installers).
+/// Why running side-by-side breaks, shared by every surface (log and support subcommand).
 pub const UNSUPPORTED_BLURB: &str =
     "Running Slipstream alongside another Moonlight-compatible host \
 (Sunshine and its forks) is UNSUPPORTED: they bind the same GameStream ports (47984/47989, \
@@ -187,7 +159,7 @@ virtual-display driver. Expect \"address already in use\" errors, failed pairing
 glitches. Stop and uninstall the other host, or don't run them at the same time.";
 
 /// Scan the machine for conflicting hosts. Portable; dispatches into the platform back-end. Does
-/// real OS work (process enumeration, service/registry queries, filesystem stats) — cheap, but not
+/// real OS work (process enumeration, systemd and filesystem checks) — cheap, but not
 /// free, so use [`init`]/[`snapshot`] for the startup report and
 /// [`current_summary_labels`] for the live status path.
 pub fn scan() -> Vec<Detection> {
@@ -229,7 +201,7 @@ pub fn snapshot() -> &'static [Detection] {
 /// Compact labels for the tray / web-console summary: **running detections only**.
 ///
 /// Install-only / service-registered evidence stays in [`scan`] / [`render_report`] for
-/// `detect-conflicts` and installers; the console field means "another server is running", so
+/// `detect-conflicts`; the console field means "another server is running", so
 /// static evidence must not leak through here. This filters the detections it is given; callers
 /// that need current state should use [`current_summary_labels`].
 pub fn summary_labels(detections: &[Detection]) -> Vec<String> {
@@ -311,7 +283,7 @@ mod tests {
                     process: "sunshine".into(),
                 },
                 Evidence::Service {
-                    name: "SunshineService".into(),
+                    name: "sunshine.service".into(),
                 },
             ],
         );
@@ -324,7 +296,7 @@ mod tests {
         let d = det(
             Product::Apollo,
             vec![Evidence::Installed {
-                at: "C:\\Program Files\\Apollo".into(),
+                at: "/usr/bin/apollo".into(),
             }],
         );
         assert!(!d.is_running());
@@ -361,20 +333,20 @@ mod tests {
                     process: "sunshine".into(),
                 },
                 Evidence::Installed {
-                    at: "C:\\Program Files\\Sunshine".into(),
+                    at: "/usr/bin/sunshine".into(),
                 },
             ],
         );
         let installed_only = det(
             Product::Apollo,
             vec![Evidence::Installed {
-                at: "C:\\Program Files\\Apollo".into(),
+                at: "/usr/bin/apollo".into(),
             }],
         );
         let service_only = det(
             Product::Vibeshine,
             vec![Evidence::Service {
-                name: "VibeshineService".into(),
+                name: "vibeshine.service".into(),
             }],
         );
         assert_eq!(
@@ -398,19 +370,15 @@ mod tests {
 
     #[test]
     fn known_table_rows_are_well_formed() {
-        // Every known product carries at least a process name and a Windows service so the runtime
-        // scan and the installer's registry check stay in agreement.
+        // Every known product carries a process name and a Linux unit so the runtime scan and
+        // static evidence check stay in agreement.
         for k in KNOWN {
             assert!(
                 !k.processes.is_empty(),
                 "{:?} has no process name",
                 k.product
             );
-            assert!(
-                !k.win_services.is_empty(),
-                "{:?} has no Windows service name",
-                k.product
-            );
+            assert!(!k.linux_units.is_empty(), "{:?} has no Linux unit", k.product);
         }
     }
 }

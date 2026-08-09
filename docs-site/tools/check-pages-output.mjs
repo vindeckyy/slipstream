@@ -16,6 +16,9 @@ requireFile(join(output, '404.html'))
 requireFile(join(output, 'api', 'index.html'))
 requireFile(join(output, 'openapi.json'))
 requireFile(join(output, 'search-index.json'))
+requireFile(join(output, 'robots.txt'))
+requireFile(join(output, 'sitemap.xml'))
+requireFile(join(output, 'manifest.webmanifest'))
 
 for (const file of readdirSync(docs)) {
   if (!file.endsWith('.md') && !file.endsWith('.mdx')) continue

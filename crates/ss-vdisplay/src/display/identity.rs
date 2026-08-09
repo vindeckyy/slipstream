@@ -2,12 +2,9 @@
 //! §5.4 — identity). A client that reconnects gets the SAME small stable id every time, so the
 //! desktop environment can key its per-display config (notably **DPI scaling**) to it and reapply it:
 //!
-//! * **Windows** seeds the ss-vdisplay monitor's EDID serial + IddCx `ConnectorIndex` from the id, so
-//!   Windows reapplies the client's saved `PerMonitorSettings` scaling. The id must stay `1..=15`
-//!   (`ConnectorIndex < MaxMonitorsSupported = 16`).
 //! * **KWin** names the streamed output `Virtual-slipstream-<id>`; KWin persists per-output scale/mode
 //!   in `kwinoutputconfig.json` matched by name, so a stable per-client name makes KDE reapply that
-//!   client's scaling. (Generalised here from the Windows-only map; the KWin wiring is Stage 3.)
+//!   client's scaling.
 //! * **Mutter** can't carry the id into its virtual monitor (fresh EDID serial per `RecordVirtual`,
 //!   no API to override), so GNOME's `monitors.xml` never rematches — the host persists the scale
 //!   itself instead ([`ScaleMap`], keyed by the same [`identity_key`]) and the Mutter backend
@@ -18,21 +15,20 @@
 //! Anonymous/TOFU/GameStream sessions have no fingerprint and resolve to id `0` (auto) upstream,
 //! never reaching this map.
 //!
-//! Persisted to `<config>/display-identity.json` (migrated from the legacy Windows
-//! `ss-vdisplay-identity.json`) so ids — and the client→config association — survive host restarts.
+//! Persisted to `<config>/display-identity.json` so ids and the client-to-config association survive
+//! host restarts.
 
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
 
-/// Max stable id. Bounded by the Windows driver's use of the id as the IddCx `ConnectorIndex`
-/// (`< MaxMonitorsSupported = 16`), so ids run `1..=15` on every platform for a single shared map.
+/// Max stable id. The map keeps fifteen reusable slots and evicts the least-recently-used entry
+/// when the cache is full.
 const MAX_ID: u32 = 15;
 
-/// The map filename (migrated from the legacy Windows-only `ss-vdisplay-identity.json`).
+/// The map filename.
 const FILE: &str = "display-identity.json";
-const LEGACY_FILE: &str = "ss-vdisplay-identity.json";
 
 /// Compose the map key for a client. `per_client_mode` appends the resolution so a client keeps a
 /// distinct id (and thus distinct persisted scaling) per resolution; otherwise the fingerprint alone.
@@ -55,8 +51,8 @@ struct Store {
 
 #[derive(Serialize, Deserialize)]
 struct Entry {
-    /// The composed client key ([`identity_key`]) — the map key. (Serialized as `fp` for
-    /// back-compat with the legacy Windows `ss-vdisplay-identity.json`.)
+    /// The composed client key ([`identity_key`]) — the map key. The `fp` field name is retained
+    /// for compatibility with the existing on-disk schema.
     #[serde(rename = "fp")]
     key: String,
     /// The client's stable display id (`1..=15`).
@@ -73,14 +69,11 @@ pub(crate) struct DisplayIdentityMap {
 
 impl DisplayIdentityMap {
     /// Load the persisted map (empty on first run / unreadable / parse failure — a fresh map just
-    /// re-derives ids, costing a client one scaling re-set the first time). Migrates the legacy
-    /// Windows `ss-vdisplay-identity.json` if the new file is absent.
+    /// re-derives ids, costing a client one scaling re-set the first time).
     pub(crate) fn load() -> Self {
         let dir = ss_paths::config_dir();
         let path = dir.join(FILE);
-        let bytes = std::fs::read(&path)
-            .or_else(|_| std::fs::read(dir.join(LEGACY_FILE)))
-            .ok();
+        let bytes = std::fs::read(&path).ok();
         let mut store = bytes
             .and_then(|b| serde_json::from_slice::<Store>(&b).ok())
             .unwrap_or_default();
@@ -157,18 +150,15 @@ impl DisplayIdentityMap {
     }
 }
 
-/// The process-wide identity map (persisted, loaded once). Shared by the Windows manager and the
-/// Linux KWin/Mutter backends — never in the same process (a host runs one platform), so one
-/// instance ⇒ no clobbering of the shared `display-identity.json`.
+/// The process-wide identity map (persisted, loaded once) shared by the KWin and Mutter backends.
 pub(crate) fn global() -> &'static Mutex<DisplayIdentityMap> {
     static MAP: OnceLock<Mutex<DisplayIdentityMap>> = OnceLock::new();
     MAP.get_or_init(|| Mutex::new(DisplayIdentityMap::load()))
 }
 
 /// Resolve the connecting client's stable slot id per the `identity` policy. When no policy is
-/// configured, `default` applies — **PerClient on Windows / Shared on Linux**, preserving each
-/// platform's historical behavior (Windows always keyed monitors per-client; Linux used one shared
-/// output name). `None` ⇒ shared / anonymous → the backend uses its base name / auto slot.
+/// configured, `default` applies. `None` means shared or anonymous, so the backend uses its base
+/// name and automatic slot.
 pub(crate) fn resolve_slot(
     fp: Option<[u8; 32]>,
     mode: (u32, u32),
@@ -229,8 +219,8 @@ fn scale_key_for(
     }
 }
 
-/// Persistent client-key → desktop-scale map. Windows and KDE persist per-display scaling
-/// themselves once the backend gives the monitor a stable identity — but GNOME **cannot**: Mutter
+/// Persistent client-key → desktop-scale map. KDE persists per-display scaling once the backend
+/// gives the output a stable identity. GNOME **cannot**: Mutter
 /// mints a fresh EDID serial (`0x%.6x`, a per-shell counter) for every `RecordVirtual` monitor, so
 /// the `monitors.xml` entry GNOME writes never rematches on reconnect, and `RecordVirtual` offers
 /// no way to pass a stable identity. The host therefore remembers the scale itself; the Mutter

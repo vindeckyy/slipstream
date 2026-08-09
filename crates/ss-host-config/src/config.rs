@@ -1,4 +1,4 @@
-use crate::env::{default_on_gate, env_on};
+use crate::env::default_on_gate;
 
 /// Env key for the 10-bit encode policy gate (must match the key `to_host_env` writes).
 pub const TEN_BIT_ENV: &str = "SLIPSTREAM_10BIT";
@@ -117,11 +117,6 @@ pub struct HostConfig {
     /// `SLIPSTREAM_RENDER_ADAPTER` — discrete render-GPU pin by description substring (`Some` even when empty:
     /// the empty string still counts as "set" for the presence checks, and the value reader filters it).
     pub render_adapter: Option<String>,
-    /// `SLIPSTREAM_IDD_DEPTH` — IDD-push pipeline depth override (default 2; the call site clamps to its `OUT_RING`).
-    pub idd_depth: usize,
-    /// `SLIPSTREAM_ZEROCOPY` — Windows D3D11 zero-copy encode input override. `None` (unset) defers to
-    /// the per-vendor default (AMF on, QSV off — see module docs and `encode/ffmpeg_win.rs`).
-    pub zerocopy: Option<bool>,
     /// `SLIPSTREAM_10BIT` — host policy gate for 10-bit encode (HEVC Main10 / AV1 10-bit).
     /// **Default ON** (since 10-bit went probe-gated end-to-end, 2026-07-16): the host merely
     /// *allows* 10-bit — a session only becomes 10-bit when the client advertised `VIDEO_CAP_10BIT`
@@ -171,18 +166,6 @@ pub struct HostConfig {
     pub headless_compositor: Option<String>,
     /// `SLIPSTREAM_GAMEPAD` — client/operator virtual-pad backend preference (fed to `pick_gamepad`).
     pub gamepad: Option<String>,
-    /// `SLIPSTREAM_VDISPLAY` — Windows virtual-display backend. The ss-vdisplay IddCx driver is now the only
-    /// backend (the legacy SudoVDA backend was removed), so this is currently informational — kept for the
-    /// shipped `host.env` and as a forward seam if a second backend is ever added.
-    pub vdisplay: Option<String>,
-    /// `SLIPSTREAM_STALL_PROBES` — run the Windows IDD-push capture's micro-probe engine (per-GPU
-    /// fence probes, DWM tick/flush watchdogs, scanline + CPU sentinels — `idd_push/probes.rs`),
-    /// the corroborating evidence legs on every stall report. Default ON while the
-    /// interval-stutter field program runs; explicit-off grammar for perf-sensitive boxes — the
-    /// engine costs standing threads (a blocking `DwmFlush` waiter, ~10 Hz fence copies per GPU,
-    /// a 5 ms-cadence CPU sentinel). Off, stall lines still carry the driver telemetry + the ETW
-    /// present/queue discriminator (cheap, session-filtered); only the probe legs read absent.
-    pub stall_probes: bool,
     /// `SLIPSTREAM_GAMESCOPE_STEAM` — force the bare headless gamescope spawn into its Steam
     /// integration mode (`--steam`) for EVERY launch. A Steam title auto-enables `--steam` on its
     /// own regardless of this knob; it exists to force it on for non-Steam launches too. Managed
@@ -292,9 +275,6 @@ impl HostConfig {
             performance_profile: PerformanceProfile::from_env(),
             latency_profile: LatencyProfile::from_env(),
             network_policy: NetworkPolicy::from_env(),
-            // (`SLIPSTREAM_IDD_PUSH` was removed: IDD-push is the sole Windows capture path, so the knob
-            // only split dispatch — capture ignored it while the vdisplay manager obeyed it, and `=0`
-            // produced dead-swap-chain reuse on reconnect. A stale setting in an old host.env is ignored.)
             host_name: val("SLIPSTREAM_HOST_NAME")
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty()),
@@ -302,10 +282,6 @@ impl HostConfig {
                 .unwrap_or_default()
                 .to_ascii_lowercase(),
             render_adapter: val("SLIPSTREAM_RENDER_ADAPTER"),
-            idd_depth: val("SLIPSTREAM_IDD_DEPTH")
-                .and_then(|s| s.parse::<usize>().ok())
-                .unwrap_or(2),
-            zerocopy: env_on("SLIPSTREAM_ZEROCOPY"),
             // Default ON, explicit-off grammar (mirrors `four_four_four`: the client's HDR setting
             // is the real per-session switch; the encode probe keeps incapable GPUs honest at 8-bit).
             ten_bit: default_on_gate(val(TEN_BIT_ENV).as_deref()),
@@ -316,8 +292,6 @@ impl HostConfig {
             // per-session switch; see the field doc).
             chacha20: default_on_gate(val("SLIPSTREAM_CHACHA20").as_deref()),
             perf: flag("SLIPSTREAM_PERF"),
-            // Default ON while the interval-stutter field program runs (see the field doc).
-            stall_probes: default_on_gate(val("SLIPSTREAM_STALL_PROBES").as_deref()),
             // Defaults to `virtual` — the flagship per-client virtual output. It used to be unset,
             // which fell through to the synthetic test pattern: fine for a dev box that always has
             // a host.env, wrong for a packaged install, whose unit no longer requires that file at
@@ -336,7 +310,6 @@ impl HostConfig {
                 .map(|s| s.trim().to_ascii_lowercase())
                 .filter(|s| !s.is_empty() && s != "off"),
             gamepad: val("SLIPSTREAM_GAMEPAD"),
-            vdisplay: val("SLIPSTREAM_VDISPLAY"),
             gamescope_steam: val("SLIPSTREAM_GAMESCOPE_STEAM").is_some_and(|s| {
                 matches!(
                     s.trim().to_ascii_lowercase().as_str(),

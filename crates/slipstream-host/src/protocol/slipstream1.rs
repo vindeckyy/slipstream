@@ -343,10 +343,8 @@ pub(crate) async fn serve(
     let injector = crate::inject::InjectorService::start();
     // One virtual microphone for the whole host lifetime (see [`crate::audio::MicPump`]): the
     // client's mic uplink (0xCB) is Opus-decoded and fed into a persistent virtual mic host apps
-    // record from (Linux PipeWire Audio/Source; Windows a virtual audio device's render endpoint).
-    // The pump opens the backend EAGERLY (the mic device exists before any game launches and
-    // binds its capture device) and self-heals when the backend dies (PipeWire restart, Windows
-    // endpoint churn).
+    // record from the Linux PipeWire Audio/Source endpoint. The pump opens the backend eagerly,
+    // before any game launches, and self-heals after a PipeWire restart.
     let mic_service = crate::audio::MicPump::start();
     // Host-lifetime worker that fires debounced TV-session restores (the managed gamescope path
     // restores the box's autologin gaming session on idle, not per-disconnect  -  see
@@ -704,9 +702,7 @@ fn pyrowave_auto_pin_ceiling_kbps() -> Option<u32> {
 
 /// Resolve the audio channel count the session will capture + encode from the client's request.
 /// Normalizes to one of 2 (stereo) / 6 (5.1) / 8 (7.1); anything else (older client, garbage)
-/// becomes stereo. Both backends can produce the requested count (PipeWire pads/upmixes positions,
-/// WASAPI loopback up/downmixes via AUTOCONVERTPCM), so no capability clamp is needed here  -  the
-/// surround channels just carry up/downmixed content when the host's sink has fewer real channels.
+/// becomes stereo. PipeWire pads or upmixes positions when the host sink has fewer real channels.
 fn resolve_audio_channels(requested: u8) -> u8 {
     slipstream_core::audio::normalize_channels(requested)
 }
@@ -795,12 +791,7 @@ fn interval_hz(interval: std::time::Duration) -> u32 {
 /// The mode a pipeline is ACTUALLY delivering, for the H2/H3 corrective ack: the captured frame's
 /// real dimensions (`build_pipeline` opens the encoder at `frame.{width,height}`, so this is exactly
 /// what the client decodes) paced at the rate the pipeline achieved ([`interval_hz`]). It diverges
-/// from the requested mode when a backend can't honor it: KWin caps a virtual output's refresh, or  -
-/// the case this exists for  -  Windows ss-vdisplay rejects an in-place `SetMode` to a resolution not
-/// in the running monitor's advertised EDID list and the host falls back to the actual display mode
-/// (`capture::idd_push`: "sizing the ring to the display's actual mode"). Comparing this against the
-/// already-acked request decides whether a corrective `Reconfigured` ack is owed so the client
-/// doesn't believe it got a resolution it never received.
+/// from the requested mode when the compositor cannot honor its refresh or output dimensions.
 fn delivered_mode(
     frame_width: u32,
     frame_height: u32,
@@ -853,9 +844,8 @@ mod tests {
         let honored = delivered_mode(2560, 1440, hz60);
         assert_eq!(honored, requested);
 
-        // Resolution fallback (Windows ss-vdisplay rejected the out-of-list SetMode, host stayed at
-        // the actual display mode): the frame's real dims flow through, so the delivered mode differs
-        // from the acked request and a corrective ack IS owed  -  the exact gap this fixes.
+        // Resolution fallback: the frame's real dimensions flow through, so the delivered mode
+        // differs from the acknowledged request and a corrective acknowledgement is owed.
         let fell_back = delivered_mode(1920, 1080, hz60);
         assert_ne!(fell_back, requested);
         assert_eq!(

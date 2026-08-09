@@ -7,8 +7,8 @@ Two features that landed together in 0.22.0 and work with each other: **settings
 bundles of stream settings you can attach to a host, and **`slipstream://` links**, URLs that start a
 stream you have already set up.
 
-Both live in the client apps: iPhone, Android and Steam Deck (where the controller shell uses a
-bound profile). Neither exists in the host's [web console](/docs/web-console).
+Both live in the Android app and Steam Deck client (where the controller shell uses a bound profile).
+Neither exists in the host's [web console](/docs/web-console).
 
 The controller-driven surfaces are a half-exception: the Android app's console mode and the Steam
 Deck console the Decky plugin launches all *use* the profile a host is bound to, but none of them can
@@ -28,7 +28,6 @@ Where the catalog is kept:
 
 | Client | Stored in |
 |---|---|
-| iPhone | the app-group store, beside your saved hosts |
 | Android | app-private storage |
 | Steam Deck | `~/.config/slipstream/client-profiles.json` (shared with the session client) |
 
@@ -41,9 +40,8 @@ Profiles are created and edited in the client's own **Settings** screen, there i
 so a profile can never drift from the surface it overrides.
 
 1. Open Settings. At the top is a scope switcher listing **Default settings**, your profiles, and a
-   **New profile** entry. iPhone labels the control **Editing**; Android shows the choices as a row
-   of chips.
-2. Create a new profile. iPhone and Android ask for a name (and a colour) first. Names must be
+   **New profile** entry. Android shows the choices as a row of chips.
+2. Create a new profile. Android asks for a name (and a colour) first. Names must be
    unique, ignoring case.
 3. Change the rows you want. Every row shows the *effective* value, the inherited default until you
    touch it.
@@ -54,11 +52,11 @@ Each profile can carry a colour from a small preset palette (the exact swatches 
 between apps). It tints the profile's chip on host cards, so a grid of hosts is readable at a
 glance.
 
-Renaming, duplicating (overrides and colour included) and deleting sit next to the switcher on
-iPhone. Android puts them on the selected profile's own chip, tap it a second time.
+Renaming, duplicating (overrides and colour included) and deleting sit on the selected profile's own
+chip in Android; tap it a second time.
 
 While a stream runs with a profile, the profile's name closes the first line of the
-[stats overlay](/docs/stats), on the iPhone client, from the Normal tier up.
+[stats overlay](/docs/stats) from the Normal tier up.
 
 ## What a profile can't change
 
@@ -75,16 +73,15 @@ The row-by-row list, and why each row stays global, is on
 ## Three ways to use a profile
 
 **Bind it to a host.** Open a saved host's edit sheet and set **Profile**. Every plain click on that
-host's card now uses it. This is the only sticky choice. (The iPhone app also offers **Connect with ▸
-Set Default Profile** on the card itself.)
+host's card now uses it. This is the only sticky choice.
 
 **Use it once.** A card's menu has **Connect with**, pick a profile for this connect only. It never
 rebinds the host. **Default settings** in that menu is a real choice: on a bound host it forces your
 globals for one session. (Android lists the same choices flat, as *Connect with: ...*.)
 
 **Pin it as its own card.** A pinned profile gets its own card beside the host, one click, no menu.
-Pin it in the host's edit sheet on Android and iPhone, or from a card menu: **Pin as Card** on
-iPhone, **Pin as card: ...** on Android. A pinned card is a shortcut, not a second host: unpinning
+Pin it in the host's edit sheet on Android, or from the card menu using **Pin as card: ...**. A
+pinned card is a shortcut, not a second host: unpinning
 changes neither the profile nor the host's binding.
 
 ### Work vs Play on the same host
@@ -156,9 +153,8 @@ could do, minus every trust decision.**
   [pairing](/docs/pairing) stays something you do with the fingerprint on screen.
 - A link naming a host you don't know is never connected. When it carries an address, as
   `<host-ref>` or as `host=`, Android opens the app's normal trust prompt, pre-filled with that
-  address and any `fp` the link carried, so the first connect is verified rather than blind. iPhone
-  shows a notice naming the host instead, and you pair from the host list yourself. A link with no
-  address to fall back on, a bare name or a stale record id, is simply refused with a notice.
+  address and any `fp` the link carried, so the first connect is verified rather than blind. A link
+  with no address to fall back on, a bare name or a stale record id, is simply refused with a notice.
 - If the link's `fp` contradicts the fingerprint already pinned for that host, it is a hard refusal
   with a notice. Nothing connects.
 - A `profile=` that names nothing on this device, or two profiles at once, refuses **before**
@@ -170,8 +166,8 @@ could do, minus every trust decision.**
 
 ## Getting a link, and making a shortcut
 
-On iPhone the card menu has **Copy Link**. Android has no copy action yet. On Steam Deck, use a
-pinned card or a `slipstream://` URL from a script where the CLI is available.
+Android has no copy action yet. On Steam Deck, use a pinned card or a `slipstream://` URL from a
+script where the CLI is available.
 
 A copied link carries the host's stable record id, plus `host=` and `fp=` (the fingerprint only when
 one is pinned). That is what keeps a shortcut written today working after the host changes address

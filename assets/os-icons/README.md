@@ -1,13 +1,12 @@
 # OS icon masters
 
 The canonical OS/distro brand marks every client derives its host-card OS icon from
-(web console inline SVGs, GTK symbolic icons, Windows PNGs, Apple template imagesets,
-Android `ImageVector`s). One file per **icon token** of the host's OS-identity chain
+(web console inline SVGs, GTK symbolic icons, Apple template imagesets, Android
+`ImageVector`s). One file per **icon token** of the host's OS-identity chain
 (see `crates/slipstream-host/src/osinfo.rs` and `crates/ss-client-core/src/os.rs`):
 
 | token | mark | source |
 |---|---|---|
-| `windows` | Windows (the current four-pane mark, no perspective skew) | own geometry |
 | `apple` | Apple (also `macos` via alias) | Font Awesome Free brands (CC BY 4.0) |
 | `linux` | Tux | Font Awesome Free brands (CC BY 4.0) |
 | `steam` | Steam (also `steamos` via alias) | Font Awesome Free brands (CC BY 4.0) |
@@ -28,21 +27,16 @@ they are what this project's hosts actually run. Every other distro with no file
 Mint, …) still degrades to its family's mark and finally to Tux — that fallback is the design,
 not a gap.
 
-Windows is the one mark drawn here rather than sourced: every icon set that ships a "Windows"
-brand glyph still carries the **Windows 8/10 flag with the perspective skew**, which reads as
-dated next to the flat four-pane mark Microsoft has used since Windows 11. Four equal squares
-(11.377 + 1.246 gap) is the current proportion.
-
 All files are monochrome (`fill="currentColor"`), original per-icon viewBoxes preserved. Because
 those viewBoxes are not all square, a client must letterbox rather than stretch — see the aspect
 note in `clients/android/.../components/OsIcons.kt`.
 
 ## Regenerating the per-client derivatives
 
-`bash scripts/gen-os-icons.sh [token ...]` turns a master into the three baked forms (GTK
-symbolic SVG, Windows PNG, Apple template PDF) and prints the path data for the three clients
-that inline it (web console, Decky plugin, Android). Adding a **new** token also means adding it
-to each client's shipped-token list — the script prints that checklist too.
+`bash scripts/gen-os-icons.sh [token ...]` turns a master into the baked GTK symbolic SVG and
+Apple template PDF forms, then prints the path data used by the web console, Decky plugin, and
+Android client. Adding a **new** token also means adding it to each client's shipped-token list —
+the script prints that checklist too.
 
 ## Licensing
 

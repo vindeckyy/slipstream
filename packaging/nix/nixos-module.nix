@@ -88,11 +88,11 @@ in
 
       gamestream = mkOption {
         type = types.bool;
-        default = true;
+        default = false;
         description = ''
           Advertise the GameStream/Moonlight-compatible planes (`serve --gamestream`) so a stock
-          Moonlight client can pair. Set to `false` for a native-only, more secure host (no
-          plain-HTTP pairing / legacy GCM path) and drop the GameStream firewall ports.
+          Moonlight client can pair. This is disabled by default because the compatibility path uses
+          weaker legacy pairing. Set to `true` only on a trusted LAN.
         '';
       };
 

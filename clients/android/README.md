@@ -22,8 +22,8 @@ Google TV, budget Amlogic boxes) that otherwise reject a 64-bit-only build as "n
 
 ## Get it
 
-Published to **Google Play (Internal Testing)** - access is invite-only. Signed APKs are linked from
-[GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when available. Per-device setup and pairing:
+The current preview is distributed as a signed APK from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases).
+There is no public app-store channel yet. Per-device setup and pairing:
 **[docs-site/content/docs/install-client.md](../../docs-site/content/docs/install-client.md)**.
 
 ## How it's built - Rust-heavy
@@ -54,10 +54,10 @@ kit/              :kit - NativeBridge · native mDNS discovery · Gamepad · Key
 
 ## Build & run
 
-**Prerequisites:** Android SDK + **NDK r30** (`30.0.14904198`), `platforms;android-37.0`,
-`build-tools;37.0.0`, **`cmake;3.22.1`** (builds libopus); **JDK 21** (AGP 9.2 runs on JDK 17-21, not
+**Prerequisites:** Android SDK + **NDK r30** (`30.0.14904198`), `platforms;android-37`,
+`build-tools;37.0.0`, **`cmake;3.22.1`** (builds libopus); **JDK 21** (AGP 9.3 runs on JDK 17-21, not
 a newer default); Rust with `rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android` and
-`cargo install cargo-ndk`. Toolchain is pinned (AGP 9.2 · Gradle 9.4.1 · Kotlin 2.3.21 · Compose BOM
+`cargo install cargo-ndk`. Toolchain is pinned (AGP 9.3.1 · Gradle 9.5.0 · Kotlin 2.3.21 · Compose BOM
 2026.05.01 · compileSdk 37 · minSdk 28).
 
 **Android Studio:** open `clients/android` - it uses its bundled JBR 21, and the `cargoNdk*` task
@@ -90,8 +90,8 @@ apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
 ```
 
 The release artifact is a universal signed APK containing `arm64-v8a`, `armeabi-v7a`, and
-`x86_64`. CI publishes the signed APK as the `slipstream-android` artifact and keeps the canary and
-stable sideload aliases separate from the Play bundle.
+`x86_64`. The release workflow publishes a signed APK only when the signing key is configured in the
+protected release environment. Local builds remain sideload-only.
 
 ## Related
 

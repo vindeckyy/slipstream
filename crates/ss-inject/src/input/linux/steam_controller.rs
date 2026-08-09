@@ -446,7 +446,7 @@ impl PadProto for SteamProto {
             rumble,
             hidout: Vec::new(),
             // Rumble-plane liveness: a `0xEB` rumble command this poll. Steam Input drives this
-            // pad over hidraw (the same abandonment semantics as the Windows Deck backend), so
+            // pad over hidraw with the same abandonment semantics as the other controller paths, so
             // the shared abandoned-rumble force-off applies.
             rumble_drove: Some(rumble.is_some()),
             resync: false,

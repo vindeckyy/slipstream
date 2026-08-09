@@ -1,6 +1,6 @@
 // Swift wrapper around the slipstream-core C ABI's post-loss re-anchor gate
 // (`slipstream_reanchor_gate_*`, ABI v6). The shared Rust gate (crates/slipstream-core/src/reanchor.rs)
-// is what the Linux/Windows desktop pump and the Android client use directly; the Swift clients reach
+// is what the Linux desktop pump and the Android client use directly; the Swift clients reach
 // it across the C ABI so the freeze-until-reanchor policy is defined ONCE for every platform.
 //
 // Why a freeze at all: after unrecoverable loss the host keeps sending delta frames that reference a

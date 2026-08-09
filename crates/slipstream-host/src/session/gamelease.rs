@@ -260,12 +260,7 @@ pub struct LeaseRequest {
 /// The reference instant for adopting this launch's processes, in seconds since boot. Call it
 /// **before** anything spawns; see [`LeaseRequest::launch_stamp`].
 pub fn launch_clock() -> Option<f64> {
-    // Delegate unconditionally: `procscan::launch_stamp` already answers `None` on a platform with
-    // no matcher. Gating this on Linux here silently disabled the start-time floor on Windows —
-    // `find(spec, None)` skips the filter entirely — so a copy of the game the player already had
-    // open was adopted and then ended with the session (caught on glass, .173: Steam focused a
-    // running instance instead of starting one, and the lease took it). The Windows matcher is
-    // exactly where that rule matters most, since the host is SYSTEM and can see every process.
+    // The process scanner supplies the reference used to reject instances that predate this launch.
     crate::procscan::launch_stamp()
 }
 
@@ -365,24 +360,13 @@ fn spawn_watcher(
     if matches!(shared.kind, LeaseKind::Nested) && shared.spec.is_empty() {
         return None;
     }
-    // Platforms with no matcher at all (macOS has no launch path either) keep a lease for the status
-    // surface, but nothing polls it.
-    #[cfg(not(any(target_os = "linux", windows)))]
-    {
-        let _ = (child, on_exit);
-        return None;
-    }
-    #[cfg(any(target_os = "linux", windows))]
-    {
-        std::thread::Builder::new()
-            .name("pf1-gamelease".into())
-            .spawn(move || watch(shared, child, on_exit))
-            .ok()
-    }
+    std::thread::Builder::new()
+        .name("pf1-gamelease".into())
+        .spawn(move || watch(shared, child, on_exit))
+        .ok()
 }
 
 /// The watch loop: wait for the game to appear, then for it to go away.
-#[cfg(any(target_os = "linux", windows))]
 fn watch(shared: Arc<LeaseShared>, mut child: Option<std::process::Child>, on_exit: OnExit) {
     let scanner = crate::procscan::Scanner::system();
     let cancelled = || shared.cancel.load(Ordering::Relaxed);
@@ -391,8 +375,8 @@ fn watch(shared: Arc<LeaseShared>, mut child: Option<std::process::Child>, on_ex
 
     // The game's processes as last seen. Phase 2 re-verifies these rather than re-scanning the whole
     // process table each second: `alive` costs one query per known process, while `find` costs one per
-    // process on the box (and on Windows that means an `OpenProcess` each). A full re-scan still
-    // happens the moment they all vanish, which is what catches a game that re-execs into a new pid.
+    // process on the box. A full re-scan still happens the moment they all vanish, which is what
+    // catches a game that re-execs into a new pid.
     //
     // Deliberately uninitialized: the only way out of phase 1 and into phase 2 is the branch that
     // assigns it, so an initial value would be dead.
@@ -564,7 +548,6 @@ fn watch(shared: Arc<LeaseShared>, mut child: Option<std::process::Child>, on_ex
 }
 
 /// Record the exit and, unless the host itself ended the game, run the session-ending action.
-#[cfg(any(target_os = "linux", windows))]
 fn finish(shared: &Arc<LeaseShared>, on_exit: &OnExit, why: &str) {
     shared.set_state(GameState::Exited);
     let terminated = shared.is_terminating();
@@ -666,10 +649,7 @@ fn terminate_blocking(shared: &LeaseShared) {
             );
         }
         LeaseKind::Child | LeaseKind::Matched => {
-            #[cfg(target_os = "linux")]
             unix_term_ladder(shared);
-            #[cfg(windows)]
-            windows_term_ladder(shared);
         }
         LeaseKind::Untracked => {}
     }
@@ -732,52 +712,6 @@ fn unix_term_ladder(shared: &LeaseShared) {
         }
     }
     let killed = signal_all(libc::SIGKILL);
-    tracing::warn!(
-        title = %shared.game.title,
-        killed,
-        grace_s = TERM_GRACE.as_secs(),
-        "the game did not close when asked — killed it"
-    );
-}
-
-/// Windows: ask the game's windows to close, wait, then terminate what's left.
-///
-/// Same shape as the Unix ladder, different primitives — and one structural difference: the host never
-/// holds a child here. Every Windows launch goes through a launcher or the shell
-/// (`steam://`, `com.epicgames.launcher://`, `shell:AppsFolder\…`), so the game is always recognized
-/// rather than owned, and the pid set comes entirely from the matcher.
-#[cfg(windows)]
-fn windows_term_ladder(shared: &LeaseShared) {
-    let scanner = crate::procscan::Scanner::system();
-    let live = || scanner.alive(&scanner.find(&shared.spec, shared.launch_stamp));
-
-    let pids: Vec<u32> = live().into_iter().map(|p| p.pid).collect();
-    if pids.is_empty() {
-        tracing::info!(title = %shared.game.title, "the game is already gone — nothing to end");
-        return;
-    }
-    // Polite first: a `WM_CLOSE` is what clicking the window's X does, so the game runs its own
-    // shutdown and can save.
-    let asked = crate::game_term::request_close(&pids);
-    tracing::debug!(
-        title = %shared.game.title,
-        windows_asked = asked,
-        procs = pids.len(),
-        grace_s = TERM_GRACE.as_secs(),
-        "asked the game to close"
-    );
-    let deadline = Instant::now() + TERM_GRACE;
-    while Instant::now() < deadline {
-        std::thread::sleep(POLL);
-        if live().is_empty() {
-            tracing::info!(title = %shared.game.title, "the game closed when asked");
-            return;
-        }
-    }
-    // Re-verify (pid, creation time) one last time, then insist. Windows recycles pids briskly, so the
-    // list handed to `kill` must be freshly checked rather than the one gathered above.
-    let remaining: Vec<u32> = live().into_iter().map(|p| p.pid).collect();
-    let killed = crate::game_term::kill(&remaining);
     tracing::warn!(
         title = %shared.game.title,
         killed,
@@ -1281,7 +1215,6 @@ mod tests {
     /// match them against — it is the only thing standing between this feature and ending a copy of
     /// the game the player already had open. `None` here doesn't fail loudly; it silently turns the
     /// filter off ([`crate::procscan::Scanner::find`] skips it), so nothing downstream can notice.
-    #[cfg(any(target_os = "linux", windows))]
     #[test]
     fn a_launch_always_gets_a_reference_instant_to_adopt_against() {
         assert!(

@@ -1338,7 +1338,7 @@ impl Encoder for VaapiEncoder {
     /// Encode-stall recovery: drop the wedged libavcodec encoder (its `Drop` releases the VA
     /// surfaces/filter graph/devices) and let the next `submit` rebuild it lazily from the first
     /// frame's payload, exactly like first-frame bring-up — the same drop-and-reopen lever the
-    /// Windows QSV path has. The owed AUs are forfeited (`in_flight` zeroed) and the rebuilt
+    /// direct-NVENC path has. The owed AUs are forfeited (`in_flight` zeroed) and the rebuilt
     /// encoder's first frame is forced IDR so the client resyncs immediately. Without this the
     /// encode-stall watchdog had no lever on Linux AMD/Intel and a wedged driver ended the session.
     fn reset(&mut self) -> bool {

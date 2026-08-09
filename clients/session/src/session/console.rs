@@ -132,8 +132,8 @@ pub fn run(target: Option<&str>) -> u8 {
         bus.send(cmd);
     }
 
-    // `--json-status`: a shell parent is reading stdout (the WinUI shell hides itself on
-    // `{"ready":true}` and restores on exit) — plain CLI/gamescope runs stay silent.
+    // `--json-status`: a shell parent is reading stdout and uses the ready/ended events to
+    // manage its view. Plain CLI/gamescope runs stay silent.
     let json_status = arg_flag("--json-status");
     let settings_at_start = trust::Settings::load();
     // The console's window and its input models are built ONCE, from the global defaults, and

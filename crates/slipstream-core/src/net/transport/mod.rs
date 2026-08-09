@@ -3,16 +3,10 @@
 
 mod loopback;
 mod qos;
-#[cfg(windows)]
-mod qos_windows;
 mod udp;
 
 pub use loopback::{loopback_pair, LoopbackTransport};
 pub use qos::{grow_socket_buffers, set_dscp_default, set_media_qos, MediaClass, QosFlow};
-/// Windows-only: reusable USO (UDP Send Offload) batch send for callers that own their own connected
-/// socket (the GameStream video sender) rather than going through [`UdpTransport`].
-#[cfg(target_os = "windows")]
-pub use udp::send_uso_all;
 pub use udp::{spawn_data_punch, UdpTransport, PUNCH_MAGIC};
 // Phase 5: the pacing-capability probe + GSO gate + low-latency socket-buffer target, surfaced
 // for the host's send thread (records them in the session stats / latency artifact).
@@ -33,7 +27,7 @@ pub trait Transport: Send + Sync {
     /// is the 1 Gbps+ lever: the [`UdpTransport`](super::UdpTransport) override uses `sendmmsg`
     /// (~64 packets/syscall) instead of one `send` each — at ~125k pkt/s that is the difference
     /// between ~2k and ~125k syscalls/sec. The default is the scalar `send` loop (correct for the
-    /// loopback transport and non-Linux builds). On a full send buffer it stops early and reports
+    /// loopback transport). On a full send buffer it stops early and reports
     /// the partial count rather than blocking — same lossy, FEC-protected contract as `send`.
     fn send_batch(&self, packets: &[&[u8]]) -> std::io::Result<usize> {
         let mut sent = 0;
@@ -65,7 +59,7 @@ pub trait Transport: Send + Sync {
     /// arrived (`0` = none available; non-blocking). The recv counterpart of [`send_batch`]: the
     /// [`UdpTransport`](super::UdpTransport) override uses `recvmmsg` into a caller-owned, reused
     /// buffer ring — no per-packet allocation or syscall at line rate. The default does a single
-    /// scalar [`recv`](Self::recv) into `out[0]` (correct for the loopback transport + non-Linux).
+    /// scalar [`recv`](Self::recv) into `out[0]` (correct for the loopback transport).
     fn recv_batch(&self, out: &mut [Vec<u8>], lens: &mut [usize]) -> std::io::Result<usize> {
         if out.is_empty() {
             return Ok(0);

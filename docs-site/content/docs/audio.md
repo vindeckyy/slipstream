@@ -33,7 +33,7 @@ Offered everywhere except the Decky plugin. Details:
 
 ### Speaker device
 
-iPhone, Android, Decky, and the console home use the system default endpoints. Speaker and
+Android, Decky, and the console home use the system default endpoints. Speaker and
 microphone pickers (where a client offers them) are facts about this device and **cannot** live in a
 [settings profile](/docs/profiles-and-links#what-a-profile-cant-change).
 
@@ -51,7 +51,6 @@ delete bogus session anchors rather than chasing mixer settings
 | Client | Default |
 |---|---|
 | Android, console home, Decky | **Off** |
-| iPhone | **On** |
 
 When on, this device's microphone is sent to the host's virtual mic. Games and chat apps on the
 host pick that device the way they would any other input.
@@ -74,7 +73,7 @@ a question you ask ten minutes later.
 The mute lasts for **that stream only**. The next session starts unmuted, and nothing is written
 to settings. If **Stream microphone** is off, the shortcut does nothing and no badge appears.
 
-iPhone, Android, and Decky have no mute shortcut yet; turn **Stream microphone** off in their
+Android and Decky have no mute shortcut yet; turn **Stream microphone** off in their
 settings instead.
 
 Full context: [Muting your microphone](/docs/input#muting-your-microphone).
@@ -87,11 +86,11 @@ speakers, from being picked up by the microphone and sent straight back. It hand
 
 | Platform | What "on" means |
 |---|---|
-| **iPhone / Android** | Platform voice-processing mode |
+| **Android** | Platform voice-processing mode |
 
 Turn it off if your microphone already runs its own processing, or if the canceller makes your
 voice sound thin. The row sits under the microphone toggle and greys out while the microphone is
-off. Offered by iPhone, Android, and the console home; Decky has no toggle.
+off. Offered by Android and the console home; Decky has no toggle.
 
 Operators can force cancellation off for a run with `SLIPSTREAM_NO_AEC=1` on the **client**
 environment ([Configuration → client-side](/docs/configuration)); that only switches processing

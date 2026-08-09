@@ -126,8 +126,8 @@ pub(super) fn update_cursor_meta(cursor: &mut CursorState, spa_buf: *mut spa::sy
         // REWRITES a buffer's meta region when the cursor changed, so recycled buffers
         // between damage frames carry a stale id-0 meta — treating that as hidden flickered
         // the cursor off between hovers (on-glass round 5). Keep the last-known state; a
-        // pointer that really left/hid simply stops producing updates. (The M3 hidden hint
-        // loses its Mutter signal — Windows has its own CURSOR_SUPPRESSED source.)
+        // pointer that really left/hid simply stops producing updates. The M3 hidden hint
+        // loses its Mutter signal, so the cursor remains visible in the stream.
         return;
     }
     cursor.visible = true;

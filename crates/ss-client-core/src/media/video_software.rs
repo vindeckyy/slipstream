@@ -61,7 +61,7 @@ impl SoftwareDecoder {
                 scaling::Context::get(fmt, w, h, Pixel::RGBA, w, h, scaling::Flags::POINT)
                     .context("swscale context")?;
             // swscale defaults to BT.601 coefficients — set them from the FRAME's signaling
-            // (unspecified → BT.709 limited, the host's SDR default; a Windows HDR desktop
+            // (unspecified → BT.709 limited, the host's SDR default; an HDR desktop
             // streams BT.2020 in-band). Without this, YUV→RGB decodes with the wrong matrix
             // and colours shift. Destination = full-range RGB; the transfer function stays
             // baked in (the presenter tags PQ textures so GTK applies the EOTF).
@@ -160,7 +160,7 @@ mod tests {
 
     /// The wire → `ColorDesc` plumbing: an HDR10 stream's VUI (BT.2020 primaries, PQ
     /// transfer, BT.2020-NCL matrix, limited range) must arrive on the decoded frame —
-    /// this is what the Windows host emits in-band for an HDR desktop, and mis-rendering
+    /// this is what the host emits in-band for an HDR desktop, and mis-rendering
     /// it as BT.709 is the washed-out-colors bug. Fixture: one 64×64 Main10 IDR
     /// (`tests/pq-frame.h265`, x265 with explicit VUI).
     #[test]

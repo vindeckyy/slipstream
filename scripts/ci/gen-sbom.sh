@@ -5,9 +5,9 @@
 # syft walks the checkout and catalogs every lockfile-pinned dependency (both Rust workspaces via
 # their Cargo.locks, the Bun/pnpm/npm trees, the Swift Package.resolved);
 # compliance/sbom/manual-components.cdx.json contributes the components no lockfile records  -
-# vendored C/C++ trees (pyrowave/Granite/volk/Vulkan-Headers, libvpl), dynamically-linked/bundled
-# libraries (FFmpeg, SDL3), the redistributed VB-CABLE driver, and the patched gamescope. Keep
-# that file current when vendoring changes (scripts/vendor-pyrowave.sh etc.).
+# vendored C/C++ trees (pyrowave/Granite/volk/Vulkan-Headers), dynamically-linked/bundled
+# libraries (FFmpeg, SDL3), and the patched gamescope. Keep that file current when vendoring
+# changes (scripts/vendor-pyrowave.sh etc.).
 #
 # Usage: scripts/ci/gen-sbom.sh VERSION [OUTPUT]
 # Requires: syft (pinned install in the workflow), python3 (a proven runner dependency).

@@ -73,8 +73,8 @@ pub struct Hello {
     /// Appended after `video_codecs` as a single trailing byte. Omitted by older clients (→ `0`).
     pub preferred_codec: u8,
     /// The client's **display** HDR colour volume — primaries / white point / luminance range in
-    /// the ST.2086 units of [`HdrMeta`] — read from the client OS (e.g. Windows
-    /// `IDXGIOutput6::GetDesc1`) when it advertised [`VIDEO_CAP_HDR`]. The host forwards it into
+    /// the ST.2086 units of [`HdrMeta`] - read from the client OS when it advertised
+    /// [`VIDEO_CAP_HDR`]. The host forwards it into
     /// the virtual display's EDID (the ss-vdisplay CTA-861.3 HDR static-metadata block), so host
     /// apps and the OS tone-map to the CLIENT's real panel instead of the driver's built-in
     /// ~1000-nit placeholder — the client can then present the PQ stream untouched. Also echoed
@@ -173,8 +173,7 @@ pub struct Welcome {
     pub chroma_format: u8,
     /// The audio channel count the host actually resolved and **will** send on the `0xC9` plane:
     /// `2` (stereo, default), `6` (5.1) or `8` (7.1). Echoes [`Hello::audio_channels`] clamped to
-    /// what the host can capture (Linux PipeWire always synthesizes the count; Windows WASAPI
-    /// loopback is clamped to the render endpoint's mix-format channels). The client builds its Opus
+    /// what the host can capture (Linux PipeWire synthesizes the count). The client builds its Opus
     /// (multistream) decoder from THIS value via [`crate::audio::layout_for`] — never from its own
     /// request — so an older host that omits the byte (→ `2`) always yields working stereo. Appended
     /// after `chroma_format` as a single trailing byte.

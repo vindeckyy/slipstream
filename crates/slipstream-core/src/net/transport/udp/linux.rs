@@ -62,7 +62,7 @@ fn mmsghdrs(iovs: &mut [libc::iovec]) -> Vec<mmsghdr> {
 /// involved), so the default stays opt-in on fabric evidence, not on pacing readiness. Revisit
 /// with a bare-metal Linux host on a clean 10G path. NOTE the gate is value-aware:
 /// `SLIPSTREAM_GSO=0` explicitly disables (it used to key on env *presence*, so `=0` ENABLED
-/// it here while disabling Windows USO).
+/// it here while keeping the Linux GSO gate explicit).
 #[cfg(target_os = "linux")]
 pub(crate) mod gso {
     use std::sync::atomic::{AtomicU8, Ordering};

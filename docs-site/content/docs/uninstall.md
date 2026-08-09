@@ -200,9 +200,8 @@ Removing a client does **not** tell the host to forget it. Unpair the device fro
 
 ### Android / Android TV
 
-Uninstall the app from Google Play or from Settings -> Apps. The Android client is still an invite-only
-test track. If you want your account removed from the tester list, open a
-[GitHub issue](https://github.com/vindeckyy/slipstream/issues).
+Uninstall the APK from Settings -> Apps. The preview APK does not create a Slipstream account or
+remote subscription.
 
 ### Steam Deck, Decky plugin
 

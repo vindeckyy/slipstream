@@ -14,7 +14,7 @@ pub enum PickSource {
     Preference,
     /// `SLIPSTREAM_RENDER_ADAPTER` substring matched.
     Env,
-    /// Auto: max dedicated VRAM (Windows) / platform default (Linux display).
+    /// Auto: max dedicated VRAM, with the Linux render node as the fallback.
     Auto,
     /// A manual preference is set but that GPU is absent — fell back to auto so the host keeps
     /// streaming (logged; the console shows the fallback).
@@ -103,26 +103,7 @@ pub fn pick(
     ))
 }
 
-/// The GPU the next session will run on. Windows: the full precedence over the DXGI inventory —
-/// this is what `win_adapter::resolve_render_adapter_luid` (capture ring + IddCx render pin) and
-/// the encoder-vendor dispatch both consume, so capture, encode, and the advertisement agree by
-/// construction. Pure query — callers log (this runs per serverinfo poll).
-#[cfg(target_os = "windows")]
-pub fn selected_gpu() -> Option<SelectedGpu> {
-    let gpus = enumerate();
-    let pref = prefs().get();
-    let env = ss_host_config::config()
-        .render_adapter
-        .clone()
-        .filter(|s| !s.is_empty());
-    let (i, source) = pick(&gpus, &pref, env.as_deref())?;
-    Some(SelectedGpu {
-        info: gpus.into_iter().nth(i)?,
-        source,
-    })
-}
-
-/// The GPU the next session will run on (Linux). Mirrors the encode dispatch for display: a
+/// The GPU the next session will run on. Mirrors the encode dispatch for display: a
 /// matched manual preference wins; otherwise NVIDIA-presence → the NVIDIA GPU, else the GPU that
 /// owns the VAAPI render node. (The *authoritative* Linux switches stay in `encode::open_video` /
 /// [`linux_render_node`] — this is the console's view of them.)
@@ -168,11 +149,6 @@ pub fn selected_gpu() -> Option<SelectedGpu> {
     })
 }
 
-#[cfg(not(any(target_os = "windows", target_os = "linux")))]
-pub fn selected_gpu() -> Option<SelectedGpu> {
-    None
-}
-
 /// The manually preferred GPU, only when `mode == Manual` **and** it is currently present.
 /// The Linux encode dispatch consults this (auto mode keeps today's NVIDIA-presence behavior
 /// exactly).
@@ -211,23 +187,11 @@ fn linux_nvidia_present() -> bool {
 }
 
 /// A cache key that changes whenever the *selection* changes (preference edits included), for the
-/// per-GPU probe caches (`can_encode_444`, `windows_codec_support`) that were process-lifetime
+/// per-GPU probe caches that were process-lifetime
 /// `OnceLock`s back when selection was env-only.
 pub fn selection_key() -> String {
     match selected_gpu() {
-        Some(sel) => {
-            #[cfg(target_os = "windows")]
-            {
-                format!(
-                    "{}:{:08x}{:08x}",
-                    sel.info.id, sel.info.handle.luid_high as u32, sel.info.handle.luid_low
-                )
-            }
-            #[cfg(not(target_os = "windows"))]
-            {
-                sel.info.id
-            }
-        }
+        Some(sel) => sel.info.id,
         None => String::new(),
     }
 }
@@ -269,9 +233,8 @@ impl Drop for ActiveSession {
     }
 }
 
-/// Record a session opening on `gpu`. Concurrent sessions share one GPU (the Windows pipeline is
-/// single-GPU by construction; Linux sessions share the selection), so the latest record wins and
-/// a counter tracks liveness.
+/// Record a session opening on `gpu`. Concurrent sessions share the selection, so the latest record
+/// wins and a counter tracks liveness.
 pub fn session_begin(gpu: ActiveGpu) -> ActiveSession {
     let mut st = ACTIVE.lock().unwrap_or_else(|e| e.into_inner());
     let sessions = st.as_ref().map(|s| s.sessions).unwrap_or(0) + 1;
@@ -287,40 +250,4 @@ pub fn active() -> Option<(ActiveGpu, u32)> {
         .unwrap_or_else(|e| e.into_inner())
         .as_ref()
         .map(|s| (s.gpu.clone(), s.sessions))
-}
-
-/// Pick the render GPU LUID the Windows pipeline is created on: the IDD-push capturer's
-/// shared-texture ring, the IddCx `SET_RENDER_ADAPTER` pin, and (via the captured frame's device)
-/// NVENC/AMF/QSV all follow this one decision — see [`selected_gpu`] for the precedence (operator
-/// preference > `SLIPSTREAM_RENDER_ADAPTER` substring > max `DedicatedVideoMemory`). A configured
-/// preference that doesn't match a present GPU falls back to auto selection (with a warning) rather
-/// than returning `None`, so a stale preference never stops the host from streaming.
-///
-/// Lives here (not in a host module) so BOTH the capture and encode subsystem crates depend on it
-/// as a peer of GPU selection instead of the orchestrator — the plan's `windows/adapter.rs`, folded
-/// into `ss-gpu` (plan §W6). It was historically the SudoVDA backend's, then the host's
-/// `win_adapter.rs`; the LUID-shaped view of [`selected_gpu`] plus the per-decision logging.
-#[cfg(target_os = "windows")]
-pub fn resolve_render_adapter_luid() -> Option<windows::Win32::Foundation::LUID> {
-    match selected_gpu() {
-        Some(sel) => {
-            tracing::info!(
-                adapter = sel.info.name,
-                vram_mb = sel.info.vram_bytes / (1024 * 1024),
-                source = sel.source.tag(),
-                "render adapter selected"
-            );
-            if sel.source == PickSource::PreferenceMissing {
-                tracing::warn!(
-                    "the preferred GPU is not present — auto-selected the adapter above \
-                     (fix or clear the preference in the web console)"
-                );
-            }
-            Some(sel.info.luid())
-        }
-        None => {
-            tracing::warn!("no suitable render adapter found for SET_RENDER_ADAPTER");
-            None
-        }
-    }
 }

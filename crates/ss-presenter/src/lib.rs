@@ -10,9 +10,8 @@
 //! import/present failure streak, demote the decoder to software via the session pump's
 //! `force_software` contract, same as the GTK presenter.
 //!
-//! Builds on Linux AND Windows; `dmabuf` is Linux-only (DRM-PRIME does not exist on
-//! Windows) and `d3d11` is its Windows counterpart (D3D11VA shared-texture import) —
-//! the decode chain there is Vulkan → D3D11VA → software.
+//! Builds on Linux with DRM-PRIME dmabuf import for hardware-decoded frames and
+//! software fallback when the Vulkan decode path is unavailable.
 //!
 //! Layout: sources live under `present/` (including `present/vk/`). Crate-root module
 //! names stay stable via `#[path]` so `ss_presenter::vk` and friends do not move.
@@ -40,39 +39,23 @@
 // A block doing something OUTSIDE these three shapes gets a real, specific proof; if you add one and
 // find yourself writing "as above", it probably belongs in one of them.
 
-#[cfg(any(target_os = "linux", windows))]
 #[path = "present/csc.rs"]
 pub mod csc;
-#[cfg(any(target_os = "linux", windows))]
 #[path = "present/cursor.rs"]
 pub mod cursor;
-#[cfg(windows)]
-#[path = "present/d3d11.rs"]
-pub mod d3d11;
-#[cfg(target_os = "linux")]
 #[path = "present/dmabuf.rs"]
 pub mod dmabuf;
-#[cfg(any(target_os = "linux", windows))]
 #[path = "present/input.rs"]
 pub mod input;
-#[cfg(any(target_os = "linux", windows))]
 #[path = "present/keymap_sdl.rs"]
 pub mod keymap_sdl;
-#[cfg(any(target_os = "linux", windows))]
 #[path = "present/overlay.rs"]
 pub mod overlay;
-#[cfg(any(target_os = "linux", windows))]
 #[path = "present/run.rs"]
 mod run;
-#[cfg(any(target_os = "linux", windows))]
 #[path = "present/touch.rs"]
 pub mod touch;
-#[cfg(any(target_os = "linux", windows))]
 #[path = "present/vk/mod.rs"]
 pub mod vk;
-#[cfg(windows)]
-#[path = "present/win32.rs"]
-mod win32;
 
-#[cfg(any(target_os = "linux", windows))]
 pub use run::{run_browse, run_session, ActionOutcome, Outcome, SessionOpts};

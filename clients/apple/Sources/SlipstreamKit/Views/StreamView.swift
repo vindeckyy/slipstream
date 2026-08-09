@@ -618,7 +618,7 @@ public final class StreamLayerView: NSView {
             window?.invalidateCursorRects(for: self)
         }
         // M3 host-driven auto-flip is DISABLED: `relative_hint` is derived from host cursor
-        // VISIBILITY, and Windows hides the pointer for ordinary desktop activity (clicking,
+        // VISIBILITY, and some hosts hide the pointer for ordinary desktop activity (clicking,
         // typing) — not just when a game grabs it. Acting on those transients flipped
         // desktop→capture→desktop, which warped the cursor to view-centre and flushed held
         // buttons (a spurious button-up ~200 ms into every press → broke window drags). Until

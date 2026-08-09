@@ -82,10 +82,11 @@ final class AudioRing: @unchecked Sendable {
 /// CoreAudio channel layout for the canonical wire order FL FR FC LFE RL RR [SL SR]. nil for
 /// stereo (the standard layout is correct). For 5.1/7.1 we list explicit channel labels via
 /// `kAudioChannelLayoutTag_UseChannelDescriptions` — preset tags (DTS_5_1 etc.) don't reliably
-/// match Moonlight's order. NB the 7.1 mapping (verified against the WASAPI 0x63F + SPA orderings):
+/// match Moonlight's order. NB the 7.1 mapping is verified against the reference 0x63F + SPA
+/// orderings:
 /// wire idx 4-5 = RL/RR = the WAVE *back* pair → LeftSurround/RightSurround; idx 6-7 = SL/SR = the
 /// WAVE *side* pair → LeftSurroundDirect/RightSurroundDirect. (Using RearSurround* for 6-7 would
-/// swap side/back vs the Windows/Linux clients.)
+/// match the Linux client's side/back order.)
 func wireChannelLayout(channels: Int) -> AVAudioChannelLayout? {
     let labels: [AudioChannelLabel]
     switch channels {

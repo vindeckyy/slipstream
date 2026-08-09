@@ -37,15 +37,11 @@ your settings. If the stream isn't sending a microphone at all (**Stream microph
 [client settings](/docs/client-settings#audio)) the shortcut does nothing and no badge appears,
 rather than pretending to mute something.
 
-iPhone, Android and Decky have no mute shortcut yet; turn **Stream microphone** off in their
+Android and Steam Deck have no mute shortcut yet; turn **Stream microphone** off in their
 settings instead.
 
 ### On each client
 
-- **iPhone** with a hardware keyboard: **⌃⌥⇧Q** releases input while it is captured, and **⌘⎋**
-  toggles capture in either direction. **⌃⌥⇧D** (disconnect) and **⌃⌥⇧S** (stats) come from the
-  app's Stream shortcuts rather than from the stream itself; if they don't respond while you're
-  captured, release first or use the on-screen controls.
 - **Android and Android TV** honour **Ctrl+Alt+Shift+Q** only; it toggles pointer capture. The
   system Back button leaves the stream.
 - **Steam Deck**, use the controller chord below; Decky always launches fullscreen.
@@ -57,7 +53,6 @@ an Xbox pad), held on any connected pad.
 
 - **Steam Deck**, a press releases captured input only. The Decky plugin always launches the client
   fullscreen, and a stream that started fullscreen stays that way. Holding disconnects.
-- **iPhone**, holding it about 1.5 seconds disconnects. There is no quick-press step.
 - **Android**, holding it about a second disconnects. A quick press does nothing; the moment the
   chord completes a **Hold to quit...** cue appears so you know it registered.
 
@@ -80,7 +75,7 @@ There are two, and they are a per-client setting called **Mouse input**. Pick ba
 **Capture is the default** where the client offers mouse modes. **Android defaults to Desktop**,
 a phone or TV is more often driven by touch or a pad than by a locked mouse.
 
-Switch live with **Ctrl+Alt+Shift+M** (**⌃⌥⇧M** on iPhone with a keyboard) where supported. On
+Switch live with **Ctrl+Alt+Shift+M** where supported. On
 Android, Ctrl+Alt+Shift+Q flips the capture instead.
 
 Two things can override your choice. **gamescope hosts can't take absolute pointer input**: ask for
@@ -103,8 +98,8 @@ last resort (requires a new gnome-shell session).
 
 ## Touch modes
 
-On a touchscreen client the **Touch input** setting picks one of three models. All three exist on
-Android and iPhone.
+On a touchscreen client the **Touch input** setting picks one of three models. Android exposes all
+three; Steam Deck uses its controller and mouse modes.
 
 - **Trackpad** (the default), your finger drives the host cursor like a laptop touchpad. The cursor
   stays put when you touch down and moves by your finger's travel, so you can lift and re-swipe to
@@ -115,7 +110,7 @@ Android and iPhone.
 
 Trackpad and Direct pointer share one gesture vocabulary: tap = left click, two-finger tap = right
 click, two-finger drag = scroll, tap-then-press-and-drag = a held left drag, **three-finger tap =
-cycle the stats overlay**. On Android and iPhone a **three-finger swipe up or down** summons or
+cycle the stats overlay**. On Android a **three-finger swipe up or down** summons or
 dismisses the local on-screen keyboard for typing on the host.
 
 Touch passthrough depends on the host being able to inject touch, and that varies:
@@ -144,9 +139,6 @@ plane, so drawing and handwriting behave the way they do locally.
 
 **Clients that send pen input:**
 
-- **iPhone** with an Apple Pencil (where attached), including hover. The Pencil has no hardware
-  eraser or barrel buttons, so a **double-tap** is sent as barrel button 2, and on iOS 17.5 or newer
-  a **squeeze** is sent as barrel button 1. Pencil Pro's barrel roll also needs iOS 17.5.
 - **Android** phones and tablets with an active stylus, pressure, tilt, hover, the eraser tool and
   both barrel buttons. Android exposes no barrel-roll axis, so roll is not sent from there.
 - **[Moonlight](/docs/moonlight) clients** that send pen events reach the same host-side pen.

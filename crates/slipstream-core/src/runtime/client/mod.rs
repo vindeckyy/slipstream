@@ -387,7 +387,7 @@ impl NativeClient {
         video_codecs: u8,
         preferred_codec: u8,
         // The client display's HDR colour volume (primaries/white/luminance), read from the OS
-        // (e.g. DXGI `GetDesc1`) when presenting HDR. The host forwards it into the virtual
+        // when presenting HDR. The host forwards it into the virtual
         // display's EDID so host apps tone-map to the client's real panel; `None` = unknown/SDR
         // (the host keeps its built-in EDID defaults). See [`crate::quic::Hello::display_hdr`].
         display_hdr: Option<HdrMeta>,
@@ -1055,8 +1055,8 @@ impl NativeClient {
     /// the host sent for an HDR session; same timeout/closed semantics as
     /// [`NativeClient::next_hidout`]. The host sends one near session start and re-sends it on
     /// mastering changes / keyframes, so an HDR presenter should drain this on its own thread and
-    /// apply the latest value to the display (DXGI `SetHDRMetaData` / `CAEDRMetadata` /
-    /// `KEY_HDR_STATIC_INFO`). Only an HDR session (`color.is_hdr()`, PQ) ever emits these.
+    /// apply the latest value to the display (`CAEDRMetadata` or `KEY_HDR_STATIC_INFO`). Only an
+    /// HDR session (`color.is_hdr()`, PQ) ever emits these.
     pub fn next_hdr_meta(&self, timeout: Duration) -> Result<HdrMeta> {
         match self.hdr_meta.lock().unwrap().recv_timeout(timeout) {
             Ok(m) => Ok(m),

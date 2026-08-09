@@ -44,7 +44,7 @@ speed...** entry on a host card to measure the link and suggest a value -
 **Automatic** is a soft preference: the host emits your choice when it can also produce it,
 otherwise the best codec you both speak, in the order **HEVC → AV1 → H.264**.
 **[PyroWave](/docs/pyrowave) is never auto-picked** - you must choose it explicitly on a client that
-offers it. Android and iPhone hide AV1 unless the device has a hardware AV1 decoder; Android never
+offers it. Android hides AV1 unless the device has a hardware AV1 decoder; Android never
 offers PyroWave.
 
 Practical rule of thumb:
@@ -114,9 +114,8 @@ Honest gates today (do not skip these when diagnosing):
 - **Only NVENC and PyroWave** produce it on the host. AMD (VCN / AMF) and Intel (QSV / VAAPI /
   Vulkan Video) decline HEVC 4:4:4 - that is a hardware or backend limit, not a missing toggle.
   See the [encoder matrix](/docs/support-matrix#encoders).
-- **Today only the iPhone app actually advertises 4:4:4**, and only when its hardware decode probe
-  passes. Android, Decky, and the console home do not offer it. Moonlight / GameStream sessions are
-  always 4:2:0.
+- **Android, Decky, and the console home do not advertise 4:4:4.** Moonlight / GameStream sessions
+  are always 4:2:0.
 - On Detailed stats, asking for full chroma prints `4:4:4` when granted or `4:4:4→4:2:0` when the
   host could not - [Stats](/docs/stats).
 
@@ -156,9 +155,9 @@ Create a **Work** settings profile and bind it to the office host:
 | **Resolution / refresh** | Match the laptop panel (Native) | Host builds a virtual display at your client mode - no local upscale of a smaller stream |
 | **Render scale** | Native (1x) first; try >1x only if you have spare bitrate and decode headroom | Supersampling helps sharpness but spends bandwidth |
 
-On an iPhone talking to an **NVIDIA** host (NVENC) over a capable path, HEVC + 4:4:4 + HDR off is
-the sharpest shipping desk-work picture Slipstream offers today. Other clients that do not advertise
-4:4:4 stay on **4:2:0** - raise bitrate and keep HEVC meanwhile.
+On a capable path, HEVC + 4:4:4 + HDR off is the sharpest desk-work picture Slipstream offers
+today. Clients that do not advertise 4:4:4 stay on **4:2:0** - raise bitrate and keep HEVC
+meanwhile.
 
 Over a **VPN**, raise bitrate until text stops looking muddy, then stop. If the VPN cannot carry
 more, drop refresh or resolution before chasing settings the product does not have. Over a **wired
@@ -203,8 +202,8 @@ corrupt host.
    expected; soft glyphs at 50 Mbps on a quiet LAN usually point elsewhere.
 3. **Chroma (4:2:0).** Coloured text and red/blue edges look fringed while grayscale looks
    acceptable - classic 4:2:0. Enable full chroma **when your client advertises it and the host
-   GPU can encode it**; otherwise raise bitrate and stay on HEVC. Remember only iPhone advertises
-   4:4:4 today.
+   GPU can encode it**; otherwise raise bitrate and stay on HEVC. Client support is required; the
+   Android app, Decky client, and console home currently stay on 4:2:0.
 4. **HDR fighting the panel or chroma.** Office UI on an SDR laptop with HDR left on → turn HDR
    off. Wanted 4:4:4 but left HDR on → session may resolve to SDR; turn HDR off for that Work
    profile.
@@ -246,8 +245,8 @@ Turn-on summary:
 
 1. Host: Linux hosts advertise it in default builds (any GPU vendor via Vulkan import; no special
    `host.env` line).
-2. Client: set **Video codec → PyroWave (wired LAN)** on iPhone or Steam Deck where the decode probe
-   passes. Or `SLIPSTREAM_PREFER_PYROWAVE=1` where the UI is hard to reach. Android has no PyroWave
+2. Client: set **Video codec → PyroWave (wired LAN)** on Steam Deck where the decode probe passes.
+   Or `SLIPSTREAM_PREFER_PYROWAVE=1` where the UI is hard to reach. Android has no PyroWave
    decoder.
 3. Leave bitrate on Automatic unless you need a lower explicit pin or a host
    `SLIPSTREAM_PYROWAVE_MAX_MBPS` cap.
@@ -260,8 +259,8 @@ the latency-and-chroma extreme; for HDR games, stay on HEVC or AV1.
 
 Call these out so expectations stay accurate:
 
-- **4:4:4 advertising is iPhone-only today.** AMD and Intel hosts cannot encode HEVC 4:4:4; use
-  NVIDIA NVENC or PyroWave.
+- **Full-chroma advertising is client-dependent.** AMD and Intel hosts cannot encode HEVC 4:4:4;
+  use NVIDIA NVENC or PyroWave.
 - **Moonlight stays 4:2:0.** Full chroma is native `slipstream/1` only (`SLIPSTREAM_444` has no
   effect on GameStream).
 - **Automatic bitrate starts at 20 Mbps** for the hardware codecs, then may climb. It is not a

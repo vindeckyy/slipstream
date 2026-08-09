@@ -6,12 +6,11 @@
 //!
 //! [`set_media_qos`] DSCP-tags the latency-sensitive video/audio traffic (+ Linux `SO_PRIORITY`) so a
 //! QoS-aware path (Wi-Fi WMM access categories, a managed switch, a shaped uplink) can prioritize it
-//! over bulk flows. Mirrors what Apollo/Sunshine tag — DSCP **CS5** for video, **CS6** for audio. It
+//! over bulk flows. Mirrors what Apollo/Sunshine tag, DSCP **CS5** for video, **CS6** for audio. It
 //! is **opt-in** (`SLIPSTREAM_DSCP=1`, or [`set_dscp_default`] from an embedder — the Android client
 //! ties it to its experimental low-latency mode): DSCP can interact badly with some consumer
-//! ISPs/routers. On Windows a plain `IP_TOS` is silently stripped from the wire, so the marking
-//! goes through qWAVE flows instead (see [`super::qos_windows`]) — the caller holds the returned
-//! [`QosFlow`] guard for as long as the socket sends media.
+//! ISPs/routers, so the caller opts in explicitly and holds the returned [`QosFlow`] guard for as
+//! long as the socket sends media.
 
 use std::net::UdpSocket;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -116,13 +115,8 @@ pub(crate) fn dscp_enabled() -> bool {
     }
 }
 
-/// RAII token for a socket's QoS marking. On Windows it is the qWAVE flow membership
-/// ([`super::qos_windows::QosFlow`]) — dropping it removes the marking, so hold it for as long
-/// as the socket sends media. Elsewhere DSCP rides the socket option itself and the token is
-/// inert (and never constructed — [`set_media_qos`] returns `None`).
-#[cfg(windows)]
-pub use super::qos_windows::QosFlow;
-#[cfg(not(windows))]
+/// RAII token retained by the transport while a media socket is active. Linux applies DSCP through
+/// the socket option itself, so this token remains inert and [`set_media_qos`] returns `None`.
 pub struct QosFlow {
     _never: std::convert::Infallible,
 }
@@ -131,28 +125,18 @@ pub struct QosFlow {
 /// unless `SLIPSTREAM_DSCP=1`. Every step is best-effort (failures logged at debug, never fatal) — QoS
 /// is a nicety, not required for correctness.
 ///
-/// The socket must already be `connect`ed (Windows derives the qWAVE flow from the connected
-/// 5-tuple). IPv4 only (all current media sockets bind `0.0.0.0`); a v6 socket simply isn't
-/// tagged. Returns the [`QosFlow`] guard on Windows — keep it alive with the socket; `None`
-/// elsewhere (the marking is a plain socket option) and whenever a step refused.
+/// The socket must already be `connect`ed. IPv4 only (all current media sockets bind `0.0.0.0`);
+/// a v6 socket simply isn't tagged. Returns `None` whenever a step refused.
 pub fn set_media_qos(socket: &UdpSocket, class: MediaClass) -> Option<QosFlow> {
     if !dscp_enabled() {
         return None;
     }
-    #[cfg(windows)]
-    {
-        super::qos_windows::add_media_flow(socket, class)
-    }
-    #[cfg(not(windows))]
-    {
-        apply_media_qos(socket, class);
-        None
-    }
+    apply_media_qos(socket, class);
+    None
 }
 
 /// The unconditional QoS application, factored out of [`set_media_qos`] so it is directly testable
 /// without touching the process-global `SLIPSTREAM_DSCP` env. Best-effort (every step logs-and-continues).
-#[cfg_attr(windows, allow(dead_code))]
 fn apply_media_qos(socket: &UdpSocket, class: MediaClass) {
     let sock = socket2::SockRef::from(socket);
     // DSCP occupies the high 6 bits of the TOS byte → shift left 2.

@@ -18,7 +18,7 @@
 //! - `mac` — the host's wake-capable NIC MAC(s) (comma-separated, routed NIC first), which a client
 //!   persists so it can Wake-on-LAN this host after it sleeps. Advisory/unauthenticated (a wrong
 //!   MAC only makes a wake fail). Omitted when none can be read.
-//! - `os` — the host's OS identity chain (`windows` | `macos` | `linux[/<family>][/<id>]`, e.g.
+//! - `os` — the host's Linux identity chain (`linux[/<family>][/<id>]`, e.g.
 //!   `linux/fedora/bazzite` — see [`crate::osinfo`]), so a client can show an OS icon on the host
 //!   card. Advisory/unauthenticated like `mac`: a wrong value only draws a wrong icon.
 

@@ -1,13 +1,11 @@
-//! Transport-independent DualShock 4 HID contract — the pure report codec shared by the Windows
-//! UMDF-driver backend ([`super::dualshock4_windows`]) and the Linux UHID backend
+//! Transport-independent DualShock 4 HID contract for the Linux UHID backend
 //! ([`super::dualshock4`]).
 //!
 //! The PS4 sibling of [`super::dualsense_proto`]: the pure report codec with no transport. The DS4
-//! reuses the DualSense [`DsState`] controller model + its `GameStream`/XInput mapper
-//! ([`DsState::from_gamepad`]) — only the report *byte layout*, the touchpad resolution, and the
-//! feedback report differ. The Linux backend writes report `0x01` to `/dev/uhid` and reads `0x05` via
-//! `UHID_OUTPUT`; the Windows backend pushes `0x01` to the UMDF driver and pulls `0x05` back over its
-//! shared-memory channel — both build/parse the exact same bytes here.
+//! reuses the DualSense [`DsState`] controller model and its `GameStream`/XInput mapper
+//! ([`DsState::from_gamepad`]); only the report byte layout, touchpad resolution, and feedback
+//! report differ. The Linux backend writes report `0x01` to `/dev/uhid` and reads `0x05` via
+//! `UHID_OUTPUT`.
 //!
 //! Field offsets are the canonical real-DS4-USB layout the kernel `struct
 //! dualshock4_input_report_usb` / `_output_report_common` parse.

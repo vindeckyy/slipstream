@@ -155,16 +155,14 @@ fn nvenc_input(format: PixelFormat) -> (Pixel, bool) {
         PixelFormat::Rgba => (Pixel::RGBA, false),
         PixelFormat::Rgb => (Pixel::RGBZ, true), // RGB -> rgb0
         PixelFormat::Bgr => (Pixel::BGRZ, true), // BGR -> bgr0
-        // NV12 is native YUV: NVENC encodes it with NO internal RGB→YUV CSC (the Tier 2A win). On
-        // Linux it's produced by the GPU convert on the zero-copy tiled path (`SLIPSTREAM_NV12`); on
-        // Windows by the D3D11 video processor.
+        // NV12 is native YUV: NVENC encodes it with no internal RGB→YUV CSC. On Linux it is
+        // produced by the GPU conversion on the zero-copy path (`SLIPSTREAM_NV12`).
         PixelFormat::Nv12 => (Pixel::NV12, false),
         // Planar YUV444 from the zero-copy worker's GPU convert (a 4:4:4 session) — native
         // full-chroma YUV in, `hevc_nvenc` emits Range-Extensions 4:4:4.
         PixelFormat::Yuv444 => (Pixel::YUV444P, false),
-        // Rgb10a2 (HDR) and P010 (the Windows 10-bit video-processor output) are produced only by
-        // the Windows paths; the Linux capturer never emits them. Map to BGRA so the match is
-        // exhaustive — unreachable here.
+        // Rgb10a2 and P010 are not emitted by the Linux capturer. Map them to BGRA so the match is
+        // exhaustive for defensive callers.
         PixelFormat::Rgb10a2 | PixelFormat::P010 => (Pixel::BGRA, false),
         // The Linux HDR capture formats never take the RGB-passthrough input: `open` intercepts
         // them onto the X2RGB10→P010 swscale path before consulting this mapping (like 4:4:4).
@@ -373,7 +371,7 @@ impl NvencEncoder {
 
         // Colour signalling, written for EVERY session (colorspace/range/primaries/transfer) —
         // otherwise the client decoder assumes a default and the picture comes out washed-out /
-        // wrong-contrast. Matches the Windows NV12 path's BT.709 limited-range signalling.
+        // wrong-contrast. This matches the NV12 path's BT.709 limited-range signalling.
         //
         // The packed-RGB 4:2:0 path used to be excluded, on the belief that "NVENC's internal CSC
         // writes its own VUI". It does not: libavcodec's nvenc wrapper derives
@@ -382,8 +380,8 @@ impl NvencEncoder {
         // then falls back to BT.709 (`csc_rows`) and looks fine, but vendor TV decoders guess from
         // RESOLUTION — an LG webOS panel reads a 4K SDR stream as BT.2020 and washes it out.
         // BT.709 limited is the honest answer for that path too: NVENC's internal RGB→YUV is the
-        // same conversion both direct-SDK backends feed from an ARGB surface
-        // (`nvenc_cuda.rs`/`windows/nvenc.rs`), and `nvenc_core.rs` already stamps 709-limited on
+        // same conversion the direct-SDK backend feeds from an ARGB surface
+        // (`nvenc_cuda.rs`), and `nvenc_core.rs` already stamps 709-limited on
         // those unconditionally. This only makes the libav sibling consistent with them.
         //
         // Reachable whenever the direct-SDK path is not: a CPU/dmabuf (non-CUDA) capture, a build
@@ -393,12 +391,12 @@ impl NvencEncoder {
         // recovers the ~12% of code space limited-range quantization gives up, for the exact
         // text/UI chroma 4:4:4 exists for. Every slipstream client honors the signaled range
         // (csc_rows / the Apple rows port); ship as default only if the on-glass A/B shows a
-        // visible win. Linux-only: the Windows path's NVENC-internal CSC range is unmeasured.
+        // visible win. The NVENC-internal CSC range is measured only for this Linux path.
         let full_range_444 =
             want_444 && std::env::var("SLIPSTREAM_444_FULLRANGE").is_ok_and(|v| v.trim() == "1");
         if want_hdr10 {
             // HDR10: BT.2020 primaries + SMPTE-2084 (PQ) transfer, limited range — matches the
-            // swscale BT.2020 CSC below and the Windows paths' signalling. The client decoder
+            // swscale BT.2020 CSC below and the encoder's signalling. The client decoder
             // auto-detects PQ from the VUI; static mastering metadata rides out-of-band.
             // SAFETY: `raw = video.as_mut_ptr()` is the non-null, properly-aligned, sole-owned,
             // not-yet-opened `AVCodecContext`; we set its four VUI colour enum fields to valid
@@ -691,7 +689,7 @@ impl Encoder for NvencEncoder {
             // NVENC intra-refresh is purpose-built GDR loss recovery (moving band + recovery-point
             // SEI): the wave heals a lost picture within one period, so mark the boundary AUs and let
             // the client re-anchor on them instead of forcing a full IDR. Tied to `intra_refresh`
-            // (already the `SLIPSTREAM_INTRA_REFRESH` opt-in), unlike AMF/QSV which stay unvalidated.
+            // (already the `SLIPSTREAM_INTRA_REFRESH` opt-in).
             intra_refresh_recovery: self.intra_refresh,
             intra_refresh_period: self.intra_refresh_period,
             ..super::EncoderCaps::default()
@@ -727,7 +725,7 @@ impl Encoder for NvencEncoder {
 
     /// Encode-stall recovery: drop the wedged libavcodec encoder and reopen it fresh with the
     /// session's negotiated parameters (the stored [`OpenArgs`]) — the drop-and-reopen lever the
-    /// QSV/VAAPI paths use, so the encode-stall watchdog can heal a wedged NVENC/driver instead of
+    /// VAAPI uses, so the encode-stall watchdog can heal a wedged NVENC/driver instead of
     /// ending the session. Owed AUs are forfeited; the fresh encoder opens on an IDR.
     fn reset(&mut self) -> bool {
         let a = self.args;

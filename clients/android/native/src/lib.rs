@@ -11,7 +11,7 @@
 //! bridge is unavoidable. Writing it in Rust lets the Android client reuse the Linux client's
 //! orchestration verbatim — audio jitter ring, the VK keymap inverse, latency/skew math, the
 //! input capture state machine, trust/pairing logic, **mDNS discovery** ([`discovery`], the same
-//! `mdns-sd` browse the Linux/Windows clients use) — instead of re-porting it into Kotlin. Kotlin
+//! `mdns-sd` browse the Linux client uses) — instead of re-porting it into Kotlin. Kotlin
 //! keeps only the Android-framework surface it must (Compose UI, `SurfaceView`, input capture, the
 //! Wi-Fi `MulticastLock` + permission UX, Keystore identity).
 //!

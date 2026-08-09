@@ -1,5 +1,4 @@
-//! Shared virtual-pad creation-retry policy, used by every backend manager (Linux uinput/uhid,
-//! Windows XUSB/UMDF). See [`PadGate`].
+//! Shared virtual-pad creation-retry policy for Linux uinput and UHID backends. See [`PadGate`].
 
 use std::time::{Duration, Instant};
 
@@ -12,8 +11,8 @@ const MAX_BACKOFF: Duration = Duration::from_secs(30);
 /// Create-retry gate shared by every virtual-pad manager.
 ///
 /// Each backend used to carry a `broken: bool` that latched permanently on the FIRST pad-creation
-/// error, so a single transient failure — a startup race on `/dev/uinput`, a momentary `EBUSY`, the
-/// Windows companion driver not yet ready — disabled EVERY controller for the rest of the session,
+/// error, so a single transient failure, such as a startup race on `/dev/uinput` or a momentary
+/// `EBUSY`, disabled every controller for the rest of the session,
 /// even after the underlying cause cleared. `PadGate` replaces that latch with capped exponential
 /// backoff:
 ///
@@ -23,9 +22,8 @@ const MAX_BACKOFF: Duration = Duration::from_secs(30);
 /// * A success clears the backoff, so the next failure starts fresh from [`FIRST_BACKOFF`].
 /// * Consecutive failures widen the window, doubling up to [`MAX_BACKOFF`].
 ///
-/// Even a genuinely broken setup (bad `/dev/uinput` permissions, missing Windows driver) therefore
-/// self-heals within [`MAX_BACKOFF`] of the fix — a udev-rule reload, a driver install, the next
-/// client connect — with no host restart, while costing at most one failed syscall plus one log
+/// Even a genuinely broken setup, such as bad `/dev/uinput` permissions, therefore self-heals within
+/// [`MAX_BACKOFF`] of the fix, with no host restart, while costing at most one failed syscall plus one log
 /// line per backoff window. The gate is manager-wide (not per slot), matching the old `broken`
 /// flag: these failures are systemic (device-node permissions, absent driver), not per-controller.
 #[derive(Debug, Default)]

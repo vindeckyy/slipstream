@@ -1,50 +1,9 @@
-//! The encoder contract (plan §7, Tier 1): the [`Encoder`] trait plus the plain-data value types its
-//! signatures use — [`EncodedFrame`], [`Codec`], [`ChromaFormat`], [`EncoderCaps`] — and the
-//! dimension/VBV helpers [`validate_dimensions`] and [`vbv_frames_env`]. Backend selection, the
-//! capability probes that mirror it, and `Codec::host_wire_caps` stay in the parent the `ss-encode` crate root
-//! facade, which re-exports this module (`pub(crate) use codec::*;`) so every `crate::*` path
-//! is unchanged.
+//! The encoder contract: the [`Encoder`] trait plus the plain-data value types its signatures use,
+//! and the dimension/VBV helpers [`validate_dimensions`] and [`vbv_frames_env`]. Backend selection,
+//! capability probes, and `Codec::host_wire_caps` stay in the parent `ss-encode` facade, which
+//! re-exports this module so every `crate::*` path is unchanged.
 use anyhow::Result;
 use ss_frame::CapturedFrame;
-
-/// Whether an encoder fed `format` must be built 10-bit — decided by **the pixels that actually
-/// arrive**, never by the negotiated `bit_depth`.
-///
-/// The three Windows backends each derived this as `bit_depth >= 10 || matches!(format, P010 |
-/// Rgb10a2)`, i.e. the *negotiated* depth could force a 10-bit encoder over an 8-bit capture. That
-/// combination is not hypothetical: a client advertises 10-bit, the handshake negotiates
-/// `bit_depth = 10`, and then enabling advanced colour on the IDD virtual display fails — at which
-/// point the capturer says so and delivers 8-bit NV12 anyway (`ss-capture`'s idd_push logs "10-bit
-/// HDR was negotiated but enabling advanced color on the virtual display FAILED — encoding 8-bit
-/// SDR"). Every backend then lost the session, each in its own way: native AMF and native QSV
-/// `bail!` at open because the format does not match the P010 they derived, and the libavcodec
-/// path accepted the open and then failed EVERY submit forever (its per-frame depth check
-/// recomputes from the frame, which never matches), where `reset()` could not help because the
-/// rebuild re-derived the same wrong depth.
-///
-/// Following the pixels keeps the stream alive and, more importantly, keeps it HONEST: the depth
-/// also selects the colour signalling (BT.2020 PQ vs BT.709) and the staging surface format, so an
-/// 8-bit capture now yields an 8-bit stream that says it is SDR — which is what the capturer
-/// already reported it is sending. The negotiated depth remains an upper bound; the session label
-/// may still claim HDR, and that mismatch belongs to the negotiation, not to the encoder.
-/// Windows-only: the three backends that derive an encoder depth from a capture live there
-/// (native AMF, native QSV, libavcodec AMF/QSV). The Linux backends take the depth from the
-/// negotiated `bit_depth` alone because their capture formats carry it unambiguously.
-#[cfg(target_os = "windows")]
-pub(crate) fn ten_bit_input(format: ss_frame::PixelFormat, negotiated_depth: u8) -> bool {
-    use ss_frame::PixelFormat;
-    let ten = matches!(format, PixelFormat::P010 | PixelFormat::Rgb10a2);
-    if negotiated_depth >= 10 && !ten {
-        tracing::warn!(
-            ?format,
-            negotiated_depth,
-            "session negotiated 10-bit but the capturer delivers an 8-bit format — encoding 8-bit \
-             SDR (the stream's colour signalling follows the pixels; check whether advanced colour \
-             failed to enable on the virtual display)"
-        );
-    }
-    ten
-}
 
 /// An encoded access unit (one NAL/AU) to hand to `slipstream_core` for FEC + packetization.
 /// `data` is in-band Annex-B (the encoder is opened without a global header), so each
@@ -59,11 +18,9 @@ pub struct EncodedFrame {
     /// encoder coded against a known-good reference in response to
     /// [`invalidate_ref_frames`](Encoder::invalidate_ref_frames). The pump tags it
     /// [`slipstream_core::packet::USER_FLAG_RECOVERY_ANCHOR`] so the client lifts its post-loss
-    /// freeze on it without an IDR. Set by BOTH RFI backends: native AMF (the LTR force-reference
-    /// frame) and Windows direct-NVENC (the first frame encoded after `nvEncInvalidateRefFrames` —
-    /// the invalidation applies at the next `encode_picture`, so that AU is by construction the
-    /// clean re-anchor). Without it the client's freeze can only lift on an IDR — which the host
-    /// suppresses after a successful RFI (the cooldown), a ~1 s frozen stall per loss event.
+    /// freeze on it without an IDR. Set by an RFI-capable backend after it emits a clean
+    /// re-anchor. Without it the client's freeze can only lift on an IDR, which the host suppresses
+    /// after a successful RFI, causing a frozen stall per loss event.
     pub recovery_anchor: bool,
     /// The AU is shard-aligned self-delimiting chunks (see [`Encoder::set_wire_chunking`]);
     /// the session stamps [`slipstream_core::packet::USER_FLAG_CHUNK_ALIGNED`] so the client
@@ -221,32 +178,6 @@ impl Codec {
             Codec::PyroWave => unreachable!("PyroWave has no FFmpeg encoder"),
         }
     }
-
-    /// The FFmpeg AMD **AMF** encoder name (the Windows AMD backend). Selected by name (the codec id
-    /// would pick the software encoder). AV1 (`av1_amf`) is RDNA3+/RX 7000+ — probe, never assume.
-    pub fn amf_name(self) -> &'static str {
-        match self {
-            Codec::H264 => "h264_amf",
-            Codec::H265 => "hevc_amf",
-            Codec::Av1 => "av1_amf",
-            // Guarded by the open_video dispatch: a PyroWave session never reaches a
-            // libavcodec backend.
-            Codec::PyroWave => unreachable!("PyroWave has no FFmpeg encoder"),
-        }
-    }
-
-    /// The FFmpeg Intel **QSV** encoder name (the Windows Intel backend). Selected by name. AV1
-    /// (`av1_qsv`) is Arc/Xe2+; HEVC Main10 is Gen9.5+ — probe, never assume.
-    pub fn qsv_name(self) -> &'static str {
-        match self {
-            Codec::H264 => "h264_qsv",
-            Codec::H265 => "hevc_qsv",
-            Codec::Av1 => "av1_qsv",
-            // Guarded by the open_video dispatch: a PyroWave session never reaches a
-            // libavcodec backend.
-            Codec::PyroWave => unreachable!("PyroWave has no FFmpeg encoder"),
-        }
-    }
 }
 
 /// Static capabilities an [`Encoder`] declares so the session glue routes loss-recovery and
@@ -264,13 +195,12 @@ pub struct EncoderCaps {
     /// The encoder can perform real reference-frame invalidation — i.e.
     /// [`invalidate_ref_frames`](Encoder::invalidate_ref_frames) can return `true`. When `false`
     /// the caller skips that always-`false` call and forces a keyframe directly on loss recovery.
-    /// Two backends implement RFI: Windows direct-NVENC (`nvEncInvalidateRefFrames`) and native
-    /// AMF (user-LTR force-reference, when the driver accepted the LTR slots at open). The
-    /// libavcodec paths (Linux NVENC, VAAPI, QSV) can't express it and always keyframe.
+    /// The direct Linux NVENC backend implements RFI. The libavcodec and software paths cannot
+    /// express it and use keyframes instead.
     pub supports_rfi: bool,
     /// The opened encoder is actually producing a full-chroma 4:4:4 (`chroma_format_idc = 3`) stream.
     /// `false` on every 4:2:0 session (the default) and on a backend that declined 4:4:4. Set by the
-    /// NVENC backends (Linux + Windows). The chroma is committed to the wire (`Welcome::chroma_format`)
+    /// Linux NVENC backends. The chroma is committed to the wire (`Welcome::chroma_format`)
     /// from the pre-open probe, so this is a *post-open cross-check*: the session glue logs loudly if
     /// the encoder's real chroma disagrees with what was negotiated (the in-band SPS is authoritative
     /// for the decoder either way).
@@ -278,11 +208,11 @@ pub struct EncoderCaps {
     /// The encoder runs a periodic **intra-refresh wave** — a moving band of intra blocks that
     /// re-codes the whole picture over ~0.5 s, no periodic IDR. FEC-unrecoverable loss self-heals as
     /// the band sweeps, so the session glue rate-limits client keyframe requests instead of answering
-    /// each with a full IDR (the 20-40× frame-size spike that cascades under loss). Linux NVENC / AMF
-    /// set it when `SLIPSTREAM_INTRA_REFRESH` opened the encoder in that mode; VAAPI/QSV/software never
-    /// do. NOTE — the wave carries NO decoder-visible clean-point: FFmpeg never sets `AV_FRAME_FLAG_KEY`
+    /// each with a full IDR (the 20-40× frame-size spike that cascades under loss). Linux NVENC sets
+    /// it when `SLIPSTREAM_INTRA_REFRESH` opened the encoder in that mode; VAAPI and software never
+    /// do. The wave carries no decoder-visible clean point: FFmpeg never sets `AV_FRAME_FLAG_KEY`
     /// at a recovery point (H.264 flags key only when `recovery_frame_cnt == 0`; HEVC only on IRAP),
-    /// and AMF emits no recovery-point SEI at all. So this cap ALONE does not let the client lift its
+    /// and the encoder does not emit a recovery-point SEI. This cap alone does not let the client lift its
     /// post-loss freeze without an IDR — that needs [`intra_refresh_recovery`](Self::intra_refresh_recovery).
     pub intra_refresh: bool,
     /// The intra-refresh wave is a *validated constrained GDR* — verified on real hardware to fully
@@ -359,7 +289,7 @@ pub trait Encoder: Send {
     /// in-band (HEVC/H.264 `mastering_display_colour_volume` + `content_light_level_info` SEI, or
     /// AV1 metadata OBUs) on keyframes so a stock decoder — e.g. stock Moonlight — tone-maps from
     /// the source's real grade. Default: no-op (SDR encoders / paths that don't attach it).
-    /// Cheap to call every frame; consumed by Windows direct-NVENC, native AMF, and native QSV.
+    /// Cheap to call every frame; consumed by the Linux direct-NVENC backend when supported.
     /// Every first-party client reads the grade out-of-band (the 0xCE datagram) regardless, so
     /// this is a bonus for stock decoders, never the primary channel.
     fn set_hdr_meta(&mut self, _meta: Option<slipstream_core::quic::HdrMeta>) {}
@@ -369,8 +299,8 @@ pub trait Encoder: Send {
     /// a full IDR. Returns `true` if a real reference invalidation was performed; `false` means the
     /// encoder couldn't (range older than the DPB/LTR history, or the backend has no RFI) and the
     /// caller should fall back to [`request_keyframe`](Self::request_keyframe). Default: `false` —
-    /// the Windows direct-NVENC path (`nvEncInvalidateRefFrames`) and native AMF (LTR
-    /// force-reference) implement true RFI; the libavcodec paths can't express it, so they keyframe.
+    /// The direct-NVENC path implements true RFI; the libavcodec paths cannot express it, so they
+    /// keyframe.
     fn invalidate_ref_frames(&mut self, _first_frame: i64, _last_frame: i64) -> bool {
         false
     }
@@ -413,7 +343,7 @@ pub trait Encoder: Send {
         Ok(self.poll()?.map(AuChunk::whole))
     }
     /// Tear the underlying hardware encoder down and rebuild it in place, keeping the session's
-    /// negotiated parameters — the encode-stall watchdog's recovery lever (a wedged AMF/QSV
+    /// negotiated parameters — the encode-stall watchdog's recovery lever (a wedged encoder
     /// driver stops emitting AUs or accepting frames without ever returning an error). Returns
     /// `true` when the encoder was rebuilt: every submitted-but-unpolled frame is forfeited and
     /// the next submitted frame starts a fresh stream (IDR). Default `false`: the backend has no
@@ -522,8 +452,8 @@ pub const SPLIT_FORCE_PIXEL_RATE: u64 = 950_000_000;
 
 /// `SLIPSTREAM_VBV_FRAMES` — HRD/VBV size in frame intervals (default 1.0, the strict low-latency
 /// shape every backend ships: each frame must fit its rate share, keeping frame sizes uniform for
-/// the pacer). The AMF/VAAPI/QSV paths parse the same variable locally; this helper brings the
-/// direct-NVENC paths (which used to hardwire 1 frame) to parity. Larger values let complex
+/// the pacer). The VAAPI path parses the same variable locally; this helper brings the direct-NVENC
+/// path (which used to hardwire 1 frame) to parity. Larger values let complex
 /// frames borrow bits — better rate utilization at the cost of per-frame size variance.
 pub(crate) fn vbv_frames_env() -> f64 {
     std::env::var("SLIPSTREAM_VBV_FRAMES")
@@ -551,8 +481,8 @@ pub(crate) fn vbv_frames_env() -> f64 {
 /// (`VUID-...-08358` is `<=`, relaxed in Vulkan 1.3.299).
 ///
 /// Carries its only caller's gate: `vulkan_video.rs` is the sole ms-form consumer, and with the
-/// crate-wide `allow(dead_code)` gone (WP0.3) an item unused in ANY feature combination is a hard
-/// error — this is dead on every Windows leg.
+/// crate-wide `allow(dead_code)` gone (WP0.3), an item unused in any feature combination is a hard
+/// error, so this stays gated with its Vulkan caller.
 #[cfg(all(target_os = "linux", feature = "vulkan-encode"))]
 pub(crate) fn vbv_window_ms(fps: u32, vbv_frames: f64) -> (u32, u32) {
     let ms = (vbv_frames * 1000.0 / fps.max(1) as f64).round();
@@ -626,11 +556,11 @@ mod tests {
     #[test]
     fn vbv_window_is_about_one_frame_and_always_legal() {
         // The house default is ~1 frame interval, not the 1000 ms the Vulkan backend hardwired.
-        assert_eq!(vbv_window_ms(60).0, 17); // 16.67 ms
-        assert_eq!(vbv_window_ms(30).0, 33);
-        assert_eq!(vbv_window_ms(240).0, 4);
+        assert_eq!(vbv_window_ms(60, 1.0).0, 17); // 16.67 ms
+        assert_eq!(vbv_window_ms(30, 1.0).0, 33);
+        assert_eq!(vbv_window_ms(240, 1.0).0, 4);
         for fps in [1, 24, 30, 60, 120, 144, 240, 480, 1000, 4000, u32::MAX] {
-            let (window, initial) = vbv_window_ms(fps);
+            let (window, initial) = vbv_window_ms(fps, 1.0);
             assert!(window > 0, "virtualBufferSizeInMs must be > 0 (fps {fps})");
             assert!(
                 initial <= window,
@@ -638,7 +568,7 @@ mod tests {
             );
         }
         // fps 0 must not divide by zero — `open` clamps, but the helper is called directly too.
-        assert!(vbv_window_ms(0).0 > 0);
+        assert!(vbv_window_ms(0, 1.0).0 > 0);
     }
 
     #[test]

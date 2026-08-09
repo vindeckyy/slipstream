@@ -1,7 +1,7 @@
 //! Session/frame **construction** for the Vulkan Video encoder — the unsafe builders
 //! (`make_frame*`, `make_video_image`, `probe_rgb_direct`) and the parameter-set bitstream
 //! writers (`build_parameters_h265`/`_av1`, the AV1 sequence-header OBU). Split from
-//! `vulkan_video.rs` (WP7.5) the way `amf_sys.rs` was split from `amf.rs`: a `#[path]` child
+//! `vulkan_video.rs` (WP7.5) as a `#[path]` child
 //! module, so this file sees the parent's private items (`Frame` and friends) with zero
 //! visibility churn, and ~800 lines of construction `unsafe` get their own review surface.
 //! Steady-state encode logic stays in the parent.

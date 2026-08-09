@@ -4,9 +4,8 @@
 //!
 //! One stream session per invocation: `--connect host[:port]` (+ `--fp HEX`,
 //! `--launch id`, `--fullscreen`), exits when the session ends. Reads the same identity
-//! / known-hosts / settings stores as the desktop shell on each OS — the GTK client
-//! (`slipstream-client`) on Linux, the WinUI client on Windows — so pairing on either side
-//! makes the other connect silently. `--pair <PIN> --connect host` runs the ceremony here,
+//! / known-hosts / settings stores as the Linux desktop shell, so pairing in either entry
+//! point makes the other connect silently. `--pair <PIN> --connect host` runs the ceremony here,
 //! with no window and no toolkit, for machines that have only a shell.
 //!
 //! Stdout is the machine interface (the shell↔session contract): `{"ready":true}` after
@@ -15,20 +14,18 @@
 //! 2 connect failed, 3 trust rejected / pairing required, 4 presenter init failed.
 #![forbid(unsafe_code)]
 
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 mod session;
 
-#[cfg(any(target_os = "linux", windows))]
+#[cfg(target_os = "linux")]
 fn main() -> std::process::ExitCode {
     std::process::ExitCode::from(session::run())
 }
 
 /// This stub keeps `cargo build --workspace` green elsewhere (the Mac client lives in
 /// clients/apple).
-#[cfg(not(any(target_os = "linux", windows)))]
+#[cfg(not(target_os = "linux"))]
 fn main() {
-    eprintln!(
-        "slipstream-session runs on Linux and Windows — the macOS client lives in clients/apple"
-    );
+    eprintln!("slipstream-session is available on Linux");
     std::process::exit(2);
 }

@@ -10,7 +10,6 @@ members = [
     "crates/ss-presenter",
     "crates/ss-console-ui",
     "crates/ss-ffvk",
-    "crates/ss-driver-proto",
     "crates/ss-paths",
     "crates/ss-update",
     "crates/ss-update-check",
@@ -18,21 +17,17 @@ members = [
     "crates/ss-gpu",
     "crates/ss-zerocopy",
     "crates/ss-frame",
-    "crates/ss-win-display",
     "crates/ss-encode",
     "crates/ss-capture",
     "crates/ss-inject",
     "crates/ss-vdisplay",
     "crates/pyrowave-sys",
-    "crates/libvpl-sys",
     "clients/probe",
     "clients/cli",
     "clients/linux",
     "clients/session",
-    "clients/windows",
     "clients/android/native",
     "tools/cursor-probe",
-    "tools/display-disturb",
     "tools/latency-probe",
     "tools/loss-harness",
 ]
@@ -60,8 +55,8 @@ license = "MIT OR Apache-2.0"
 authors = ["Slipstream contributors"]
 repository = "https://github.com/vindeckyy/slipstream"
 
-# The `unsafe` discipline the `packaging/windows/drivers/*` crates already run, extended to the
-# workspace. `unsafe fn` marks a CONTRACT the caller must uphold; it is not a licence for the whole
+# The workspace uses the Rust 2024 unsafe-operation discipline. `unsafe fn` marks a CONTRACT the
+# caller must uphold; it is not a licence for the whole
 # body to skip checking. Without this lint an `unsafe fn` body is unchecked end to end, so a 600-line
 # function hides which handful of lines are actually the unsafe ones — exactly the reviewer-hostile
 # shape we are working down. (This is the Rust 2024 default; adopting it early also pays off the
@@ -80,7 +75,7 @@ repository = "https://github.com/vindeckyy/slipstream"
 # unsafe operation at all). Narrowing them means one `unsafe {}` per line plus, since ss-encode also
 # denies `clippy::undocumented_unsafe_blocks`, one hand-written SAFETY comment per line that could
 # only ever restate "an ash call on a live device" — the precise noise that made `unsafe` stop
-# meaning anything here before (see the header of `ss-win-display/src/win_display.rs`).
+# meaning anything here before.
 #
 # Everything else in the workspace is at zero and enforced. Removing one of those allows, file by
 # file, is real work with a real payoff; blanket-narrowing all fourteen is not. Prefer DELETING an

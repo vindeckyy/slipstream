@@ -1,9 +1,4 @@
-//! Build script: stamps the build version. NVENC deliberately needs NOTHING here — the entry
-//! points (`NvEncodeAPICreateInstance` / `NvEncodeAPIGetMaxSupportedVersion`) live in
-//! `nvEncodeAPI64.dll`, which only exists where the NVIDIA driver is installed, so
-//! `encode/windows/nvenc.rs` resolves them at RUNTIME (`LoadLibraryExW`). The former link-time
-//! import (`cargo:rustc-link-lib=nvencodeapi`) made the Windows loader kill the all-vendor host
-//! binary on every AMD/Intel-only box before `main` ("nvencodeapi64.dll was not found").
+//! Build script: stamps the build version.
 fn main() {
     // Build provenance: stamp the exact package/build version into the binary so a running host
     // can report what it is (mgmt /health, the startup log, `--version`) and a stale/shadowed
@@ -18,20 +13,4 @@ fn main() {
     println!("cargo:rustc-env=SLIPSTREAM_VERSION={version}");
     println!("cargo:rerun-if-env-changed=SLIPSTREAM_BUILD_VERSION");
 
-    // Windows identity resources: the branded icon + version info. Task Manager / Explorer show a
-    // process by its version-info FileDescription — without one the host appears as a bare
-    // "slipstream-host.exe" with no icon. Same winresource pattern as clients/windows and
-    // slipstream-tray (cfg(windows) = build HOST, so Linux packaging builds skip it; CARGO_CFG_WINDOWS
-    // = TARGET).
-    #[cfg(windows)]
-    if std::env::var_os("CARGO_CFG_WINDOWS").is_some() {
-        let icon = "../../packaging/windows/branding/slipstream.ico";
-        println!("cargo:rerun-if-changed={icon}");
-        winresource::WindowsResource::new()
-            .set_icon_with_id(icon, "1")
-            .set("FileDescription", "Slipstream Host")
-            .set("ProductName", "Slipstream")
-            .compile()
-            .expect("embed windows icon/version resources");
-    }
 }

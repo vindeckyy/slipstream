@@ -86,8 +86,8 @@ const PUMP_TUNING: PumpTuning = PumpTuning {
 /// - **Eager**: the backend opens at host start (retrying with backoff), NOT on the first mic
 ///   frame — so the virtual mic device already exists when host apps/games launch and bind
 ///   their capture device (most games never re-follow a default-device change mid-run).
-/// - **Self-healing**: a dead backend (PipeWire restart, Windows endpoint churn) is detected on
-///   every push and on an idle heartbeat, and reopened with backoff. Sessions keep their
+/// - **Self-healing**: a dead backend after a PipeWire restart is detected on every push and on
+///   an idle heartbeat, and reopened with backoff. Sessions keep their
 ///   senders; nothing upstream notices.
 /// - **Stale-flush**: buffered audio is discarded after an uplink gap (see [`PumpTuning`]).
 /// - **De-jittered**: frames pass a sequence-aware reorder window + loss concealment, and an
@@ -104,20 +104,13 @@ pub struct MicPump {
 }
 
 impl MicPump {
-    /// Start the host-lifetime pump (Linux/Windows). On platforms without a virtual-mic backend
-    /// the thread just drains and drops frames (sessions still count the datagrams).
+    /// Start the host-lifetime PipeWire microphone pump.
     pub fn start() -> MicPump {
         let (tx, rx) = std::sync::mpsc::sync_channel::<MicFrame>(MIC_QUEUE_CAP);
         let spawned = std::thread::Builder::new()
             .name("slipstream-mic-pump".into())
             .spawn(move || {
-                #[cfg(any(target_os = "linux", target_os = "windows"))]
                 pump_thread(rx, || super::open_virtual_mic(MIC_CHANNELS), PUMP_TUNING);
-                #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-                {
-                    tracing::warn!("mic passthrough unsupported on this platform — frames dropped");
-                    for _ in rx {}
-                }
             });
         if let Err(e) = spawned {
             tracing::error!(error = %e, "mic pump thread spawn failed — mic passthrough disabled");
@@ -136,7 +129,6 @@ impl MicPump {
 /// Sleep for `dur` while draining (and dropping) queued frames, so a closed/reopening backend
 /// never accumulates a stale backlog and senders never see a wedged queue. Returns `false` when
 /// every sender is gone (host shutdown).
-#[cfg_attr(not(any(target_os = "linux", target_os = "windows")), allow(dead_code))]
 fn drain_sleep(rx: &std::sync::mpsc::Receiver<MicFrame>, dur: std::time::Duration) -> bool {
     use std::sync::mpsc::RecvTimeoutError;
     let deadline = std::time::Instant::now() + dur;
@@ -155,7 +147,6 @@ fn drain_sleep(rx: &std::sync::mpsc::Receiver<MicFrame>, dur: std::time::Duratio
 
 /// The pump loop. `opener` is injected so the tests can run the REAL loop against a mock
 /// backend; production passes [`open_virtual_mic`](super::open_virtual_mic).
-#[cfg_attr(not(any(target_os = "linux", target_os = "windows")), allow(dead_code))]
 fn pump_thread<O>(rx: std::sync::mpsc::Receiver<MicFrame>, opener: O, tuning: PumpTuning)
 where
     O: Fn() -> Result<Box<dyn VirtualMic>>,

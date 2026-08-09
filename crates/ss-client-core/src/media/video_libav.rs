@@ -1,5 +1,4 @@
-//! Shared libav ownership helpers for the hardware decoders (`video_vaapi`, `video_vulkan`,
-//! `video_d3d11`).
+//! Shared libav ownership helpers for the hardware decoders (`video_vaapi`, `video_vulkan`).
 //!
 //! The host has its own copy of this in `ss-encode`'s `enc/libav.rs`. The two crates do not depend
 //! on each other — host encode and client decode share no code path — and the client's copy needs

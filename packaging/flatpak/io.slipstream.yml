@@ -29,7 +29,7 @@
 # runtime), whose full libavcodec.so.61 transparently shadows the base one at runtime. So HEVC
 # (software + VAAPI) works with NO app-side codec extension to declare  -  we just build against
 # the SDK's linkable libavcodec.so.61 and let the runtime swap in the capable build.
-app-id: io.slipstream
+app-id: io.slipstream.Slipstream
 runtime: org.gnome.Platform
 runtime-version: '50'
 sdk: org.gnome.Sdk
@@ -204,19 +204,6 @@ modules:
         # invocation doesn't inherit the SDK's default include search, so pass it explicitly).
         PF_FFVK_VULKAN_INCLUDE: /app/include
     build-commands:
-      # Drop every reference to the windows-rs GIT dependency before building. That git
-      # source is deliberately NOT vendored into cargo-sources.json  -  see
-      # packaging/flatpak/prune-windows-lock.py, which strips it so flatpak-builder doesn't
-      # full-clone the multi-GB windows-rs repo. But `cargo --offline` needs every DECLARED
-      # dependency's source just to build the unit graph (cfg(windows)-gated or not), so any
-      # manifest still pinning it fails with "can't checkout ... you are in the offline
-      # mode". Two declare it: the Windows client (removed from the workspace members) and
-      # ss-client-core's D3D11VA backend (entry pruned in place  -  nothing cfg(windows)
-      # compiles here). Both edits touch only the sandbox copies. (No --locked: the lock no
-      # longer matches the reduced graph; --offline still pins every crate to the vendored
-      # cargo-sources.json, so the build stays reproducible.)
-      - sed -i '\#"clients/windows",#d' Cargo.toml
-      - python3 packaging/flatpak/prune-windows-toml.py crates/ss-client-core/Cargo.toml
       # One cargo invocation for both binaries: the shell and the Vulkan session binary it
       # execs for --connect/--browse. Building them together keeps skia-bindings' feature
       # unification identical to a workspace build (the pinned skia-binaries archive's
@@ -226,19 +213,19 @@ modules:
       - install -Dm0755 target/release/slipstream-client ${FLATPAK_DEST}/bin/slipstream-client
       - install -Dm0755 target/release/slipstream-session ${FLATPAK_DEST}/bin/slipstream-session
       # The headless CLI (design/client-architecture-split.md §4)  -  reachable as
-      # `flatpak run --command=slipstream io.slipstream ...`.
+      # `flatpak run --command=slipstream io.slipstream.Slipstream ...`.
       - install -Dm0755 target/release/slipstream ${FLATPAK_DEST}/bin/slipstream
       # Desktop entry (renamed to the app id; Exec is the in-sandbox binary).
       - install -Dm0644 packaging/flatpak/io.slipstream.desktop
-          ${FLATPAK_DEST}/share/applications/io.slipstream.desktop
+          ${FLATPAK_DEST}/share/applications/io.slipstream.Slipstream.desktop
       # AppStream metainfo (required for a well-formed flatpak / Software listings).
       - install -Dm0644 packaging/flatpak/io.slipstream.metainfo.xml
-          ${FLATPAK_DEST}/share/metainfo/io.slipstream.metainfo.xml
+          ${FLATPAK_DEST}/share/metainfo/io.slipstream.Slipstream.metainfo.xml
       # Scalable icon named for the app id (GNOME runtime renders SVG via librsvg).
       # One icon source for every Linux packaging (it used to live under packaging/flatpak,
       # which is why the deb/rpm/arch entries shipped a stock `video-display` instead).
       - install -Dm0644 packaging/linux/icons/hicolor/scalable/apps/io.slipstream.svg
-          ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.slipstream.svg
+          ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.slipstream.Slipstream.svg
     sources:
       # The repo checkout. For a Flathub/published build, replace with a pinned git source:
       #   - type: git

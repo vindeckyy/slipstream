@@ -4,9 +4,8 @@
 use ffmpeg_next as ffmpeg;
 
 /// The stream's colour signaling, read PER-FRAME from the decoder (HEVC VUI → the
-/// `AVFrame` CICP fields). The Windows host switches an HDR desktop to Main10 BT.2020 PQ
-/// **in-band** (the Welcome still says SDR — clients are expected to follow the VUI, as
-/// the Windows/Apple/Android clients do), so rendering must follow the frames, not the
+/// `AVFrame` CICP fields). The host switches an HDR desktop to Main10 BT.2020 PQ
+/// **in-band** (the Welcome still says SDR, so clients are expected to follow the VUI), so rendering must follow the frames, not the
 /// handshake — else PQ content drawn as BT.709 comes out washed out and desaturated.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct ColorDesc {
@@ -18,9 +17,8 @@ pub struct ColorDesc {
 }
 
 impl ColorDesc {
-    /// Read the CICP fields off a raw decoded frame. Public: the Windows client's raw-FFI
-    /// D3D11VA/software decoders build their per-frame `ColorDesc` with it too (same
-    /// `ffmpeg-next` major, so the `AVFrame` type unifies across the workspace).
+    /// Read the CICP fields off a raw decoded frame. Public so each decoder path
+    /// can build its per-frame `ColorDesc` from the shared FFmpeg frame type.
     ///
     /// # Safety
     /// `frame` must point to a valid `AVFrame` (alive for the duration of the call).
@@ -43,10 +41,9 @@ impl ColorDesc {
 }
 
 /// The Y′CbCr→RGB conversion as three vec4 rows for a shader constant buffer / push-constant
-/// block: `rgb[i] = dot(r[i].xyz, yuv) + r[i].w` — bit-depth exact. The ONE coefficient
-/// implementation every presenter derives its CSC from (Vulkan push constants, the Windows
-/// client's D3D11 constant buffer), so a stream's signaled matrix/range is honored identically
-/// everywhere; the Apple client ports this function (and its tests) to Swift.
+/// block: `rgb[i] = dot(r[i].xyz, yuv) + r[i].w` — bit-depth exact. Every presenter derives
+/// its CSC from this implementation, so a stream's signaled matrix/range is honored identically;
+/// the Apple client ports this function and its tests to Swift.
 ///
 /// `depth` picks the limited-range code points (8-bit: 16/235/240 over 255; 10-bit:
 /// 64/940/960 over 1023 — NOT the same normalized values, the difference is ~half a

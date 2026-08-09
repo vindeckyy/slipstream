@@ -3,9 +3,8 @@
 //! vocabulary + the capturer types so every `crate::capture::*` path is unchanged, and (b) keeps
 //! the orchestration entry points — [`open_portal_monitor`] / [`open_desktop_capture`] /
 //! [`capture_virtual_output`] — which know about `crate::{vdisplay, session_plan, inject, encode}`
-//! and hand ss-capture the pre-resolved facts it needs (the [`ss_capture::ZeroCopyPolicy`] and, on
-//! Windows, the [`ss_capture::FrameChannelSender`]) so the capturer never reaches back into the
-//! orchestrator.
+//! and hand ss-capture the pre-resolved facts it needs, so the capturer never reaches back into
+//! the orchestrator.
 
 use anyhow::{bail, Context, Result};
 
@@ -20,11 +19,6 @@ pub use ss_frame::{CapturedFrame, OutputFormat, PixelFormat};
 // and a caller reaching for it by that name would silently miss the gamescope arm. The host's
 // answer is [`capturer_supports_hdr_for`] below.
 pub use ss_capture::{capturer_supports_444, Capturer, FastSyntheticCapturer, SyntheticCapturer};
-// `crate::capture::dxgi::{install_gpu_pref_hook, hdr_p010_selftest_at}` (main.rs subcommands) and
-// `crate::capture::synthetic_nv12` resolve through ss-capture's Windows modules.
-#[cfg(target_os = "windows")]
-pub use ss_capture::{dxgi, synthetic_nv12};
-
 /// Resolve the [`ss_capture::ZeroCopyPolicy`] for a Linux capture session from the encode backend —
 /// the one reach into `crate::encode` the capturer must NOT make itself (it would recreate the
 /// capture→encode cycle). Resolved here (the host facade) and threaded in, so the edge stays one-way
@@ -98,14 +92,6 @@ pub fn open_portal_monitor(
     )
 }
 
-#[cfg(not(target_os = "linux"))]
-pub fn open_portal_monitor(
-    _want_hdr: bool,
-    _want_metadata_cursor: bool,
-) -> Result<Box<dyn Capturer>> {
-    bail!("portal capture requires Linux (xdg-desktop-portal + PipeWire)")
-}
-
 /// Open a capturer for an *existing* desktop (GameStream mirror / `video_source=portal` path).
 ///
 /// Honours `SLIPSTREAM_CAPTURE_METHOD` / [`CaptureBackend::resolve`]:
@@ -163,14 +149,6 @@ pub fn open_desktop_capture(
     )
 }
 
-#[cfg(not(target_os = "linux"))]
-pub fn open_desktop_capture(
-    _want_hdr: bool,
-    _want_metadata_cursor: bool,
-) -> Result<Box<dyn Capturer>> {
-    bail!("desktop capture requires Linux")
-}
-
 /// Open one concrete desktop-mirror backend. Used by [`open_desktop_capture`] (and auto-order).
 #[cfg(target_os = "linux")]
 fn open_desktop_backend(
@@ -192,9 +170,7 @@ fn open_desktop_backend(
             crate::vdisplay::capture_monitor().as_deref(),
         )
         .context("open NvFBC desktop capturer"),
-        CaptureBackend::IddPush => {
-            bail!("IDD-push is a Windows capture path, not a Linux desktop mirror")
-        }
+        _ => bail!("capture backend is unavailable in this Linux build"),
     }
 }
 
@@ -207,9 +183,8 @@ pub fn capture_virtual_output(
     want: OutputFormat,
     capture: crate::session_plan::CaptureBackend,
 ) -> Result<Box<dyn Capturer>> {
-    // The virtual-output source is currently PipeWire on Linux and IDD-push on Windows. Keep the
-    // resolved backend in the call so the display and capture decision remains one pipeline record;
-    // Linux's virtual-output source is always the compositor-created PipeWire node. The capture
+    // The virtual-output source is the compositor-created PipeWire node. Keep the resolved backend
+    // in the call so the display and capture decision remains one pipeline record. The capture
     // method preference applies only to an existing desktop mirror, where there is no output we
     // created and no PipeWire node selected by the virtual-display backend.
     // `want.gpu` gates GPU zero-copy capture and `want.chroma_444` selects the worker's planar-YUV444
@@ -254,7 +229,6 @@ pub fn capture_virtual_output(
 /// (`ss-encode/src/enc/linux/mod.rs`). So every term here is a STATIC fact resolvable before the
 /// spawn — never "spawn it and find out".
 ///
-/// - **Windows**: the IDD-push capturer proactively enables advanced colour → the platform answer.
 /// - **Linux + gamescope**: true when the host knob allows it, the resolved gamescope binary
 ///   offers 10-bit BT.2020/PQ capture formats (`packaging/gamescope`), the sub-mode is one we
 ///   SPAWN (an attach to a foreign gamescope tells us nothing about how it was started — §3.6
@@ -263,137 +237,10 @@ pub fn capture_virtual_output(
 ///   other Linux HDR path — the GNOME 50+ portal monitor mirror — belongs to the GameStream plane
 ///   and is gated by `gamestream::host_hdr_capable` + the live monitor colour-mode probe instead.
 pub fn capturer_supports_hdr_for(compositor: Option<crate::vdisplay::Compositor>) -> bool {
-    #[cfg(target_os = "linux")]
-    {
-        if compositor == Some(crate::vdisplay::Compositor::Gamescope) {
-            return ss_host_config::config().gamescope_hdr
-                && ss_vdisplay::gamescope_hdr_available()
-                && !ss_capture::hdr_capture_failed(ss_capture::HdrSource::VirtualOutput);
-        }
+    if compositor == Some(crate::vdisplay::Compositor::Gamescope) {
+        return ss_host_config::config().gamescope_hdr
+            && ss_vdisplay::gamescope_hdr_available()
+            && !ss_capture::hdr_capture_failed(ss_capture::HdrSource::VirtualOutput);
     }
-    let _ = compositor;
     ss_capture::capturer_supports_hdr()
-}
-
-#[cfg(target_os = "windows")]
-pub fn capture_virtual_output(
-    vout: crate::vdisplay::VirtualOutput,
-    want: OutputFormat,
-    _capture: crate::session_plan::CaptureBackend,
-) -> Result<Box<dyn Capturer>> {
-    let target = vout.win_capture.clone().ok_or_else(|| {
-        anyhow::anyhow!(
-            "ss-vdisplay target not yet an active display path (activation failed — see the \
-             virtual-display warnings above)"
-        )
-    })?;
-    // Aim the injectors' absolute mapping (pen/touch/abs-mouse) at THIS display: the wire
-    // normalizes over the streamed frame, and mapping it over the whole virtual desktop is wrong
-    // the moment a physical monitor shares the desktop (Extend topology, or an Exclusive isolate
-    // degraded to the keep-physicals fallback) — the pen-offset field bug.
-    crate::inject::set_stream_target(Some(target.target_id));
-    let pref = vout.preferred_mode;
-    let keep = vout.keepalive;
-    // The sealed-channel delivery seam: resolve the ss-vdisplay control device ONCE (it is
-    // process-global — a dead one is retired, kept alive — so the raw value is stable for the
-    // process) and wrap `send_frame_channel` in a `Send + Sync` closure the IDD-push capturer calls
-    // at ring attach. This is the ONE reach into `crate::vdisplay` the capturer would otherwise make;
-    // building it here keeps the capture→vdisplay dependency out of ss-capture (plan §W6).
-    let control = crate::vdisplay::manager::control_device_handle().ok_or_else(|| {
-        anyhow::anyhow!(
-            "ss-vdisplay control device not open (monitor not created via the manager?)"
-        )
-    })?;
-    // `HANDLE` is not `Send`; capture the raw value and rebuild it inside the closure (the control
-    // device is never closed for the process lifetime, so the value stays valid).
-    let control_raw = control.0 as isize;
-    let sender: ss_capture::FrameChannelSender = std::sync::Arc::new(
-        move |req: &ss_driver_proto::control::SetFrameChannelRequest| {
-            // SAFETY: `control_raw` is the ss-vdisplay control handle resolved above; it is never
-            // closed for the process lifetime, so reconstructing the `HANDLE` and issuing the
-            // `IOCTL_SET_FRAME_CHANNEL` is sound (`send_frame_channel`'s precondition).
-            unsafe {
-                crate::vdisplay::driver::send_frame_channel(
-                    windows::Win32::Foundation::HANDLE(control_raw as *mut core::ffi::c_void),
-                    req,
-                )
-            }
-        },
-    );
-    // IDD direct-push is the sole Windows capture path: consume frames straight from the ss-vdisplay
-    // driver's shared ring (in-process — no Desktop Duplication, no WGC helper). The host itself runs
-    // as SYSTEM in the active interactive console session (1+), spawned there by the session-0 SCM
-    // supervisor (`windows/service.rs`), which is what lets it capture the secure desktop too.
-    // A FRESH monitor + ring is created per session. `want.hdr`
-    // proactively enables advanced color and selects the per-frame conversion. There is NO fallback:
-    // if it can't open or the driver doesn't attach, the session fails cleanly and the client
-    // reconnects.
-    // Cursor-forward sessions (M2c): hand the capturer the v5 cursor-channel delivery closure —
-    // its presence opts the session in (the capturer creates + delivers the CursorShm section,
-    // the driver declares the IddCx hardware cursor). Built exactly like `sender` above.
-    let cursor_sender: Option<ss_capture::CursorChannelSender> = want.hw_cursor.then(|| {
-        std::sync::Arc::new(
-            move |req: &ss_driver_proto::control::SetCursorChannelRequest| {
-                // SAFETY: `control_raw` is the ss-vdisplay control handle resolved above; it is
-                // never closed for the process lifetime (`send_cursor_channel`'s precondition).
-                unsafe {
-                    crate::vdisplay::driver::send_cursor_channel(
-                        windows::Win32::Foundation::HANDLE(control_raw as *mut core::ffi::c_void),
-                        req,
-                    )
-                }
-            },
-        ) as ss_capture::CursorChannelSender
-    });
-    // The secure-desktop guard's actuator (`IOCTL_SET_CURSOR_FORWARD`): the capturer flips the
-    // driver's hardware-cursor declare off while UAC/Winlogon is up (the secure desktop renders
-    // only through the OS's software-cursor path) and back on at dismissal. The stand-down needs
-    // the same-mode re-commit that actualises the software-cursor default — driven here because
-    // topology commits belong under the vdisplay manager's lock, which ss-capture cannot take.
-    // Built for EVERY session (not just `want.hw_cursor`): a channel-less session can reuse a
-    // driver monitor whose cursor worker (an earlier session's) is still live and re-declaring —
-    // the flip is the only way to stop it; on a never-declared target the driver answers
-    // NOT_FOUND, which the capturer logs and ignores.
-    let target_id = target.target_id;
-    let cursor_forward: Option<ss_capture::CursorForwardSender> = Some({
-        std::sync::Arc::new(move |enable: bool| {
-            let req = ss_driver_proto::control::SetCursorForwardRequest {
-                target_id,
-                enable: enable as u32,
-            };
-            // SAFETY: `control_raw` is the ss-vdisplay control handle resolved above; it is
-            // never closed for the process lifetime (`send_cursor_forward`'s precondition).
-            unsafe {
-                crate::vdisplay::driver::send_cursor_forward(
-                    windows::Win32::Foundation::HANDLE(control_raw as *mut core::ffi::c_void),
-                    &req,
-                )?;
-            }
-            if !enable {
-                crate::vdisplay::manager::force_recommit();
-            }
-            Ok(())
-        }) as ss_capture::CursorForwardSender
-    });
-    ss_capture::open_idd_push(
-        target,
-        pref,
-        want.hdr,
-        want.chroma_444,
-        want.pyrowave,
-        keep,
-        sender,
-        cursor_sender,
-        cursor_forward,
-    )
-    .map_err(|(e, _keep)| e.context("IDD-push capture open (no fallback)"))
-}
-
-#[cfg(not(any(target_os = "linux", target_os = "windows")))]
-pub fn capture_virtual_output(
-    _vout: crate::vdisplay::VirtualOutput,
-    _want: OutputFormat,
-    _capture: crate::session_plan::CaptureBackend,
-) -> Result<Box<dyn Capturer>> {
-    anyhow::bail!("virtual-output capture requires Linux or Windows")
 }

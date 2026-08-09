@@ -98,6 +98,91 @@ export function peerAddress(event: H3Event): string {
 	return getRequestIP(event) ?? "unknown";
 }
 
+/** Whether an address belongs to the local machine. Used to protect first-run setup. */
+export function isLoopbackAddress(address: string): boolean {
+	const normalized = address
+		.trim()
+		.toLowerCase()
+		.replace(/^\[|\]$/g, "");
+	const parts = normalized.split("::");
+	if (!normalized.includes(":")) return isLoopbackIpv4(normalized);
+
+	let hextets: number[] | null;
+	if (parts.length === 1) {
+		const part = parts[0];
+		if (part === undefined) return false;
+		const expanded = parseIpv6Part(part);
+		hextets = expanded?.length === 8 ? expanded : null;
+	} else if (parts.length === 2) {
+		const leftPart = parts[0];
+		const rightPart = parts[1];
+		if (leftPart === undefined || rightPart === undefined) return false;
+		const left = parseIpv6Part(leftPart);
+		const right = parseIpv6Part(rightPart);
+		if (!left || !right) return false;
+		const zeroes = 8 - left.length - right.length;
+		hextets =
+			zeroes >= 1
+				? [...left, ...Array.from({ length: zeroes }, () => 0), ...right]
+				: null;
+	} else {
+		return false;
+	}
+	if (hextets?.length !== 8) return false;
+
+	if (hextets.every((value, index) => value === (index === 7 ? 1 : 0))) {
+		return true;
+	}
+	const mappedHextet = hextets[5];
+	const high = hextets[6];
+	const low = hextets[7];
+	if (
+		!hextets.slice(0, 5).every((value) => value === 0) ||
+		mappedHextet !== 0xffff ||
+		high === undefined ||
+		low === undefined
+	) {
+		return false;
+	}
+	return isLoopbackIpv4(
+		[high >> 8, high & 0xff, low >> 8, low & 0xff].join("."),
+	);
+}
+
+function isLoopbackIpv4(address: string): boolean {
+	const octets = address.split(".");
+	return (
+		octets.length === 4 &&
+		octets.every(
+			(octet) => /^(?:0|[1-9]\d{0,2})$/.test(octet) && Number(octet) <= 255,
+		) &&
+		octets[0] === "127"
+	);
+}
+
+function parseIpv6Part(part: string): number[] | null {
+	if (!part) return [];
+	const values: number[] = [];
+	for (const segment of part.split(":")) {
+		if (segment.includes(".")) {
+			const octets = segment.split(".");
+			if (
+				octets.length !== 4 ||
+				!octets.every(
+					(octet) => /^(?:0|[1-9]\d{0,2})$/.test(octet) && Number(octet) <= 255,
+				)
+			)
+				return null;
+			values.push((Number(octets[0]) << 8) | Number(octets[1]));
+			values.push((Number(octets[2]) << 8) | Number(octets[3]));
+			continue;
+		}
+		if (!/^[0-9a-f]{1,4}$/.test(segment)) return null;
+		values.push(Number.parseInt(segment, 16));
+	}
+	return values;
+}
+
 /** The login password file used by the packaged console and the browser setup flow. */
 function uiPasswordFile(): string {
 	if (process.env.SLIPSTREAM_UI_PASSWORD_FILE) {
@@ -185,8 +270,8 @@ export function isLoopbackUrl(url: string): boolean {
 	}
 	// URL wraps IPv6 in brackets in .host but strips them in .hostname; normalize anyway.
 	const h = host.replace(/^\[|\]$/g, "").toLowerCase();
-	if (h === "localhost" || h === "::1") return true;
-	return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h);
+	if (h === "localhost") return true;
+	return isLoopbackAddress(h);
 }
 
 /**
@@ -259,6 +344,7 @@ export function timingSafeEqual(a: string, b: string): boolean {
  * `.json`/`.png` management route) through the proxy unauthenticated. */
 export function isPublicPath(pathname: string): boolean {
 	if (pathname === "/api" || pathname.startsWith("/api/")) return false; // always gated
+	if (isPluginUiEmbedPath(pathname)) return true;
 	if (pathname === "/login" || pathname === "/setup") return true;
 	if (pathname.startsWith("/_auth/")) return true;
 	if (pathname.startsWith("/assets/")) return true;
@@ -267,6 +353,22 @@ export function isPublicPath(pathname: string): boolean {
 	// visitor cannot already see from the login page (name, colours, the brand mark).
 	if (pathname === "/manifest.webmanifest") return true;
 	return false;
+}
+
+/** A capability URL is public only because the plugin proxy validates its live token. */
+const PLUGIN_UI_EMBED_PATH_RE =
+	/^\/plugin-ui\/[a-z][a-z0-9-]*\/_embed\/[0-9a-f]{64}(?:\/|$)/;
+
+export function isPluginUiEmbedPath(pathname: string): boolean {
+	if (!PLUGIN_UI_EMBED_PATH_RE.test(pathname)) return false;
+	return !pathname.split("/").some((segment) => {
+		try {
+			const decoded = decodeURIComponent(segment);
+			return decoded === "." || decoded === "..";
+		} catch {
+			return false;
+		}
+	});
 }
 
 /**

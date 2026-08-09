@@ -21,7 +21,7 @@
 //       would drag those padding rows into view — and since encoders fill them by
 //       replicating the last picture line, that reads as the bottom row smeared over the
 //       final few rows. 1.0/1.0 for every path whose image is already crop-sized (dmabuf
-//       imports the planes at the crop over the real stride; D3D11VA clamps in its
+//       imports the planes at the crop over the real stride; hardware decode clamps in its
 //       VideoProcessor blit).
 //
 // Regenerate: shaders/build.sh (committed .spv, no build-time toolchain).
@@ -76,7 +76,7 @@ void main() {
     // 4:2:0 chroma is left-cosited (H.273 type 0 — the default inference when unsignaled, and
     // what the hosts produce), but sampling the half-res plane at the luma UV assumes CENTER
     // siting — a ~0.5-luma-px rightward chroma shift on hard colored edges. Offset +0.25 chroma
-    // texels to re-align (the same correction the Apple/Windows clients apply). Self-disables
+    // texels to re-align (the same correction used by the other clients). Self-disables
     // when the plane widths match (a full-size 4:4:4 chroma plane needs no correction).
     // textureSize is the POOL's chroma width, which is the space `uv` is already in — so the
     // offset stays a true quarter-texel whatever the crop.

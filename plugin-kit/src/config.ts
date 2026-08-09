@@ -46,12 +46,11 @@ export interface ConfigService<S extends Schema.Top> {
 	readonly path: string;
 }
 
-/** Refuse a group/world-writable config file (POSIX only; Windows state dir is DACL'd). */
+/** Refuse a group/world-writable config file. */
 const checkNotWorldWritable = (
 	file: string,
 ): Effect.Effect<void, ConfigPermissionError> =>
 	Effect.suspend(() => {
-		if (process.platform === "win32") return Effect.void;
 		let mode: number;
 		try {
 			mode = fs.statSync(file).mode;

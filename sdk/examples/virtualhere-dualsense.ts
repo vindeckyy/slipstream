@@ -21,8 +21,8 @@
 // stop`). Full walkthrough: docs → Events & hooks → "full controller passthrough (VirtualHere)".
 //
 // Env: VH_DEVICE      required — a VirtualHere address (`server.port`) or a device-name substring.
-//      VH_CLIENT      client binary. Default `vhclientx86_64` (Linux); Windows `vhui64.exe`,
-//                     macOS `vhclientosx`, ARM Linux `vhclientarm64`.
+//      VH_CLIENT      client binary. Default `vhclientx86_64` (Linux), with macOS and ARM Linux
+//                     builds accepted when the environment points to them.
 //      VH_ONLY_CLIENT optional — only bind for this slipstream client label (multi-couch setups).
 import { execFile } from "node:child_process";
 import { connect } from "../src/index.js";

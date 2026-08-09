@@ -1,12 +1,8 @@
 //! Presenter bring-up: instance → surface → device → swapchain (init-time construction).
 
-#[cfg(target_os = "linux")]
 use super::HwCtx;
-#[cfg(windows)]
-use super::HwCtxWin;
 use super::{OverlayPipe, Presenter};
 use crate::csc::CscPass;
-#[cfg(target_os = "linux")]
 use crate::dmabuf;
 use anyhow::{anyhow, bail, Context as _, Result};
 use ash::vk;
@@ -84,8 +80,7 @@ impl Presenter {
         }
 
         // The dmabuf import set is optional: enabled when the device offers all four,
-        // else that path is off (`supports_dmabuf() == false`). Windows has no
-        // dmabuf/DRM-PRIME — the whole import path is compiled out there.
+        // else that path is off (`supports_dmabuf() == false`).
         // SAFETY: per the Vulkan contract above - a read-only query on the live instance/device,
         // filling locals returned by value.
         let available = unsafe { instance.enumerate_device_extension_properties(pdev) }?;
@@ -94,10 +89,8 @@ impl Presenter {
                 .iter()
                 .any(|e| e.extension_name_as_c_str() == Ok(name))
         };
-        #[cfg(target_os = "linux")]
         let hw_capable = dmabuf::DEVICE_EXTENSIONS.iter().all(|n| has(n));
         let mut dev_exts = vec![ash::khr::swapchain::NAME.as_ptr()];
-        #[cfg(target_os = "linux")]
         if hw_capable {
             dev_exts.extend(dmabuf::DEVICE_EXTENSIONS.iter().map(|n| n.as_ptr()));
         } else {
@@ -106,34 +99,6 @@ impl Presenter {
                  unavailable"
             );
         }
-        // D3D11 shared-texture import (the D3D11VA decode hand-off) — optional exactly
-        // like the dmabuf set; a device without it keeps Vulkan-Video/software decode.
-        // Extensions alone aren't the whole gate: the driver must also report the
-        // multiplanar NV12 image as IMPORTABLE from a D3D11 texture handle
-        // (vkGetPhysicalDeviceImageFormatProperties2 — creating an unsupported external
-        // image is UB, observed as VK_ERROR_DEVICE_LOST at the first submits on NVIDIA).
-        #[cfg(windows)]
-        let (import_bgra8, import_rgb10) = crate::d3d11::import_supported(&instance, pdev);
-        #[cfg(windows)]
-        let win_capable = crate::d3d11::DEVICE_EXTENSIONS.iter().all(|n| has(n)) && import_bgra8;
-        #[cfg(windows)]
-        if win_capable {
-            dev_exts.extend(crate::d3d11::DEVICE_EXTENSIONS.iter().map(|n| n.as_ptr()));
-        } else {
-            tracing::info!(
-                "device lacks the win32 external-memory/keyed-mutex extensions — D3D11VA \
-                 hardware frames unavailable"
-            );
-        }
-        // The adapter LUID (for the D3D11VA backend to create its decode device on the
-        // SAME adapter). Core 1.1 query; valid on effectively every Windows driver.
-        let mut id_props = vk::PhysicalDeviceIDProperties::default();
-        let mut props2 = vk::PhysicalDeviceProperties2::default().push_next(&mut id_props);
-        // SAFETY: per the Vulkan contract above - a read-only query on the live instance/device,
-        // filling locals returned by value.
-        unsafe { instance.get_physical_device_properties2(pdev, &mut props2) };
-        let adapter_luid: Option<[u8; 8]> =
-            (id_props.device_luid_valid == vk::TRUE).then_some(id_props.device_luid);
         // Static HDR metadata (ST.2086 mastering + CLL) to the presentation engine.
         // Compositors key their "this app is HDR" signaling on the client pushing
         // metadata via vkSetHdrMetadataEXT in addition to picking the HDR10 colorspace
@@ -336,7 +301,6 @@ impl Presenter {
         // SAFETY: per the Vulkan contract above - a read-only query on the live instance/device,
         // filling locals returned by value.
         let queue = unsafe { device.get_device_queue(qfi, 0) };
-        #[cfg(target_os = "linux")]
         let hw = if hw_capable {
             Some(HwCtx {
                 ext_mem_fd: ash::khr::external_memory_fd::Device::new(&instance, &device),
@@ -344,31 +308,22 @@ impl Presenter {
         } else {
             None
         };
-        #[cfg(windows)]
-        let hw_win = win_capable.then(|| HwCtxWin {
-            ext_mem_win32: ash::khr::external_memory_win32::Device::new(&instance, &device),
-        });
         let csc = CscPass::new(&device, vk::Format::R8G8B8A8_UNORM)?;
         // Starts SDR like `csc`; an HDR (PQ) pyrowave session rebuilds it at the 10-bit
         // intermediate via `set_hdr_mode`, exactly like the H.26x pass.
-        #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+        #[cfg(feature = "pyrowave")]
         let csc_planar = if pyrowave_ok {
             Some(CscPass::new_planar(&device, vk::Format::R8G8B8A8_UNORM)?)
         } else {
             None
         };
 
-        // The exported handle bundle: FFmpeg Vulkan Video handles when the device can
-        // decode, AND (Windows) the D3D11-interop facts — so it's built whenever EITHER
-        // consumer needs it; `video_decode`/`d3d11_import` tell the decoder chain which
-        // paths are real. Extension lists must mirror creation exactly — FFmpeg keys its
-        // code paths off the strings.
+        // The exported handle bundle contains the FFmpeg Vulkan Video facts when the
+        // device can decode and the PyroWave feature is available. Extension lists must
+        // mirror creation exactly because FFmpeg keys its code paths off the strings.
         // One lock per device for queue external sync (FFmpeg + Skia + this presenter
         // all funnel their queue calls through it — see the `queue_lock` field docs).
         let queue_lock = std::sync::Arc::new(ss_client_core::video::QueueLock::new());
-        #[cfg(windows)]
-        let export_worthy = video_ok || win_capable || pyrowave_ok;
-        #[cfg(not(windows))]
         let export_worthy = video_ok || pyrowave_ok;
         let video_export = if export_worthy {
             // SAFETY: per the Vulkan contract above - a read-only query on the live
@@ -376,18 +331,9 @@ impl Presenter {
             let qf_props = unsafe { instance.get_physical_device_queue_family_properties(pdev) };
             let mut device_extensions: Vec<CString> =
                 vec![CString::from(ash::khr::swapchain::NAME)];
-            #[cfg(target_os = "linux")]
             if hw_capable {
                 device_extensions
                     .extend(dmabuf::DEVICE_EXTENSIONS.iter().map(|n| CString::from(*n)));
-            }
-            #[cfg(windows)]
-            if win_capable {
-                device_extensions.extend(
-                    crate::d3d11::DEVICE_EXTENSIONS
-                        .iter()
-                        .map(|n| CString::from(*n)),
-                );
             }
             if has_hdr_metadata {
                 device_extensions.push(CString::from(ash::ext::hdr_metadata::NAME));
@@ -427,29 +373,12 @@ impl Presenter {
                 // The phase-lock gate: real on-glass latch stamps exist only when the
                 // present-wait timer runs (see `PresentTimer`).
                 present_timing: present_timer.is_some(),
-                #[cfg(windows)]
-                d3d11_import: win_capable,
-                #[cfg(not(windows))]
-                d3d11_import: false,
-                // Filled in below — the HDR10 surface facts arrive with pick_formats.
-                d3d11_hdr10: false,
-                adapter_luid,
                 queue_lock: queue_lock.clone(),
             })
         } else {
             None
         };
-        #[cfg(windows)]
-        let mut video_export = video_export;
-
         let (format, hdr10_format) = pick_formats(&surface_i, pdev, surface, has_colorspace_ext)?;
-        // The D3D11VA backend may emit its HDR (RGB10 PQ) ring only when this device can
-        // import the 10-bit texture AND the surface offers an HDR10 swapchain to pass it
-        // through to; otherwise a PQ stream keeps the decoder-side tonemap to sRGB.
-        #[cfg(windows)]
-        if let Some(v) = video_export.as_mut() {
-            v.d3d11_hdr10 = win_capable && import_rgb10 && hdr10_format.is_some();
-        }
         let present_mode = pick_present_mode(&surface_i, pdev, surface)?;
         tracing::info!(
             ?format,
@@ -507,12 +436,9 @@ impl Presenter {
             swap_d,
             queue,
             qfi,
-            #[cfg(target_os = "linux")]
             hw,
-            #[cfg(windows)]
-            hw_win,
             csc,
-            #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+            #[cfg(feature = "pyrowave")]
             csc_planar,
             video_export,
             overlay_pipe,
@@ -718,8 +644,7 @@ fn pick_device(
     };
     // Rank the candidates (stable sort; the index override wins outright):
     // 1. The Settings GPU pick — `SLIPSTREAM_VK_ADAPTER` carries the adapter's marketing
-    //    name (the WinUI shell's picker stores DXGI's, which matches Vulkan's for the
-    //    same GPU): exact match, then substring, plain order when nothing matches
+    //    name: exact match, then substring, plain order when nothing matches
     //    (eGPU unplugged, stale setting).
     // 2. Discrete over integrated: enumeration order puts the iGPU FIRST on some
     //    hybrids (observed: Ryzen iGPU ahead of an RTX dGPU), and the iGPU's video

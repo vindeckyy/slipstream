@@ -20,9 +20,6 @@
 #   CHANNEL              stable | canary                                   (required)
 #   VERSION              the announced host version string                 (required)
 #   CI_RUN               CI run number                                     (required for canary)
-#   WINDOWS_URL          immutable per-version installer URL               (required for stable)
-#   WINDOWS_SHA256       hex sha256 of that installer                      (paired with WINDOWS_URL)
-#   AUTHENTICODE_SHA256  comma-separated accepted signing-leaf sha256s     (optional)
 #   NOTES_URL            release-notes link (optional; prefer GitHub blob URLs)
 #   UPDATE_MANIFEST_KEY  PKCS#8 PEM, the Ed25519 private key               (required to sign)
 #   REQUIRE_KEY=1        missing key is a hard failure (announce/stable)   (optional)
@@ -41,13 +38,6 @@ case "$CHANNEL" in stable|canary) ;; *) echo "CHANNEL must be stable or canary" 
 if [ "$CHANNEL" = canary ] && [ -z "${CI_RUN:-}" ]; then
   echo "canary manifests need CI_RUN (the definitive newer-than axis)" >&2; exit 1
 fi
-if [ "$CHANNEL" = stable ] && [ -z "${WINDOWS_URL:-}" ]; then
-  echo "stable manifests need WINDOWS_URL/WINDOWS_SHA256 (the U1 apply leg)" >&2; exit 1
-fi
-if [ -n "${WINDOWS_URL:-}" ] && ! printf '%s' "${WINDOWS_SHA256:-}" | grep -Eq '^[0-9a-f]{64}$'; then
-  echo "WINDOWS_SHA256 must be 64 hex chars when WINDOWS_URL is set" >&2; exit 1
-fi
-
 # ---- key handling (fail-closed where it matters) --------------------------------------------
 if [ -z "${UPDATE_MANIFEST_KEY:-}" ]; then
   if [ "${REQUIRE_KEY:-0}" = 1 ] || case "${GITHUB_REF:-}" in refs/tags/v*) true ;; *) false ;; esac; then
@@ -91,26 +81,18 @@ SERIAL="$(date +%s)"
 PUBLISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 MANIFEST="$WORK/manifest.json"
 
-# `printf '%s\n'`, not '%s': an EMPTY value must still hand jq one (empty) input line —
-# with no line at all, `jq -R` emits nothing and `--argjson auth ""` is invalid JSON
-# (bit the first live canary publish). The fallback belts the suspenders.
-AUTH_JSON="$(printf '%s\n' "${AUTHENTICODE_SHA256:-}" | jq -R 'split(",") | map(select(length > 0))')"
-AUTH_JSON="${AUTH_JSON:-[]}"
+# Keep optional metadata in jq arguments so omitted values do not add manifest fields.
 jq -n \
   --arg channel "$CHANNEL" \
   --arg version "$VERSION" \
   --arg published_at "$PUBLISHED_AT" \
   --arg notes_url "${NOTES_URL:-}" \
   --argjson serial "$SERIAL" \
-  --arg win_url "${WINDOWS_URL:-}" \
-  --arg win_sha "${WINDOWS_SHA256:-}" \
-  --argjson auth "$AUTH_JSON" \
   --arg ci_run "${CI_RUN:-}" \
   '
   {schema: 1, channel: $channel, serial: $serial, published_at: $published_at, version: $version}
   + (if $notes_url != "" then {notes_url: $notes_url} else {} end)
   + (if $ci_run != "" then {ci_run: ($ci_run | tonumber)} else {} end)
-  + (if $win_url != "" then {windows_host: {url: $win_url, sha256: $win_sha, authenticode_sha256: $auth}} else {} end)
   ' > "$MANIFEST"
 echo "manifest:"; cat "$MANIFEST"
 

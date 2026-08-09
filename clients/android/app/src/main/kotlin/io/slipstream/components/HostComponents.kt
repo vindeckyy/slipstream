@@ -75,7 +75,7 @@ fun SectionLabel(text: String) {
 /**
  * One row of a host card's overflow menu. [startsSection] draws a divider above it, which is how
  * the profile actions ("Connect with: …", "Pin as card: …") stay legible next to the host actions
- * in one flat menu — Compose has no submenus, and the Windows client made the same call.
+ * in one flat menu — Compose has no submenus, and the desktop client uses the same layout.
  */
 data class HostMenuItem(
     val label: String,

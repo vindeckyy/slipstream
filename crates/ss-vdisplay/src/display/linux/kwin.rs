@@ -57,7 +57,7 @@ use zkde::zkde_screencast_stream_unstable_v1::{
 use zkde::zkde_screencast_unstable_v1::ZkdeScreencastUnstableV1 as Screencast;
 
 /// `pointer` attachment modes (the protocol enum), chosen per session by `set_hw_cursor`
-/// (Phase B — the Windows no-regression gate mirrored): a CURSOR-CHANNEL session gets METADATA
+/// (Phase B cursor-channel compatibility): a CURSOR-CHANNEL session gets METADATA
 /// (`SPA_META_Cursor` on the stream — shapes forwarded to the client, the composite flip blends
 /// host-side; embedded would leave both with nothing, the round-1 mutter trap), every other
 /// session gets EMBEDDED — KWin composites the pointer into frames itself, zero host-side

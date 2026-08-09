@@ -37,12 +37,6 @@ fn scanner_defs() -> Vec<(&'static str, &'static str)> {
         defs.push(("lutris", "Lutris"));
         defs.push(("heroic", "Heroic (Epic / GOG / Amazon)"));
     }
-    #[cfg(windows)]
-    {
-        defs.push(("epic", "Epic Games Launcher"));
-        defs.push(("gog", "GOG Galaxy"));
-        defs.push(("xbox", "Xbox / Game Pass"));
-    }
     defs
 }
 

@@ -78,8 +78,7 @@ struct ContentView: View {
     @State private var isFullscreen = false
     #endif
     #if os(macOS) || os(tvOS)
-    /// Shows the start-of-stream shortcut banner (the Windows client's discoverability
-    /// pattern): raised on every transition to `.streaming`, dropped by the banner's own
+    /// Shows the start-of-stream shortcut banner: raised on every transition to `.streaming`, dropped by the banner's own
     /// 6-second task. Independent of the stats HUD so the keys are discoverable even with
     /// statistics off. On tvOS it carries the ONLY exits (hold Back / the pad chord) plus
     /// the remote-as-pointer controls, so it must be seen at least once per session.
@@ -746,8 +745,8 @@ struct ContentView: View {
                         }
                         #endif
                         #if os(macOS) || os(tvOS)
-                        // The start-of-stream shortcut banner (Windows-client parity): the
-                        // platform's reserved controls on a glass pill for the first 6 seconds of
+                        // The start-of-stream shortcut banner: the platform's reserved controls
+                        // on a glass pill for the first 6 seconds of
                         // every session — independent of the stats HUD, so the keys are
                         // discoverable even with statistics off. The banner's own task drops it
                         // (cancelled cleanly if the session view goes away first). On tvOS it

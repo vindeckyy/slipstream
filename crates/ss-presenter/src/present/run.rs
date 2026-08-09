@@ -58,7 +58,7 @@ pub struct SessionOpts {
     pub mouse_mode: MouseMode,
     /// Reverse the scroll direction sent to the host ([`Settings::invert_scroll`]).
     pub invert_scroll: bool,
-    /// Send system chords (Alt+Tab, the Windows key / Super) to the host while input is
+    /// Send system chords (Alt+Tab, the Super key) to the host while input is
     /// captured ([`Settings::inhibit_shortcuts`], default on). Off keeps them local — the
     /// work profile that streams on a second screen and still Alt-Tabs here. Never applies
     /// under the `desktop` mouse model, which is something you Alt-Tab *away* from.
@@ -216,7 +216,7 @@ struct StreamState {
     /// PyroWave present has no demote rung (nothing else decodes the codec), so a
     /// persistent non-device-lost present failure would warn on every frame. Latch it:
     /// warn on the first failure of a streak, then stay quiet until a present succeeds.
-    #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+    #[cfg(feature = "pyrowave")]
     pyro_present_warned: bool,
     hw_fails: u32,
     /// The OSD's text (multi-line; rebuilt each Stats window and on a live tier cycle).
@@ -313,7 +313,7 @@ impl StreamState {
             win_start: Instant::now(),
             presented: PresentedWindow::default(),
             dmabuf_demoted: false,
-            #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+            #[cfg(feature = "pyrowave")]
             pyro_present_warned: false,
             hw_fails: 0,
             osd_text: String::new(),
@@ -365,10 +365,6 @@ fn device_lost(e: &anyhow::Error) -> bool {
 }
 
 fn run_inner(mut opts: SessionOpts, mut mode: ModeCtl) -> Result<Option<Outcome>> {
-    // Before any window exists: unpackaged runs adopt the shell's AppUserModelID so the
-    // shell⇄session windows group as one taskbar app (win32.rs; MSIX identity wins).
-    #[cfg(windows)]
-    crate::win32::set_app_user_model_id();
     sdl3::hint::set("SDL_JOYSTICK_THREAD", "1");
     // A touchscreen (the Deck's glass) is forwarded as REAL touch passthrough below — so
     // suppress SDL's default synthesis of mouse events from touch. Left on, every touch
@@ -425,10 +421,6 @@ fn run_inner(mut opts: SessionOpts, mut mode: ModeCtl) -> Result<Option<Outcome>
         }
         b.build().context("SDL window")?
     };
-    // The exe-embedded icon onto the title bar/taskbar/Alt-Tab (SDL's class icon is the
-    // generic default); a no-op for exes that embed none.
-    #[cfg(windows)]
-    crate::win32::stamp_window_icon(&window);
     let instance_exts = window
         .vulkan_instance_extensions()
         .map_err(|e| anyhow::anyhow!("vulkan instance extensions: {e}"))?;
@@ -1067,8 +1059,7 @@ fn run_inner(mut opts: SessionOpts, mut mode: ModeCtl) -> Result<Option<Outcome>
                     st.clock_offset = Some(c.clock_offset_shared());
                     // gamescope's EIS grants only a relative pointer — absolute sends
                     // would be dropped, so the desktop model is pinned off there. Auto
-                    // (an older host that didn't say) stays allowed: Windows hosts and
-                    // pre-Welcome-compositor Linux hosts both take absolute.
+                    // (an older host that didn't say) stays allowed on Linux.
                     let abs_ok = c.resolved_compositor != CompositorPref::Gamescope;
                     if opts.mouse_mode == MouseMode::Desktop && !abs_ok {
                         tracing::info!(
@@ -1290,7 +1281,7 @@ fn run_inner(mut opts: SessionOpts, mut mode: ModeCtl) -> Result<Option<Outcome>
                     // PyroWave planar frames: already on the presenter's device and
                     // fence-complete — a present failure has no demote rung (nothing
                     // else decodes the codec); only device loss ends the session.
-                    #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+                    #[cfg(feature = "pyrowave")]
                     DecodedImage::PyroWave(f) => {
                         // The wavelet stream carries the negotiated ColorInfo (no VUI): an
                         // HDR (PQ) pyrowave session presents through the HDR10 path exactly
@@ -1325,7 +1316,6 @@ fn run_inner(mut opts: SessionOpts, mut mode: ModeCtl) -> Result<Option<Outcome>
                         st.hdr = c.color.is_pq();
                         presenter.present(&window, FrameInput::Cpu(&c), overlay_frame.as_ref())?
                     }
-                    #[cfg(target_os = "linux")]
                     DecodedImage::Dmabuf(d)
                         if presenter.supports_dmabuf() && !st.dmabuf_demoted =>
                     {
@@ -1361,7 +1351,6 @@ fn run_inner(mut opts: SessionOpts, mut mode: ModeCtl) -> Result<Option<Outcome>
                             }
                         }
                     }
-                    #[cfg(target_os = "linux")]
                     DecodedImage::Dmabuf(_) => {
                         // No import extensions on this device (or already demoted) — the
                         // pump rebuilds the decoder as software; frames flow again soon.
@@ -1370,52 +1359,6 @@ fn run_inner(mut opts: SessionOpts, mut mode: ModeCtl) -> Result<Option<Outcome>
                             tracing::warn!(
                                 "no dmabuf import support on this device — demoting the \
                                  decoder to software"
-                            );
-                            st.force_software.store(true, Ordering::Relaxed);
-                        }
-                        false
-                    }
-                    // D3D11VA: shared-texture import, same gate + failure-streak
-                    // demotion contract as the dmabuf path.
-                    #[cfg(windows)]
-                    DecodedImage::D3d11(d) if presenter.supports_d3d11() && !st.dmabuf_demoted => {
-                        st.hdr = d.color.is_pq();
-                        match presenter.present(
-                            &window,
-                            FrameInput::D3d11(d),
-                            overlay_frame.as_ref(),
-                        ) {
-                            Ok(p) => {
-                                st.hw_fails = 0;
-                                p
-                            }
-                            Err(e) => {
-                                // Lost device ⇒ unrecoverable, never demote ([`device_lost`]).
-                                if device_lost(&e) {
-                                    return Err(e)
-                                        .context("GPU device lost — the session cannot continue");
-                                }
-                                st.hw_fails += 1;
-                                tracing::warn!(error = %format!("{e:#}"), fails = st.hw_fails,
-                                    "hardware present failed");
-                                if st.hw_fails >= 3 && !st.dmabuf_demoted {
-                                    st.dmabuf_demoted = true;
-                                    tracing::warn!("demoting the decoder to software");
-                                    st.force_software.store(true, Ordering::Relaxed);
-                                }
-                                false
-                            }
-                        }
-                    }
-                    #[cfg(windows)]
-                    DecodedImage::D3d11(_) => {
-                        // No import extensions on this device (or already demoted) — the
-                        // pump rebuilds the decoder as software; frames flow again soon.
-                        if !st.dmabuf_demoted {
-                            st.dmabuf_demoted = true;
-                            tracing::warn!(
-                                "no win32 external-memory import on this device — demoting \
-                                 the decoder to software"
                             );
                             st.force_software.store(true, Ordering::Relaxed);
                         }
@@ -1780,10 +1723,9 @@ impl ResizeIndicator {
 }
 
 /// Apply the capture state to the window: pointer lock (relative mouse + hidden cursor)
-/// and a keyboard grab, so system chords (Alt+Tab, the Windows key / Super) reach the
-/// host while captured instead of the local shell. SDL implements the grab per platform:
-/// a low-level keyboard hook on Windows (the same mechanism the WinUI shell's in-process
-/// client used its own WH_KEYBOARD_LL hooks for), `zwp_keyboard_shortcuts_inhibit_manager_v1`
+/// and a keyboard grab, so system chords (Alt+Tab, the Super key) reach the host while
+/// captured instead of the local shell. SDL maps the grab to the active Linux backend:
+/// `zwp_keyboard_shortcuts_inhibit_manager_v1`
 /// on Wayland, `XGrabKeyboard` (plus the `_XWAYLAND_MAY_GRAB_KEYBOARD` message under
 /// XWayland) on X11.
 ///

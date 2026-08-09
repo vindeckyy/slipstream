@@ -1,6 +1,6 @@
 [package]
 name = "ss-presenter"
-description = "The Vulkan session presenter — SDL3 window, ash swapchain, frame present, input capture; the stage-2 presenter of slipstream-planning linux-client-rearchitecture.md"
+description = "The Linux Vulkan session presenter: SDL3 window, ash swapchain, frame present, and input capture."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,20 +8,19 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
-# Same Linux+Windows gating as the rest of the client stack (dmabuf import is the one
-# Linux-only module — see lib.rs).
-[target.'cfg(any(target_os = "linux", windows))'.dependencies]
+# The Linux session client shares this presenter plumbing.
+[target.'cfg(target_os = "linux")'.dependencies]
 # `default-features = false`: the PyroWave decode backend is turned on through THIS crate's own
 # `pyrowave` feature (which re-exports it below), never by inheriting the dependency's default.
 # Otherwise a consumer that deliberately builds us without `pyrowave` still drags the vendored
-# C++ in — fatal on Windows ARM64, where Granite has no SIMD path.
+# C++ in, which is only needed by the Linux client build.
 ss-client-core = { path = "../ss-client-core", default-features = false }
 # AVVkFrame access (Vulkan Video frames: live sync state under the frames lock).
 ss-ffvk = { path = "../ss-ffvk" }
 slipstream-core = { path = "../slipstream-core", features = ["quic"] }
 
 # `loaded` dlopens libvulkan at runtime (no link-time dependency — GPU-less boxes still
-# start and fail into a clean error; on Windows vulkan-1.dll is a GPU-driver component).
+# start and fail into a clean error when no Vulkan loader is available.
 # `ash` on sdl3 types SDL_Vulkan_CreateSurface with ash 0.38 handles so the surface
 # hands over without transmutes.
 ash = { version = "0.38", features = ["loaded"] }
@@ -30,23 +29,8 @@ async-channel = "2"
 anyhow = "1"
 tracing = "0.1"
 
-# Linux links the system SDL3; Windows builds it from source (same choice as the rest
-# of the workspace's Windows SDL consumers).
-[target.'cfg(target_os = "linux")'.dependencies]
+# Linux links the system SDL3.
 sdl3 = { version = "0.18", features = ["hidapi", "ash"] }
-
-[target.'cfg(windows)'.dependencies]
-sdl3 = { version = "0.18", features = ["hidapi", "ash", "build-from-source"] }
-# Window branding only (win32.rs): the exe-embedded icon onto the SDL window's title
-# bar/taskbar (WM_SETICON) and the shared AppUserModelID for unpackaged runs, so the
-# shell and the session window group as ONE taskbar app across the visibility handoff.
-windows-sys = { version = "0.61", features = [
-    "Win32_Foundation",
-    "Win32_Storage_Packaging_Appx",
-    "Win32_System_LibraryLoader",
-    "Win32_UI_Shell",
-    "Win32_UI_WindowsAndMessaging",
-] }
 
 [features]
 # PyroWave planar present path (the wired-LAN wavelet codec) — forwards to the decode

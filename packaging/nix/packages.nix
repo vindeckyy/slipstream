@@ -12,13 +12,10 @@
 #                        the Vulkan/ash session streamer it execs (slipstream-session).
 #
 # Why crane and not rustPlatform.buildRustPackage:
-#   * The lockfile carries `windows 0.62.2` (and friends) from BOTH crates.io AND a pinned
-#     microsoft/windows-rs git rev — the Windows client uses the git one. importCargoLock keys its
-#     vendor dir by `name-version`, so those same-name-same-version-different-source entries collide;
-#     crane vendors per-source and handles it. (Those crates are `cfg(windows)`-gated and never
-#     COMPILE on Linux — they only need to be vendored to satisfy the lock.)
-#   * crane fetches git deps with `builtins.fetchGit` (the rev is a full sha ⇒ pure-eval-safe), so
-#     no hand-maintained `outputHashes` for the windows-rs checkout.
+#   * crane vendors each lockfile source independently, which keeps the workspace's registry and
+#     git dependencies reproducible without a hand-maintained source-collision workaround.
+#   * crane fetches git dependencies with `builtins.fetchGit` (the rev is a full sha, so pure
+#     evaluation remains safe) and keeps their source hashes in the derivation.
 #
 # The whole workspace is built from real source (no crane dep-only "dummy" pre-build): pyrowave-sys
 # runs CMake over its committed `vendor/pyrowave` tree in build.rs, which a dummy src would omit —
@@ -409,7 +406,7 @@ in
     # every consumer's install). No aggregate deps hash to bump.
     bunDeps = bun2nix.fetchBunDeps { bunNix = src + "/sdk/bun.nix"; };
     bunRoot = "sdk";
-    dontRunLifecycleScripts = true; # matches the deb/rpm/windows SDK builds' `--ignore-scripts`
+    dontRunLifecycleScripts = true; # matches the deb/rpm SDK builds' `--ignore-scripts`
     dontUseBunBuild = true;
     dontUseBunCheck = true;
     dontUseBunInstall = true;

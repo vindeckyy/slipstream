@@ -1,5 +1,5 @@
-//! Key/button mapping tables (plan §W4, carved out of the inject facade): the Windows Virtual-Key
-//! → Linux-evdev keyboard map (mirrored bit-for-bit by the Windows SendInput positional table), the
+//! Key/button mapping tables: the GameStream virtual-key
+//! to Linux-evdev keyboard map, the
 //! GameStream mouse-button → evdev `BTN_*` map, and the in-process semantic-VK flag. Pure lookup
 //! tables — no state, no OS handles.
 
@@ -7,13 +7,13 @@
 /// resolved under the sending client's keyboard layout — the GameStream/Moonlight convention)
 /// rather than the slipstream-native **US-positional** convention (the physical key's US-layout VK,
 /// which every first-party client sends — the client's local layout never touches the wire).
-/// The Windows injector maps semantic VKs through the foreground app's layout and positional VKs
+/// The client maps semantic virtual keys through the foreground app's layout and positional keys
 /// through a fixed table; conflating the two is exactly the German y↔z / ö→ü scramble.
 /// Set ONLY by `gamestream::input::decode`; the slipstream/1 ingest strips it from wire events, so
 /// a network client can never flip the host's key-decoding convention.
 pub const KEY_FLAG_SEMANTIC_VK: u32 = 0x8000_0000;
 
-/// Map a Windows Virtual-Key code (as sent by Moonlight/GameStream) to a Linux evdev key code.
+/// Map a GameStream virtual-key code to a Linux evdev key code.
 pub fn vk_to_evdev(vk: u8) -> Option<u16> {
     match vk {
         // --- Navigation / editing / whitespace ---

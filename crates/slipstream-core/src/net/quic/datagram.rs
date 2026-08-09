@@ -260,7 +260,7 @@ pub const HID_REPORT_MAX: usize = 64;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RichInput {
     /// One touchpad contact. `x`/`y` are normalized `0..=65535` in SCREEN convention —
-    /// origin top-left, +y DOWN, exactly what SDL/Windows/Android capture APIs produce
+    /// origin top-left, +y DOWN, matching SDL and Android capture APIs
     /// (the host scales to the DualSense touchpad resolution); `active = false` lifts
     /// the finger.
     Touchpad {
@@ -531,7 +531,7 @@ impl HidOutput {
 /// for HLG (scene-referred — no mastering metadata).
 ///
 /// All fields use the standard HDR10 SEI fixed-point units, so they pass straight to
-/// `DXGI_HDR_METADATA_HDR10` / Android `KEY_HDR_STATIC_INFO` / Apple `CAEDRMetadata` — the
+/// Android `KEY_HDR_STATIC_INFO` / Apple `CAEDRMetadata` - the
 /// libavcodec `AVMasteringDisplayMetadata` side needs an `AVRational` conversion.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct HdrMeta {
@@ -784,7 +784,7 @@ mod tests {
     #[test]
     fn hdr_meta_datagram_roundtrip_and_truncation() {
         let m = HdrMeta {
-            // BT.2020 display primaries in 1/50000 units (the DXGI/ST.2086 reference values).
+            // BT.2020 display primaries in 1/50000 units (the ST.2086 reference values).
             display_primaries: [[8500, 39850], [6550, 2300], [35400, 14600]],
             white_point: [15635, 16450],                 // D65
             max_display_mastering_luminance: 10_000_000, // 1000 nits in 0.0001 cd/m²

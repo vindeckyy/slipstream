@@ -1,10 +1,8 @@
 //! Video decode: reassembled HEVC access units → frames for the presenter.
 //!
-//! Three backends, picked at session start (auto is vendor-ordered on BOTH desktop OSes —
-//! see [`VulkanDecodeDevice::prefer_vulkan_first`]. Linux: vaapi → vulkan → software on
-//! desktop Mesa, vulkan first on NVIDIA/VanGogh. Windows: d3d11va → vulkan → software on
-//! Intel/unknown, vulkan first on NVIDIA/AMD.
-//! Override: `SLIPSTREAM_DECODER=vulkan|vaapi|d3d11va|software`):
+//! Three backends, picked at session start. Linux uses VAAPI → Vulkan → software on desktop
+//! Mesa, and Vulkan first on NVIDIA/VanGogh.
+//! Override: `SLIPSTREAM_DECODER=vulkan|vaapi|software`.
 //!
 //! * **Vulkan Video**: FFmpeg's Vulkan decoder running on the PRESENTER's own VkDevice
 //!   (its handles arrive via [`VulkanDecodeDevice`]) — the decoded VkImage feeds the
@@ -22,25 +20,16 @@
 //! Both run `AV_CODEC_FLAG_LOW_DELAY`; the host encodes zero-reorder streams (no
 //! B-frames, in-band parameter sets on every IDR), so decode is strictly one-in/one-out.
 //!
-//! On Windows the VAAPI/dmabuf backend does not exist (DRM-PRIME is a Linux concept); the
-//! hardware pair there is Vulkan Video and **D3D11VA** (`crate::video_d3d11` — the
-//! vendor-agnostic DXVA path every Windows video player exercises), ordered per vendor:
-//! Intel's driver DOES advertise Vulkan Video (Arc drivers since 2023), but FFmpeg-Vulkan
-//! on it strobes and burns the frame budget (B580 field report, 2026-07) where D3D11VA
-//! streams clean — so Intel/unknown take D3D11VA first and NVIDIA/AMD keep Vulkan first.
-//! Everything dmabuf-shaped is `cfg(target_os = "linux")`-gated inline.
-
-// bindgen's C-enum repr is target-dependent (u32 on Linux/clang, i32 on MSVC), so the
-// ss-ffvk Vulkan flag/enum casts below are required on one platform and no-ops on the
-// other — the lint would fire on whichever platform the cast is a no-op for.
+// Bindgen's C-enum representation can differ from ash's, so the explicit casts below are
+// retained even when a particular build treats one of them as a no-op.
 #![allow(clippy::unnecessary_cast)]
 
-use anyhow::{anyhow, bail, Context as _, Result};
+use anyhow::{Context as _, Result, anyhow, bail};
 use ffmpeg_next as ffmpeg;
 #[cfg(target_os = "linux")]
 use std::os::fd::RawFd;
 
-pub use crate::video_color::{csc_rows, ColorDesc};
+pub use crate::video_color::{ColorDesc, csc_rows};
 use crate::video_software::SoftwareDecoder;
 #[cfg(target_os = "linux")]
 use crate::video_vaapi::VaapiDecoder;
@@ -59,25 +48,16 @@ pub struct DecodedFrame {
     pub image: DecodedImage,
 }
 
-/// Re-exported so consumers (the presenter) name every frame type through `video::`.
-#[cfg(windows)]
-pub use crate::video_d3d11::D3d11Frame;
-
 pub enum DecodedImage {
     Cpu(CpuFrame),
     #[cfg(target_os = "linux")]
     Dmabuf(DmabufFrame),
     /// FFmpeg Vulkan Video output: a VkImage already on the PRESENTER's device.
     VkFrame(VkVideoFrame),
-    /// D3D11VA output copied into a shareable NT-handle texture the presenter imports
-    /// (`VK_KHR_external_memory_win32`) — the DXVA path for GPUs without Vulkan Video
-    /// (Intel's Windows driver foremost). See `crate::video_d3d11`.
-    #[cfg(windows)]
-    D3d11(crate::video_d3d11::D3d11Frame),
     /// PyroWave planar output: three R8 plane views on the presenter's own device,
     /// decode already fence-complete, GENERAL layout — the presenter's planar CSC
     /// samples them directly (BT.709 limited, the codec's fixed colour contract).
-    #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+    #[cfg(all(target_os = "linux", feature = "pyrowave"))]
     PyroWave(crate::video_pyrowave::PyroWavePlanarFrame),
 }
 
@@ -119,10 +99,7 @@ pub struct VkVideoFrame {
     /// numbers — `width`/`height` is what to display, `coded_*` is what the texture
     /// actually spans. Sampling `0..1` without the ratio stretches the alignment padding
     /// into view; because encoders fill those rows by replicating the picture's last
-    /// line, that reads as the bottom row smeared over the final few rows of the image
-    /// (field report 2026-07-31). Same class as the D3D11VA source-rect clamp in
-    /// `crate::video_d3d11`, which shows as a green bar there only because DXVA padding
-    /// is left uninitialized rather than replicated.
+    /// line, that reads as the bottom row smeared over the final few rows of the image.
     pub coded_width: u32,
     pub coded_height: u32,
     pub color: ColorDesc,
@@ -168,9 +145,7 @@ impl DecodedImage {
             #[cfg(target_os = "linux")]
             DecodedImage::Dmabuf(f) => f.keyframe,
             DecodedImage::VkFrame(f) => f.keyframe,
-            #[cfg(windows)]
-            DecodedImage::D3d11(f) => f.keyframe,
-            #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+            #[cfg(all(target_os = "linux", feature = "pyrowave"))]
             DecodedImage::PyroWave(f) => f.keyframe,
         }
     }
@@ -184,9 +159,7 @@ impl DecodedImage {
             #[cfg(target_os = "linux")]
             DecodedImage::Dmabuf(f) => (f.width, f.height),
             DecodedImage::VkFrame(f) => (f.width, f.height),
-            #[cfg(windows)]
-            DecodedImage::D3d11(f) => (f.width, f.height),
-            #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+            #[cfg(all(target_os = "linux", feature = "pyrowave"))]
             DecodedImage::PyroWave(f) => (f.width, f.height),
         }
     }
@@ -256,13 +229,10 @@ enum Backend {
     Vulkan(VulkanDecoder),
     #[cfg(target_os = "linux")]
     Vaapi(VaapiDecoder),
-    #[cfg(windows)]
-    D3d11va(crate::video_d3d11::D3d11vaDecoder),
     /// PyroWave (wired-LAN wavelet codec): pyrowave compute on the presenter's device,
-    /// no FFmpeg involvement (Linux + Windows — same Vulkan presenter on both). No demotion
-    /// rung — there is no other decoder for it.
+    /// with no FFmpeg involvement. No demotion rung exists because there is no other decoder for it.
     /// Boxed: the decoder (pinned create-info hold + plane ring) dwarfs the other variants.
-    #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+    #[cfg(all(target_os = "linux", feature = "pyrowave"))]
     PyroWave(Box<crate::video_pyrowave::PyroWaveDecoder>),
     Software(SoftwareDecoder),
 }
@@ -286,21 +256,9 @@ pub struct Decoder {
     /// The pump drains it and asks the host — under the infinite GOP there is no periodic
     /// keyframe, so a rebuilt/erroring decoder would otherwise stay gray/frozen forever.
     want_keyframe: bool,
-    /// The presenter has the win32 external-memory import path, so D3D11VA frames can reach
-    /// the screen — kept for the mid-session Vulkan→D3D11VA demotion rung (the Windows
-    /// analog of Linux's Vulkan→VAAPI rung).
-    #[cfg(windows)]
-    d3d11_import: bool,
-    /// The presenter adapter's LUID (see [`VulkanDecodeDevice::adapter_luid`]) so a demotion
-    /// rebuild lands on the SAME GPU.
-    #[cfg(windows)]
-    adapter_luid: Option<[u8; 8]>,
-    /// [`VulkanDecodeDevice::d3d11_hdr10`], for the same demotion rebuild.
-    #[cfg(windows)]
-    d3d11_hdr10: bool,
 }
 
-/// Demote a hardware backend (Vulkan→VAAPI/D3D11VA, VAAPI/D3D11VA→software) only after
+/// Demote a hardware backend (Vulkan→VAAPI, VAAPI→software) only after
 /// this many consecutive decode errors; a lone transient error just re-requests an IDR
 /// and keeps the hardware decoder.
 const VAAPI_DEMOTE_AFTER: u32 = 3;
@@ -344,11 +302,11 @@ pub fn decodable_codecs() -> u8 {
 /// under its explicit opt-in.
 pub fn decodable_codecs_for(vk: Option<&VulkanDecodeDevice>) -> u8 {
     let bits = decodable_codecs();
-    #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+    #[cfg(all(target_os = "linux", feature = "pyrowave"))]
     if vk.map(|v| v.pyrowave_decode).unwrap_or(false) {
         return bits | slipstream_core::quic::CODEC_PYROWAVE;
     }
-    #[cfg(not(all(any(target_os = "linux", windows), feature = "pyrowave")))]
+    #[cfg(not(all(target_os = "linux", feature = "pyrowave")))]
     let _ = vk;
     bits
 }
@@ -374,18 +332,15 @@ fn quiet_ffmpeg_log() {
 
 impl Decoder {
     /// `codec_id` is the codec the host resolved in the Welcome (never assume HEVC).
-    /// `pref` is the Settings "Video decoder" value (`auto`/`vulkan`/`vaapi`/`d3d11va`/
-    /// `software`; `hardware` — the WinUI shell's stored value — reads as auto).
+    /// `pref` is the Settings "Video decoder" value (auto/vulkan/vaapi/software;
+    /// hardware reads as auto).
     /// `vk` is the presenter's shared Vulkan device when its stack can run FFmpeg's
     /// Vulkan Video decoder — decode lands as VkImages the presenter samples directly.
     /// Precedence: the `SLIPSTREAM_DECODER` env override wins (support/debug escape
     /// hatch, and the documented knob), then the setting; both default to auto.
-    /// Auto's hardware order depends on the device on BOTH desktop OSes
-    /// ([`VulkanDecodeDevice::prefer_vulkan_first`]). Linux: VAAPI → Vulkan → software on
-    /// desktop Mesa (AMD/Intel), Vulkan → VAAPI → software on NVIDIA and the Deck's
-    /// VanGogh. Windows (no VAAPI there): Vulkan → D3D11VA → software on NVIDIA/AMD,
-    /// D3D11VA → Vulkan → software on Intel/unknown (Intel's driver advertises Vulkan
-    /// Video, but FFmpeg-Vulkan on it strobes/overruns the budget — B580 field report).
+    /// Auto uses VAAPI → Vulkan → software on desktop Mesa and Vulkan → VAAPI → software on
+    /// NVIDIA and the Deck's VanGogh, as selected by
+    /// `VulkanDecodeDevice::prefer_vulkan_first`.
     pub fn new(
         codec_id: ffmpeg::codec::Id,
         pref: &str,
@@ -397,12 +352,6 @@ impl Decoder {
             .ok()
             .filter(|v| !v.is_empty())
             .unwrap_or_else(|| pref.to_string());
-        #[cfg(windows)]
-        let (d3d11_import, adapter_luid, d3d11_hdr10) = (
-            vk.is_some_and(|v| v.d3d11_import),
-            vk.and_then(|v| v.adapter_luid),
-            vk.is_some_and(|v| v.d3d11_hdr10),
-        );
         let done = |backend| {
             Ok(Decoder {
                 backend,
@@ -410,12 +359,6 @@ impl Decoder {
                 vaapi_fails: 0,
                 first_fail: None,
                 want_keyframe: false,
-                #[cfg(windows)]
-                d3d11_import,
-                #[cfg(windows)]
-                adapter_luid,
-                #[cfg(windows)]
-                d3d11_hdr10,
             })
         };
         // Linux `auto`: try VAAPI FIRST unless this device is one where Vulkan Video is
@@ -443,48 +386,10 @@ impl Decoder {
                 }
             }
         }
-        // Windows `auto`: D3D11VA FIRST unless this device is one where Vulkan Video is
-        // the established right answer (NVIDIA/AMD). Intel's Windows driver advertises
-        // Vulkan Video (Arc drivers since 2023) so the capability gate alone no longer
-        // keeps Intel off FFmpeg-Vulkan — and that combination is field-broken (B580,
-        // 2026-07: strobing between clean anchors and corrupt inter frames that never
-        // trips the error-streak demotion, 7 ms p50 decodes blowing the 120 Hz budget)
-        // where D3D11VA — the DXVA path every Windows video player exercises, and what
-        // this backend was built for — streams clean. Vulkan stays reachable below by
-        // explicit preference and as auto's fallback when D3D11VA can't be built.
-        #[cfg(windows)]
-        let mut d3d11_tried = false;
-        #[cfg(windows)]
-        if matches!(choice.as_str(), "auto" | "" | "hardware")
-            && !vk
-                .filter(|v| v.video_decode)
-                .is_some_and(|v| v.prefer_vulkan_first())
-        {
-            if let Some(v) = vk.filter(|v| v.d3d11_import) {
-                d3d11_tried = true;
-                match crate::video_d3d11::D3d11vaDecoder::new(
-                    codec_id,
-                    v.adapter_luid,
-                    v.d3d11_hdr10,
-                ) {
-                    Ok(d) => {
-                        tracing::info!(
-                            ?codec_id,
-                            "D3D11VA hardware decode active (shared-texture hand-off)"
-                        );
-                        return done(Backend::D3d11va(d));
-                    }
-                    Err(e) => {
-                        tracing::info!(reason = %format!("{e:#}"),
-                            "D3D11VA unavailable — trying Vulkan Video");
-                    }
-                }
-            }
-        }
         if matches!(choice.as_str(), "auto" | "" | "vulkan" | "hardware") {
             // `video_decode` gates the Vulkan Video attempt: the presenter now exports its
-            // handle bundle even when the device has no decode queue (Windows D3D11 interop
-            // rides the same struct), so presence alone no longer implies a usable decoder.
+            // handle bundle even when the device has no decode queue, so presence alone no
+            // longer implies a usable decoder.
             match vk.filter(|v| v.video_decode) {
                 Some(vk) => match VulkanDecoder::new(codec_id, vk) {
                     Ok(v) => {
@@ -514,8 +419,7 @@ impl Decoder {
         // Deck/NVIDIA note: `auto` reaches VAAPI here when Vulkan Video isn't available
         // (on desktop Mesa it was already tried above — `vaapi_tried` skips the repeat).
         // A presenter that can't display the dmabufs demotes this decoder to software
-        // mid-session via [`Decoder::force_software`]. Windows has no VAAPI — auto falls
-        // straight through to software there.
+        // mid-session via [`Decoder::force_software`].
         #[cfg(target_os = "linux")]
         if choice != "software" && choice != "vulkan" && !vaapi_tried {
             match VaapiDecoder::new(codec_id) {
@@ -529,43 +433,6 @@ impl Decoder {
                     }
                     tracing::warn!(error = %e, "VAAPI unavailable — falling back to software decode");
                 }
-            }
-        }
-        // Windows: D3D11VA as the fallback rung for NVIDIA/AMD auto (Vulkan Video missing
-        // or failed to open) and the explicit `d3d11va` preference — gated on the presenter
-        // having the win32 external-memory import path, else its frames could never reach
-        // the screen. (On Intel/unknown auto it was already tried above — `d3d11_tried`
-        // skips the repeat.)
-        #[cfg(windows)]
-        if choice != "software" && choice != "vulkan" && !d3d11_tried {
-            match vk.filter(|v| v.d3d11_import) {
-                Some(v) => {
-                    match crate::video_d3d11::D3d11vaDecoder::new(
-                        codec_id,
-                        v.adapter_luid,
-                        v.d3d11_hdr10,
-                    ) {
-                        Ok(d) => {
-                            tracing::info!(
-                                ?codec_id,
-                                "D3D11VA hardware decode active (shared-texture hand-off)"
-                            );
-                            return done(Backend::D3d11va(d));
-                        }
-                        Err(e) => {
-                            if choice == "d3d11va" {
-                                return Err(e.context("SLIPSTREAM_DECODER=d3d11va but it failed"));
-                            }
-                            tracing::info!(reason = %format!("{e:#}"),
-                                "D3D11VA unavailable — software decode");
-                        }
-                    }
-                }
-                None if choice == "d3d11va" => bail!(
-                    "SLIPSTREAM_DECODER=d3d11va but the presenter's device lacks the win32 \
-                     external-memory import extensions — see the presenter log"
-                ),
-                None => {}
             }
         }
         if choice == "software" {
@@ -594,7 +461,7 @@ impl Decoder {
     /// Open a PyroWave decoder for a `CODEC_PYROWAVE` session (plan §4.5): pyrowave
     /// compute on the presenter's device, no FFmpeg. `codec_id` is irrelevant (kept as
     /// HEVC so an — impossible — demotion path stays well-formed).
-    #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+    #[cfg(all(target_os = "linux", feature = "pyrowave"))]
     pub fn new_pyrowave(
         vk: &VulkanDecodeDevice,
         width: u32,
@@ -618,15 +485,6 @@ impl Decoder {
             vaapi_fails: 0,
             first_fail: None,
             want_keyframe: false,
-            // A PyroWave session never demotes (nothing else decodes it — a failure
-            // renegotiates the codec instead), so the D3D11VA rebuild facts are unused
-            // here; keep them well-formed rather than plumbing them in for nothing.
-            #[cfg(windows)]
-            d3d11_import: false,
-            #[cfg(windows)]
-            adapter_luid: None,
-            #[cfg(windows)]
-            d3d11_hdr10: false,
         })
     }
 
@@ -662,7 +520,7 @@ impl Decoder {
     }
 
     /// [`decode`](Self::decode) with the AU's wire facts: `user_flags` (chunk-aligned AUs
-    /// are parsed in shard windows — [`slipstream_core::packet::USER_FLAG_CHUNK_ALIGNED`])
+    /// are parsed in shard ranges — [`slipstream_core::packet::USER_FLAG_CHUNK_ALIGNED`])
     /// and completeness (`false` = a partial delivery; only the PyroWave backend decodes
     /// those — as one frame of localized blur, plan §4.4).
     pub fn decode_frame(
@@ -670,7 +528,7 @@ impl Decoder {
         au: &[u8],
         // Only the PyroWave backend reads the flags; without that feature the param is unused.
         #[cfg_attr(
-            not(all(any(target_os = "linux", windows), feature = "pyrowave")),
+            not(all(target_os = "linux", feature = "pyrowave")),
             allow(unused_variables)
         )]
         user_flags: u32,
@@ -683,12 +541,10 @@ impl Decoder {
             }
             #[cfg(target_os = "linux")]
             Backend::Vaapi(v) => v.decode(au).map(|f| f.map(DecodedImage::Dmabuf)),
-            #[cfg(windows)]
-            Backend::D3d11va(d) => d.decode(au).map(|f| f.map(DecodedImage::D3d11)),
             // No demote ladder below PyroWave (nothing else decodes it): propagate the
             // error; the pump surfaces it and the session falls back to HEVC by
             // renegotiation (plan §4.6), not by decoder swap.
-            #[cfg(all(any(target_os = "linux", windows), feature = "pyrowave"))]
+            #[cfg(all(target_os = "linux", feature = "pyrowave"))]
             Backend::PyroWave(p) => {
                 let aligned = user_flags & slipstream_core::packet::USER_FLAG_CHUNK_ALIGNED != 0;
                 return Ok(p
@@ -706,8 +562,6 @@ impl Decoder {
             Err(e) => {
                 let which = match self.backend {
                     Backend::Vulkan(_) => "Vulkan Video",
-                    #[cfg(windows)]
-                    Backend::D3d11va(_) => "D3D11VA",
                     _ => "VAAPI",
                 };
                 self.vaapi_fails += 1;
@@ -732,27 +586,6 @@ impl Decoder {
                             }
                             Err(va) => tracing::info!(reason = %va,
                                 "VAAPI unavailable for demotion — software decode"),
-                        }
-                    }
-                    // Windows' hardware rung below Vulkan is D3D11VA (a 4K120 stream is
-                    // not survivable on software) — same-GPU rebuild via the stashed LUID.
-                    #[cfg(windows)]
-                    if matches!(self.backend, Backend::Vulkan(_)) && self.d3d11_import {
-                        match crate::video_d3d11::D3d11vaDecoder::new(
-                            self.codec_id,
-                            self.adapter_luid,
-                            self.d3d11_hdr10,
-                        ) {
-                            Ok(d) => {
-                                tracing::warn!(error = %e, fails = self.vaapi_fails,
-                                    "Vulkan Video decode failing repeatedly — demoting to D3D11VA");
-                                self.backend = Backend::D3d11va(d);
-                                self.vaapi_fails = 0;
-                                self.first_fail = None;
-                                return Ok(None);
-                            }
-                            Err(dx) => tracing::info!(reason = %dx,
-                                "D3D11VA unavailable for demotion — software decode"),
                         }
                     }
                     tracing::warn!(error = %e, fails = self.vaapi_fails,
@@ -888,8 +721,7 @@ pub struct VulkanDecodeDevice {
     pub f_timeline_semaphore: bool,
     pub f_synchronization2: bool,
     /// Vulkan Video decode is actually usable on this device (decode queue + extensions +
-    /// features). The bundle now exists even without it — Windows D3D11 interop rides the
-    /// same struct — so consumers gate the FFmpeg-Vulkan decoder on THIS, not on `Some`.
+    /// features). Consumers gate the FFmpeg-Vulkan decoder on this, not on `Some`.
     pub video_decode: bool,
     /// The presenter has REAL on-glass present timing (`VK_KHR_present_wait` — its
     /// `PresentTimer` runs). Gates the `CLIENT_CAP_PHASE_LOCK` advertisement: without a
@@ -913,17 +745,6 @@ pub struct VulkanDecodeDevice {
     /// The queue families the device was created with (one `VkDeviceQueueCreateInfo` each,
     /// one queue per family, priority 1.0) — mirrored by the reconstruction.
     pub queue_families: Vec<u32>,
-    /// The presenter enabled `VK_KHR_external_memory_win32` + `VK_KHR_win32_keyed_mutex`:
-    /// D3D11 shared-texture frames can reach the screen. Always `false` off Windows.
-    pub d3d11_import: bool,
-    /// The presenter can also import the RGB10A2 hand-off texture AND offers an HDR10
-    /// swapchain — the D3D11VA backend emits its HDR (RGB10 PQ pass-through) ring flavor
-    /// for PQ streams instead of tone-mapping to sRGB. Always `false` off Windows.
-    pub d3d11_hdr10: bool,
-    /// `VkPhysicalDeviceIDProperties::deviceLUID` when the driver reports one — the D3D11VA
-    /// backend creates its decode device on the SAME adapter so shared textures never cross
-    /// GPUs. `None` when not reported (or off Windows, where it's unused).
-    pub adapter_luid: Option<[u8; 8]>,
     /// The device's shared queue lock (see [`QueueLock`]). The presenter holds it around
     /// its own submits/presents; the decoder wires it into FFmpeg's
     /// `lock_queue`/`unlock_queue` callbacks so both sides serialize on the same queues.
@@ -931,22 +752,9 @@ pub struct VulkanDecodeDevice {
 }
 
 impl VulkanDecodeDevice {
-    /// Should `auto` try Vulkan Video BEFORE the platform's other hardware path (VAAPI on
-    /// Linux, D3D11VA on Windows) on this device?
-    ///  * **NVIDIA** — Vulkan Video is the proven path (on Linux the only one: no usable
-    ///    VAAPI — the nvidia-vaapi-driver is broken for this, Moonlight blacklists it;
-    ///    on Windows it's the validated zero-copy default, 4K@144 with 0.1 ms decode).
-    ///  * **AMD (RADV, VanGogh included)** — Vulkan decode outperforms VAAPI on RADV
-    ///    (on-glass verdict), and on VanGogh VAAPI's separate-plane dmabuf import
-    ///    additionally shows chroma fringing; the session binary opts RADV into
-    ///    `video_decode` precisely to get the Vulkan path. Vulkan-first is safe here
-    ///    because a mid-session Vulkan failure streak demotes to VAAPI (not software),
-    ///    so a broken Mesa Vulkan path still lands on the working driver.
-    ///
-    /// Intel and unknown vendors take the battle-tested path first: VAAPI on Linux (ANV's
-    /// Vulkan Video is the least-proven Mesa path), D3D11VA on Windows — Intel's Windows
-    /// driver advertises Vulkan Video (Arc drivers since 2023), but FFmpeg-Vulkan on it is
-    /// field-broken (B580, 2026-07: strobing + ~7 ms decodes) where DXVA streams clean.
+    /// Should auto try Vulkan Video before VAAPI on this device?
+    /// NVIDIA uses Vulkan as its only practical hardware path. AMD, including VanGogh,
+    /// benefits from Vulkan before VAAPI. Intel and unknown vendors use VAAPI first on Linux.
     pub fn prefer_vulkan_first(&self) -> bool {
         const VENDOR_NVIDIA: u32 = 0x10DE;
         const VENDOR_AMD: u32 = 0x1002;
@@ -963,7 +771,7 @@ const fn fourcc(a: u8, b: u8, c: u8, d: u8) -> u32 {
 /// 4:2:0 (NV12); P010 is here for the eventual 10-bit/HDR path.
 // Only the (Linux-gated) VAAPI path calls this outside tests; the constants are worth
 // locking on every platform, so it stays compiled rather than cfg-gated with its caller.
-#[cfg_attr(windows, allow(dead_code))]
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub(crate) fn drm_fourcc_for(sw: ffmpeg_next::ffi::AVPixelFormat) -> Option<u32> {
     use ffmpeg_next::ffi::AVPixelFormat::*;
     Some(match sw {
@@ -1007,21 +815,13 @@ mod tests {
             pyrowave_decode: false,
             video_decode: true,
             present_timing: false,
-            d3d11_import: false,
-            d3d11_hdr10: false,
-            adapter_luid: None,
             queue_lock: std::sync::Arc::new(QueueLock::new()),
         }
     }
 
-    /// Auto's hardware order (both OSes): Vulkan-first on NVIDIA (on Linux: no usable
-    /// VAAPI) and ALL AMD (Vulkan decode outperforms VAAPI on RADV — on-glass verdict;
-    /// VanGogh additionally chroma-fringes over VAAPI); Intel/unknown take the proven
-    /// path first — VAAPI on Linux (ANV's Vulkan Video is the least-proven Mesa path),
-    /// D3D11VA on Windows (Intel's driver advertises Vulkan Video since 2023, but
-    /// FFmpeg-Vulkan on it strobes — B580 field report). A Vulkan failure streak still
-    /// demotes to hardware (VAAPI/D3D11VA), so Vulkan-first can never strand a box on
-    /// software decode.
+    /// Auto uses Vulkan first on NVIDIA and AMD, including VanGogh. Intel and unknown
+    /// vendors use VAAPI first on Linux, while a Vulkan failure can demote to VAAPI
+    /// before software.
     #[test]
     fn vulkan_first_on_nvidia_and_amd_only() {
         assert!(decode_device(0x10DE, "NVIDIA GeForce RTX 5070 Ti").prefer_vulkan_first());
@@ -1031,10 +831,6 @@ mod tests {
         assert!(
             !decode_device(0x8086, "Intel(R) Arc(tm) A770 Graphics (DG2)").prefer_vulkan_first()
         );
-        // The Windows-side motivation: discrete Arc advertises Vulkan Video and must
-        // still land on D3D11VA in auto.
-        assert!(!decode_device(0x8086, "Intel(R) Arc(TM) B580 Graphics").prefer_vulkan_first());
-        assert!(!decode_device(0x8086, "Intel(R) Arc(TM) Pro Graphics").prefer_vulkan_first());
     }
 
     /// Lock the DRM FourCC magic numbers against typos — these are the exact values

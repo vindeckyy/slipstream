@@ -1,5 +1,8 @@
 # slipstream - Apple client (macOS · iOS · iPadOS · tvOS)
 
+> This client is development-only. Slipstream currently publishes Android and Steam Deck clients;
+> there is no public Apple download or support channel.
+
 The native **Apple** app for streaming a slipstream host to your Mac, iPhone, iPad, or Apple TV. A
 SwiftUI app that finds hosts on your network, pairs with a PIN, and streams at your display's own
 resolution and refresh rate - with VideoToolbox hardware decode and full controller support.
@@ -36,8 +39,8 @@ Runs from one shared codebase across **macOS, iOS, iPadOS, and tvOS**.
 
 ## Get it
 
-Install from the App Store / TestFlight, or build from source below. Per-device install steps and the
-pairing walkthrough:
+Build from source below. There is no app-store or beta distribution. Per-device build steps
+and the pairing walkthrough:
 **[docs-site/content/docs/install-client.md](../../docs-site/content/docs/install-client.md)**.
 
 ## Build / run / test (on a Mac)
@@ -86,8 +89,8 @@ SLIPSTREAM_AUTOCONNECT=<box-ip> SLIPSTREAM_MODE=1280x720x60 swift run Slipstream
   the two trust flows (TOFU prompt + SPAKE2 `PairSheet`), the stream view with the HUD, a
   tabbed Settings pane (General / Display / Audio / Controllers / Advanced), and the network speed
   test. A Scene-level **Stream** menu carries the cross-client shortcut set: Release Mouse (⌃⌥⇧Q),
-  Disconnect (⌃⌥⇧D) and the HUD toggle (⌃⌥⇧S) - the same Ctrl+Alt+Shift combos the Windows and
-  Linux clients reserve, also shown on a 6-second banner at stream start.
+    Disconnect (⌃⌥⇧D) and the HUD toggle (⌃⌥⇧S) - the same Ctrl+Alt+Shift combos the Linux client
+    reserves, also shown on a 6-second banner at stream start.
   On iOS/iPadOS **and macOS** a connected controller swaps the whole home for the **gamepad UI**
   (`Home/Gamepad*`, `Settings/GamepadSettingsView`): a console-style host carousel (A connect · Y
   library · X settings), a controller-navigable settings screen, an add-host flow with an

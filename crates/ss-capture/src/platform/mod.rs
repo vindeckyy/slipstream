@@ -1,8 +1,8 @@
 //! OS-specific capture backends. Grouped here for structural divergence; crate-root shims in
-//! `lib.rs` keep `ss_capture::dxgi`, `ss_capture::pwinit`, and the Linux helper re-exports stable.
+//! `lib.rs` keeps the PipeWire and Linux helper re-exports stable.
 //!
 //! Re-exports of crate-root types let `linux/` keep its existing `super::…` imports without a
-//! capture-logic rewrite (same pattern as `windows/mod.rs` for IDD-push).
+//! capture-logic rewrite.
 
 #[cfg(target_os = "linux")]
 pub(crate) use crate::{
@@ -12,6 +12,3 @@ pub(crate) use crate::{
 
 #[cfg(target_os = "linux")]
 pub mod linux;
-
-#[cfg(target_os = "windows")]
-pub mod windows;

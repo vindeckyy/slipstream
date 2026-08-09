@@ -5,7 +5,7 @@
 //! compiled perfectly. Nothing in CI ever *ran* the binary; the failure only existed at
 //! runtime, as a connect that silently bounced back to the host list. This test is the
 //! gate that would have caught it: whatever the binary does, it must SAY so on stdout.
-#![cfg(any(target_os = "linux", windows))]
+#![cfg(target_os = "linux")]
 
 use std::io::Read as _;
 use std::process::{Command, Stdio};

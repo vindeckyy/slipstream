@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 const RFI_THROTTLE: Duration = Duration::from_millis(100);
 
 /// State for [`NativeClient::note_frame_index`] — the client-side loss-range detector shared by every
-/// embedder (Android, the C-ABI Apple client, the Windows shell pump) so none re-derives the wrapping
+/// embedder (Android and the C-ABI Apple client) so none re-derives the wrapping
 /// frame-index arithmetic. `next_expected` is the `frame_index` expected next in receive order;
 /// `last_req` throttles the RFI requests a gap fires.
 #[derive(Default)]
@@ -82,7 +82,7 @@ impl RfiRecovery {
 #[cfg(test)]
 mod rfi_recovery_tests {
     //! The client-side loss-range detector shared by every embedder (Android, the C-ABI Apple
-    //! client, the Windows shell pump). `observe` is pure over `(frame_index, now)`, so the wrapping
+    //! client). `observe` is pure over `(frame_index, now)`, so the wrapping
     //! frame arithmetic and the RFI throttle are exercised here without a live session.
     use super::{RecoveryAsk, RfiRecovery, RFI_THROTTLE};
     use std::time::{Duration, Instant};
