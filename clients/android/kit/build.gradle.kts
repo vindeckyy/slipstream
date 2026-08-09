@@ -32,7 +32,7 @@ kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_21) } }
 dependencies {
     // mTLS HTTPS client for the host's management API (the game-library fetch + cover-art loads).
     // OkHttp lets us present the paired client cert and pin the host's self-signed cert by SHA-256.
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp:5.4.0")
     testImplementation("junit:junit:4.13.2") // JVM unit tests for the pure parsers/migrations
     // A REAL org.json on the unit-test classpath. android.jar's org.json is stubs that throw
     // "Stub!", so the host-store migration test — which asserts over the very JSON blobs the store
