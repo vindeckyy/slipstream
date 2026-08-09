@@ -34,7 +34,7 @@ jobs:
         run: bun run build:pages
       - name: Prepare Pages artifact
         working-directory: docs-site
-        run: touch .output/public/.nojekyll
+        run: touch dist/client/.nojekyll
       - uses: actions/upload-pages-artifact@v4
         with:
           path: docs-site/dist/client
