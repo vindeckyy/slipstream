@@ -1,5 +1,5 @@
 // "Copy Link" on a host or pinned card puts a `slipstream://` URL on the clipboard — the same
-// self-emitted form a shortcut or a Playnite entry would carry (design/client-deep-links.md §5):
+// self-emitted form a desktop shortcut would carry (design/client-deep-links.md §5):
 // stable id first, with the address and pin alongside so it still resolves after the record is
 // re-addressed or the store is wiped.
 //

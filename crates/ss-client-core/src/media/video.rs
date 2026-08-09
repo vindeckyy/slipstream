@@ -120,7 +120,7 @@ pub struct VkVideoFrame {
 /// but not the flag). NOTE: FFmpeg's H.264/HEVC decode layer sets this flag **only for true IDR
 /// frames**, never for an *intra-refresh recovery point*. H.264 flags key only when a picture's
 /// `recovery_frame_cnt == 0` (a moving band uses `> 0`); HEVC clears the flag on every non-IRAP
-/// frame regardless of the recovery-point SEI. So an intra-refresh host (NVENC/AMF/QSV) heals the
+/// frame regardless of the recovery-point SEI. So an intra-refresh encoder heals the
 /// picture over N P-frames with no decoded frame ever flagged key — this function cannot detect
 /// that clean point, and the pump would freeze until the `REANCHOR_FREEZE_MAX` backstop (in
 /// `session.rs`) forces a real IDR. Detecting an intra-refresh re-anchor requires an out-of-band
@@ -603,7 +603,7 @@ impl Decoder {
     }
 }
 
-// -EAGAIN. FFmpeg uses POSIX errno values on both our targets (MinGW's EAGAIN is 11 too).
+// AVERROR(EAGAIN) is -11 because POSIX errno EAGAIN is 11.
 pub(crate) const AVERROR_EAGAIN: i32 = -11;
 
 pub(crate) fn averr(what: &str, code: i32) -> anyhow::Error {

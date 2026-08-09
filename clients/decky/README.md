@@ -19,7 +19,7 @@ the panel looks and feels native to Gaming Mode.
    ceremony headlessly, then remembers the host so future streams connect silently.
 3. **Stream** - launches fullscreen via a branded "Slipstream" Steam shortcut so gamescope focuses it.
 4. **Games** - each host row has a games button that opens its **library picker**: pin titles as
-   one-tap "Stream <Game>" rows in the QAM (jump straight into e.g. Playnite on the host), or
+   one-tap "Stream <Game>" rows in the QAM (jump straight into a host library title), or
    **"Open library on screen"** to launch the client's controller-driven, console-style library
    browser (aurora backdrop + poster coverflow; A plays, B returns to Gaming Mode). Pins survive
    plugin reinstalls (stored next to the client's config) and follow a host across IP changes

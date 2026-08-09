@@ -192,7 +192,7 @@ resolves an explicit inbox (`<config_dir>/ingest/<name>`) for that handoff:
 
 ```ts
 import { pluginIngestDir } from "@slipstream/host";
-const inbox = pluginIngestDir("playnite"); // <config_dir>/ingest/playnite  (your app writes here)
+const inbox = pluginIngestDir("catalog-sync"); // <config_dir>/ingest/catalog-sync
 ```
 
 Treat what you read from it as lower trust than your own state — the inbox is writable by any local
@@ -247,15 +247,15 @@ The same CLI manages plugin packages — it creates the plugins dir, points it a
 registry, and installs on the bun it is already running on:
 
 ```sh
-bun src/runner-cli.ts add playnite      # → @slipstream/plugin-playnite (bare names resolve first-party)
-bun src/runner-cli.ts remove playnite
+bun src/runner-cli.ts add catalog-sync  # resolves to @slipstream/plugin-catalog-sync
+bun src/runner-cli.ts remove catalog-sync
 bun src/runner-cli.ts list              # installed plugin packages + versions
 ```
 
 On an installed host these are reached through the host CLI, which drives the runner service:
 
 ```sh
-slipstream-host plugins add playnite
+slipstream-host plugins add catalog-sync
 slipstream-host plugins enable          # enable + start the runner (opt-in)
 slipstream-host plugins status
 ```

@@ -355,9 +355,8 @@ pub(crate) async fn serve(
     crate::vdisplay::restore_takeover_on_startup();
     // ...and the other end of that: give the box its session back when WE are the ones going away.
     install_shutdown_restore();
-    // Host-lifetime cover-art warmer: fetches + caches GOG/Xbox cover art (no-auth api.gog.com /
-    // displaycatalog) off the hot path so `all_games()` (the library list + launch resolve) never
-    // blocks on the network. A no-op on a host whose stores all carry their own art.
+    // Host-lifetime cover-art preparation hook. It stays off the hot path so `all_games()` never
+    // blocks on network work. It is a no-op while all providers carry their own art.
     let _art_warmer = crate::library::start_art_warmer();
     // Pairing state (arming PIN + trust store) is shared with the management API. If it was armed
     // at startup (the CLI flags), surface the PIN the headless operator reads from the log; the

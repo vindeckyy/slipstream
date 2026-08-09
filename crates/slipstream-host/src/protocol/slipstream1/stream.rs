@@ -1831,7 +1831,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         // Client capability only  -  whether AUs actually stream per-slice depends on the encoder
         // backend's `supports_chunked_poll()` (today: Linux direct-NVENC only), which doesn't
         // exist yet at this point. The old wording ("chunked encoder output will stream
-        // per-slice") sent a 2026-07 field triage chasing a streaming path AMF doesn't have.
+        // per-slice") sent a 2026-07 field triage chasing a streaming path this code does not have.
         tracing::info!(
             "client accepts streamed AUs (VIDEO_CAP_STREAMED_AU)  -  used if this session's \
              encoder supports chunked output"
@@ -2141,8 +2141,8 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
     // (reset/rebuild/teardown) clears `inflight` AND the encoder's reference state, so the reused
     // predictions can never meet stale bookkeeping. Passing it to `Encoder::submit_indexed` keeps
     // the RFI backends' frame numbers 1:1 with the client's across encoder rebuilds  -  an
-    // encoder-internal counter desyncs on the first adaptive-bitrate rebuild (NVENC RFI then
-    // silently dies; AMF may anchor onto a post-loss LTR).
+    // encoder-internal counter desyncs on the first adaptive-bitrate rebuild, so reference
+    // recovery can silently fail or anchor after a loss.
     let mut au_seq: u32 = 0;
     // Rebuild-in-place on capture loss: track the live mode (a mode switch updates it) so a rebuild
     // targets the CURRENT mode, and cap consecutive rebuilds so a flapping source can't loop the
@@ -2490,7 +2490,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         // Adaptive bitrate: drain to the NEWEST requested rate (the client's controller may step
         // several times while we stream) and retarget the ENCODER ONLY  -  the mode didn't change,
         // so capture and the virtual output are untouched. Preferred lever: an IN-PLACE
-        // `reconfigure_bitrate` (Phase 3.2  -  NVENC nvEncReconfigureEncoder / AMF dynamic props /
+        // `reconfigure_bitrate` (Phase 3.2: NVENC nvEncReconfigureEncoder /
         // Vulkan RC control), which keeps the encoder, its reference chain and the in-flight AUs,
         // so the step costs NOTHING on the wire (no IDR, no forfeit  -  exactly what the Automatic
         // controller's doubling climb wants). A backend that can't (libavcodec paths) or a driver
@@ -3385,7 +3385,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         // so the encode of N overlaps the convert/copy of N+1. NVENC's `pending` is FIFO, so poll() returns
         // the oldest submitted frame's AU  -  matching `inflight.pop_front()`.
         let mut send_gone = false;
-        // A poll error is the explicit form of an encode stall (e.g. a QSV device failure);
+        // A poll error is the explicit form of an encode stall (e.g. an encoder device failure);
         // carry it to the shared stall recovery below instead of killing the session outright.
         let mut poll_err: Option<anyhow::Error> = None;
         while inflight.len() >= depth {
@@ -3560,7 +3560,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
             let au = match polled {
                 Ok(Some(au)) => au,
                 // No AU ready for a submitted frame. Routine on the non-blocking backends (the
-                // libavcodec AMF/QSV wrapper holds ~2 frames; async NVENC drains a ready queue)  -
+                // libavcodec wrapper holds ~2 frames; async NVENC drains a ready queue)  -
                 // the frame stays in flight and the next tick re-polls. The stall watchdog below
                 // decides when "not ready yet" has become "the driver is wedged".
                 Ok(None) => break,
@@ -3677,13 +3677,13 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
             break;
         }
         // Encode-stall watchdog. Trip on: an explicit poll error; no AU within the window while
-        // frames are owed (the full wedge  -  AMF/QSV's non-blocking poll returns None forever and
+        // frames are owed (the full wedge  -  a non-blocking poll returns None forever and
         // nothing else ever errors); or an owed backlog worth more than the window's frames (the
         // slow leak  -  AUs still trickle, so the gap never trips, but latency grows without bound).
         // Recovery rebuilds the encoder in place and forces an IDR  -  a logged ~one-second hiccup
         // instead of a silent permanent freeze  -  bounded so a genuinely dead encoder still ends
         // the session with a clear error. The window scales with the frame interval so low-fps
-        // modes (where the AMF wrapper's ~2-frame hold spans seconds) can't false-trip.
+        // modes (where the libavcodec wrapper's ~2-frame hold spans seconds) can't false-trip.
         let stall_window = ENCODE_STALL_WINDOW.max(interval * 8);
         let stall_backlog =
             depth + (stall_window.as_secs_f64() / interval.as_secs_f64().max(1e-6)).ceil() as usize;

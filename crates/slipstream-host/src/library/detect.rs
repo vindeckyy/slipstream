@@ -45,7 +45,7 @@ pub struct DetectSpec {
     /// The game's install directory — the universal recipe. A process whose image path (or, for
     /// Proton/Wine, whose command line) sits under this directory is part of the game.
     pub install_dir: Option<PathBuf>,
-    /// The game's executable **file name** (`Hades.exe`, `retroarch`), matched case-insensitively
+    /// The game's executable **file name** (for example, `retroarch`), matched case-insensitively
     /// against a process's image name and nothing else.
     ///
     /// The weakest signal here, and the only one an operator supplies by hand
@@ -118,28 +118,27 @@ impl DetectSpec {
     }
 }
 
-/// What an operator (or a provider plugin) can tell the host about recognizing a title — the wire
+/// What an operator or provider plugin can tell the host about recognizing a title. This is the wire
 /// half of [`DetectSpec`], and the only part of it that is ever accepted from outside.
 ///
 /// Deliberately a **subset**: the store-derived signals (a Steam appid, a launcher's environment
-/// marker) are things the host discovers for itself and would be meaningless — or dangerous — to take
+/// marker) are things the host discovers for itself and would be meaningless or dangerous to take
 /// on someone's word. What is left is what a provider genuinely knows and the host cannot guess: where
 /// the title is installed, which executable is the game, what the process is called. All three are
 /// optional; supplying none is the same as supplying no hint at all.
 ///
-/// Never returned by the catalog API — see the module docs on why detect data does not cross the wire
+/// Never returned by the catalog API. See the module docs on why detect data does not cross the wire
 /// outbound.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct DetectHint {
     /// Where the title is installed. Any process running from under this directory is part of the
-    /// game — the universal recipe, and the one worth supplying if you supply only one.
+    /// game. This is the best field to supply when only one is available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub install_dir: Option<String>,
     /// The game's own executable, as an absolute path.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exe: Option<String>,
-    /// The executable's file name (`Hades.exe`), when its location isn't fixed. Weakest of the three
-    /// — see [`DetectSpec::process_name`].
+    /// The executable's file name, when its location is not fixed. See [`DetectSpec::process_name`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub process_name: Option<String>,
 }

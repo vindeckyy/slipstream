@@ -190,12 +190,10 @@ function uiPasswordFile(): string {
 	}
 	const configDir =
 		process.env.SLIPSTREAM_CONFIG_DIR ||
-		(process.platform === "win32"
-			? join(process.env.ProgramData || homedir(), "slipstream")
-			: join(
-					process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
-					"slipstream",
-				));
+		join(
+			process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
+			"slipstream",
+		);
 	return join(configDir, "web-password");
 }
 

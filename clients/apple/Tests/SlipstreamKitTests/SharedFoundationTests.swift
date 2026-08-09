@@ -386,13 +386,13 @@ final class SharedFoundationTests: XCTestCase {
         overlay.refreshHz = 120
         overlay.codec = "av1"
         overlay.enable444 = true
-        overlay.modifierLayout = "windows"
+        overlay.modifierLayout = "pc"
         XCTAssertFalse(overlay.isEmpty)
         let out = base.applying(overlay)
         XCTAssertEqual([out.width, out.height, out.refreshHz], [3840, 2160, 120])
         XCTAssertEqual(out.codec, "av1")
         XCTAssertTrue(out.enable444)
-        XCTAssertEqual(out.modifierLayout, "windows")
+        XCTAssertEqual(out.modifierLayout, "pc")
         // Untouched fields keep following the base.
         XCTAssertEqual(out.bitrateKbps, 20_000)
         // Tier-G endpoints are not in the overlay at all — no profile can move this device's

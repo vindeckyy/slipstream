@@ -83,7 +83,7 @@ pub(crate) const CLOCK_RESYNC_INTERVAL: Duration = Duration::from_secs(60);
 pub(crate) const STANDING_LAT_THRESH_NS: i128 = 10_000_000;
 
 /// Consecutive elevated report windows (~750 ms each) before the bleed escalates — ~4.5 s of a
-/// continuously standing, loss-free elevation. Windows with any loss reset the run: loss means
+/// continuously standing, loss-free elevation. Any interval with loss resets the run: loss means
 /// genuine congestion, which the FEC/ABR machinery owns, not this detector.
 pub(crate) const STANDING_LAT_WINDOWS: u32 = 6;
 

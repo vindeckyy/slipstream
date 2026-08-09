@@ -33,13 +33,13 @@ const writePkg = (dir: string, name: string, version: string) => {
 
 describe("resolvePackage", () => {
 	test("maps bare first-party names into the @slipstream scope", () => {
-		expect(resolvePackage("playnite")).toBe("@slipstream/plugin-playnite");
+		expect(resolvePackage("catalog-sync")).toBe("@slipstream/plugin-catalog-sync");
 		expect(resolvePackage("rom-manager")).toBe("@slipstream/plugin-rom-manager");
 	});
 
 	test("passes @slipstream-scoped names through verbatim (our registry, no gate)", () => {
-		expect(resolvePackage("@slipstream/plugin-playnite")).toBe(
-			"@slipstream/plugin-playnite",
+		expect(resolvePackage("@slipstream/plugin-catalog-sync")).toBe(
+			"@slipstream/plugin-catalog-sync",
 		);
 	});
 
@@ -62,7 +62,7 @@ describe("resolvePackage", () => {
 	});
 
 	test("trims and rejects empty", () => {
-		expect(resolvePackage("  playnite  ")).toBe("@slipstream/plugin-playnite");
+		expect(resolvePackage("  catalog-sync  ")).toBe("@slipstream/plugin-catalog-sync");
 		expect(() => resolvePackage("   ")).toThrow();
 	});
 });
@@ -116,13 +116,13 @@ describe("listInstalled", () => {
 	test("finds both scoped and unscoped plugins with versions, ignoring other packages", () => {
 		const dir = tmp("list-mixed");
 		writePkg(dir, "slipstream-plugin-custom", "1.2.3");
-		writePkg(dir, path.join("@slipstream", "plugin-playnite"), "0.2.0");
+		writePkg(dir, path.join("@slipstream", "plugin-catalog-sync"), "0.2.0");
 		writePkg(dir, "effect", "4.0.0"); // an ordinary dep — must not be listed
 		writePkg(dir, path.join("@slipstream", "host"), "0.1.1"); // scoped non-plugin — ignored
 
 		const found = listInstalled(dir);
 		expect(found).toEqual([
-			{ pkg: "@slipstream/plugin-playnite", version: "0.2.0" },
+			{ pkg: "@slipstream/plugin-catalog-sync", version: "0.2.0" },
 			{ pkg: "slipstream-plugin-custom", version: "1.2.3" },
 		]);
 	});
@@ -210,7 +210,7 @@ describe("ensurePluginsDir", () => {
 
 	test("never overwrites an existing package.json", () => {
 		const dir = tmp("ensure-keep");
-		const manifest = '{"dependencies":{"@slipstream/plugin-playnite":"0.3.0"}}';
+		const manifest = '{"dependencies":{"@slipstream/plugin-catalog-sync":"0.3.0"}}';
 		fs.writeFileSync(path.join(dir, "package.json"), manifest);
 		ensurePluginsDir(dir);
 		expect(fs.readFileSync(path.join(dir, "package.json"), "utf8")).toBe(manifest);

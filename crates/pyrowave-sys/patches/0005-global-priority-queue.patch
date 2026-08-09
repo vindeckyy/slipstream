@@ -2,38 +2,34 @@ Elevated global-priority encode queue — SLIPSTREAM LOCAL PATCH.
 
 Not upstream. PyroWave's wavelet encode runs on the GPU's compute/shader cores, so a GPU-bound
 game starves it: `pyrowave_encoder_encode_gpu_synchronous` spikes from ~2 ms to ~15 ms under a
-95%+ game load and the stream framerate collapses (NVENC is immune — it uses the separate encoder
-ASIC). A WDDM *process* scheduling-priority raise does not help (it orders packet submission, not
-hardware preemption). This requests a global-priority Vulkan *queue* — the actual NVIDIA compute-
-preemption lever — on the pyrowave encode device.
+95%+ game load and the stream framerate collapses. NVENC uses the separate encoder ASIC. This
+requests a global-priority Vulkan queue on the PyroWave encode device.
 
 `Context::create_device` (the pyrowave path uses plain vkCreateDevice, not the vpCreateDevice
 profile path): enable VK_KHR_global_priority (or the EXT alias), chain a
 VkDeviceQueueGlobalPriorityCreateInfoKHR into every queue-create-info, and a create loop that tries
-`PYROWAVE_QUEUE_PRIORITY` (off|high|realtime, default realtime) → HIGH → no-priority, downgrading on
+`PYROWAVE_QUEUE_PRIORITY` (off|high|realtime, default realtime), then HIGH, then no-priority, downgrading on
 VK_ERROR_NOT_PERMITTED_KHR so a refused class NEVER regresses the encoder. Gated on !inherit_info
 (only the fresh encoder device). This Granite copy is vendored solely for the PyroWave codec.
 
-NOTE: on an RTX 4090 / Windows / WDDM this did not reduce the spikes (the graphics-vs-compute
-preemption granularity is the wall) — kept because it is correct, harmless (graceful fallback), and
-may help other GPUs/drivers. Reduce the encode's GPU cost (4:2:0/8-bit) or use H.265 for a
-GPU-saturated game.
+Tests on an RTX 4090 did not reduce the spikes because graphics and compute preemption remains
+coarse. The fallback is harmless and may help other GPUs or drivers. Reduce the encode GPU cost
+(4:2:0/8-bit) or use H.265 for a GPU-saturated game.
 
 diff --git a/crates/pyrowave-sys/vendor/pyrowave/Granite/vulkan/context.cpp b/crates/pyrowave-sys/vendor/pyrowave/Granite/vulkan/context.cpp
 index 5257fc33..479eeded 100644
 --- a/crates/pyrowave-sys/vendor/pyrowave/Granite/vulkan/context.cpp
 +++ b/crates/pyrowave-sys/vendor/pyrowave/Granite/vulkan/context.cpp
-@@ -2115,6 +2115,51 @@ bool Context::create_device(VkPhysicalDevice gpu_, VkSurfaceKHR surface,
+@@ -2115,6 +2115,50 @@ bool Context::create_device(VkPhysicalDevice gpu_, VkSurfaceKHR surface,
  		vpGetProfileProperties(profile.profile, &props);
  #endif
  
 +	// SLIPSTREAM PATCH (patches/0005-global-priority-queue.patch, NOT upstream): request a high
 +	// global-priority queue so PyroWave's compute-shader encode can PREEMPT a GPU-bound game on
-+	// the shared shader cores. A WDDM process-priority raise does not help (it only orders packet
-+	// submission, not hardware preemption); a global-priority queue is the actual NVIDIA compute-
++	// the shared shader cores. A global-priority queue is the actual NVIDIA compute-
 +	// preemption lever. `PYROWAVE_QUEUE_PRIORITY` = off | high | realtime (default realtime). The
 +	// device-create loop below downgrades on NOT_PERMITTED, so a refused class NEVER fails the
-+	// encoder — it just runs at default priority. Only the fresh encoder device (no inherit_info)
++	// encoder; it just runs at default priority. Only the fresh encoder device (no inherit_info)
 +	// is affected; this Granite copy is vendored solely for the PyroWave codec.
 +	Util::SmallVector<VkQueueGlobalPriorityKHR> ss_priority_candidates;
 +	Util::SmallVector<VkDeviceQueueGlobalPriorityCreateInfoKHR> ss_global_priority_infos;
@@ -75,7 +71,7 @@ index 5257fc33..479eeded 100644
  	if (inherit_info)
  	{
  		device_info.enabledExtensionCount = inherit_info->enabledExtensionCount;
-@@ -2144,8 +2189,41 @@ bool Context::create_device(VkPhysicalDevice gpu_, VkSurfaceKHR surface,
+@@ -2144,8 +2188,41 @@ bool Context::create_device(VkPhysicalDevice gpu_, VkSurfaceKHR surface,
  			if (device == VK_NULL_HANDLE)
  				return false;
  		}

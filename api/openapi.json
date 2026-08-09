@@ -4896,7 +4896,7 @@
         "allOf": [
           {
             "$ref": "#/components/schemas/GameMeta",
-            "description": "Descriptive metadata (platform, description, …), flattened — see [`GameMeta`]."
+            "description": "Descriptive metadata (platform, description, and related fields), flattened. See [`GameMeta`]."
           },
           {
             "type": "object",
@@ -4910,14 +4910,14 @@
               },
               "detect": {
                 "$ref": "#/components/schemas/DetectHint",
-                "description": "How to recognize this title's process once it is running (design §9) — the one thing a\nprovider knows that the host cannot work out for itself.\n\nOptional: without it the entry is still tracked by the child the host spawns for it, which\ncovers every command that stays in the foreground. It earns its keep for a command that hands\noff and exits — a launcher script, a `flatpak run`, a front-end that starts an emulator — where\nthe host would otherwise lose the game the moment the shim returns."
+                "description": "How to recognize this title's process once it is running (design §9), the one thing a\nprovider knows that the host cannot work out for itself.\n\nOptional: without it the entry is still tracked by the child the host spawns for it, which\ncovers every command that stays in the foreground. It earns its keep for a command that hands\noff and exits, such as a launcher script, `flatpak run`, or a front-end that starts an emulator, where\nthe host would otherwise lose the game the moment the shim returns."
               },
               "external_id": {
                 "type": [
                   "string",
                   "null"
                 ],
-                "description": "The provider's own stable key for this title — the reconcile diff key, so the\nhost-assigned `id` stays stable across reconciles. Present iff `provider` is."
+                "description": "The provider's own stable key for this title. This is the reconcile diff key, so the\nhost-assigned `id` stays stable across reconciles. Present iff `provider` is."
               },
               "id": {
                 "type": "string",
@@ -4945,7 +4945,7 @@
                   "string",
                   "null"
                 ],
-                "description": "The external provider owning this entry (RFC §8), set ONLY by the provider reconcile\nAPI — `None` = a manual entry, which no provider operation ever touches, and which the\nmanual CRUD alone may edit (the converse holds too: manual CRUD refuses provider-owned\nentries, so ownership is never ambiguous)."
+                "description": "The external provider owning this entry (RFC §8), set ONLY by the provider reconcile\nAPI. `None` means a manual entry, which no provider operation ever touches, and which the\nmanual CRUD alone may edit (the converse holds too: manual CRUD refuses provider-owned\nentries, so ownership is never ambiguous)."
               },
               "title": {
                 "type": "string"
@@ -4959,7 +4959,7 @@
         "allOf": [
           {
             "$ref": "#/components/schemas/GameMeta",
-            "description": "Descriptive metadata (platform, description, …), flattened — see [`GameMeta`]. Replaced\nwholesale on update, like `art`: an edit must round-trip every field it wants kept."
+            "description": "Descriptive metadata (platform, description, and related fields), flattened. See [`GameMeta`]. Replaced\nwholesale on update, like `art`: an edit must round-trip every field it wants kept."
           },
           {
             "type": "object",
@@ -4972,7 +4972,7 @@
               },
               "detect": {
                 "$ref": "#/components/schemas/DetectHint",
-                "description": "How to recognize this title's process — see [`CustomEntry::detect`]."
+                "description": "How to recognize this title's process. See [`CustomEntry::detect`]."
               },
               "launch": {
                 "oneOf": [
@@ -4989,7 +4989,7 @@
                 "items": {
                   "$ref": "#/components/schemas/PrepCmd"
                 },
-                "description": "Per-title prep/undo steps — commands run as the host user; operator-privileged config."
+                "description": "Per-title prep/undo steps. Commands run as the host user with operator privileges."
               },
               "title": {
                 "type": "string"
@@ -4997,7 +4997,7 @@
             }
           }
         ],
-        "description": "Request body to create or replace a custom entry (no `id` — the host owns it)."
+        "description": "Request body to create or replace a custom entry. The host owns the `id`."
       },
       "CustomPreset": {
         "type": "object",
@@ -5047,7 +5047,7 @@
       },
       "DetectHint": {
         "type": "object",
-        "description": "What an operator (or a provider plugin) can tell the host about recognizing a title — the wire\nhalf of [`DetectSpec`], and the only part of it that is ever accepted from outside.\n\nDeliberately a **subset**: the store-derived signals (a Steam appid, a launcher's environment\nmarker) are things the host discovers for itself and would be meaningless — or dangerous — to take\non someone's word. What is left is what a provider genuinely knows and the host cannot guess: where\nthe title is installed, which executable is the game, what the process is called. All three are\noptional; supplying none is the same as supplying no hint at all.\n\nNever returned by the catalog API — see the module docs on why detect data does not cross the wire\noutbound.",
+        "description": "What an operator or provider plugin can tell the host about recognizing a title. This is the wire\nhalf of [`DetectSpec`], and the only part of it that is ever accepted from outside.\n\nDeliberately a **subset**: the store-derived signals (a Steam appid, a launcher's environment\nmarker) are things the host discovers for itself and would be meaningless or dangerous to take\non someone's word. What is left is what a provider genuinely knows and the host cannot guess: where\nthe title is installed, which executable is the game, what the process is called. All three are\noptional; supplying none is the same as supplying no hint at all.\n\nNever returned by the catalog API. See the module docs on why detect data does not cross the wire\noutbound.",
         "properties": {
           "exe": {
             "type": [
@@ -5061,14 +5061,14 @@
               "string",
               "null"
             ],
-            "description": "Where the title is installed. Any process running from under this directory is part of the\ngame — the universal recipe, and the one worth supplying if you supply only one."
+            "description": "Where the title is installed. Any process running from under this directory is part of the\ngame. This is the best field to supply when only one is available."
           },
           "process_name": {
             "type": [
               "string",
               "null"
             ],
-            "description": "The executable's file name (`Hades.exe`), when its location isn't fixed. Weakest of the three\n— see [`DetectSpec::process_name`]."
+            "description": "The executable's file name, when its location is not fixed. See [`DetectSpec::process_name`]."
           }
         }
       },
@@ -5733,7 +5733,7 @@
         "allOf": [
           {
             "$ref": "#/components/schemas/GameMeta",
-            "description": "Descriptive metadata, flattened — see [`GameMeta`]."
+            "description": "Descriptive metadata, flattened. See [`GameMeta`]."
           },
           {
             "type": "object",
@@ -5768,7 +5768,7 @@
                   "string",
                   "null"
                 ],
-                "description": "The external provider owning this entry (custom-store entries synced by a provider\nplugin, RFC §8) — `None` for installed-store titles and manual custom entries. The\nconsole uses it for attribution; `GET /library?provider=` filters on it."
+                "description": "The external provider owning this entry (custom-store entries synced by a provider\nplugin, RFC §8). This is `None` for installed-store titles and manual custom entries. The\nconsole uses it for attribution; `GET /library?provider=` filters on it."
               },
               "store": {
                 "type": "string",
@@ -5785,7 +5785,7 @@
       },
       "GameMeta": {
         "type": "object",
-        "description": "Descriptive metadata for a title — everything a richer library UI (details pane, platform\nfilter, couch-pick badges) renders beyond the poster. Every field is optional and defaults to\nabsent, so pre-metadata catalogs, providers, and clients keep working unchanged. The struct is\n`#[serde(flatten)]`-ed into [`GameEntry`] / the custom-store shapes: one definition, a flat\nwire shape everywhere.\n\nValues are free-form display strings, not enums — emulation sources (RomM, EmuDeck, Playnite)\neach have their own vocabulary and the host has no business normalizing it.",
+        "description": "Descriptive metadata for a title. This covers everything a richer library UI (details pane, platform\nfilter, couch-pick badges) renders beyond the poster. Every field is optional and defaults to\nabsent, so pre-metadata catalogs, providers, and clients keep working unchanged. The struct is\nflattened into [`GameEntry`] and the custom-store shapes: one definition, a flat\nwire shape everywhere.\n\nValues are free-form display strings, not enums. Emulation sources such as RomM, EmuDeck, and Lutris\neach have their own vocabulary and the host has no business normalizing it.",
         "properties": {
           "description": {
             "type": [
@@ -5805,14 +5805,14 @@
             "items": {
               "type": "string"
             },
-            "description": "Genre taxonomy from the metadata source (`\"RPG\"`, `\"Platformer\"`, …)."
+            "description": "Genre taxonomy from the metadata source, such as `\"RPG\"` or `\"Platformer\"`."
           },
           "platform": {
             "type": [
               "string",
               "null"
             ],
-            "description": "The system the title runs on — `\"PS2\"`, `\"Xbox 360\"`, `\"SNES\"`, … Installed-store\nscanners stamp `\"PC\"`; `GET /library?platform=` filters on it (case-insensitive).",
+            "description": "The system the title runs on, such as `\"PS2\"`, `\"Xbox 360\"`, `\"SNES\"`, or `\"PC\"`. Installed-store\nscanners stamp `\"PC\"`; `GET /library?platform=` filters on it (case-insensitive).",
             "example": "PS2"
           },
           "players": {
@@ -5835,7 +5835,7 @@
               "string",
               "null"
             ],
-            "description": "Release region — emulation-relevant (`\"NTSC-U\"`, `\"PAL\"`, `\"NTSC-J\"`)."
+            "description": "Emulation release region, such as `\"NTSC-U\"`, `\"PAL\"`, or `\"NTSC-J\"`."
           },
           "release_year": {
             "type": [
@@ -5843,7 +5843,7 @@
               "null"
             ],
             "format": "int32",
-            "description": "Year of first release — the granularity metadata sources reliably agree on.",
+            "description": "Year of first release, the granularity metadata sources reliably agree on.",
             "example": 2001,
             "minimum": 0
           },
@@ -5852,7 +5852,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Free-form organizational labels (`\"co-op\"`, `\"kids\"`, `\"finished\"`, …)."
+            "description": "Free-form organizational labels, such as `\"co-op\"`, `\"kids\"`, or `\"finished\"`."
           }
         }
       },
@@ -7360,7 +7360,7 @@
         "allOf": [
           {
             "$ref": "#/components/schemas/GameMeta",
-            "description": "Descriptive metadata (platform, description, …), flattened — see [`GameMeta`]."
+            "description": "Descriptive metadata (platform, description, and related fields), flattened. See [`GameMeta`]."
           },
           {
             "type": "object",
@@ -7374,7 +7374,7 @@
               },
               "detect": {
                 "$ref": "#/components/schemas/DetectHint",
-                "description": "How to recognize this title's process — see [`CustomEntry::detect`]. A provider that knows its\ntitles' install directories (Playnite does) should send them: it is what lets a game launched\nthrough the provider's own client still end its session when the player quits."
+                "description": "How to recognize this title's process. See [`CustomEntry::detect`]. Providers that know their\ntitles' install directories should send them so the session can end when the player quits."
               },
               "external_id": {
                 "type": "string",
@@ -7395,7 +7395,7 @@
                 "items": {
                   "$ref": "#/components/schemas/PrepCmd"
                 },
-                "description": "Per-title prep/undo steps — commands run as the host user; operator-privileged config."
+                "description": "Per-title prep/undo steps. Commands run as the host user with operator privileges."
               },
               "title": {
                 "type": "string"

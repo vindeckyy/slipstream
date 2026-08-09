@@ -315,7 +315,7 @@ impl<B: PadProto> UhidManager<B> {
                 // A non-zero rumble is latched but the game has not driven the rumble plane for
                 // the idle window — a residual it forgot to stop (or whose stop was lost). Force it
                 // off (and forward the zero) so `native.rs`'s resend loop stops droning it to the
-                // client. Mirrors the XUSB path's guard; see RUMBLE_IDLE_TIMEOUT.
+                // client. Mirrors the other gamepad path's guard; see RUMBLE_IDLE_TIMEOUT.
                 tracing::info!(
                     backend = B::LABEL,
                     index = i,

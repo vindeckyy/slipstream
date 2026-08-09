@@ -179,13 +179,11 @@ export const BrowseTab: FC<{
 };
 
 /**
- * The catalog stores platform IDENTIFIERS (`linux | windows | macos` — see the index
- * validator); these are their display names. Proper nouns, so deliberately not routed
- * through i18n, and `macos` is spelled the way Apple spells it.
+ * Catalog platform identifiers map to short display names. Proper nouns are deliberately not
+ * routed through i18n, and `macos` is spelled the way Apple spells it.
  */
 const PLATFORM_LABELS: Record<string, string> = {
 	linux: "Linux",
-	windows: "Windows",
 	macos: "macOS",
 };
 
@@ -249,7 +247,7 @@ export const StoreCard: FC<{ entry: StoreEntry; onInstall: () => void }> = ({
 				<div className="flex flex-wrap gap-1.5">
 					{entry.platforms.map((p) => (
 						<Badge key={p} variant="secondary" className="font-normal">
-							{PLATFORM_LABELS[p] ?? p}
+							{PLATFORM_LABELS[p] ?? "Other"}
 						</Badge>
 					))}
 				</div>

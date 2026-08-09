@@ -346,7 +346,7 @@ impl KnownHosts {
     ///
     /// `upsert` alone keys on the fingerprint, deliberately: that is how a host which moved
     /// address keeps its record and the fields the user set on it. The cost was that a host
-    /// which changed IDENTITY — a reinstall, a wiped `ProgramData`, a re-key — matched nothing
+    /// which changed identity after a reinstall, wiped host state, or re-key matched nothing
     /// and got a SECOND record appended for the address it already had, and every later
     /// connect then pinned the dead fingerprint from the older one. No way out from the UI,
     /// and re-pairing didn't help: the ceremony succeeded and appended yet another record.
@@ -1323,7 +1323,7 @@ mod tests {
         assert_eq!(k.hosts[0].pinned_profiles, vec!["dddddddddddd".to_string()]);
     }
 
-    /// A host that regenerated its identity (reinstall, wiped ProgramData, re-key) ends up with
+    /// A host that regenerated its identity after a reinstall, wiped state, or re-key ends up with
     /// ONE record for its address — the live one. This is the `.173` lockout: `upsert` keys on
     /// the fingerprint, so the re-paired host used to be appended beside the dead record, and
     /// every later connect pinned the dead one — forever, re-pairing included.

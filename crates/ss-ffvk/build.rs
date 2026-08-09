@@ -16,6 +16,7 @@ use std::path::PathBuf;
 fn main() {
     println!("cargo:rerun-if-changed=wrapper.h");
     println!("cargo:rerun-if-env-changed=PF_FFVK_VULKAN_INCLUDE");
+    println!("cargo:rustc-check-cfg=cfg(ss_ffvk_has_queue_family_list)");
     let out = PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs");
 
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
@@ -62,6 +63,12 @@ fn main() {
          (the header includes <vulkan/vulkan.h>)",
     );
     bindings.write_to_file(&out).unwrap();
+    if std::fs::read_to_string(&out)
+        .map(|contents| contents.contains("pub struct AVVulkanDeviceQueueFamily"))
+        .unwrap_or(false)
+    {
+        println!("cargo:rustc-cfg=ss_ffvk_has_queue_family_list");
+    }
 
     // The av_vk_* symbols live in libavutil, which ffmpeg-sys-next already links into
     // every consumer of this crate; no extra link flags needed.

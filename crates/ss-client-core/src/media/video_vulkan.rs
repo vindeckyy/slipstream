@@ -167,46 +167,16 @@ impl VulkanDecoder {
             (*hwctx).enabled_dev_extensions = store.dev_ptrs.as_ptr();
             (*hwctx).nb_enabled_dev_extensions = store.dev_ptrs.len() as i32;
 
-            // Queue map: the deprecated per-role indices (tx/comp are "Required") plus
-            // the qf[] list, which per the header must also carry every family named
-            // above. One merged entry when decode shares the graphics family.
+            // Configure the role-specific queue fields and the queue-family list when available.
             let g = vk.graphics_qf as i32;
             let d = vk.decode_qf as i32;
-            (*hwctx).queue_family_index = g;
-            (*hwctx).nb_graphics_queues = 1;
-            (*hwctx).queue_family_tx_index = g;
-            (*hwctx).nb_tx_queues = 1;
-            (*hwctx).queue_family_comp_index = g;
-            (*hwctx).nb_comp_queues = 1;
-            (*hwctx).queue_family_encode_index = -1;
-            (*hwctx).nb_encode_queues = 0;
-            (*hwctx).queue_family_decode_index = d;
-            (*hwctx).nb_decode_queues = 1;
-            const VIDEO_DECODE_BIT: u32 = 0x20; // VK_QUEUE_VIDEO_DECODE_BIT_KHR
-                                                // Bindgen enum types are cast at this FFI boundary.
-            if g == d {
-                (*hwctx).qf[0] = ss_ffvk::AVVulkanDeviceQueueFamily {
-                    idx: g,
-                    num: 1,
-                    flags: (vk.graphics_queue_flags | VIDEO_DECODE_BIT) as _,
-                    video_caps: vk.decode_video_caps as _,
-                };
-                (*hwctx).nb_qf = 1;
-            } else {
-                (*hwctx).qf[0] = ss_ffvk::AVVulkanDeviceQueueFamily {
-                    idx: g,
-                    num: 1,
-                    flags: vk.graphics_queue_flags as _,
-                    video_caps: 0,
-                };
-                (*hwctx).qf[1] = ss_ffvk::AVVulkanDeviceQueueFamily {
-                    idx: d,
-                    num: 1,
-                    flags: VIDEO_DECODE_BIT as _,
-                    video_caps: vk.decode_video_caps as _,
-                };
-                (*hwctx).nb_qf = 2;
-            }
+            ss_ffvk::configure_device_queues(
+                &mut *hwctx,
+                g,
+                d,
+                vk.graphics_queue_flags,
+                vk.decode_video_caps,
+            );
 
             // Shared-queue external sync (see [`QueueLock`]): FFmpeg must take the
             // same lock the presenter holds around its own submits/presents — set

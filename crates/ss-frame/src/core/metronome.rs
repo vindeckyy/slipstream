@@ -4,8 +4,8 @@
 //! disturbance on a stable multi-second period (display-topology churn, display-poller software,
 //! virtual-display present timing). Random network loss is bursty and irregular; a stable period is
 //! a machine, and saying so in the host log turns a "nothing in the logs :/" report into a
-//! self-diagnosis. Two feeds today: served client-recovery IDRs (`native`) and IDD-push capture
-//! stalls in the display capture pipeline.
+//! self-diagnosis. Two feeds today: served client-recovery IDRs (`native`) and capture stalls in
+//! the display capture pipeline.
 
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};

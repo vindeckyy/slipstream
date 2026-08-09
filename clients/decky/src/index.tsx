@@ -126,7 +126,7 @@ const QamPanel: FC = () => {
         </PanelSectionRow>
       </PanelSection>
 
-      {/* Pinned games — the "jump straight into Playnite" rows. Pin games from a host's
+      {/* Pinned games for direct launch. Pin games from a host's
           picker (fullscreen page → host row → games button). */}
       {pins.pins.length > 0 && (
         <PanelSection title="Pinned Games">

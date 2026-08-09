@@ -8,14 +8,14 @@
 //
 // With a subcommand it manages plugin packages (the host CLI forwards `slipstream-host plugins …`
 // here):
-//   add <name…>      install first-party plugins (playnite, rom-manager); anything resolving on
+//   add <name...>     install first-party plugins (catalog-sync, rom-manager); anything resolving on
 //                    the PUBLIC npm registry (slipstream-plugin-*, foreign scopes) additionally
 //                    needs --allow-public-registry
 //   remove <name…>   uninstall
 //   list             list installed plugin packages
 //
 //   bun src/runner-cli.ts [--scripts DIR] [--plugins DIR] [--list]   (run the runner)
-//   bun src/runner-cli.ts add playnite [--plugins DIR]               (package ops)
+//   bun src/runner-cli.ts add catalog-sync [--plugins DIR]           (package ops)
 //
 // Package-op flags: --exact pins the resolved version instead of a caret range, and
 // --registry @scope=https://… maps a scope to its registry in bunfig.toml. Both exist for the
@@ -107,7 +107,7 @@ const runPkgOp = (
 	const names = positionals();
 	if (names.length === 0) {
 		console.error(
-			`usage: slipstream-host plugins ${verb} <name…>  (e.g. playnite, rom-manager)`,
+			`usage: slipstream-host plugins ${verb} <name...>  (e.g. catalog-sync, rom-manager)`,
 		);
 		process.exit(2);
 	}

@@ -88,8 +88,8 @@ pub fn vk_to_evdev(vk: u8) -> Option<u16> {
         0x5A => Some(44), // Z
 
         // --- Meta / context-menu ---
-        0x5B => Some(125), // VK_LWIN -> KEY_LEFTMETA
-        0x5C => Some(126), // VK_RWIN -> KEY_RIGHTMETA
+        0x5B => Some(125), // left Super to KEY_LEFTMETA
+        0x5C => Some(126), // right Super to KEY_RIGHTMETA
         0x5D => Some(127), // VK_APPS -> KEY_COMPOSE
 
         // --- Numpad ---

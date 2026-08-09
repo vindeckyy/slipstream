@@ -60,7 +60,7 @@ pub(crate) fn fetch_image(url: &str) -> Option<(Vec<u8>, String)> {
 
 /// A stored [`Artwork`] value that is a **local filesystem path** to an image on the host — as
 /// opposed to an `http(s)`/`data:` URL or an already-relative host proxy path. Provider plugins that
-/// run on the host (e.g. the Playnite sync plugin) set these: the reconcile payload stays tiny
+/// run on the host set these: the reconcile payload stays small
 /// (paths, not inlined bytes, so it scales to thousands of titles) and the host serves the bytes
 /// through the art proxy, exactly like Steam's cache art. Absolute Linux paths are accepted;
 /// proxy paths and URLs are not.

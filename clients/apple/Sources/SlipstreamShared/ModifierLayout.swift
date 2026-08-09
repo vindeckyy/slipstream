@@ -1,34 +1,33 @@
-// Location-based modifier mapping — which Windows VK each PHYSICAL modifier position forwards to
-// the host. A Mac keyboard's bottom row is `⌃ Control / ⌥ Option / ⌘ Command / space`; a Windows
-// keyboard's is `Ctrl / ⊞ Super / Alt / space`. So the key NEAREST the space bar is Command on a
-// Mac but Alt on Windows, and the next one out is Option on a Mac but the Windows key. A user who
-// grew up on Windows reaches for Alt where the Mac has Command; this setting lets them get that
-// muscle memory back WITHOUT relabelling keycaps — it remaps by physical position, not by a blunt
-// "swap these two VKs" that would also drag Control/Shift or lose the left/right distinction.
+// Location-based modifier mapping, which GameStream virtual-key each PHYSICAL modifier position
+// forwards to the host. A Mac keyboard's bottom row is `Control / Option / Command / space`; a PC
+// keyboard's is `Ctrl / Super / Alt / space`. The key nearest the space bar is Command on a Mac but
+// Alt on a PC, and the next one out is Option on a Mac but Super on a PC. This setting preserves
+// that muscle memory without relabelling keycaps. It remaps by physical position, preserving
+// Control/Shift and the left/right distinction.
 //
-// The model: keep the physical detection (which side, which key) exactly as the OS reports it, and
-// swap only the Alt-vs-Super ROLE between the Option and Command keys, per side. So under `.windows`
-// the ⌘ position emits Alt (VK_L/RMENU) and the ⌥ position emits the Windows key (VK_L/RWIN), while
+// The model keeps physical detection (which side, which key) exactly as the OS reports it, then
+// swaps only the Alt and Super roles between the Option and Command keys, per side. Under `.pc`,
+// the Command position emits Alt (VK_L/RMENU) and the Option position emits Super (VK_L/RWIN), while
 // left stays left and right stays right. Control and Shift are in the same place on both keyboards,
-// so they never move. Lives in SlipstreamShared because both the Settings UI (SlipstreamClient) and
-// the wire-boundary remap (`InputCapture.applyModifierLayout`, SlipstreamKit) resolve it.
+// so they never move. This lives in SlipstreamShared because both the Settings UI (SlipstreamClient)
+// and the wire-boundary remap (`InputCapture.applyModifierLayout`, SlipstreamKit) resolve it.
 
 import Foundation
 
 /// How the physical ⌥ Option / ⌘ Command keys map to host modifiers. The raw values are stable on
-/// disk — rename the cases freely, never the strings.
+/// disk. Keep the raw values stable after release.
 public enum ModifierLayout: String, CaseIterable, Sendable {
-    /// Apple positions (default): ⌥ Option → Alt, ⌘ Command → Super/Windows. The current behaviour.
+    /// Apple positions (default): Option to Alt, Command to Super. The current behaviour.
     case mac
-    /// Windows positions: the key nearest the space bar (⌘ Command) → Alt, the next one (⌥ Option)
-    /// → the Windows/Super key. Side (left/right) is preserved.
-    case windows
+    /// PC positions: the key nearest the space bar (Command) to Alt, the next one (Option) to Super.
+    /// Side (left/right) is preserved.
+    case pc
 
     /// User-facing label (Settings picker).
     public var label: String {
         switch self {
         case .mac: return "Mac (⌥ Alt · ⌘ Super)"
-        case .windows: return "Windows (⌘ Alt · ⌥ Super)"
+        case .pc: return "PC (⌘ Alt · ⌥ Super)"
         }
     }
 
@@ -36,9 +35,9 @@ public enum ModifierLayout: String, CaseIterable, Sendable {
     public var detail: String {
         switch self {
         case .mac:
-            return "The ⌥ Option key sends Alt and the ⌘ Command key sends the Windows key — the Apple layout."
-        case .windows:
-            return "The key nearest the space bar sends Alt and the next one sends the Windows key, matching a PC keyboard. Client shortcuts (⌘⎋ and friends) still use the physical ⌘ key."
+            return "The Option key sends Alt and the Command key sends Super, the Apple layout."
+        case .pc:
+            return "The key nearest the space bar sends Alt and the next one sends Super, matching a PC keyboard. Client shortcuts still use the physical Command key."
         }
     }
 

@@ -73,17 +73,17 @@ pub struct LaunchSpec {
     pub value: String,
 }
 
-/// Descriptive metadata for a title — everything a richer library UI (details pane, platform
+/// Descriptive metadata for a title. This covers everything a richer library UI (details pane, platform
 /// filter, couch-pick badges) renders beyond the poster. Every field is optional and defaults to
 /// absent, so pre-metadata catalogs, providers, and clients keep working unchanged. The struct is
-/// `#[serde(flatten)]`-ed into [`GameEntry`] / the custom-store shapes: one definition, a flat
+/// flattened into [`GameEntry`] and the custom-store shapes: one definition, a flat
 /// wire shape everywhere.
 ///
-/// Values are free-form display strings, not enums — emulation sources (RomM, EmuDeck, Playnite)
+/// Values are free-form display strings, not enums. Emulation sources such as RomM, EmuDeck, and Lutris
 /// each have their own vocabulary and the host has no business normalizing it.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct GameMeta {
-    /// The system the title runs on — `"PS2"`, `"Xbox 360"`, `"SNES"`, … Installed-store
+    /// The system the title runs on, such as `"PS2"`, `"Xbox 360"`, `"SNES"`, or `"PC"`. Installed-store
     /// scanners stamp `"PC"`; `GET /library?platform=` filters on it (case-insensitive).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(example = "PS2")]
@@ -95,17 +95,17 @@ pub struct GameMeta {
     pub developer: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub publisher: Option<String>,
-    /// Year of first release — the granularity metadata sources reliably agree on.
+    /// Year of first release, the granularity metadata sources reliably agree on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(example = 2001)]
     pub release_year: Option<u16>,
-    /// Genre taxonomy from the metadata source (`"RPG"`, `"Platformer"`, …).
+    /// Genre taxonomy from the metadata source, such as `"RPG"` or `"Platformer"`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub genres: Vec<String>,
-    /// Free-form organizational labels (`"co-op"`, `"kids"`, `"finished"`, …).
+    /// Free-form organizational labels, such as `"co-op"`, `"kids"`, or `"finished"`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
-    /// Release region — emulation-relevant (`"NTSC-U"`, `"PAL"`, `"NTSC-J"`).
+    /// Emulation release region, such as `"NTSC-U"`, `"PAL"`, or `"NTSC-J"`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub region: Option<String>,
     /// Maximum simultaneous (local) players.
@@ -139,7 +139,7 @@ pub struct GameEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub launch: Option<LaunchSpec>,
     /// The external provider owning this entry (custom-store entries synced by a provider
-    /// plugin, RFC §8) — `None` for installed-store titles and manual custom entries. The
+    /// plugin, RFC §8). This is `None` for installed-store titles and manual custom entries. The
     /// console uses it for attribution; `GET /library?provider=` filters on it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
@@ -152,7 +152,7 @@ pub struct GameEntry {
     #[serde(skip)]
     #[schema(ignore)]
     pub detect: DetectSpec,
-    /// Descriptive metadata, flattened — see [`GameMeta`].
+    /// Descriptive metadata, flattened. See [`GameMeta`].
     #[serde(flatten)]
     pub meta: GameMeta,
 }

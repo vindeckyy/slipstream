@@ -45,7 +45,7 @@ fn parse_compositor(s: &str) -> Option<crate::vdisplay::Compositor> {
 
 /// The GameStream catalog Moonlight sees in `/applist`: the operator base ([`base_catalog`] — Desktop +
 /// apps.json) with the host's auto-detected game library ([`append_library`]) layered on top, so a
-/// Moonlight client sees the same Steam/Epic/GOG/Xbox titles the native clients do instead of just Desktop.
+/// Moonlight client sees the same Steam, Lutris, Heroic, and custom titles as native clients.
 pub fn catalog() -> Vec<AppEntry> {
     let mut apps = base_catalog();
     append_library(&mut apps);
@@ -128,7 +128,7 @@ fn base_catalog() -> Vec<AppEntry> {
 /// the small Desktop/apps.json ids so the two never collide.
 const LIBRARY_ID_BASE: u32 = 0x4000_0000;
 
-/// Append the host's installed game library ([`crate::library::all_games`] — Steam/Epic/GOG/Xbox/custom)
+/// Append the host's installed game library from [`crate::library::all_games`]
 /// to `apps`. Each title gets a STABLE GameStream `<ID>` derived from its store-qualified library id
 /// (Moonlight caches appids, so a title keeps its id across host restarts), carries that library id so
 /// the launch path resolves it against the host's own library, and is de-duplicated (by id) against the

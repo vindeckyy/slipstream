@@ -53,7 +53,7 @@ export const MonitorCard: FC = () => {
 	// `policy` is undefined, which is never equal to `pinned` — so the card used to announce an env
 	// pin that may not exist and go read-only on every slow load.
 	const envLocked = !!pinned && !!policy && policy.capture_monitor !== pinned;
-	// The host says whether it can honor a pin at all. Windows enumerates its heads but has no
+	// The host says whether it can honor a pin at all. A host can enumerate its heads without a
 	// backend that can capture one (see `MonitorsResponse.pin_supported`), and this card used to
 	// offer the choice anyway: the PUT persisted, nothing consumed it, and a virtual display was
 	// still created on connect. Defaults to TRUE when the field is absent so an older host — which

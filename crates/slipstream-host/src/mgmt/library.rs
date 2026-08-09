@@ -49,8 +49,8 @@ pub(crate) async fn get_library(
         });
     }
     // Rewrite provider entries' local-file art into host art-proxy URLs so a client fetches covers
-    // from the host (a provider like Playnite stores on-host paths; the payload stays tiny at any
-    // library size, and the client never sees an unreachable `C:\…`).
+    // from the host. Providers can store on-host paths, keeping the payload small at any library
+    // size without exposing an unreachable local path to the client.
     for g in &mut games {
         crate::library::proxy_local_art(&g.id, &mut g.art);
     }
@@ -343,8 +343,8 @@ pub(crate) async fn get_library_art(Path((id, kind)): Path<(String, String)>) ->
             _ => api_error(StatusCode::NOT_FOUND, "no art of that kind for this title"),
         };
     }
-    // Custom/provider entry (id `custom:<id>`): serve its stored LOCAL art file — e.g. the Playnite
-    // plugin's covers, reconciled as on-host paths rather than inlined bytes.
+    // Custom/provider entry (id `custom:<id>`): serve its stored local art file. Provider covers
+    // are reconciled as on-host paths rather than inlined bytes.
     if let Some(cid) = id.strip_prefix("custom:").map(str::to_owned) {
         return match tokio::task::spawn_blocking(move || {
             crate::library::custom_local_art_bytes(&cid, kind)

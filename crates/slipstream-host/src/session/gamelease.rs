@@ -11,8 +11,8 @@
 //!
 //! ### Why a lease rather than a pid
 //!
-//! Most stores never hand the host the game's process. `steam://rungameid/…`, Epic's launcher URI,
-//! an AUMID activation and Playnite's `playnite://` all hand off to a launcher that starts the game
+//! Most stores never hand the host the game's process. Steam, Heroic, and provider commands can all
+//! hand off to a launcher that starts the game
 //! somewhere else entirely and exits. So a lease is defined by *how to recognize* the game
 //! ([`crate::library::DetectSpec`]), not by a pid we happen to hold — and a lease we do hold a child
 //! for ([`LeaseKind::Child`]) falls back to recognition the moment that child turns out to be a shim.

@@ -122,11 +122,11 @@ public enum DefaultsKey {
     /// the macOS wheel, the iOS trackpad pan, and a GCMouse wheel. For users whose host expects the
     /// opposite convention from their local OS preference.
     public static let invertScroll = "slipstream.invertScroll"
-    /// Location-based modifier mapping (a `ModifierLayout` value, default `.mac`): which Windows VK
+    /// Location-based modifier mapping (a `ModifierLayout` value, default `.mac`): which GameStream virtual-key
     /// each PHYSICAL modifier position forwards to the host. `.mac` keeps ⌥ Option → Alt and
-    /// ⌘ Command → Super/Win (the Apple positions). `.windows` swaps the Alt/Super ROLE between the
-    /// Option and Command keys — preserving side (L/R) — so the key nearest the space bar acts as
-    /// Alt and the next one as the Windows key, matching a Windows keyboard's `Ctrl / ⊞ / Alt` row.
+    /// Command to Super (the Apple positions). `.pc` swaps the Alt/Super role between the
+    /// Option and Command keys, preserving side (L/R), so the key nearest the space bar acts as
+    /// Alt and the next one as the Super key, matching a PC keyboard's `Ctrl / Super / Alt` row.
     /// Only what's FORWARDED changes; client-local shortcuts (⌘⎋ &co.) stay on the physical ⌘ key.
     /// Read live at the wire boundary by `InputCapture`. Control/Shift never move (same position on
     /// both keyboards).

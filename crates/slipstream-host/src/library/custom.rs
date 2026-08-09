@@ -19,30 +19,30 @@ pub struct CustomEntry {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub prep: Vec<crate::hooks::PrepCmd>,
     /// The external provider owning this entry (RFC §8), set ONLY by the provider reconcile
-    /// API — `None` = a manual entry, which no provider operation ever touches, and which the
+    /// API. `None` means a manual entry, which no provider operation ever touches, and which the
     /// manual CRUD alone may edit (the converse holds too: manual CRUD refuses provider-owned
     /// entries, so ownership is never ambiguous).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
-    /// The provider's own stable key for this title — the reconcile diff key, so the
+    /// The provider's own stable key for this title. This is the reconcile diff key, so the
     /// host-assigned `id` stays stable across reconciles. Present iff `provider` is.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub external_id: Option<String>,
-    /// How to recognize this title's process once it is running (design §9) — the one thing a
+    /// How to recognize this title's process once it is running (design §9), the one thing a
     /// provider knows that the host cannot work out for itself.
     ///
     /// Optional: without it the entry is still tracked by the child the host spawns for it, which
     /// covers every command that stays in the foreground. It earns its keep for a command that hands
-    /// off and exits — a launcher script, a `flatpak run`, a front-end that starts an emulator — where
+    /// off and exits, such as a launcher script, `flatpak run`, or a front-end that starts an emulator, where
     /// the host would otherwise lose the game the moment the shim returns.
     #[serde(default, skip_serializing_if = "DetectHint::is_empty")]
     pub detect: DetectHint,
-    /// Descriptive metadata (platform, description, …), flattened — see [`GameMeta`].
+    /// Descriptive metadata (platform, description, and related fields), flattened. See [`GameMeta`].
     #[serde(flatten)]
     pub meta: GameMeta,
 }
 
-/// Request body to create or replace a custom entry (no `id` — the host owns it).
+/// Request body to create or replace a custom entry. The host owns the `id`.
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct CustomInput {
     pub title: String,
@@ -50,13 +50,13 @@ pub struct CustomInput {
     pub art: Artwork,
     #[serde(default)]
     pub launch: Option<LaunchSpec>,
-    /// Per-title prep/undo steps — commands run as the host user; operator-privileged config.
+    /// Per-title prep/undo steps. Commands run as the host user with operator privileges.
     #[serde(default)]
     pub prep: Vec<crate::hooks::PrepCmd>,
-    /// How to recognize this title's process — see [`CustomEntry::detect`].
+    /// How to recognize this title's process. See [`CustomEntry::detect`].
     #[serde(default)]
     pub detect: DetectHint,
-    /// Descriptive metadata (platform, description, …), flattened — see [`GameMeta`]. Replaced
+    /// Descriptive metadata (platform, description, and related fields), flattened. See [`GameMeta`]. Replaced
     /// wholesale on update, like `art`: an edit must round-trip every field it wants kept.
     #[serde(flatten)]
     pub meta: GameMeta,
@@ -73,15 +73,14 @@ pub struct ProviderEntryInput {
     pub art: Artwork,
     #[serde(default)]
     pub launch: Option<LaunchSpec>,
-    /// Per-title prep/undo steps — commands run as the host user; operator-privileged config.
+    /// Per-title prep/undo steps. Commands run as the host user with operator privileges.
     #[serde(default)]
     pub prep: Vec<crate::hooks::PrepCmd>,
-    /// How to recognize this title's process — see [`CustomEntry::detect`]. A provider that knows its
-    /// titles' install directories (Playnite does) should send them: it is what lets a game launched
-    /// through the provider's own client still end its session when the player quits.
+    /// How to recognize this title's process. See [`CustomEntry::detect`]. Providers that know their
+    /// titles' install directories should send them so the session can end when the player quits.
     #[serde(default)]
     pub detect: DetectHint,
-    /// Descriptive metadata (platform, description, …), flattened — see [`GameMeta`].
+    /// Descriptive metadata (platform, description, and related fields), flattened. See [`GameMeta`].
     #[serde(flatten)]
     pub meta: GameMeta,
 }

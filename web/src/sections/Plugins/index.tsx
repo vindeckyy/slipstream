@@ -292,11 +292,10 @@ const OfflineCard: FC<{ title: string; onRetry: () => void }> = ({
 					{m.plugin_offline_hint()}
 				</p>
 			</div>
-			{/* The exact runner commands, so the operator can act without leaving the page. */}
+			{/* The runner command, so the operator can act without leaving the page. */}
 			<pre className="w-full overflow-x-auto rounded-lg border border-border/60 bg-muted/50 p-3 text-left text-xs text-muted-foreground">
 				<code>
 					systemctl --user status slipstream-scripting{"\n"}
-					Get-ScheduledTask SlipstreamScripting{"  # Windows"}
 				</code>
 			</pre>
 			<div className="flex w-full flex-col items-center gap-1.5 sm:w-auto sm:flex-row">

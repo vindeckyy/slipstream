@@ -93,8 +93,7 @@ answers — the same cadence every graphical shell uses."
 slipstream library <host-ref> [--json] — the host's game library
 
 TSV on stdout by default (id TAB store TAB title), one game per line; --json
-emits {\"games\":[…]} for tools — the Playnite importer shells to exactly
-this. Needs a paired host (exit 6 otherwise)."
+emits {\"games\":[...]} for tools. Needs a paired host (exit 6 otherwise)."
         }
         "launch" => {
             "\
@@ -502,8 +501,7 @@ fn wake(args: &[String]) -> u8 {
 }
 
 /// `library <host-ref> [--json]` — the host's games. TSV by default because that is what
-/// Decky's existing consumer parses; `--json` is the door for tools (the Playnite importer
-/// shells to exactly this).
+/// Decky's existing consumer parses; `--json` is the interface for other tools.
 fn library_cmd(args: &[String]) -> u8 {
     let Some(reference) = positional(args, 0) else {
         eprintln!("usage: slipstream library <host-ref> [--json]");

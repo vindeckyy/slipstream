@@ -4,7 +4,8 @@
 //! from the Kotlin UI thread. NOT android-gated — send_input exists on the host build too, so these
 //! compile everywhere (parity with nativeConnect/nativeClose). The wire codes are the GameStream
 //! conventions: buttons 1=left/2=middle/3=right/4=X1/5=X2; scroll axis 0=vertical/1=horizontal,
-//! signed 120-unit delta, +=up/right; keys are Windows VK (mapped from KEYCODE_* on the Kotlin side).
+//! signed 120-unit delta, +=up/right; keys use GameStream virtual-key codes (mapped from KEYCODE_*
+//! on the Kotlin side).
 
 use jni::objects::{JByteBuffer, JFloatArray, JObject, JString};
 use jni::sys::{jboolean, jint, jlong};
@@ -125,9 +126,9 @@ pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendTouch(
     send_event(handle, kind, id as u32, x, y, (w << 16) | h);
 }
 
-/// `NativeBridge.nativeSendKey(handle, vk, down, mods)` — one key transition. `vk`: Windows
-/// Virtual-Key code (0 = unmapped → dropped). `down`: 1=press, 0=release. `mods`: VK modifier
-/// bitmask (0 for now — the host folds modifiers from the L/R modifier key events themselves).
+/// `NativeBridge.nativeSendKey(handle, vk, down, mods)` sends one key transition. `vk` is a
+/// GameStream virtual-key code (0 = unmapped and dropped). `down`: 1=press, 0=release. `mods` is
+/// a virtual-key modifier bitmask (0 for now; the host folds modifiers from the L/R events).
 #[no_mangle]
 pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeSendKey(
     _env: JNIEnv,

@@ -30,7 +30,7 @@ public extension SlipstreamInputEvent {
             (down ? SLIPSTREAM_INPUT_KIND_MOUSE_BUTTON_DOWN : SLIPSTREAM_INPUT_KIND_MOUSE_BUTTON_UP).rawValue,
             code: button, x: 0, y: 0)
     }
-    /// `vk` is a Windows virtual-key code (the host's vk_to_evdev table consumes these).
+    /// `vk` is a GameStream virtual-key code consumed by the host's vk_to_evdev table.
     static func key(_ vk: UInt32, down: Bool) -> SlipstreamInputEvent {
         make((down ? SLIPSTREAM_INPUT_KIND_KEY_DOWN : SLIPSTREAM_INPUT_KIND_KEY_UP).rawValue, code: vk, x: 0, y: 0)
     }

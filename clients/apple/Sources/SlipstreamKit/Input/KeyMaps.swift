@@ -1,30 +1,29 @@
-// InputCapture's static keymap tables: HID usage → Windows VK (the GCKeyboard path on all
-// platforms) and, on macOS, NSEvent.keyCode → Windows VK (the NSEvent key path).
+// InputCapture's static keymap tables: HID usage to GameStream virtual-key codes (the GCKeyboard
+// path on all platforms) and, on macOS, NSEvent.keyCode to the same wire codes.
 
 import SlipstreamShared
 
 extension InputCapture {
-    /// Remap one modifier VK for the active location-based [`ModifierLayout`] just before it goes on
-    /// the wire. `.mac` (and every non-modifier VK) is the identity. `.windows` swaps the Alt vs
-    /// Super/Windows ROLE between the Option and Command keys while KEEPING the side, so a Windows
-    /// user's `⌘ = Alt, ⌥ = Win` muscle memory lands correctly:
-    ///   L Command 0x5B ↔ L Alt 0xA4   ·   R Command 0x5C ↔ R Alt 0xA5.
-    /// It's applied ONLY at the send boundary (`InputCapture.emitKey`) — all press/release
+    /// Remap one modifier virtual-key code for the active location-based [`ModifierLayout`] just
+    /// before it goes on the wire. `.mac` (and every non-modifier code) is the identity. `.pc`
+    /// swaps the Alt and Super roles between the Option and Command keys while keeping the side, so
+    /// a PC keyboard user's `⌘ = Alt, ⌥ = Super` muscle memory lands correctly.
+    /// It is applied only at the send boundary (`InputCapture.emitKey`). All press/release
     /// bookkeeping stays on the physical VK, so modifier direction tracking and the client-local
     /// ⌘-based shortcuts are untouched. The swap is its own inverse: a key that went down remapped
     /// goes up remapped, so the host never sees a stuck modifier.
     static func applyModifierLayout(_ vk: UInt32, _ layout: ModifierLayout) -> UInt32 {
-        guard layout == .windows else { return vk }
+        guard layout == .pc else { return vk }
         switch vk {
-        case 0x5B: return 0xA4 // L Command → L Alt (VK_LWIN → VK_LMENU)
-        case 0x5C: return 0xA5 // R Command → R Alt (VK_RWIN → VK_RMENU)
-        case 0xA4: return 0x5B // L Option  → L Win (VK_LMENU → VK_LWIN)
-        case 0xA5: return 0x5C // R Option  → R Win (VK_RMENU → VK_RWIN)
+        case 0x5B: return 0xA4 // Left Command to left Alt
+        case 0x5C: return 0xA5 // Right Command to right Alt
+        case 0xA4: return 0x5B // Left Option to left Super
+        case 0xA5: return 0x5C // Right Option to right Super
         default: return vk
         }
     }
-    /// HID usage (GCKeyCode raw) → Windows VK (the host maps VK → evdev; every VK emitted
-    /// here exists in slipstream-host/src/inject.rs::vk_to_evdev — extend the two together).
+    /// HID usage (GCKeyCode raw) to GameStream virtual-key codes. The host maps these codes to
+    /// evdev; every emitted code exists in slipstream-host/src/inject.rs::vk_to_evdev.
     static let hidToVK: [Int: UInt32] = {
         var m: [Int: UInt32] = [:]
         // a–z: HID 0x04..0x1D → VK 'A'..'Z'.
@@ -50,8 +49,8 @@ extension InputCapture {
         m[0x49] = 0x2D; m[0x4A] = 0x24; m[0x4B] = 0x21 // insert home pageup
         m[0x4C] = 0x2E; m[0x4D] = 0x23; m[0x4E] = 0x22 // delete end pagedown
         // Keypad: NumLock, / * - +, Enter, 1..9, 0, decimal. KP Enter goes as
-        // VK_SEPARATOR (0x6C) — this host maps it to KEY_KPENTER (Windows itself would
-        // send VK_RETURN+extended, which vk_to_evdev can't distinguish).
+        // VK_SEPARATOR (0x6C): this host maps it to KEY_KPENTER; VK_RETURN with an extended flag
+        // cannot distinguish this keypad key.
         m[0x53] = 0x90
         m[0x54] = 0x6F; m[0x55] = 0x6A; m[0x56] = 0x6D; m[0x57] = 0x6B
         m[0x58] = 0x6C
@@ -65,9 +64,9 @@ extension InputCapture {
     }()
 
     #if os(macOS)
-    /// NSEvent.keyCode (Carbon virtual keycode, kVK_*) → Windows VK. The macOS NSEvent key
+    /// NSEvent.keyCode (Carbon virtual keycode, kVK_*) to GameStream virtual-key codes. The macOS key
     /// path is keyed by keyCode (a layout-independent hardware position), NOT by HID usage,
-    /// so it needs its own table — but it emits the EXACT SAME Windows VK integers `hidToVK`
+    /// so it needs its own table, but it emits the same virtual-key integers `hidToVK`
     /// already produces for each physical key (A→0x41, Return→0x0D, KeypadEnter→0x6C, …), so
     /// the host's vk_to_evdev (inject.rs) accepts both with zero change. Modifier keys come
     /// via flagsChanged (handleFlagsChanged), not keyDown, so they're absent here. Keys with
@@ -121,7 +120,7 @@ extension InputCapture {
     }()
 
     /// NSEvent.keyCode of each modifier key (kVK_Shift & co. — modifiers arrive only as
-    /// flagsChanged) → its Windows VK plus the `NSEvent.modifierFlags` bits that describe
+    /// flagsChanged) to its GameStream virtual-key code plus the `NSEvent.modifierFlags` bits that describe
     /// it: `classMask` is the device-INDEPENDENT NX_*MASK for the modifier class,
     /// `deviceBit`/`siblingBit` the device-dependent bits (LOW 16 bits, NX_DEVICE*KEYMASK
     /// in IOLLEvent.h) for this key and its opposite-side twin. Consumed by
@@ -134,14 +133,14 @@ extension InputCapture {
             62: (0xA3, 0x4_0000, 0x2000, 0x1), // right control → VK_RCONTROL
             58: (0xA4, 0x8_0000, 0x20, 0x40), // left option → VK_LMENU
             61: (0xA5, 0x8_0000, 0x40, 0x20), // right option → VK_RMENU
-            55: (0x5B, 0x10_0000, 0x8, 0x10), // left command → VK_LWIN
-            54: (0x5C, 0x10_0000, 0x10, 0x8), // right command → VK_RWIN
+            55: (0x5B, 0x10_0000, 0x8, 0x10), // left Command to left Super
+            54: (0x5C, 0x10_0000, 0x10, 0x8), // right Command to right Super
         ]
     #endif
 }
 
 #if os(iOS)
-/// US-layout character → Windows VK for the on-screen keyboard (`StreamLayerUIView`'s
+/// US-layout character to GameStream virtual-key code for the on-screen keyboard (`StreamLayerUIView`'s
 /// UIKeyInput). Unlike every other key source, `insertText` delivers CHARACTERS, not key
 /// positions, so this is the inverse of a US layout: `shift` means "wrap in VK_LSHIFT so the
 /// host types the shifted symbol". Same contract as `hidToVK`: emit only VKs the host's

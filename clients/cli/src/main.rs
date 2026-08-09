@@ -9,8 +9,7 @@
 //!
 //! Existing surfaces are a frozen compatibility contract and are NOT replaced by this: the
 //! Linux shell keeps its headless flags (Decky invokes them), and `slipstream-probe` stays the
-//! diagnostics tool. This is the door new consumers should use — the Playnite importer shells
-//! to `slipstream library <host> --json`.
+//! diagnostics tool. New integrations should use `slipstream library <host> --json`.
 //!
 //! Exit codes extend the session binary's: 0 ok, 2 connect failed, 3 trust rejected,
 //! 4 renderer failed, 5 could not resolve what was asked for, 6 refused because it needs a

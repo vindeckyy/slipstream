@@ -30,29 +30,29 @@ const BASE: StoreEntry = {
 	source: "slipstream official",
 	tier: "verified",
 	// The catalog stores lowercase platform IDENTIFIERS; the card renders display names.
-	platforms: ["linux", "windows"],
+	platforms: ["linux"],
 	compatible: true,
 	update_available: false,
 };
 
 export const Default: Story = { args: { entry: BASE } };
 
-export const AllPlatforms: Story = {
-	args: { entry: { ...BASE, platforms: ["linux", "windows", "macos"] } },
+export const MultiplePlatforms: Story = {
+	args: { entry: { ...BASE, platforms: ["linux", "macos"] } },
 };
 
 export const SinglePlatform: Story = {
 	args: {
 		entry: {
 			...BASE,
-			id: "playnite",
-			pkg: "@slipstream/plugin-playnite",
-			title: "Playnite",
+			id: "library-sync",
+			pkg: "@slipstream/plugin-library-sync",
+			title: "Library Sync",
 			description:
-				"Syncs your Playnite library into the host game library — every store and emulator Playnite manages, launched back through Playnite.",
+				"Syncs a local game library into the host game library with launch details and artwork.",
 			icon: "library-big",
 			version: "0.2.0",
-			platforms: ["windows"],
+			platforms: ["linux"],
 		},
 	},
 };

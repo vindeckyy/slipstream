@@ -375,7 +375,7 @@ object NativeBridge {
         surfaceHeight: Int,
     )
 
-    /** One key transition. vk: Windows VK (0 = dropped by Rust). mods: VK modifier mask (0 for now). */
+    /** One key transition. vk: GameStream virtual-key code (0 = dropped by Rust). mods: virtual-key modifier mask (0 for now). */
     external fun nativeSendKey(handle: Long, vk: Int, down: Boolean, mods: Int)
 
     /**

@@ -494,7 +494,7 @@ mod tests {
         start + TICK * n
     }
 
-    /// Drive `n` clean windows, asserting no decision fires before the clean threshold. Windows
+    /// Drive `n` clean report intervals, asserting no decision fires before the clean threshold. They
     /// are fully loaded (1 Gb/s actual) so neither the utilization gate nor the proven cap binds.
     fn run_clean(c: &mut BitrateController, start: Instant, from: u32, n: u32) -> Option<u32> {
         let mut out = None;

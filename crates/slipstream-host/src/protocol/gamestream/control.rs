@@ -61,7 +61,7 @@ pub fn spawn(state: Arc<AppState>) -> Result<()> {
             // junk-packet flood can't spam unbounded lines (security-review 2026-06-28 #10).
             let mut decrypt_fails: u64 = 0;
             // Decoded keyboard/mouse is forwarded to a dedicated host-lifetime injector thread —
-            // NEVER injected inline, so a slow Wayland/libei/SendInput call can't head-block ENet
+            // NEVER injected inline, so a slow Wayland/libei call can't head-block ENet
             // keepalive/retransmit servicing on this thread. The injector owns non-Send compositor
             // state and lives on its own thread (see crate::inject::InjectorService); the held
             // `inj_tx` clone keeps it alive for the control thread's lifetime.

@@ -183,7 +183,7 @@ you need Forever + Release for a dedicated box. Full reference:
 
 What every client sees as launchable titles:
 
-- Turn a **launcher source** on or off (Steam, Epic, GOG, Xbox, ... as the host found them).
+- Turn a **launcher source** on or off (Steam, Lutris, or Heroic, as the host found them).
 - Add or edit a **custom** title with its own art and launch command.
 
 This is the same catalog native clients and Moonlight show as the game list. Details:

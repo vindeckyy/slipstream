@@ -48,8 +48,8 @@ final class ModifierResolveTests: XCTestCase {
         XCTAssertEqual(resolve(keyCode: 60, rawFlags: 0x2_0004)?.vk, 0xA1) // VK_RSHIFT
         XCTAssertEqual(resolve(keyCode: 58, rawFlags: 0x8_0020)?.vk, 0xA4) // VK_LMENU
         XCTAssertEqual(resolve(keyCode: 61, rawFlags: 0x8_0040)?.vk, 0xA5) // VK_RMENU
-        XCTAssertEqual(resolve(keyCode: 55, rawFlags: 0x10_0008)?.vk, 0x5B) // VK_LWIN
-        XCTAssertEqual(resolve(keyCode: 54, rawFlags: 0x10_0010)?.vk, 0x5C) // VK_RWIN
+        XCTAssertEqual(resolve(keyCode: 55, rawFlags: 0x10_0008)?.vk, 0x5B) // left Super
+        XCTAssertEqual(resolve(keyCode: 54, rawFlags: 0x10_0010)?.vk, 0x5C) // right Super
         for (_, down) in [56, 60, 58, 61, 55, 54].compactMap({
             self.resolve(keyCode: UInt16($0), rawFlags: 0xFF_FFFF)
         }) {

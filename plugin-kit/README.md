@@ -59,9 +59,9 @@ export default definePluginKit({
 A `ProviderEntry` may carry an optional `detect` hint:
 
 ```ts
-{ external_id: "playnite:9f2...", title: "Hades",
-  launch: { kind: "command", value: "playnite://playnite/start/9f2..." },
-  detect: { install_dir: "D:\\Games\\Hades" } }
+{ external_id: "catalog:9f2...", title: "Hades",
+  launch: { kind: "command", value: "/usr/bin/game-launcher --start 9f2" },
+  detect: { install_dir: "/games/Hades" } }
 ```
 
 It is what lets the host tell that the *game* has exited  -  which ends the streaming session, so the

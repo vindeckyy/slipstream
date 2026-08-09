@@ -422,7 +422,7 @@ mod tests {
             1000.0,
             &[FakeProc::new(20, 50_000)
                 .exe("/steam/runtime/proton")
-                .cmdline(&["proton", "waitforexitandrun", "/games/elden/eldenring.exe"])],
+                .cmdline(&["launcher", "waitforexitandrun", "/games/elden/eldenring"])],
         );
         let s = scanner(td.path());
         assert_eq!(

@@ -366,7 +366,7 @@ impl relm4::factory::FactoryComponent for HostCard {
                     );
                 }
                 // "Copy link" / "Create shortcut…": the self-emitted URL for this card, which
-                // is what an external tool (a Playnite entry, a Stream Deck macro) is
+                // is what an external tool or a Stream Deck macro is
                 // configured with. It carries the stable id AND host+fp, so it still resolves
                 // after a re-address or a reinstall (design/client-deep-links.md §2/§5).
                 {

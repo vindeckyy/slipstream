@@ -1,5 +1,5 @@
 // The generic sync engine — the poll/watch/debounce/coalesce/fingerprint machinery that
-// was ~duplicated between rom-manager and playnite, as one Effect service.
+// shared by catalog providers as one Effect service.
 //
 // Semantics are a faithful port of the original Engine guard:
 //   - single-flight: a sync while one runs records a pending trigger and returns

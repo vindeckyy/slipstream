@@ -219,8 +219,8 @@ pub extern "system" fn Java_io_slipstream_kit_NativeBridge_nativeConnect<'local>
         GamepadPref::from_u8(gamepad_pref.clamp(0, u8::MAX as jint) as u8),
         bitrate_kbps.max(0) as u32, // 0 = host default
         // Advertise 10-bit + HDR ONLY when this device's display can actually present it (Kotlin
-        // checks Display.getHdrCapabilities() and passes the result): the host (e.g. Windows) then
-        // upgrades to a Main10 / BT.2020 PQ encode. On an SDR display we advertise 0 so the host
+        // checks Display.getHdrCapabilities() and passes the result): the host then upgrades to a
+        // Main10 / BT.2020 PQ encode. On an SDR display we advertise 0 so the host
         // sends a proper 8-bit BT.709 stream rather than PQ the panel would mis-tone-map. AMediaCodec
         // decodes Main10 from the SPS and the decode loop signals the Surface HDR dataspace + static
         // metadata (see crate::decode).

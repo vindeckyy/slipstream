@@ -19,7 +19,7 @@
 
 use std::sync::OnceLock;
 
-/// Lowercased executable basenames (no `.exe`) of every running process — the same snapshot the
+/// Lowercased executable basenames of every running process. This is the same snapshot the
 /// conflicting-host scan uses, exposed for the few callers that need to ask "is X running?"
 /// without duplicating a Toolhelp walk. Best-effort: an empty vec means "could not tell", never
 /// "nothing is running", so callers must not read absence as proof.
@@ -61,7 +61,7 @@ pub enum Evidence {
     Running { process: String },
     /// An OS service / systemd unit for the product is registered (installed; may be stopped).
     Service { name: String },
-    /// Installed on disk — a Flatpak app id or a binary on `PATH`.
+    /// Installed on disk as a Flatpak app id or a binary on `PATH`.
     Installed { at: String },
 }
 
@@ -83,7 +83,7 @@ pub struct Detection {
 }
 
 impl Detection {
-    /// True when a matching process is live — the acute case (a guaranteed resource clash the
+    /// True when a matching process is live. This guarantees a resource clash the
     /// moment Slipstream tries to bind its ports).
     pub fn is_running(&self) -> bool {
         self.evidence
@@ -102,8 +102,7 @@ impl Detection {
 }
 
 /// One row of the known-conflicting-host table. Names are matched case-insensitively; process /
-/// binary basenames are given **without** an extension (the platform code lowercases + strips
-/// `.exe`). Extend this as new Sunshine forks appear — the runtime, the subcommand, and the
+/// binary basenames are given without an extension. Extend this as new Sunshine forks appear. The runtime, the subcommand, and the
 /// tray/console summary all key off this one list.
 pub struct Known {
     pub product: Product,

@@ -9,7 +9,7 @@
 // CGAssociateMouseAndMouseCursorPosition(false) are the relative motion — OS-acceleration-
 // applied (not raw HID), which is exactly what Moonlight's macOS client ships and is fine.
 // iOS keeps the GCMouse path (raw deltas under pointer lock). GCKeyboard (both platforms)
-// gives HID keycodes which we map to the Windows VK space the host's vk_to_evdev table
+// gives HID keycodes which we map to the GameStream virtual-key space the host's vk_to_evdev table
 // consumes (same space Moonlight uses). Gamepads (GCController) come later — the host's
 // uinput pads already speak the GamepadButton/GamepadAxis event kinds, but m3's injector
 // path doesn't route them yet.
@@ -93,7 +93,7 @@ public final class InputCapture {
     private var autoRepeatTimer: Timer?
     #endif
 
-    /// Physical Control/Option/Shift keys currently held (Windows VKs, both L/R sides). iPad only:
+    /// Physical Control/Option/Shift keys currently held (GameStream virtual-key codes, both L/R sides). iPad only:
     /// the ⌃⌥⇧Q release chord is recognized from the HID stream here (iOS has no NSEvent monitor,
     /// like the ⌘⎋ toggle), so it needs the live modifier state — tracked in both forwarding states,
     /// exactly like `cmdKeysDown`, and flushed by `releaseAll` when GC delivery stops.
@@ -148,7 +148,7 @@ public final class InputCapture {
     public var onToggleFullscreen: (() -> Void)?
 
     #if os(iOS)
-    /// Windows VKs of the three modifier classes in the ⌃⌥⇧ chords, both L/R sides:
+    /// GameStream virtual-key codes for the three modifier classes in the ⌃⌥⇧ chords, both L/R sides:
     /// control (0xA2/0xA3), option (0xA4/0xA5), shift (0xA0/0xA1). Used to sift the HID key stream.
     private static let chordModifierVKs: Set<UInt32> = [0xA2, 0xA3, 0xA4, 0xA5, 0xA0, 0xA1]
 
@@ -373,7 +373,7 @@ public final class InputCapture {
     }
 
     #if !os(macOS)
-    /// Windows VKs that must never auto-repeat: the modifiers (a held Shift is a state, not a
+    /// GameStream virtual-key codes that must never auto-repeat: the modifiers (a held Shift is a state, not a
     /// stream of presses) and the lock keys (each repeat would toggle the light again).
     private static let noAutoRepeatVKs: Set<UInt32> = [
         0x10, 0xA0, 0xA1, // Shift, LShift, RShift
@@ -475,8 +475,8 @@ public final class InputCapture {
     }
 
     #if os(macOS)
-    /// NSEvent key path (macOS): StreamLayerView's keyDown/keyUp/flagsChanged route Windows
-    /// VKs here while captured. Mirrors `sendButton` — gated by `forwarding`, honours the
+    /// NSEvent key path (macOS): StreamLayerView's keyDown/keyUp/flagsChanged route GameStream
+    /// virtual-key codes here while captured. Mirrors `sendButton`, gated by `forwarding`, and honors the
     /// ⌘⎋ toggle's `suppressedVK` latch, and tracks into `pressedVKs` so releaseAll()/blur
     /// flushes anything still held (a flagsChanged up can be missed on focus change). macOS
     /// has no GCKeyboard send (that path is iOS-only now), so this is the single key source.
@@ -527,7 +527,7 @@ public final class InputCapture {
         sendKey(vk, down: down)
     }
 
-    /// Resolve one flagsChanged transition to (Windows VK, down). The changed key is
+    /// Resolve one flagsChanged transition to (GameStream virtual-key code, down). The changed key is
     /// `keyCode`; the direction comes from the flags. The device-dependent L/R bits (LOW
     /// 16 bits, NX_DEVICE*KEYMASK) disambiguate the two same-class keys, but some
     /// keyboards ship flagsChanged WITHOUT them — only the device-independent class

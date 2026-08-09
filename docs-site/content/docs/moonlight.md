@@ -118,7 +118,7 @@ The device then appears under **Paired devices**, and Moonlight remembers the ho
 
 ## 4. Stream
 
-Moonlight lists **Desktop** plus the games the host found installed (Steam, Epic, GOG, Xbox), with
+Moonlight lists **Desktop** plus the games the host found through Steam, Lutris, and Heroic, with
 cover art, the same [library](/docs/game-library) the native clients show. Pick one and start
 streaming. The host creates a virtual display at the resolution and frame rate Moonlight requests
 (set these in Moonlight's settings), encodes it on the GPU, and streams it. Mouse, keyboard, and

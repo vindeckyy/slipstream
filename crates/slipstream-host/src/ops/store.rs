@@ -713,8 +713,8 @@ mod tests {
             Some("rom-manager")
         );
         assert_eq!(
-            plugin_id_for_pkg("slipstream-plugin-playnite").as_deref(),
-            Some("playnite")
+            plugin_id_for_pkg("slipstream-plugin-catalog-sync").as_deref(),
+            Some("catalog-sync")
         );
         assert_eq!(plugin_id_for_pkg("@a/plugin-x").as_deref(), Some("x"));
         assert_eq!(plugin_id_for_pkg("effect"), None);

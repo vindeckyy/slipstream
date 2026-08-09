@@ -44,19 +44,19 @@ const fixtureEntries: LogEntry[] = [
 		5,
 		"INFO",
 		"slipstream_host::inject",
-		"virtual Xbox 360 created (Windows XUSB companion)",
+		"virtual gamepad created (GameStream input bridge)",
 	),
 	entry(
 		6,
 		"WARN",
 		"slipstream_host::inject",
-		"gamepad driver not attached to Global\\pfxusb-shm-0 after 3s — is the ss_xusb driver installed? (slipstream-host.exe driver install --gamepad)",
+		"GameStream input bridge not ready after 3s - is the input backend running?",
 	),
 	entry(
 		7,
 		"ERROR",
 		"slipstream_host::inject",
-		"virtual Xbox 360 creation failed — controller input disabled (is the ss_xusb driver installed?)",
+		"virtual gamepad creation failed - controller input disabled (is the input backend running?)",
 	),
 	entry(
 		8,

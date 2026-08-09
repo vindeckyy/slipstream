@@ -31,7 +31,7 @@ export interface ResolveOptions {
 
 /**
  * Resolve a friendly plugin name to its npm package. A bare first-party name maps into the
- * `@slipstream` scope (`playnite` → `@slipstream/plugin-playnite`, `rom-manager` →
+ * `@slipstream` scope (`catalog-sync` maps to `@slipstream/plugin-catalog-sync`, `rom-manager` maps to
  * `@slipstream/plugin-rom-manager`); an `@slipstream/…` name is used verbatim. Anything else —
  * the unscoped `slipstream-plugin-…` convention, foreign scopes, registry paths — resolves on
  * the public registry and is refused unless [`ResolveOptions.allowPublicRegistry`] is set.
@@ -204,7 +204,7 @@ export const removePlugins = (names: string[], opts: PkgOpts = {}): void =>
 	);
 
 export interface InstalledPlugin {
-	/** npm package name, e.g. `@slipstream/plugin-playnite` or `slipstream-plugin-foo`. */
+	/** npm package name, e.g. `@slipstream/plugin-catalog-sync` or `slipstream-plugin-foo`. */
 	pkg: string;
 	/** Installed version from the package's package.json, if readable. */
 	version?: string;

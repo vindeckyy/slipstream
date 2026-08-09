@@ -407,7 +407,7 @@ public final class StreamLayerView: NSView {
     // from NSEvent — GCKeyboard delivery proved unreliable on macOS (the same GameController
     // quirk that killed GCMouse motion, fixed in e414ec0), so the macOS GCKeyboard send path
     // is disabled and NSEvent is the single source. We map NSEvent.keyCode (a Carbon virtual
-    // keycode) → Windows VK and forward via InputCapture.sendKey, then CONSUME (return without
+    // keycode) to a GameStream virtual-key code and forward via InputCapture.sendKey, then CONSUME (return without
     // super) to stop the responder chain's "unhandled keyDown" beep. Keys with no VK mapping
     // are still consumed while captured so they don't beep either. The ⌘⎋ toggle's Esc is
     // swallowed upstream by InputCapture's keyDown monitor (suppressedVK), so it never gets

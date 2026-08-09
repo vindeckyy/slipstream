@@ -308,7 +308,7 @@ impl FfState {
                 // An infinite-replay effect the game stopped driving (no FF traffic for the whole
                 // idle window) — the alive-but-abandoned case the kernel's close-time auto-erase
                 // cannot see. Stop it once; a later EV_FF play re-arms it (and refreshes the
-                // clock). Mirrors the XUSB/UHID abandoned-rumble force-off.
+                // clock). Mirrors the abandoned-rumble force-off used by the other input path.
                 None if stale => {
                     tracing::info!(
                         strong = e.strong,

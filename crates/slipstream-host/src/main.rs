@@ -357,7 +357,7 @@ fn real_main() -> Result<()> {
         // Read-only installation and service preflight. The same report is available from the
         // management API, but this form works before the host is running.
         Some("doctor") => mgmt::diagnostics::run_cli(&args[1..]),
-        // Install and run host plugins: `plugins add playnite`, `plugins enable`, … Package ops are
+        // Install and run host plugins: `plugins add rom-manager`, `plugins enable`, etc. Package ops are
         // forwarded to the bun runner; enable/disable/status drive the systemd unit. See plugins.rs.
         Some("plugins") => plugins::main(&args[1..]),
         // Print the management API's OpenAPI document (for client codegen).

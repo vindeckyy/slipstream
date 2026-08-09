@@ -40,10 +40,10 @@ describe("pluginIngestDir", () => {
 	test("resolves <config_dir>/ingest[/name], distinct from plugin-state", () => {
 		process.env.SLIPSTREAM_CONFIG_DIR = path.join("/tmp", "ss-cfg3");
 		expect(pluginIngestDir()).toBe(path.join("/tmp", "ss-cfg3", "ingest"));
-		expect(pluginIngestDir("playnite")).toBe(
-			path.join("/tmp", "ss-cfg3", "ingest", "playnite"),
+		expect(pluginIngestDir("catalog-sync")).toBe(
+			path.join("/tmp", "ss-cfg3", "ingest", "catalog-sync"),
 		);
 		// The inbox is a different tree from plugin state.
-		expect(pluginIngestDir("playnite")).not.toBe(pluginStateDir("playnite"));
+		expect(pluginIngestDir("catalog-sync")).not.toBe(pluginStateDir("catalog-sync"));
 	});
 });

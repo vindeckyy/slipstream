@@ -125,7 +125,7 @@ cc myclient.o target/aarch64-unknown-linux-gnu/release/libslipstream_core.a $NAT
 ```
 
 `--print native-static-libs` is the reliable way to discover the platform libs (`-lpthread`,
-`-lm`, WinSock, etc.) a static link needs — the C harness at
+`-lm` and any other system libraries a static link needs. The C harness at
 [`crates/slipstream-core/tests/c/run.sh`](../crates/slipstream-core/tests/c/run.sh) does exactly this
 and is your smallest end-to-end reference.
 

@@ -41,7 +41,7 @@ export const DetectHint = Schema.Struct({
 	install_dir: Schema.optionalKey(Schema.NullOr(Schema.String)),
 	/** The game's own executable (absolute path on the host). */
 	exe: Schema.optionalKey(Schema.NullOr(Schema.String)),
-	/** The executable's file name (`Hades.exe`), when its location isn't fixed. Weakest signal. */
+	/** The executable's file name, when its location isn't fixed. Weakest signal. */
 	process_name: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 export type DetectHint = typeof DetectHint.Type;

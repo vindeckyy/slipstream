@@ -19,6 +19,61 @@
 #[cfg(target_os = "linux")]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
+/// Configure the queue families on a caller-owned FFmpeg Vulkan context.
+///
+/// Older FFmpeg headers expose only the role-specific queue fields. Newer headers also expose the
+/// queue-family list, which is populated when bindgen finds it.
+#[cfg(target_os = "linux")]
+pub fn configure_device_queues(
+    hwctx: &mut AVVulkanDeviceContext,
+    graphics_qf: i32,
+    decode_qf: i32,
+    graphics_queue_flags: u32,
+    decode_video_caps: u32,
+) {
+    hwctx.queue_family_index = graphics_qf;
+    hwctx.nb_graphics_queues = 1;
+    hwctx.queue_family_tx_index = graphics_qf;
+    hwctx.nb_tx_queues = 1;
+    hwctx.queue_family_comp_index = graphics_qf;
+    hwctx.nb_comp_queues = 1;
+    hwctx.queue_family_encode_index = -1;
+    hwctx.nb_encode_queues = 0;
+    hwctx.queue_family_decode_index = decode_qf;
+    hwctx.nb_decode_queues = 1;
+
+    #[cfg(ss_ffvk_has_queue_family_list)]
+    {
+        const VIDEO_DECODE_BIT: u32 = 0x20;
+        if graphics_qf == decode_qf {
+            hwctx.qf[0] = AVVulkanDeviceQueueFamily {
+                idx: graphics_qf,
+                num: 1,
+                flags: (graphics_queue_flags | VIDEO_DECODE_BIT) as _,
+                video_caps: decode_video_caps as _,
+            };
+            hwctx.nb_qf = 1;
+        } else {
+            hwctx.qf[0] = AVVulkanDeviceQueueFamily {
+                idx: graphics_qf,
+                num: 1,
+                flags: graphics_queue_flags as _,
+                video_caps: 0,
+            };
+            hwctx.qf[1] = AVVulkanDeviceQueueFamily {
+                idx: decode_qf,
+                num: 1,
+                flags: VIDEO_DECODE_BIT as _,
+                video_caps: decode_video_caps as _,
+            };
+            hwctx.nb_qf = 2;
+        }
+    }
+
+    #[cfg(not(ss_ffvk_has_queue_family_list))]
+    let _ = (graphics_queue_flags, decode_video_caps);
+}
+
 /// Conversions between the generated vulkan.h handle types and ash's.
 #[cfg(target_os = "linux")]
 pub mod ashx {

@@ -39,8 +39,6 @@ function scannerGuidance(scanner: ScannerInfo): {
 			return { help: m.library_source_help_epic() };
 		case "gog":
 			return { help: m.library_source_help_gog() };
-		case "xbox":
-			return { help: m.library_source_help_xbox() };
 		default:
 			return {
 				help: m.library_source_help_generic({ label: scanner.label }),
@@ -50,8 +48,8 @@ function scannerGuidance(scanner: ScannerInfo): {
 
 /**
  * Container: the game-source (library scanner) toggles — owns the scanner query and the toggle
- * mutation. The host only reports the scanners its platform actually has (Steam everywhere,
- * Lutris/Heroic on Linux, Epic/GOG/Xbox on Windows), so whatever arrives is renderable as-is.
+ * mutation. The host reports only the scanners available on the current host, so whatever arrives
+ * is renderable as-is.
  * Rendered only once the list is loaded: this is a secondary control, and when the API is down
  * the grid's own QueryState already tells the story — no second error banner.
  */

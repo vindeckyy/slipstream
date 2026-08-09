@@ -3,8 +3,8 @@ package io.slipstream.kit
 import android.view.KeyEvent
 
 /**
- * Hardware key → Windows Virtual-Key code (the slipstream wire contract: **US-positional** — we
- * forward the physical key, not the typed character; the host maps VK → evdev via
+ * Hardware key to GameStream virtual-key code (the slipstream wire contract: **US-positional**.
+ * We forward the physical key, not the typed character; the host maps the wire code to evdev via
  * `inject::vk_to_evdev`). The Android analogue of the Linux client's evdev→VK table
  * (`slipstream-client-linux/src/keymap.rs`) and the Apple client's `hidToVK`.
  *
@@ -17,7 +17,7 @@ import android.view.KeyEvent
  */
 object Keymap {
     /**
-     * Positional wire VK for a hardware key event: the evdev scancode table first (immune to the
+     * Positional GameStream virtual-key for a hardware key event: the evdev scancode table first (immune to the
      * selected physical-keyboard layout), falling back to the keycode table for events without a
      * scancode (soft keyboards, synthetic events) and for everything outside the typing area
      * (layout-invariant there, incl. gamepad buttons whose scancodes lie outside the table).
