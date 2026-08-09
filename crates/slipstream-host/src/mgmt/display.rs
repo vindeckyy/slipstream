@@ -132,7 +132,7 @@ pub(crate) async fn get_display_settings() -> Json<DisplaySettingsState> {
 pub(crate) async fn set_display_settings(
     ApiJson(policy): ApiJson<crate::vdisplay::policy::DisplayPolicy>,
 ) -> Response {
-    let mut policy = policy;
+    let policy = policy;
     // `keep_alive: forever` (the gaming-rig preset) is honored by the Linux display registry and
     // freed via `POST /display/release`.
     if let Err(e) = crate::vdisplay::policy::prefs().set(policy) {
@@ -262,11 +262,9 @@ pub(crate) async fn get_display_monitors() -> Json<MonitorsResponse> {
     let pin_supported = true;
     // Enumeration shells out and may round-trip through D-Bus or Wayland, so keep it off the async
     // worker.
-    let (compositor, listed) = tokio::task::spawn_blocking(|| {
-        match crate::vdisplay::detect() {
-            Ok(c) => (Some(c.id().to_string()), crate::vdisplay::monitors::list(c)),
-            Err(e) => (None, Err(e)),
-        }
+    let (compositor, listed) = tokio::task::spawn_blocking(|| match crate::vdisplay::detect() {
+        Ok(c) => (Some(c.id().to_string()), crate::vdisplay::monitors::list(c)),
+        Err(e) => (None, Err(e)),
     })
     .await
     .unwrap_or_else(|e| (None, Err(anyhow::anyhow!("enumeration task failed: {e}"))));

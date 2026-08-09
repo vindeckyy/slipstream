@@ -12,5 +12,4 @@ fn main() {
         .unwrap_or_else(|| std::env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "unknown".into()));
     println!("cargo:rustc-env=SLIPSTREAM_VERSION={version}");
     println!("cargo:rerun-if-env-changed=SLIPSTREAM_BUILD_VERSION");
-
 }

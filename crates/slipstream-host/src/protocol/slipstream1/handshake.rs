@@ -299,7 +299,7 @@ pub(super) async fn negotiate(
     // Resolve the chroma subsampling: full-chroma HEVC 4:4:4 only when ALL of — the host
     // allows it (SLIPSTREAM_444, default ON; the CLIENT's 4:4:4 setting — default OFF — is the
     // per-session policy switch behind VIDEO_CAP_444), the client advertised VIDEO_CAP_444,
-    // the session is single-process (the two-process WGC relay encodes 4:2:0 in v1), and the
+    // the session is single-process, and the
     // active GPU/driver actually supports a 4:4:4 encode (probed, cached). The native path
     // always encodes HEVC. We resolve this BEFORE the Welcome so `chroma_format` reflects
     // what we'll really emit — the honest-downgrade channel: if any gate fails the client is

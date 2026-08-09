@@ -27,7 +27,7 @@ pub struct AppEntry {
 }
 
 fn config_path() -> Option<std::path::PathBuf> {
-    // `config_dir()` resolves XDG/HOME on Linux and %APPDATA% on Windows (no HOME needed).
+    // Resolve the application list below the host configuration directory.
     Some(ss_paths::config_dir().join("apps.json"))
 }
 
@@ -148,7 +148,7 @@ fn append_library(apps: &mut Vec<AppEntry>) {
         apps.push(AppEntry {
             id,
             title: g.title,
-            compositor: None, // auto-detect the desktop session (Windows ignores the compositor)
+            compositor: None, // auto-detect the desktop session
             cmd: None,
             library_id: Some(g.id),
             prep: Vec::new(),

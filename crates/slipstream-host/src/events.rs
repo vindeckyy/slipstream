@@ -211,8 +211,8 @@ pub enum EventKind {
         version: String,
         /// The channel it was announced on (`stable` | `canary`).
         channel: String,
-        /// This host's install kind (`apt`, `windows-installer`, …) — lets a hook or the
-        /// tray render the right "how to update" hint without a second call.
+        /// This host's install kind (`apt`, `deb`, or another Linux package source), so a hook
+        /// can render the update hint without another call.
         install_kind: String,
     },
     /// A host update completed: emitted by boot-time reconciliation, i.e. by the NEW binary's

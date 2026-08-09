@@ -7,8 +7,7 @@
 //! the media streams follow (see the GameStream host task list / plan).
 
 pub mod apps;
-// Platform-neutral wire/negotiation logic + the Linux capture/encode pipeline (non-Linux
-// builds get a stub `start` inside the module).
+// GameStream wire and negotiation logic plus the Linux capture and encode pipeline.
 mod audio;
 pub(crate) mod cert;
 mod control;

@@ -437,19 +437,13 @@ fn stream_config(map: &HashMap<String, String>) -> Option<StreamConfig> {
         _ => Codec::H264,
     };
     // 10-bit/HDR request (Moonlight sets `dynamicRangeMode != 0` only when it both saw our Main10 SCM
-    // bit AND the user enabled HDR). Honor it only when the host can actually deliver Main10
-    // (`host_hdr_capable` — Windows IDD-push, or the Linux GNOME 50+ portal mirror). On Windows,
-    // when honored, the video path proactively enables advanced color on the virtual display so a
-    // PQ stream flows even from an SDR desktop. On Linux the portal can only deliver PQ while the
-    // MIRRORED monitor is in HDR mode, so additionally probe the live colour mode here (one D-Bus
+    // bit AND the user enabled HDR). Honor it only when the host can actually deliver Main10.
+    // The portal can deliver PQ while the mirrored monitor is in HDR mode, so additionally probe
+    // the live colour mode here (one D-Bus
     // round-trip, sync RTSP thread) — an SDR desktop honestly degrades to 8-bit SDR up front
     // instead of running the capture negotiation into its timeout. A request we can't honor
-    // degrades to 8-bit SDR (and a Windows desktop that is ALREADY HDR still streams PQ
-    // regardless, since the IDD-push capturer follows the display).
+    // degrades to 8-bit SDR, while an HDR monitor can continue to stream PQ through the portal.
     let hdr_requested = parse_u("x-nv-video[0].dynamicRangeMode").unwrap_or(0) != 0;
-    // `mut` is load-bearing on Linux only — the GNOME colour-mode probe below clears it. Scope the
-    // allow to non-Linux so `unused_mut` still fires here if that probe ever goes away.
-    #[cfg_attr(not(target_os = "linux"), allow(unused_mut))]
     let mut hdr = hdr_requested && crate::gamestream::host_hdr_capable();
     if hdr_requested && !hdr {
         tracing::warn!(
@@ -473,9 +467,7 @@ fn stream_config(map: &HashMap<String, String>) -> Option<StreamConfig> {
     // monitor at all — its HDR is a static fact about the binary we spawn, already settled by
     // `host_hdr_capable` — so running the probe there would hard-refuse every gamescope HDR
     // session on a headless box (there is no monitor to be in HDR mode).
-    #[cfg(target_os = "linux")]
     let portal_source = ss_host_config::config().video_source.as_deref() == Some("portal");
-    #[cfg(target_os = "linux")]
     if hdr && portal_source && !ss_capture::gnome_hdr_monitor_active() {
         tracing::warn!(
             "client requested HDR but no monitor is in BT.2100 (HDR) colour mode — enable HDR in \
@@ -495,13 +487,11 @@ fn stream_config(map: &HashMap<String, String>) -> Option<StreamConfig> {
     // above: that fn is the STATIC serverinfo capability, and this is a live per-session fact.
     // The latch is PER SOURCE, so consult the one belonging to the source this session drives —
     // a wedged monitor mirror must not disable a gamescope session's HDR, or vice versa.
-    #[cfg(target_os = "linux")]
     let hdr_source = if portal_source {
         ss_capture::HdrSource::PortalMonitor
     } else {
         ss_capture::HdrSource::VirtualOutput
     };
-    #[cfg(target_os = "linux")]
     if hdr && ss_capture::hdr_capture_failed(hdr_source) {
         tracing::warn!(
             ?hdr_source,
@@ -515,7 +505,7 @@ fn stream_config(map: &HashMap<String, String>) -> Option<StreamConfig> {
     // (colorspace << 1) | fullRange` — colorspace 0=Rec601, 1=Rec709, 2=Rec2020). Moonlight
     // renderers configure their YUV→RGB from this REQUESTED value (not the bitstream VUI), so a
     // host that encodes something else shifts the client's colours. INSTRUMENTATION ONLY for
-    // now: we always encode BT.709 limited for SDR (the IDD VideoConverter / VUI-driven NVENC)
+    // now: we always encode BT.709 limited for SDR (the VUI-driven encoder)
     // and BT.2020 PQ for HDR — log what clients actually ask for so honoring `encoderCscMode`
     // can be scoped from field data rather than guessed. (Absent on very old clients.)
     if let Some(csc) = parse_u("x-nv-video[0].encoderCscMode") {

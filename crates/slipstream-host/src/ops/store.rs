@@ -677,7 +677,7 @@ mod tests {
     /// The name-shape guard is necessary but NOT sufficient — see `mgmt::store::uninstall_plugin`.
     ///
     /// `@slipstream/plugin-kit` is a plugin's *framework*, and it satisfies every syntactic rule
-    /// here. Windows on-glass accepted an uninstall of it. The real gate is membership in
+    /// here. A name-shape check alone is not sufficient. The real gate is membership in
     /// [`installed_packages`], which excludes transitive dependencies; this test pins the fact that
     /// the shape check alone lets it through, so nobody "simplifies" the handler back.
     #[test]

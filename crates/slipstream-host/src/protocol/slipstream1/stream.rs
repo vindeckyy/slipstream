@@ -917,7 +917,7 @@ impl SharedCaptureTelemetry {
 ///   * **gamescope** (every sub-mode): a resize would respawn the nested game / restart the box's
 ///     game-mode session  -  it must never relaunch the title, so the client keeps scaling client-side.
 ///   * a **per-client-mode identity** policy: the mode is part of the display-identity slot key, so a
-///     resize resolves a DIFFERENT slot (a fresh Windows monitor / a differently-named KWin output),
+///     resize resolves a DIFFERENT slot (a fresh virtual output / a differently-named KWin output),
 ///     defeating the policy  -  honest downgrade is to reject and let the client scale.
 ///   * a **monitor mirror** (`mirrored`): the source is a physical head running at the mode its owner
 ///     set, and `MirrorDisplay::create` ignores the requested one by design
@@ -1219,7 +1219,7 @@ fn send_loop(
                         }
                         if perf || stats.rec.is_armed() {
                             // `encode_us`/`pace_us`/fps are valid for every frame (always measured),
-                            // including the Windows relay + tail-drain frames. The cap/submit/wait splits
+                            // including relay and tail-drain frames. The cap/submit/wait splits
                             // are only real when the frame was measured at capture time  -  a frame captured
                             // before this capture armed carries zeroed splits, so skip those (an empty
                             // window → `percentile()` returns 0) rather than pull the percentiles down.
@@ -1525,7 +1525,7 @@ pub(super) struct SessionContext {
     pub(super) transport_state:
         Arc<std::sync::Mutex<crate::transport_state::TransportStateMachine>>,
     pub(super) transport_policy: Arc<crate::transport_state::TransportPolicyShared>,
-    /// The resolved compositor backend (moot on Windows  -  `vdisplay::open` ignores it there).
+    /// The resolved compositor backend.
     pub(super) compositor: crate::vdisplay::Compositor,
     /// This session's resolved gamescope sub-mode, or `None` for every other backend. Carried here
     /// (and on to the backend instance) rather than through `SLIPSTREAM_GAMESCOPE_NODE`/`_SESSION`:
@@ -1619,10 +1619,8 @@ pub(super) struct SessionContext {
     /// The client's display name (trust-store name, else sanitized Hello name; `None` = nameless
     /// knock)  -  published to the live-session registry for the local summary's connect toast.
     pub(super) client_name: Option<String>,
-    /// The session's requested launch, `None` = none. On Windows the store-qualified library id
-    /// (spawned into the interactive user session once capture is live); on other hosts the shell
-    /// command already resolved against the host's own library  -  nested into gamescope's bare spawn
-    /// via `set_launch_command`, or spawned into the live session once capture is up.
+    /// The session's requested launch command, already resolved against the host's own library.
+    /// Gamescope may nest it via `set_launch_command`; other backends spawn it after capture starts.
     pub(super) launch: Option<String>,
     /// Identity + detection metadata for the launched title, resolved once at handshake time
     /// alongside `launch`. `None` when nothing was launched. Drives the game's lifetime  -  its exit
@@ -2152,10 +2150,10 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
     let mut cur_mode = mode;
     const MAX_CAPTURE_REBUILDS: u32 = 5;
     let mut capture_rebuilds: u32 = 0;
-    // Encode-stall watchdog: AMF/QSV (and async NVENC) poll non-blocking, so a wedged driver
+    // Encode-stall watchdog: asynchronous encoders poll non-blocking, so a wedged driver
     // shows up as poll() returning None forever while submits keep succeeding  -  `inflight` grows,
     // no AU ever reaches the send thread, and the client freezes on the last frame with nothing
-    // logged (field reports: AMD/Intel Windows streams freezing after minutes). Track when the
+    // logged. Track when the
     // encoder last produced an AU and rebuild it in place (bounded, like the capture rebuilds)
     // when it stops. `ENCODE_STALL_WINDOW` also sizes the in-flight backlog bound: a backlog worth
     // more than the window's frames means AUs still trickle (so the gap never trips) but latency
@@ -2402,72 +2400,70 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
             // acked the switch as accepted, so a rebuild failure must not kill an otherwise
             // healthy session  -  keep streaming the current mode and log instead.
             let rebuilt = match build_pipeline(
-                    &mut vd,
-                    new_mode,
-                    mode_bitrate,
-                    bitrate_auto,
-                    bit_depth,
-                    plan,
-                    &quit,
-                    // The display this rebuild supersedes (retired below once the new pipeline is
-                    // up)  -  its replacement inherits the group topology (Primary/Exclusive).
-                    cur_display_gen,
-                    // No first-frame shortening here: this direct call has no retry wrapper to
-                    // absorb an early bail, and the resize source is a live compositor (the
-                    // takeover race doesn't apply)  -  keep the patient default.
-                    None,
-                    Some(resize_trace.as_ref()),
-                ) {
-                    Ok(next_pipe) => {
-                        let old_display_gen = cur_display_gen;
-                        // The destructuring assignment drops the OLD capturer (→ its display lease)
-                        // as each binding is replaced  -  the new pipeline is already up
-                        // (create-before-drop).
-                        (
-                            capturer,
-                            enc,
-                            frame,
-                            interval,
-                            cur_node_id,
-                            cur_display_gen,
-                            built_bitrate,
-                        ) = next_pipe;
-                        // H4: the old display's lease drop above is indistinguishable from a
-                        // disconnect to the keep-alive machinery  -  under linger/forever policies
-                        // every resize would ACCUMULATE kept monitors at stale modes. Retire the
-                        // superseded entry now (a no-op when it was already torn down under
-                        // `immediate`, or off Linux; the in-place fast path keeps the SAME display,
-                        // so it has nothing to retire).
-                        if let Some(g) = old_display_gen.filter(|g| cur_display_gen != Some(*g)) {
-                            crate::vdisplay::registry::retire(g);
-                        }
-                        true
+                &mut vd,
+                new_mode,
+                mode_bitrate,
+                bitrate_auto,
+                bit_depth,
+                plan,
+                &quit,
+                // The display this rebuild supersedes (retired below once the new pipeline is
+                // up)  -  its replacement inherits the group topology (Primary/Exclusive).
+                cur_display_gen,
+                // No first-frame shortening here: this direct call has no retry wrapper to
+                // absorb an early bail, and the resize source is a live compositor (the
+                // takeover race doesn't apply)  -  keep the patient default.
+                None,
+                Some(resize_trace.as_ref()),
+            ) {
+                Ok(next_pipe) => {
+                    let old_display_gen = cur_display_gen;
+                    // The destructuring assignment drops the OLD capturer (→ its display lease)
+                    // as each binding is replaced  -  the new pipeline is already up
+                    // (create-before-drop).
+                    (
+                        capturer,
+                        enc,
+                        frame,
+                        interval,
+                        cur_node_id,
+                        cur_display_gen,
+                        built_bitrate,
+                    ) = next_pipe;
+                    // H4: the old display's lease drop above is indistinguishable from a
+                    // disconnect to the keep-alive machinery  -  under linger/forever policies
+                    // every resize would ACCUMULATE kept monitors at stale modes. Retire the
+                    // superseded entry now (a no-op when it was already torn down under
+                    // `immediate`, or off Linux; the in-place fast path keeps the SAME display,
+                    // so it has nothing to retire).
+                    if let Some(g) = old_display_gen.filter(|g| cur_display_gen != Some(*g)) {
+                        crate::vdisplay::registry::retire(g);
                     }
-                    Err(e) => {
-                        tracing::warn!(error = %format!("{e:#}"), ?new_mode,
+                    true
+                }
+                Err(e) => {
+                    tracing::warn!(error = %format!("{e:#}"), ?new_mode,
                             "mode-switch rebuild failed  -  staying on the current mode");
-                        // H2 rollback: the control task acked the switch BEFORE this rebuild, so the
-                        // client's mode slot already flipped to `new_mode`. A second accepted ack
-                        // carrying the still-live mode corrects it (any accepted ack means "the
-                        // active mode is now X" client-side; old clients just log it). `frame` is
-                        // untouched here (the fast path returned false before swapping anything and
-                        // the destructure only runs on the Ok arm), so it's still the OLD
-                        // pipeline's frame  -  its real dims + interval are what's still on glass.
-                        let _ = reconfig_result_tx.send(Reconfigured {
-                            accepted: true,
-                            mode: delivered_mode(frame.width, frame.height, interval),
-                        });
-                        false
-                    }
-                };
+                    // H2 rollback: the control task acked the switch BEFORE this rebuild, so the
+                    // client's mode slot already flipped to `new_mode`. A second accepted ack
+                    // carrying the still-live mode corrects it (any accepted ack means "the
+                    // active mode is now X" client-side; old clients just log it). `frame` is
+                    // untouched here (the fast path returned false before swapping anything and
+                    // the destructure only runs on the Ok arm), so it's still the OLD
+                    // pipeline's frame  -  its real dims + interval are what's still on glass.
+                    let _ = reconfig_result_tx.send(Reconfigured {
+                        accepted: true,
+                        mode: delivered_mode(frame.width, frame.height, interval),
+                    });
+                    false
+                }
+            };
             if rebuilt {
                 adopt_built_bitrate(&mut bitrate_kbps, built_bitrate, &live_bitrate);
                 cur_mode = new_mode;
                 next = std::time::Instant::now();
-                // H2/H3: the backend may have honored a different mode than requested  -  KWin caps
-                // a virtual output's refresh, or Windows ss-vdisplay rejects a resolution its
-                // running monitor doesn't advertise and the host falls back to the actual display
-                // mode. `frame` is the NEW pipeline's first frame (just rebound above), so its
+                // H2/H3: the backend may have honored a different mode than requested. `frame` is
+                // the new pipeline's first frame (just rebound above), so its
                 // dims are what the client actually decodes. Publish that ACTUAL mode to the live
                 // stats slot, and correct the client's mode slot when it differs from the accept
                 // ack it already got.
@@ -2630,7 +2626,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         }
         // Client LTR-RFI recovery: prefer re-referencing a known-good older frame (a clean recovery
         // P-frame  -  no 20-40× IDR spike) over a full keyframe when the encoder supports it (native
-        // AMF LTR / Windows NVENC). Drain the backlog (the client re-requests until the recovery
+        // encoder backends). Drain the backlog (the client re-requests until the recovery
         // frame lands) coalesced to the widest lost range. Attempt the invalidate only when a full
         // IDR isn't already queued  -  an explicit keyframe request means a fully wedged decoder that
         // needs the IDR, which supersedes an RFI recovery. A failure (range older than the encoder's
@@ -2750,7 +2746,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                          disturbance (display-topology churn, display-poller software, \
                          virtual-display timing) is the likely cause, not random network loss; \
                          correlate with 'slow display-descriptor poll' / 'display descriptor \
-                         changed' / 'IDD-push capture stall' lines"
+                         changed' / 'capture stall' lines"
                     );
                 }
             }
@@ -3074,7 +3070,6 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                 // park schedule  -  the pointer may have drifted onto another monitor while the
                 // desktop model steered it, and a capture-model session can never bring it
                 // back on its own (see `park_pointer`).
-                #[cfg(target_os = "linux")]
                 if !client_draws {
                     park_attempts = 0;
                     next_park_at = std::time::Instant::now();
@@ -3237,20 +3232,20 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         // the capturer's call (Some iff the virtual display is in HDR mode); the VALUE prefers the
         // client's own display volume when it sent one  -  the virtual display's EDID advertises
         // exactly that volume, so host apps already tone-mapped the content into it and the honest
-        // mastering description IS the client's panel. (The IDD capturer only knows the generic
-        // baseline; if the driver ever forwards per-content IDDCX_HDR10_METADATA, prefer that here.)
+        // mastering description is the client's panel. The capturer supplies the generic baseline;
+        // a source-specific value can replace it when available.
         let hdr_meta = capturer.hdr_meta().map(|m| client_hdr.unwrap_or(m));
         enc.set_hdr_meta(hdr_meta);
         let mut resend_meta = hdr_meta != last_hdr_meta;
         if resend_meta {
             last_hdr_meta = hdr_meta;
         }
-        // How deep to pipeline (1 = synchronous submit→poll, the original behaviour). The IDD-push
-        // capturer hands a rotating ring of output textures, so it returns >1; other capturers default 1.
+        // How deep to pipeline (1 = synchronous submit to poll). The capturer reports its supported
+        // ring depth; a depth of one is the default.
         // Adaptive (default): start at 1 for latency, `cur_depth` escalates on sustained overrun (the
         // tail below). Pinned to the capturer's max when adaptive is off or the max is already 1.
         let max_depth = capturer.pipeline_depth().max(1);
-        let depth = if idd_adaptive_enabled() {
+        let depth = if adaptive_pipeline_enabled() {
             cur_depth.clamp(1, max_depth)
         } else {
             max_depth
@@ -3717,16 +3712,16 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         }
         // Adaptive-depth escalate signal (measured BEFORE the trailing sleep): "behind" = the
         // frame's work overran its cadence deadline `next`, so the trailing sleep would be
-        // zero/negative. At depth-1 that means the synchronous poll (encode + WDDM wait) can't
+        // zero/negative. At depth-1 that means the synchronous poll (encode plus GPU wait) cannot
         // fit a frame interval  -  the contention case pipelining is for  -  so escalate, and hold
         // there. Leaky bucket + warmup skip reject one-off hitches and bring-up; no
-        // de-escalation in v1. Two stages: first the CAPTURER's max depth (Windows IDD depth-2
-        // overlap); where depth can't grow (Linux portal is permanently depth-1, §7 LN3), the
+        // de-escalation in v1. Two stages: first the capturer's max depth; where depth cannot grow,
+        // the
         // ENCODER's pipelined retrieve is the same trade on the other side of submit  -  the
         // two-thread lock moves the encode wait off this loop so capture/submit keep cadence,
         // at ~one tick of AU latency. `enc.set_pipelined` may decline (unsupported backend or
         // an explicit SLIPSTREAM_NVENC_ASYNC=0); either way it is asked exactly once.
-        if idd_adaptive_enabled() {
+        if adaptive_pipeline_enabled() {
             depth_frames += 1;
             if depth_frames > DEPTH_WARMUP_FRAMES {
                 let behind = std::time::Instant::now() >= next;
@@ -3769,7 +3764,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                         cur_depth = max_depth;
                         tracing::info!(
                             depth = cur_depth,
-                            "IDD pipeline depth escalated  -  encode can't hold cadence at depth-1 \
+                            "capture pipeline depth escalated  -  encode can't hold cadence at depth-1 \
                              (GPU contention); pipelining until cadence holds clean (latency \
                              trade for throughput)"
                         );
@@ -3811,7 +3806,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                             cur_depth = 1;
                             tracing::info!(
                                 depth = cur_depth,
-                                "IDD pipeline depth de-escalated  -  cadence held clean at the \
+                                "capture pipeline depth de-escalated  -  cadence held clean at the \
                                  escalated depth (latency recovery)"
                             );
                             behind_score = 0;
@@ -4237,9 +4232,8 @@ fn build_pipeline(
     // frame, encoder open) into the bring-up/resize timeline. `None` on untraced rebuilds.
     trace: Option<&crate::bringup::Trace>,
 ) -> Result<Pipeline> {
-    // Acquire through the registry (design/display-management.md): on Linux this pools the display
-    // for keep-alive (reuse a kept one, or create + keep the backend's keepalive so it outlives the
-    // session per policy); on Windows it delegates to `vd.create` (the manager already leases). The
+    // Acquire through the registry (design/display-management.md): it pools the display for
+    // keep-alive (reuse a kept one, or create and keep the backend's lease for the session). The
     // returned `VirtualOutput`'s keepalive is a registry lease  -  the capturer holds it as before. The
     // `quit` flag rides into the lease so a deliberate-quit teardown skips the keep-alive linger.
     let display_mode = display_mode_for(mode);
@@ -4250,8 +4244,7 @@ fn build_pipeline(
     }
     // A2: if this was a REUSED kept display and its first frame fails, tear the (dead) pool entry down
     // so the retry loop's next acquire creates fresh instead of re-wedging on the same corpse. Read the
-    // gen BEFORE `capture_virtual_output` consumes `vout`. (Linux-only  -  the pool is Linux.)
-    #[cfg(target_os = "linux")]
+    // gen BEFORE `capture_virtual_output` consumes `vout`.
     let reused_gen = vout.reused_gen;
     // The display's pool generation is threaded out so a mode-switch rebuild can retire the
     // display this pipeline supersedes.
@@ -4386,7 +4379,7 @@ fn build_pipeline(
     if let Some(c) = plan.wire_chunk {
         enc.set_wire_chunking(c);
     }
-    // Tell in-place backends (Windows direct-NVENC) how deep they may pipeline against the
+    // Tell the encoder how deep it may pipeline against the
     // capturer's texture ring  -  without it they use only the env/pool cap and can encode a texture
     // the capturer has already rotated and overwritten.
     enc.set_input_ring_depth(capturer.pipeline_depth().max(1));

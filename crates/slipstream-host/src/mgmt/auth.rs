@@ -31,12 +31,8 @@ pub(crate) async fn require_auth(
     if req.uri().path() == "/api/v1/health" {
         return next.run(req).await; // liveness probe is always open
     }
-    // The tray icon's status source: non-sensitive counts/booleans only, unauthenticated but
-    // confined to LOOPBACK peers. The bearer-token file (and cert.pem) are SYSTEM/Administrators-
-    // DACL'd on Windows, so the per-user tray process cannot authenticate — this one narrow
-    // read-only route is deliberately all it needs. Not on the cert allowlist: LAN mTLS clients
-    // already have the richer `/status`. (No PeerAddr ⇒ a unit test → treat as loopback, matching
-    // the bearer path below.)
+    // The tray status source exposes only non-sensitive counts and booleans, and is confined to
+    // loopback peers. LAN clients use the richer authenticated status route.
     if req.uri().path() == "/api/v1/local/summary" {
         let from_loopback = req
             .extensions()

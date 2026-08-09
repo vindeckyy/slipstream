@@ -183,7 +183,7 @@ impl LinuxDisplayPipeline {
 /// How a session is structured across processes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SessionTopology {
-/// One process captures and encodes the stream.
+    /// One process captures and encodes the stream.
     SingleProcess,
 }
 
@@ -231,11 +231,8 @@ pub struct SessionPlan {
     /// AUs stay shard-aligned across mode/bitrate/stall rebuilds. `None` for the H.26x codecs.
     pub wire_chunk: Option<usize>,
     /// The session may hand the encoder cursor bitmaps to composite (cursor-as-metadata
-    /// captures). Set via [`cursor_blend_for`] — the single platform rule — so it is `true` only
-    /// where the ENCODER is the compositing stage (Linux: cursor-forward sessions, gamescope,
-    /// AND no-channel sessions on a blend-capable backend — the compositor-EMBEDS fallback is
-    /// broken on Mutter virtual streams, see [`cursor_blend_for`]);
-    /// Windows is always `false` (the IDD capturer composites the pointer itself). Encoders
+    /// captures). Set via [`cursor_blend_for`] so it is `true` only where the encoder is the
+    /// compositing stage on Linux. Encoders
     /// whose fast path cannot blend (the Vulkan EFC RGB-direct source, native NV12) stay off
     /// those shapes when this is set — see [`Self::output_format`] and
     /// `encode::cursor_blend_capable`, the pre-open mirror that gates the cursor channel — so

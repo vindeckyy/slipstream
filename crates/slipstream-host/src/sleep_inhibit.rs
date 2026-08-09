@@ -19,12 +19,7 @@ struct State {
 
 fn state() -> &'static Mutex<State> {
     static S: OnceLock<Mutex<State>> = OnceLock::new();
-    S.get_or_init(|| {
-        Mutex::new(State {
-            count: 0,
-            fd: None,
-        })
-    })
+    S.get_or_init(|| Mutex::new(State { count: 0, fd: None }))
 }
 
 /// Take a share; the underlying inhibitor is acquired on the 0→1 edge.

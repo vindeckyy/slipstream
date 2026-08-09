@@ -33,8 +33,8 @@ pub fn load_or_generate() -> Result<String> {
 }
 
 /// Resolve the scripting runner's scoped plugin token, same precedence as [`load_or_generate`].
-/// Persisted to `plugin-token` next to `mgmt-token`; on Windows `plugins enable` grants the
-/// runner's LocalService principal read on exactly this file (and `cert.pem`) — never `mgmt-token`.
+/// Persisted to `plugin-token` next to `mgmt-token`; the plugin runner receives access only to this
+/// scoped credential, never `mgmt-token`.
 pub fn load_or_generate_plugin() -> Result<String> {
     load_or_generate_impl(PLUGIN_ENV_VAR, PLUGIN_FILE)
 }
@@ -69,7 +69,7 @@ fn load_or_generate_impl(env_var: &str, file: &str) -> Result<String> {
     rand::thread_rng().fill_bytes(&mut buf);
     let token = hex::encode(buf);
     let dir = ss_paths::config_dir();
-    // Owner-private dir (0700 Unix / DACL-locked Windows) so the token can't leak via the config path.
+    // Keep the configuration directory owner-private so the token cannot leak through the path.
     ss_paths::create_private_dir(&dir).with_context(|| format!("create {}", dir.display()))?;
     write_token(&path, env_var, &token)?;
     tracing::info!(path = %path.display(), "generated and persisted API token (owner-only)");
@@ -88,10 +88,7 @@ fn parse_token(contents: &str, env_var: &str) -> Option<String> {
     (!tok.is_empty()).then(|| tok.to_string())
 }
 
-/// Write `<KEY>=<token>` to `path` as an owner-only secret — 0600 on Unix AND DACL-locked to
-/// SYSTEM/Administrators on Windows. Routes through the shared `write_secret_file` so both bearer
-/// tokens get the SAME Windows lockdown as the host key; the bespoke `cfg(unix)`-only writer used
-/// to leave the mgmt token readable by any local user (security-review 2026-06-28 #2).
+/// Write `<KEY>=<token>` to `path` as an owner-only secret through the shared secret-file helper.
 fn write_token(path: &Path, env_var: &str, token: &str) -> Result<()> {
     let line = format!("{env_var}={token}\n");
     ss_paths::write_secret_file(path, line.as_bytes())

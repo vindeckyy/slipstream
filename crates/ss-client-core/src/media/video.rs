@@ -24,12 +24,12 @@
 // retained even when a particular build treats one of them as a no-op.
 #![allow(clippy::unnecessary_cast)]
 
-use anyhow::{Context as _, Result, anyhow, bail};
+use anyhow::{anyhow, bail, Context as _, Result};
 use ffmpeg_next as ffmpeg;
 #[cfg(target_os = "linux")]
 use std::os::fd::RawFd;
 
-pub use crate::video_color::{ColorDesc, csc_rows};
+pub use crate::video_color::{csc_rows, ColorDesc};
 use crate::video_software::SoftwareDecoder;
 #[cfg(target_os = "linux")]
 use crate::video_vaapi::VaapiDecoder;

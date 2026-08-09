@@ -20,7 +20,7 @@ pub fn main(args: &[String]) -> Result<()> {
             print_usage();
             Ok(())
         }
-        Some(other) => bail!("unknown plugins command '{other}' (try `plugins --help`)")
+        Some(other) => bail!("unknown plugins command '{other}' (try `plugins --help`)"),
     }
 }
 
@@ -144,7 +144,9 @@ pub(crate) struct RuntimeStatus {
 pub(crate) fn runtime_status() -> RuntimeStatus {
     let enabled_raw = systemctl_output(&["is-enabled", UNIT]);
     let active = systemctl_output(&["is-active", UNIT]).unwrap_or_default();
-    let unit_known = enabled_raw.as_deref().is_some_and(|value| value != "not-found");
+    let unit_known = enabled_raw
+        .as_deref()
+        .is_some_and(|value| value != "not-found");
     let installed = unit_known || runner_command().is_ok();
     RuntimeStatus {
         installed,

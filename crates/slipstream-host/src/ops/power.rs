@@ -99,30 +99,30 @@ fn schedule_reexec() -> Result<(), String> {
     // The replacement must not bind until this process has released the ports. Spawning the
     // binary immediately races the parent (Address already in use on --mgmt-bind).
     let mut cmd = Command::new("sh");
-        // $0 / $@ are the exe + serve args passed after -c.
-        let wait =
-            format!("while kill -0 {parent} 2>/dev/null; do sleep 0.05; done; exec \"$0\" \"$@\"");
-        // The replacement must survive the terminal/service session that owns the parent. Closing
-        // its inherited stdio avoids a PTY hangup, and a fresh session prevents the terminal's
-        // process group from taking the waiter down with the host.
-        cmd.stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        use std::os::unix::process::CommandExt as _;
-        // SAFETY: this hook runs in the freshly forked child before `exec`; `setsid` only detaches
-        // that child from the parent's session and does not touch shared Rust state.
-        unsafe {
-            cmd.pre_exec(|| {
-                if libc::setsid() == -1 {
-                    return Err(std::io::Error::last_os_error());
-                }
-                Ok(())
-            });
-        }
-        cmd.arg("-c").arg(wait).arg(&exe);
-        for a in &args {
-            cmd.arg(a);
-        }
+    // $0 / $@ are the exe + serve args passed after -c.
+    let wait =
+        format!("while kill -0 {parent} 2>/dev/null; do sleep 0.05; done; exec \"$0\" \"$@\"");
+    // The replacement must survive the terminal/service session that owns the parent. Closing
+    // its inherited stdio avoids a PTY hangup, and a fresh session prevents the terminal's
+    // process group from taking the waiter down with the host.
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    use std::os::unix::process::CommandExt as _;
+    // SAFETY: this hook runs in the freshly forked child before `exec`; `setsid` only detaches
+    // that child from the parent's session and does not touch shared Rust state.
+    unsafe {
+        cmd.pre_exec(|| {
+            if libc::setsid() == -1 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+    cmd.arg("-c").arg(wait).arg(&exe);
+    for a in &args {
+        cmd.arg(a);
+    }
     cmd.spawn()
         .map_err(|e| format!("spawn replacement host waiter: {e}"))?;
 

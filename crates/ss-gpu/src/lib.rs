@@ -194,5 +194,4 @@ mod tests {
         drop(b);
         assert_eq!(active().unwrap().1, 0); // idle, last-used retained
     }
-
 }

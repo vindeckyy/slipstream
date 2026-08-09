@@ -423,7 +423,7 @@ pub(crate) async fn list_capture_methods() -> Json<Vec<AvailableCaptureMethod>> 
                 crate::session_plan::CaptureBackend::Kms => ("DRM/KMS primary plane", kms_ok),
                 crate::session_plan::CaptureBackend::X11 => ("X11", x11_ok),
                 crate::session_plan::CaptureBackend::NvFbc => ("NVIDIA NvFBC", nvfbc_ok),
-                crate::session_plan::CaptureBackend::IddPush => ("IDD-push", false),
+                _ => ("Unavailable", false),
             };
             AvailableCaptureMethod {
                 id: backend.as_str().into(),

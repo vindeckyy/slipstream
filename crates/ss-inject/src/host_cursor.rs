@@ -405,7 +405,6 @@ mod linux {
     }
 }
 
-
 #[cfg(all(test, target_os = "linux"))]
 mod live_smoke {
     #[test]

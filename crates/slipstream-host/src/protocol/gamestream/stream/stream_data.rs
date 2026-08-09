@@ -170,7 +170,7 @@ pub(super) fn spawn_sender(
         .name("slipstream-send".into())
         .spawn(move || {
             // Transmit thread: above-normal, matching the native path's send thread (includes the
-            // Windows session tuning/MMCSS this used to call directly; adds the Linux nice -5).
+            // Match the native path's send-thread scheduling posture.
             crate::native::boost_thread_priority(false);
             let budget = frame_interval.mul_f32(0.75);
             let cfg = crate::send_pacing::PaceCfg {
@@ -272,7 +272,7 @@ pub(super) fn stream_body(
         // 8-bit SDR, or 10-bit when the captured frame is HDR (P010) — see `gs_bit_depth`.
         gs_bit_depth(frame.format),
         // GameStream/Moonlight stays 4:2:0 — stock Moonlight clients can't decode 4:4:4, and the
-        // Windows IDD-push capturer can't yet deliver full-chroma frames. 4:4:4 is slipstream/1-native only.
+        // GameStream remains 4:2:0 for compatibility with stock Moonlight clients.
         encode::ChromaFormat::Yuv420,
         // True only when THIS session's capture negotiated cursor-as-metadata — which the
         // callers grant only where the resolved backend composites (`cursor_blend_capable`).
@@ -281,12 +281,8 @@ pub(super) fn stream_body(
         cfg.slices,
     )
     .context("open video encoder for stream")?;
-    // Tell the encoder how deep the capturer lets it pipeline. Without this an in-place backend
-    // (Windows direct-NVENC, which encodes the capturer's textures with no CopyResource) bounds
-    // itself by an env cap instead of the ring it is actually reading, and the capturer rotates a
-    // texture out from under a live encode — torn/mixed frames, never an error. The backend now
-    // also fails safe when nobody tells it, but pass the REAL depth: `idd_depth` is configurable
-    // and a deeper ring is free pipelining the fallback would forfeit.
+    // Tell the encoder how deep the capturer lets it pipeline. Passing the actual ring depth
+    // prevents a texture from rotating out from under a live encode.
     enc.set_input_ring_depth(capturer.pipeline_depth().max(1));
     // FEC overhead percent (Sunshine default 20). Override with SLIPSTREAM_FEC_PCT (0 = data-only).
     let fec_pct: u8 = std::env::var("SLIPSTREAM_FEC_PCT")

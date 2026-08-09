@@ -4,7 +4,9 @@ use super::*;
 
 /// Keep the existing startup hook while providers supply their own URLs and local art directly.
 pub fn start_art_warmer() -> std::thread::JoinHandle<()> {
-    std::thread::Builder::new().name("ss-art-warmer".into()).spawn(|| {})
+    std::thread::Builder::new()
+        .name("ss-art-warmer".into())
+        .spawn(|| {})
         .expect("spawn art warmer thread")
 }
 
@@ -60,14 +62,15 @@ pub(crate) fn fetch_image(url: &str) -> Option<(Vec<u8>, String)> {
 /// opposed to an `http(s)`/`data:` URL or an already-relative host proxy path. Provider plugins that
 /// run on the host (e.g. the Playnite sync plugin) set these: the reconcile payload stays tiny
 /// (paths, not inlined bytes, so it scales to thousands of titles) and the host serves the bytes
-/// through the art proxy, exactly like Steam's cache art. Windows-shaped only (`C:\…`, `C:/…`, or a
-/// `\\server\share` UNC) — Playnite, the only local-art provider, is Windows-only, and this keeps the
-/// check from ever mistaking the `/api/…` proxy path (or a POSIX abs path) for a local file.
+/// through the art proxy, exactly like Steam's cache art. Absolute Linux paths are accepted;
+/// proxy paths and URLs are not.
 pub fn is_local_art_path(v: &str) -> bool {
     if v.starts_with("http://") || v.starts_with("https://") || v.starts_with("data:") {
         return false;
     }
-    let b = v.as_bytes();
+    if v.starts_with("/api/v1/library/art/") {
+        return false;
+    }
     std::path::Path::new(v).is_absolute()
 }
 
@@ -153,7 +156,6 @@ pub fn fetch_box_art(id: &str) -> Option<(Vec<u8>, String)> {
         .flatten()
         .find_map(|url| resolve_art_bytes(&url))
 }
-
 
 #[cfg(test)]
 mod tests {

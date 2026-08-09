@@ -22,11 +22,7 @@ fn main() {
     let includes = match target_os.as_str() {
         "linux" => linux_includes(),
         _ => {
-            std::fs::write(
-                &out,
-                "// ss-ffvk: Linux-only, empty on this target\n",
-            )
-            .unwrap();
+            std::fs::write(&out, "// ss-ffvk: Linux-only, empty on this target\n").unwrap();
             return;
         }
     };

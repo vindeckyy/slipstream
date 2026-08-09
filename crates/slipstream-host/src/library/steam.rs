@@ -246,9 +246,7 @@ fn steam_library_dirs() -> Vec<PathBuf> {
 fn vdf_paths(text: &str) -> Vec<String> {
     text.lines()
         .filter_map(|l| vdf_value(l.trim(), "path"))
-        .map(|p| {
-            p.to_string()
-        })
+        .map(|p| p.to_string())
         .collect()
 }
 

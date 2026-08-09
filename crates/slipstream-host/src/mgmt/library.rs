@@ -66,9 +66,8 @@ pub(crate) struct ScannerToggle {
 
 /// List the library scanners
 ///
-/// The installed-store scanners this host supports — the list is platform-dependent (Steam
-/// everywhere; Lutris + Heroic on Linux; Epic, GOG, and Xbox/Game Pass on Windows), so the console
-/// renders a toggle only for scanners that can do anything here. Scanners default to enabled;
+/// The installed-store scanners this host supports are discovered from local Linux paths, so the
+/// console renders a toggle only for scanners that can do anything here. Scanners default to enabled;
 /// disabling one hides its titles from every library surface from the next read. The user-curated
 /// custom store is not a scanner and is always on.
 #[utoipa::path(

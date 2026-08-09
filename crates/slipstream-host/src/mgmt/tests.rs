@@ -717,16 +717,9 @@ async fn compositors_lists_all_backends_with_flags() {
     let (status, body) = send(&app, get_req("/api/v1/compositors")).await;
     assert_eq!(status, StatusCode::OK);
     let arr = body.as_array().expect("array");
-    // Compositor backends are Linux-only; elsewhere the list is empty on purpose (the console
-    // renders "not applicable on this host" instead of five greyed-out rows).
-    #[cfg(not(target_os = "linux"))]
-    assert!(arr.is_empty(), "non-Linux hosts advertise no compositors");
-    // Every backend the host knows, in stable order.
-    #[cfg(target_os = "linux")]
-    {
-        let ids: Vec<&str> = arr.iter().map(|c| c["id"].as_str().unwrap()).collect();
-        assert_eq!(ids, ["kwin", "gamescope", "mutter", "wlroots", "hyprland"]);
-    }
+    // Every backend the Linux host knows, in stable order.
+    let ids: Vec<&str> = arr.iter().map(|c| c["id"].as_str().unwrap()).collect();
+    assert_eq!(ids, ["kwin", "gamescope", "mutter", "wlroots", "hyprland"]);
     for c in arr {
         assert!(c["available"].is_boolean());
         assert!(c["default"].is_boolean());
@@ -1088,8 +1081,7 @@ fn openapi_document_is_complete_and_checked_in() {
     // Compare STRUCTURALLY with `info.version` normalized on both sides: the served document
     // stamps the live crate version, but a version bump alone must never invalidate the
     // snapshot — the API *surface* is what drift-control protects (the 0.5.0 release tripped
-    // on exactly this). Structural comparison also makes line endings a non-issue (git may
-    // check the file out CRLF on Windows).
+    // on exactly this). Structural comparison also makes line endings a non-issue.
     let mut generated = doc;
     let mut snapshot: serde_json::Value = serde_json::from_str(checked_in).unwrap();
     generated["info"]["version"] = serde_json::json!("<any>");
@@ -1172,14 +1164,14 @@ async fn display_settings_surface() {
     assert!(enforced.contains(&"mode_conflict"));
     assert!(enforced.contains(&"identity"));
     assert!(enforced.contains(&"layout"));
-    // The experimental DDC/CI + PnP-disable axes are acted on (Windows exclusive-isolate path).
+    // The experimental display power and monitor-discovery axes are acted on.
     assert!(enforced.contains(&"ddc_power_off"));
     assert!(enforced.contains(&"pnp_disable_monitors"));
 }
 
 /// The display state/release endpoints are wired + auth-gated. On the test host no backend has
-/// created a display (and non-Windows reports none), so `/state` is empty and `/release` is a
-/// no-op — the shapes + the "nothing to release" path, without touching any global owner.
+/// created a display, so `/state` is empty and `/release` is a no-op. This covers the endpoint
+/// shapes and the "nothing to release" path without touching a global owner.
 #[tokio::test]
 async fn display_state_and_release_empty() {
     let app = test_app(test_state(), None);
@@ -1227,10 +1219,7 @@ async fn display_monitors_answers_even_with_no_compositor() {
     // The effective pin can come from the persisted display policy even when the environment is
     // unset. Compare against the same resolver used by real sessions, so this test does not depend
     // on whichever user's settings file happens to be mounted in the test process.
-    #[cfg(target_os = "linux")]
     let expected_pin = crate::vdisplay::capture_monitor();
-    #[cfg(not(target_os = "linux"))]
-    let expected_pin: Option<String> = None;
     assert_eq!(body["pinned"].as_str(), expected_pin.as_deref());
 }
 

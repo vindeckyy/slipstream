@@ -76,7 +76,7 @@ src/
   encode/ · encode.rs      per-GPU encoders (nvenc · vaapi · ffmpeg_win (AMF/QSV) · sw)
   linux/zerocopy/    dmabuf → CUDA → NVENC bridges (EGL/GL tiled, Vulkan LINEAR)
   inject/ · inject.rs      input backends (libei · wlr · uinput gamepads · UHID DualSense/DS4)
-  audio/ · audio.rs        Opus out + virtual mic (PipeWire / WASAPI)
+  audio/ · audio.rs        Opus out + virtual mic (PipeWire)
   gamestream/        Moonlight compat: nvhttp · pairing · rtsp · control · stream · gamepad · apps
   native.rs      the native slipstream/1 host (QUIC control + native-thread UDP data plane)
   mgmt.rs · native_pairing.rs · stats_recorder.rs   management API, pairing, perf capture

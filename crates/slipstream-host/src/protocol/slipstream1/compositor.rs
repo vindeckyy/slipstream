@@ -48,109 +48,109 @@ pub(super) fn resolve_compositor(
     // A client is (re)connecting, so cancel any pending TV-session restore before choosing a
     // compositor. No-op when nothing is pending.
     crate::vdisplay::cancel_pending_tv_restore();
-        // Explicit operator override (legacy / CI / forcing a backend for a test) wins and is assumed
-        // to come with a hand-set env — don't retarget the process env in that case.
-        let overridden = ss_host_config::config().compositor.is_some();
-        let detected = if overridden {
-            crate::vdisplay::detect().ok()
-        } else {
-            // Auto: detect the LIVE session (Gaming vs Desktop) and retarget the process env at it so
-            // every backend (video capture + input) this connect opens against the active session —
-            // this is the state machine that lets one host follow a Bazzite box across Gaming↔Desktop.
-            let active = crate::vdisplay::detect_active_session();
-            // A4: if the compositor instance changed since the last connect (an idle-time Game↔Desktop
-            // switch), bump the epoch + invalidate the old backend's kept displays so this connect never
-            // reuses a node id from the dead instance.
-            crate::vdisplay::observe_session_instance(&active);
-            crate::vdisplay::apply_session_env(&active);
+    // Explicit operator override (legacy / CI / forcing a backend for a test) wins and is assumed
+    // to come with a hand-set env — don't retarget the process env in that case.
+    let overridden = ss_host_config::config().compositor.is_some();
+    let detected = if overridden {
+        crate::vdisplay::detect().ok()
+    } else {
+        // Auto: detect the LIVE session (Gaming vs Desktop) and retarget the process env at it so
+        // every backend (video capture + input) this connect opens against the active session —
+        // this is the state machine that lets one host follow a Bazzite box across Gaming↔Desktop.
+        let active = crate::vdisplay::detect_active_session();
+        // A4: if the compositor instance changed since the last connect (an idle-time Game↔Desktop
+        // switch), bump the epoch + invalidate the old backend's kept displays so this connect never
+        // reuses a node id from the dead instance.
+        crate::vdisplay::observe_session_instance(&active);
+        crate::vdisplay::apply_session_env(&active);
+        tracing::info!(
+            active = ?active.kind,
+            wayland = active.env.wayland_display.as_deref().unwrap_or("-"),
+            "detected active graphical session"
+        );
+        crate::vdisplay::compositor_for_kind(active.kind)
+    };
+    // Dedicated game session (design/gamemode-and-dedicated-sessions.md B0): a launching session
+    // under `game_session=dedicated` (gamescope confirmed available) forces its OWN headless
+    // gamescope spawn at the client's mode, overriding the detected desktop/game-mode backend. The
+    // env was already retargeted above (for XDG_RUNTIME_DIR / the PipeWire daemon); we just pin the
+    // backend + input to the spawn sub-mode. Skipped under an explicit operator compositor pin.
+    if dedicated_launch && !overridden {
+        let route = crate::vdisplay::apply_input_env(Compositor::Gamescope, true);
+        tracing::info!(
+            ?route,
+            "dedicated game session — routing to a headless gamescope spawn at the client mode"
+        );
+        return Ok((Compositor::Gamescope, route));
+    }
+    let available = crate::vdisplay::available();
+    let chosen = match pick_compositor(pref, &available, detected) {
+        Some(c) => c,
+        // No live session, but the MANAGED gamescope infra exists (SteamOS's
+        // `gamescope-session`, Bazzite's `gamescope-session-plus`): route to the gamescope
+        // backend anyway — its managed path stands the session up from nothing at the
+        // client's mode (drop-in takeover / session relaunch), so a dead gaming session
+        // self-heals on the next connect instead of bouncing every client until someone
+        // restarts it by hand. (The trap that motivated this: a headless SteamOS box whose
+        // gamescope died — every connect failed "no usable compositor" even though the
+        // takeover could rebuild it.) Not under an operator pin: an explicit
+        // `SLIPSTREAM_COMPOSITOR` keeps its exact, hand-configured meaning.
+        None if !overridden && crate::vdisplay::managed_session_available() => {
             tracing::info!(
-                active = ?active.kind,
-                wayland = active.env.wayland_display.as_deref().unwrap_or("-"),
-                "detected active graphical session"
-            );
-            crate::vdisplay::compositor_for_kind(active.kind)
-        };
-        // Dedicated game session (design/gamemode-and-dedicated-sessions.md B0): a launching session
-        // under `game_session=dedicated` (gamescope confirmed available) forces its OWN headless
-        // gamescope spawn at the client's mode, overriding the detected desktop/game-mode backend. The
-        // env was already retargeted above (for XDG_RUNTIME_DIR / the PipeWire daemon); we just pin the
-        // backend + input to the spawn sub-mode. Skipped under an explicit operator compositor pin.
-        if dedicated_launch && !overridden {
-            let route = crate::vdisplay::apply_input_env(Compositor::Gamescope, true);
-            tracing::info!(
-                ?route,
-                "dedicated game session — routing to a headless gamescope spawn at the client mode"
-            );
-            return Ok((Compositor::Gamescope, route));
-        }
-        let available = crate::vdisplay::available();
-        let chosen = match pick_compositor(pref, &available, detected) {
-            Some(c) => c,
-            // No live session, but the MANAGED gamescope infra exists (SteamOS's
-            // `gamescope-session`, Bazzite's `gamescope-session-plus`): route to the gamescope
-            // backend anyway — its managed path stands the session up from nothing at the
-            // client's mode (drop-in takeover / session relaunch), so a dead gaming session
-            // self-heals on the next connect instead of bouncing every client until someone
-            // restarts it by hand. (The trap that motivated this: a headless SteamOS box whose
-            // gamescope died — every connect failed "no usable compositor" even though the
-            // takeover could rebuild it.) Not under an operator pin: an explicit
-            // `SLIPSTREAM_COMPOSITOR` keeps its exact, hand-configured meaning.
-            None if !overridden && crate::vdisplay::managed_session_available() => {
-                tracing::info!(
-                    "no live graphical session — managed gamescope infra present; routing to \
+                "no live graphical session — managed gamescope infra present; routing to \
                      the managed takeover to revive the session"
-                );
-                Compositor::Gamescope
-            }
-            None => {
-                // The state a compositor crash leaves behind (gnome-shell
-                // SIGSEGV → GDM greeter, whose auto-login is once-per-boot). If the operator
-                // configured a recovery hook, fire it (debounced) and tell the client to retry:
-                // its next knock lands in the recovered desktop.
-                if crate::vdisplay::try_recover_session() {
-                    anyhow::bail!(
-                        "no live graphical session for this uid — host session recovery launched \
-                         (SLIPSTREAM_RECOVER_SESSION_CMD); retry in a few seconds"
-                    );
-                }
-                anyhow::bail!(
-                    "no usable compositor (no live graphical session for this uid; set \
-                     SLIPSTREAM_COMPOSITOR or start a desktop/gaming session)"
-                );
-            }
-        };
-        // Point input at the same backend and resolve the gamescope sub-mode (managed where the
-        // session infra exists, attach to a foreign gamescope, else per-session bare spawn). The
-        // route travels back to the caller as a VALUE and is carried on the backend instance — an
-        // operator pin skips the input retarget but still needs a route resolved, or `create` would
-        // fall through to a bare spawn on a box that was pinned to the managed session.
-        let route = if !overridden {
-            crate::vdisplay::apply_input_env(chosen, false)
-        } else {
-            // An operator pin deliberately leaves SLIPSTREAM_INPUT_BACKEND alone, but still needs a
-            // route resolved — otherwise `create` falls through to a bare spawn on a box pinned to
-            // the managed session.
-            crate::vdisplay::resolve_gamescope_route(chosen, false)
-        };
-        let avail_ids: Vec<&str> = available.iter().map(|c| c.id()).collect();
-        match Compositor::from_pref(pref) {
-            Some(want) if want == chosen => {
-                tracing::info!(
-                    compositor = chosen.id(),
-                    "honoring client compositor request"
-                )
-            }
-            Some(want) => tracing::warn!(
-                requested = want.id(),
-                chosen = chosen.id(),
-                available = ?avail_ids,
-                "client-requested compositor unavailable — falling back to auto-detect"
-            ),
-            None => tracing::info!(
-                compositor = chosen.id(),
-                "auto-detected compositor (client: auto)"
-            ),
+            );
+            Compositor::Gamescope
         }
+        None => {
+            // The state a compositor crash leaves behind (gnome-shell
+            // SIGSEGV → GDM greeter, whose auto-login is once-per-boot). If the operator
+            // configured a recovery hook, fire it (debounced) and tell the client to retry:
+            // its next knock lands in the recovered desktop.
+            if crate::vdisplay::try_recover_session() {
+                anyhow::bail!(
+                    "no live graphical session for this uid — host session recovery launched \
+                         (SLIPSTREAM_RECOVER_SESSION_CMD); retry in a few seconds"
+                );
+            }
+            anyhow::bail!(
+                "no usable compositor (no live graphical session for this uid; set \
+                     SLIPSTREAM_COMPOSITOR or start a desktop/gaming session)"
+            );
+        }
+    };
+    // Point input at the same backend and resolve the gamescope sub-mode (managed where the
+    // session infra exists, attach to a foreign gamescope, else per-session bare spawn). The
+    // route travels back to the caller as a VALUE and is carried on the backend instance — an
+    // operator pin skips the input retarget but still needs a route resolved, or `create` would
+    // fall through to a bare spawn on a box that was pinned to the managed session.
+    let route = if !overridden {
+        crate::vdisplay::apply_input_env(chosen, false)
+    } else {
+        // An operator pin deliberately leaves SLIPSTREAM_INPUT_BACKEND alone, but still needs a
+        // route resolved — otherwise `create` falls through to a bare spawn on a box pinned to
+        // the managed session.
+        crate::vdisplay::resolve_gamescope_route(chosen, false)
+    };
+    let avail_ids: Vec<&str> = available.iter().map(|c| c.id()).collect();
+    match Compositor::from_pref(pref) {
+        Some(want) if want == chosen => {
+            tracing::info!(
+                compositor = chosen.id(),
+                "honoring client compositor request"
+            )
+        }
+        Some(want) => tracing::warn!(
+            requested = want.id(),
+            chosen = chosen.id(),
+            available = ?avail_ids,
+            "client-requested compositor unavailable — falling back to auto-detect"
+        ),
+        None => tracing::info!(
+            compositor = chosen.id(),
+            "auto-detected compositor (client: auto)"
+        ),
+    }
     Ok((chosen, route))
 }
 

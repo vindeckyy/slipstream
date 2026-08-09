@@ -25,8 +25,8 @@ pub(crate) async fn get_hooks() -> Json<crate::hooks::HooksConfig> {
 /// Replace the hook configuration
 ///
 /// Validates and persists a full `hooks.json` document (this is a whole-document PUT, not a
-/// patch). Applies from the next event — no restart. Hook commands run as the host user
-/// (interactive user session on Windows): treat this configuration as operator-privileged.
+/// patch). Applies from the next event, with no restart. Hook commands run as the host user, so
+/// treat this configuration as operator-privileged.
 #[utoipa::path(
     put,
     path = "/hooks",

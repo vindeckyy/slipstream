@@ -393,10 +393,7 @@ fn run(
     // virtual source does via `vdisplay::open`. Without this a Moonlight client on a pinned host
     // would silently get whichever monitor the portal handed back — "showing the wrong monitor is
     // worse than showing none" is the rule the whole feature is built on.
-    #[cfg(target_os = "linux")]
     let pinned = crate::vdisplay::capture_monitor();
-    #[cfg(not(target_os = "linux"))]
-    let pinned: Option<String> = None;
     let pooled = match video_cap.lock().unwrap().take() {
         Some((c, was_hdr, was_meta, ref was_pin))
             if was_hdr == cfg.hdr && was_meta == metadata_cursor && *was_pin == pinned =>
@@ -424,7 +421,6 @@ fn run(
             tracing::info!("video source: reusing capturer");
             c
         }
-        #[cfg(target_os = "linux")]
         None if ss_host_config::config().video_source.as_deref() == Some("portal")
             && pinned.is_some() =>
         {

@@ -601,7 +601,7 @@ pub(crate) async fn session(args: Args) -> Result<()> {
     //   --mic-burst  — two 20 ms Opus frames back-to-back every 40 ms, replicating a real
     //                  client's input-tap cadence (the Mac client's AVAudioEngine tap yields
     //                  ~2048-frame buffers → two packets per ~42 ms). This is the arrival
-            //                  pattern that exposed a missing host jitter buffer (constant
+    //                  pattern that exposed a missing host jitter buffer (constant
     //                  crackle, 2026-07-03): a steady 5 ms stream never trips it. Record the
     //                  host mic and count silence gaps to regression-test host-side buffering.
     #[cfg(not(target_os = "linux"))]

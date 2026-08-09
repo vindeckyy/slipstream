@@ -9,8 +9,8 @@
 //! `last_resize_ms`), so the web-console Dashboard and future regressions can read it per session.
 //!
 //! Deliberately coarse: stages are stamped where the session layer can see them; layers the trace
-//! doesn't reach (the Windows display manager's activation ladder / settle waits) log their own
-//! per-stage deltas and correlate by wall clock.
+//! doesn't reach, such as compositor activation and settle waits, log their own per-stage deltas
+//! and correlate by wall clock.
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};

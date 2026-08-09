@@ -610,7 +610,7 @@ mod tests {
     /// the mapping a stock Moonlight client derives from our advertised surround-params
     /// (parse → GFE swap), and verify a tone fed into each input channel comes out on the
     /// same output channel. Cross-platform via the safe `opus` crate — this also guards the
-    /// (now un-gated) Windows GameStream surround build.
+    /// GameStream surround build.
     #[test]
     fn multistream_51_roundtrip_channel_identity() {
         let layout = &LAYOUT_51;

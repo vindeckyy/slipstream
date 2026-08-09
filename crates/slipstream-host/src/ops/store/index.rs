@@ -503,7 +503,6 @@ mod tests {
             "camelCase `minHost`"
         );
         assert_eq!(scope_of(&rom.pkg).unwrap(), "@slipstream");
-
     }
 
     #[test]

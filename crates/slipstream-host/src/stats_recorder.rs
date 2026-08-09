@@ -230,7 +230,7 @@ pub fn default_dir() -> PathBuf {
 }
 
 /// `id` charset gate, matching `^[A-Za-z0-9._-]+$` — the exact charset `capture_id` emits (which
-/// deliberately uses dashes, not colons, so the stem is a valid Windows filename). We additionally
+/// deliberately uses dashes, not colons, so the stem remains portable). We additionally
 /// reject `.`/`..` so a path-component sneaks no parent reference even though the charset would allow
 /// bare dots. The charset already excludes `/` and `\`, so `dir.join("<id>.json")` is always a single
 /// child of `dir`. Defense in depth — the endpoints are bearer-authed.
@@ -251,8 +251,7 @@ fn unix_ms_now() -> u64 {
 }
 
 /// A human-readable, filesystem-safe capture id from the start time + mode, e.g.
-/// `2026-06-26T20-14-03Z_5120x1440`. Dashes (not colons) in the time so it's a valid Windows
-/// filename; matches [`valid_id`].
+/// `2026-06-26T20-14-03Z_5120x1440`. Dashes keep the identifier portable and match [`valid_id`].
 fn capture_id(unix_ms: u64, width: u32, height: u32) -> String {
     let secs = (unix_ms / 1000) as i64;
     let days = secs.div_euclid(86_400);

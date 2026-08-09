@@ -34,8 +34,8 @@ impl ServerIdentity {
             _ => {
                 let (c, k) = generate()?;
                 // The private key is the trust root for EVERY surface (TLS server cert, pairing
-                // signing, the QUIC identity clients pin) — write it owner-only (0600 / SYSTEM-only
-                // DACL) so a local user can't read it and impersonate the host. The dir is 0700.
+                // signing, the QUIC identity clients pin) and write it owner-only so a local user
+                // cannot read it and impersonate the host. The directory is private as well.
                 ss_paths::create_private_dir(&dir).ok();
                 ss_paths::write_secret_file(&key_path, k.as_bytes())
                     .with_context(|| format!("write {}", key_path.display()))?;
@@ -70,8 +70,8 @@ impl ServerIdentity {
 }
 
 fn generate() -> Result<(String, String)> {
-    // The workspace is ring-only (aws-lc-sys breaks Windows CI — see the rustls/rcgen pins), and
-    // `ring` can *sign* with an existing RSA key but cannot *generate* one: rcgen's ring backend
+    // The workspace uses the ring backend, and `ring` can sign with an existing RSA key but cannot
+    // generate one: rcgen's ring backend
     // returns `KeyGenerationUnavailable` for `generate_for(&PKCS_RSA_SHA256)`. Moonlight requires an
     // RSA-2048 identity, so generate the key with the pure-Rust `rsa` crate (already a dep for the
     // pairing signer) and hand the PKCS#8 PEM to rcgen, whose ring backend *can* load + self-sign

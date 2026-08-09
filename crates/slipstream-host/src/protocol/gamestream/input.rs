@@ -91,8 +91,8 @@ fn decode_input_packet(p: &[u8]) -> Option<InputEvent> {
             // char flags, short keyCode (LE), char modifiers, short zero2. The client stuffs a
             // 0x80 high byte on key-down; Sunshine masks to the low-byte VK (`& 0xFF`).
             // Moonlight VKs are LAYOUT-SEMANTIC (the client's layout already resolved them) —
-            // tag them so the Windows injector maps them under the receiving app's layout
-            // instead of the fixed US-positional table the first-party clients use.
+            // preserve the client's layout-semantic key code instead of applying a fixed
+            // positional table.
             let key_code = (u16::from_le_bytes([*b.get(1)?, *b.get(2)?]) & 0x00FF) as u32;
             let modifiers = *b.get(3)? as u32;
             let kind = if magic == MAGIC_KEY_DOWN {

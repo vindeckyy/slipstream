@@ -612,7 +612,7 @@ pub(super) fn input_thread(
     // Pointer buttons / keys the client currently holds down. The injector is host-lifetime, so a
     // press left dangling by an abrupt client disconnect stays latched in the compositor across the
     // reconnect (Mutter keeps the implicit pointer grab of the still-pressed button — a stuck
-    // left-button-down then turns every later click into a drag: windows move, but clicking buttons
+    // left-button-down then turns every later click into a drag: pointer movement continues, but clicking buttons
     // and text inputs does nothing). We synthesize the matching up-events when this session ends —
     // see the release loop after the `break`.
     // Sets (not Vecs) so the presence test is O(1), not O(n) per event, and bounded by `MAX_HELD`

@@ -378,7 +378,11 @@ mod tests {
                 "{:?} has no process name",
                 k.product
             );
-            assert!(!k.linux_units.is_empty(), "{:?} has no Linux unit", k.product);
+            assert!(
+                !k.linux_units.is_empty(),
+                "{:?} has no Linux unit",
+                k.product
+            );
         }
     }
 }

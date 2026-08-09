@@ -34,10 +34,7 @@ pub(super) fn route_decision(
 /// applies to the session default, minus the Auto/env session logic (a per-pad declaration is
 /// always a concrete kind).
 pub(super) fn resolve_pad_kind(kind: GamepadPref) -> GamepadPref {
-    let chosen = pick_gamepad(
-        kind,
-        None,
-    );
+    let chosen = pick_gamepad(kind, None);
     degrade_steam_on_conflict(degrade_if_no_uhid(chosen))
 }
 
@@ -65,7 +62,7 @@ fn pick_gamepad(pref: GamepadPref, env: Option<&str>) -> GamepadPref {
         // New Steam Controller (2026, `28DE:1302`): passed through as-is on Linux — the Triton
         // UHID backend mirrors the client's raw reports under the real identity and Steam on
         // the host drives it over hidraw (no kernel driver binds the PID; Steam Input is the
-        // consumer). No Windows backend; folds to Xbox360 there.
+        // consumer). Unsupported preferences fold to the Xbox360 identity.
         _ => GamepadPref::Xbox360,
     }
 }
@@ -189,10 +186,7 @@ fn degrade_steam_on_conflict(chosen: GamepadPref) -> GamepadPref {
 /// [`pick_gamepad`]). Always concrete — the `Welcome` reports what the session will drive.
 pub(super) fn resolve_gamepad(pref: GamepadPref) -> GamepadPref {
     let env = ss_host_config::config().gamepad.clone();
-    let chosen = pick_gamepad(
-        pref,
-        env.as_deref(),
-    );
+    let chosen = pick_gamepad(pref, env.as_deref());
     // Runtime degrade (separate from the compile-time platform check above): the Linux UHID
     // backends need `/dev/uhid` usable *now*, else creating the device just fails and the controller
     // goes dead — fall back to the always-available uinput X-Box 360 pad instead.
@@ -285,7 +279,10 @@ mod tests {
         assert_eq!(pick_gamepad(Auto, Some("switch")), SwitchPro);
         assert_eq!(pick_gamepad(SteamController2, None), SteamController2);
         assert_eq!(pick_gamepad(Auto, Some("sc2")), SteamController2);
-        assert_eq!(pick_gamepad(SteamController2Puck, None), SteamController2Puck);
+        assert_eq!(
+            pick_gamepad(SteamController2Puck, None),
+            SteamController2Puck
+        );
         assert_eq!(pick_gamepad(Auto, Some("sc2puck")), SteamController2Puck);
     }
 
