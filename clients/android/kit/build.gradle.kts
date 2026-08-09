@@ -37,7 +37,7 @@ dependencies {
     // A REAL org.json on the unit-test classpath. android.jar's org.json is stubs that throw
     // "Stub!", so the host-store migration test — which asserts over the very JSON blobs the store
     // reads and writes — cannot run without it. Explicit test deps precede the mockable android.jar.
-    testImplementation("org.json:json:20250107")
+    testImplementation("org.json:json:20260719")
 }
 
 // ------------------------------------------------------------------------------------------------
