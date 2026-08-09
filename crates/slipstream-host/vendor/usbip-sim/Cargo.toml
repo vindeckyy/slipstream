@@ -20,7 +20,7 @@ path = "src/lib.rs"
 
 [dependencies]
 log = "0.4"
-num-derive = "0.4"
+num-derive = "0.5"
 num-traits = "0.2"
 # `time` is for the interrupt-IN pacing added in device.rs (slipstream modification — see NOTICE).
 tokio = { version = "1", features = ["rt", "net", "io-util", "sync", "time"] }
