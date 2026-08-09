@@ -68,7 +68,7 @@ sha2 = { version = "0.10", features = ["oid"] }
 aes = "0.8"
 aes-gcm = "0.10"
 cbc = { version = "0.1", features = ["alloc"] }
-rand = "0.8"
+rand = "0.9"
 hex = "0.4"
 # Cover-art delivery in the game library: encode Lutris's local JPEGs into `data:` URLs and decode
 # the Epic launcher's base64 `catcache.bin`.
