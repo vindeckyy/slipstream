@@ -154,6 +154,12 @@ pub(super) fn run_async(
         "max-input-size",
         (mode.width * mode.height).max(2_000_000) as i32,
     );
+    // MediaTek's decoder on the Fire HD 10 uses the negotiated cadence to choose its clock and
+    // queue depth. Without the hint it can enter a power-saving paced path even when the stream is
+    // marked low-latency, adding a frame of decode wait before the first present.
+    if mode.refresh_hz > 0 {
+        format.set_i32("frame-rate", mode.refresh_hz as i32);
+    }
     configure_low_latency(&mut format, &codec_name, low_latency_mode);
     if client.color.is_hdr() {
         match client.next_hdr_meta(Duration::from_millis(250)) {

@@ -10,6 +10,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -44,7 +45,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -55,6 +58,7 @@ import io.slipstream.components.EmptyHostsState
 import io.slipstream.components.HostCard
 import io.slipstream.components.HostMenuItem
 import io.slipstream.components.SectionLabel
+import io.slipstream.design.AuroraBackdrop
 import io.slipstream.kit.Gamepad
 import io.slipstream.kit.NativeBridge
 import io.slipstream.kit.discovery.DiscoveredHost
@@ -72,6 +76,7 @@ import io.slipstream.kit.security.obtainIdentity
 import io.slipstream.models.ActiveSession
 import io.slipstream.models.HostStatus
 import io.slipstream.models.PendingTrust
+import io.slipstream.design.AuroraBackdrop
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -141,6 +146,9 @@ fun ConnectScreen(
     var attempt by remember { mutableStateOf<ConnectAttempt?>(null) }
     // The host streams at exactly this mode; "Native" settings resolve from the device display.
     val (w, h, hz) = settings.effectiveMode(context)
+    val deviceProfile = remember(context) {
+        DeviceProfiles.forModel(Build.MODEL, nativeDisplayMode(context))
+    }
 
     // mDNS discovery scoped to this screen, via the native mdns-sd browse (HostDiscovery) — its
     // onChange fires on the main thread, so it can set Compose state directly. (Emulator SLIRP drops
@@ -320,6 +328,7 @@ fun ConnectScreen(
         clipboardSync = record?.clipboardSync ?: true,
         profileName = profile?.name,
         hostId = record?.id,
+        hostName = record?.name,
     )
 
     // The actual dial (identity already ready). On a TOFU connect (pinHex null), pin the fingerprint
@@ -819,24 +828,45 @@ fun ConnectScreen(
             },
         )
     } else {
-        Box(Modifier.fillMaxSize()) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+        // The aurora field is the home's canvas — the same living backdrop the console UI wears,
+        // so the touch and console modes read as ONE app instead of two themes.
+        AuroraBackdrop(Modifier.fillMaxSize(), scrim = false)
+        val gridMinCardWidth = when {
+            deviceProfile != null -> 260.dp
+            maxWidth >= 900.dp -> 220.dp
+            else -> 160.dp
+        }
+        val gridHorizontalPadding = if (maxWidth >= 1000.dp) 24.dp else 16.dp
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 160.dp),
+            columns = GridCells.Adaptive(minSize = gridMinCardWidth),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+            contentPadding = PaddingValues(horizontal = gridHorizontalPadding, vertical = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Spacer(Modifier.height(8.dp))
-                    Text("Slipstream", style = MaterialTheme.typography.headlineLarge)
-                    Text(
-                        "stream a remote desktop",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(24.dp))
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Spacer(Modifier.height(14.dp))
+                    // Hero: the brand mark + name over the aurora, with a quiet tagline under.
+                    HomeHero()
+                    Spacer(Modifier.height(26.dp))
+
+                    deviceProfile?.let { profile ->
+                        FireHd10TuningCard(
+                            profile = profile,
+                            settings = settings,
+                            onApply = {
+                                onSettingsChange(DeviceProfiles.optimizedSettings(settings))
+                                notice = "Fire HD 10 tuning applied. New sessions use the low-latency path."
+                            },
+                            onOpenSettings = onOpenSettings,
+                        )
+                        Spacer(Modifier.height(16.dp))
+                    }
 
                     notice?.let {
                         Surface(
@@ -1287,3 +1317,73 @@ private fun KnownHost.matches(dh: DiscoveredHost): Boolean {
  */
 private fun KnownHost.isOnline(discovered: List<DiscoveredHost>, reachable: Set<String>): Boolean =
     discovered.any { matches(it) } || reachable.contains("$address:$port")
+
+/**
+ * The home's hero — the Slipstream brand mark (two overlapping circles, the launcher's motif)
+ * drawn live over the aurora, with the product name and tagline beneath. This is the first thing
+ * a user sees, so it carries the identity: quiet, luminous, unmistakably Slipstream.
+ */
+@Composable
+internal fun HomeHero() {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // The mark: two overlapping discs (cyan + violet) with a lighter lens where they meet —
+        // the same geometry as the adaptive icon, re-drawn so it can glow on the aurora.
+        val breathe = io.slipstream.design.rememberBreath()
+        Box(Modifier.size(74.dp), contentAlignment = Alignment.Center) {
+            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                val r = size.minDimension * 0.30f
+                val spread = size.minDimension * 0.16f
+                val cx = size.width / 2f
+                val cy = size.height / 2f
+                val glow = 0.75f + 0.25f * breathe
+                drawCircle(
+                    brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF0891B2).copy(alpha = 0.95f * glow),
+                            Color(0xFF0891B2).copy(alpha = 0.35f),
+                        ),
+                        center = androidx.compose.ui.geometry.Offset(cx - spread, cy),
+                        radius = r,
+                    ),
+                    center = androidx.compose.ui.geometry.Offset(cx - spread, cy),
+                    radius = r,
+                )
+                drawCircle(
+                    brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF22D3EE).copy(alpha = 0.95f * glow),
+                            Color(0xFF22D3EE).copy(alpha = 0.35f),
+                        ),
+                        center = androidx.compose.ui.geometry.Offset(cx + spread, cy),
+                        radius = r,
+                    ),
+                    center = androidx.compose.ui.geometry.Offset(cx + spread, cy),
+                    radius = r,
+                )
+                // The lens — the bright overlap.
+                drawCircle(
+                    color = Color(0xFFA5F3FC).copy(alpha = 0.85f * glow),
+                    center = androidx.compose.ui.geometry.Offset(cx, cy),
+                    radius = r * 0.42f,
+                )
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "Slipstream",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Your desktop and games, wherever you are",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White.copy(alpha = 0.55f),
+            textAlign = TextAlign.Center,
+        )
+    }
+}

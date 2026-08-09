@@ -145,7 +145,10 @@ fun LibraryScreen(
                                     launching = false
                                     if (handle != 0L) {
                                         onLaunched(
-                                            ActiveSession(handle, settings, host.clipboardSync),
+                                            ActiveSession(
+                                                handle, settings, host.clipboardSync,
+                                                hostName = host.name,
+                                            ),
                                         )
                                     }
                                     else Toast.makeText(

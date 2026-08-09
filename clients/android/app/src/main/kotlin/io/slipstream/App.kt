@@ -149,6 +149,7 @@ fun App(forceGamepadUi: Boolean = false) {
                             settings = settings,
                             onConnected = { session = it },
                             onSettingsChange = { settings = it; settingsStore.save(it) },
+                            onOpenSettings = { tab = Tab.Settings },
                             deepLink = pendingLink,
                             onDeepLinkHandled = { activity?.pendingDeepLink = null },
                         )

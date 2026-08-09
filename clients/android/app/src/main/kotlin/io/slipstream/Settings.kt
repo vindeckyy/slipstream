@@ -5,6 +5,7 @@ import android.hardware.display.DisplayManager
 import android.os.Build
 import android.util.Log
 import android.view.Display
+import kotlin.math.roundToInt
 
 /**
  * User-tunable stream settings, persisted in `SharedPreferences`. A `0` resolution/refresh means
@@ -360,7 +361,10 @@ fun nativeDisplayMode(context: Context): Triple<Int, Int, Int> {
     val mode = display.mode
     val w = mode.physicalWidth
     val h = mode.physicalHeight
-    val hz = mode.refreshRate.toInt().coerceAtLeast(1)
+    // Android commonly reports 59.94 Hz for a nominal 60 Hz panel. Truncating that value to 59
+    // makes the host and the panel disagree about cadence, which can cost a refresh of latency
+    // whenever the presenter misses its 59 Hz target.
+    val hz = mode.refreshRate.roundToInt().coerceAtLeast(1)
     return Triple(maxOf(w, h), minOf(w, h), hz)
 }
 
@@ -374,14 +378,64 @@ fun nativeDisplayMode(context: Context): Triple<Int, Int, Int> {
 object DeviceProfiles {
     const val FIRE_HD_10_13_MODEL = "KFTUWI"
 
+    /** A small, user-facing description of a known device's safe streaming envelope. */
+    data class Profile(
+        val model: String,
+        val name: String,
+        val recommendedMode: Triple<Int, Int, Int>,
+        val decoderLabel: String,
+        val networkLabel: String,
+    )
+
+    val FIRE_HD_10 = Profile(
+        model = FIRE_HD_10_13_MODEL,
+        name = "Fire HD 10 (13th Gen)",
+        recommendedMode = Triple(1680, 1050, 60),
+        decoderLabel = "HEVC or H.264 hardware decode up to 1080p60",
+        networkLabel = "5 GHz Wi-Fi recommended",
+    )
+
     fun isFireHd10(model: String?): Boolean =
         model?.trim()?.uppercase() == FIRE_HD_10_13_MODEL
+
+    fun forModel(model: String?, native: Triple<Int, Int, Int>): Profile? =
+        if (isFireHd10(model)) {
+            FIRE_HD_10.copy(recommendedMode = streamDefaultMode(model, native))
+        } else {
+            null
+        }
+
+    /**
+     * Apply the safe stream-side defaults without baking Fire dimensions into the global store.
+     * Keeping the mode fields at zero means the policy still adapts if the same install moves to
+     * another display later.
+     */
+    fun optimizedSettings(current: Settings): Settings = current.copy(
+        width = 0,
+        height = 0,
+        hz = 0,
+        renderScale = 1.0,
+        lowLatencyMode = true,
+        presentPriority = "latency",
+        smoothBuffer = 0,
+        audioChannels = 2,
+    )
+
+    fun isOptimized(settings: Settings): Boolean =
+        settings.lowLatencyMode &&
+            settings.presentPriority != "smooth" &&
+            settings.smoothBuffer == 0 &&
+            settings.renderScale <= 1.0 &&
+            settings.audioChannels == 2 &&
+            settings.hz <= 60 &&
+            (settings.width == 0 || settings.width <= 1920) &&
+            (settings.height == 0 || settings.height <= 1080)
 
     fun streamDefaultMode(model: String?, native: Triple<Int, Int, Int>): Triple<Int, Int, Int> {
         if (!isFireHd10(model)) return native
         val (width, height, hz) = native
         if (width >= 1920 && height >= 1200) {
-            return Triple(1680, 1050, hz.coerceAtMost(60))
+            return Triple(1680, 1050, hz.coerceIn(1, 60))
         }
         return native
     }

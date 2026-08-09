@@ -78,6 +78,9 @@ pub(super) fn run_sync(
         "max-input-size",
         (mode.width * mode.height).max(2_000_000) as i32,
     );
+    if mode.refresh_hz > 0 {
+        format.set_i32("frame-rate", mode.refresh_hz as i32);
+    }
     // Standard + per-SoC vendor low-latency keys and the clock hints, gated on the resolved decoder
     // name and the master toggle (see `configure_low_latency`).
     configure_low_latency(&mut format, &codec_name, low_latency_mode);

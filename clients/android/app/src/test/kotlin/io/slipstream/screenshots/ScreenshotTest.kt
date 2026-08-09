@@ -69,6 +69,10 @@ class ScreenshotTest {
     }
 
     @Test
+    @Config(sdk = [30], qualifiers = "w960dp-h600dp-xhdpi")
+    fun fireHd10Tuning() = shootRoot("fire-hd10-tuning") { FireHd10TuningScene() }
+
+    @Test
     fun settingsProfile() = shootRoot("settings-profile") { SettingsProfileScene() }
 
     @Test

@@ -40,6 +40,12 @@ object VideoDecoders {
         "omx.hisi", "c2.hisi",
     )
 
+    // MediaCodecList enumeration is surprisingly expensive on budget Android builds. The codec
+    // inventory cannot change during a foreground session, so keep one process-local answer per
+    // MIME instead of walking every codec again for the settings screen and then again at surface
+    // creation.
+    private val choiceCache = mutableMapOf<String, DecoderChoice?>()
+
     /**
      * Pick the best decoder for [mime] (`"video/hevc"` / `"video/avc"` / `"video/av01"`), or `null`
      * to let the platform resolve its default. Enumerates once — call at stream start.
@@ -146,8 +152,15 @@ object VideoDecoders {
 
     fun pickDecoder(mime: String): DecoderChoice? {
         if (mime.isEmpty()) return null
+        synchronized(choiceCache) {
+            if (choiceCache.containsKey(mime)) return choiceCache[mime]
+        }
         val infos = runCatching { MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos }
-            .getOrNull() ?: return null
+            .getOrNull()
+        if (infos == null) {
+            synchronized(choiceCache) { choiceCache[mime] = null }
+            return null
+        }
 
         var bestName: String? = null
         var bestLowLatency = false
@@ -190,6 +203,8 @@ object VideoDecoders {
                 bestLowLatency = lowLatency
             }
         }
-        return bestName?.let { DecoderChoice(it, bestLowLatency) }
+        return bestName?.let { DecoderChoice(it, bestLowLatency) }.also { choice ->
+            synchronized(choiceCache) { choiceCache[mime] = choice }
+        }
     }
 }

@@ -547,7 +547,7 @@ private fun CategoryDetail(
             Text(category.title, style = MaterialTheme.typography.headlineMedium)
         }
         when (category) {
-            SettingsCategory.General -> GeneralSettings(settings, onChange)
+            SettingsCategory.General -> GeneralSettings(settings, onChange, context)
             SettingsCategory.Display -> DisplaySettings(settings, onChange, context)
             SettingsCategory.Input -> InputSettings(settings, onChange)
             SettingsCategory.Audio -> AudioSettings(settings, onChange, onMicChange)
@@ -558,8 +558,18 @@ private fun CategoryDetail(
 }
 
 @Composable
-private fun GeneralSettings(s: Settings, update: (Settings) -> Unit) {
+private fun GeneralSettings(s: Settings, update: (Settings) -> Unit, context: android.content.Context) {
     DeviceScopeOnly {
+        val deviceProfile = remember(context) {
+            DeviceProfiles.forModel(Build.MODEL, nativeDisplayMode(context))
+        }
+        deviceProfile?.let { profile ->
+            FireHd10TuningCard(
+                profile = profile,
+                settings = s,
+                onApply = { update(DeviceProfiles.optimizedSettings(s)) },
+            )
+        }
         SettingsGroup("Session") {
             ToggleRow(
                 title = "Auto-wake on connect",

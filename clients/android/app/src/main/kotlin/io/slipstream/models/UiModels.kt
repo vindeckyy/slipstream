@@ -61,6 +61,11 @@ data class ActiveSession(
      * from "a different host" (a notice; a URL may never preempt a live session).
      */
     val hostId: String? = null,
+    /**
+     * The host's display name for in-stream chrome (the quick panel's header). Null for connects
+     * that never named their host; the UI falls back to a generic label.
+     */
+    val hostName: String? = null,
 )
 
 /** Trust state of a host, shown as a colored pill on its card. */

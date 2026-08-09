@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material3.Icon
@@ -68,6 +69,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import io.slipstream.kit.DsCapture
+import io.slipstream.kit.Gamepad
 import io.slipstream.kit.GamepadFeedback
 import io.slipstream.kit.GamepadRouter
 import io.slipstream.kit.deviceBodyVibrator
@@ -75,6 +77,8 @@ import io.slipstream.kit.NativeBridge
 import io.slipstream.kit.Sc2Capture
 import io.slipstream.kit.VideoDecoders
 import io.slipstream.models.ActiveSession
+import io.slipstream.design.glassSurface
+import io.slipstream.design.GlassShapeSmall
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -256,6 +260,41 @@ fun StreamScreen(session: ActiveSession, onDisconnect: () -> Unit) {
     // below so the capture callbacks can reach the view once it exists.
     var keyCapture by remember { mutableStateOf<KeyCaptureView?>(null) }
 
+    // ---- Virtual on-screen gamepad + quick panel (the tablet-is-the-controller stack) ----
+    // The virtual pad's persisted preferences (opacity/scale/haptics + the master switch).
+    val virtualPadStore = remember { VirtualPadStore(context) }
+    val virtualPadConfig = remember { virtualPadStore.load() }
+    // The pad's wire controller: created here, attached in the session effect, released on dispose.
+    // Pad index 15 is reserved for it — physical pads take lowest-free from 0.
+    val virtualPad = remember(handle) { VirtualPadController(handle) }
+    val virtualPadHaptics = remember(handle) { VirtualPadHaptics(context) { virtualPadConfig.haptics } }
+    // Per-session visibility. Default: shown when enabled AND no physical controller is attached —
+    // a controller-less tablet (the Fire HD 10 case) gets a pad automatically; a phone with an Xbox
+    // pad paired does not. The quick panel toggles it live.
+    var padVisible by remember(handle) {
+        mutableStateOf(virtualPadConfig.enabled && Gamepad.firstPad() == null)
+    }
+    // The quick panel (the glass sheet that hosts mic / stats / pad / keyboard / disconnect).
+    var quickPanelVisible by remember { mutableStateOf(false) }
+    // The session line for the panel header: the negotiated mode + the resolved profile, if any.
+    val sessionLine = remember(handle) {
+        val sz = NativeBridge.nativeVideoSize(handle)
+        val w = sz?.getOrNull(0) ?: 0
+        val h = sz?.getOrNull(1) ?: 0
+        val hz2 = sz?.getOrNull(2) ?: 0
+        buildString {
+            if (w > 0) {
+                append("${w}×${h}")
+                if (hz2 > 0) append("@$hz2")
+            }
+            session.profileName?.let {
+                if (isNotEmpty()) append(" · ")
+                append(it)
+            }
+            if (isEmpty()) append("Live session")
+        }
+    }
+
     // The video SurfaceView, hoisted for the same reason: the pointer paths built below map WINDOW
     // coordinates onto the picture, and with a letterboxed stream that rect is the video's, not the
     // panel's. Set when the view is created.
@@ -323,6 +362,9 @@ fun StreamScreen(session: ActiveSession, onDisconnect: () -> Unit) {
         // controller (Automatic). Built here, released on dispose.
         val router = GamepadRouter(context, handle, initialSettings.gamepad)
         activity?.gamepadRouter = router
+        // The virtual on-screen gamepad joins on its reserved wire pad (15) — Arrival before any
+        // input, exactly like a physical pad's slot. Released (release-all + Remove) on dispose.
+        virtualPad.attach()
         // Select+Start+L1+R1 chord leaves the stream — a deliberate quit (signal it so the host skips
         // the keep-alive linger), unlike a host-ended / backgrounded drop. The router debounces it
         // (must be held ~1.5 s) and fires onExitChord on its main-thread timer, so leave the stream
@@ -539,6 +581,8 @@ fun StreamScreen(session: ActiveSession, onDisconnect: () -> Unit) {
             ds?.stop() // rumble-stop on the physical pad + release the USB link + free the wire slot
             router.onExitArmed = null // don't poke Compose state from release()'s disarm while tearing down
             router.onMicChord = null // same: no mute toggle on buttons released during teardown
+            // Virtual pad: release-all + Remove so nothing sticks host-side — BEFORE the handle closes.
+            virtualPad.release()
             router.release() // flush every slot (nothing sticks host-side) + drop the hot-plug listener
             activity?.gamepadRouter = null
             // Mouse/remote-pointer teardown: lift held buttons, drop the grab, restore the cursor.
@@ -797,8 +841,63 @@ fun StreamScreen(session: ActiveSession, onDisconnect: () -> Unit) {
                 modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
             )
         }
+        // Virtual on-screen gamepad — above the gesture layer, so its controls consume their own
+        // touch regions while the stream keeps everything between them (the tablet IS the pad).
+        VirtualGamepadOverlay(
+            controller = virtualPad,
+            haptics = virtualPadHaptics,
+            config = virtualPadConfig,
+            visible = padVisible,
+        )
         // Chord confirmation (gamepad/TV) — the counterpart to the button changing under a finger.
         micHint?.let { MicChordHint(it, Modifier.align(Alignment.TopCenter).padding(top = 16.dp)) }
+        // The floating menu handle — the one persistent affordance that opens the quick panel.
+        // Top-center: the stats HUD owns the top-left corner, the mic badge the top-right.
+        Box(
+            Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 10.dp)
+                .glassSurface(shape = GlassShapeSmall, borderAlpha = 0.2f)
+                .clickable { quickPanelVisible = true }
+                .padding(horizontal = 13.dp, vertical = 8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.Menu,
+                    contentDescription = "Open menu",
+                    tint = Color.White.copy(alpha = 0.85f),
+                    modifier = Modifier.size(17.dp),
+                )
+                Spacer(Modifier.width(7.dp))
+                Text("Menu", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp)
+            }
+        }
+        // Tap-outside scrim for the quick panel (below the sheet, above everything else).
+        if (quickPanelVisible) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .clickable { quickPanelVisible = false },
+            )
+        }
+        // The in-stream quick panel — mic / stats / virtual pad / keyboard / disconnect.
+        StreamQuickPanel(
+            visible = quickPanelVisible,
+            onDismiss = { quickPanelVisible = false },
+            hostName = session.hostName ?: "Slipstream host",
+            sessionLine = sessionLine,
+            micRunning = micRunning,
+            micMuted = micMuted,
+            onMicToggle = { setMicMuted(!micMuted) },
+            statsVerbosity = statsVerbosity,
+            onCycleStats = { statsVerbosity = statsVerbosity.next() },
+            padAvailable = virtualPadConfig.enabled,
+            padVisible = padVisible,
+            onPadToggle = { padVisible = !padVisible },
+            onKeyboard = { keyCapture?.setImeVisible(true) },
+            onDisconnect = { NativeBridge.nativeDisconnectQuit(handle); onDisconnect() },
+        )
     }
 }
 

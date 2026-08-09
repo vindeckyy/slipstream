@@ -1,8 +1,15 @@
 package io.slipstream.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,10 +27,8 @@ import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,24 +42,34 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import io.slipstream.design.glassSurface
 import io.slipstream.models.HostStatus
 
-/** Left-aligned section header above each block of the connect screen. */
+/**
+ * Section header above each block of the connect screen — a brand-coloured small-caps label with a
+ * soft hairline under it, the quiet divider between "Saved hosts" and "Discovered".
+ */
 @Composable
 fun SectionLabel(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-    )
+    Column(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+        Text(
+            text.uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.4.sp,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+        )
+    }
 }
 
 /**
@@ -68,10 +83,14 @@ data class HostMenuItem(
     val onClick: () -> Unit,
 )
 
+/** Live presence green — reads as "up" on any palette. */
+private val PRESENCE_ONLINE = Color(0xFF4ADE80)
+
 /**
- * A host as an Apple-style card: a colored avatar carrying the host's OS mark (its initial when we
- * don't know the OS), name + address, a trust pill, and (for saved hosts) an overflow menu with
- * Wake / Edit / Forget plus whatever [menuItems] adds. Tapping the card connects.
+ * A host as a glass card: a coloured avatar carrying the host's OS mark, name + address, a trust
+ * badge, and (for saved hosts) an overflow menu with Wake / Edit / Forget plus whatever
+ * [menuItems] adds. Tapping the card connects — with a spring-press scale so the tap feels
+ * physical. The card sits on the aurora backdrop: translucent glass wash, hairline highlight.
  *
  * [profileLabel] names the settings profile this card connects with. On a host's own card that is
  * its default binding, drawn as a quiet chip — the card says what a tap will do. On a **pinned
@@ -104,117 +123,138 @@ fun HostCard(
      */
     reserveProfileSlot: Boolean = false,
 ) {
-    // D-pad / controller focus highlight: a clickable card is focusable, but the default state
-    // layer is too subtle on a TV across a room — draw a clear primary-colour border when focused.
-    var focused by remember { mutableStateOf(false) }
-    ElevatedCard(
-        onClick = onConnect,
-        enabled = enabled,
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val focused by interactionSource.collectIsFocusedAsState()
+    // Spring the press so a tap feels physical; scale on focus (D-pad) too, with the violet ring.
+    val scale by animateFloatAsState(
+        targetValue = when {
+            pressed -> 0.96f
+            focused -> 1.02f
+            else -> 1f
+        },
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium),
+        label = "cardPress",
+    )
+    val focusBorder by animateColorAsState(
+        if (focused) MaterialTheme.colorScheme.primary.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.14f),
+        label = "cardFocusBorder",
+    )
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(4.dp)
-            .onFocusChanged { focused = it.isFocused }
-            .then(
-                if (focused) {
-                    Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CardDefaults.elevatedShape)
-                } else {
-                    Modifier
-                },
-            ),
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .glassSurface(
+                shape = RoundedCornerShape(22.dp),
+                tint = if (profileProminent) (accent ?: MaterialTheme.colorScheme.primary) else MaterialTheme.colorScheme.primary,
+                tintAlpha = if (profileProminent) 0.35f else 0.08f,
+                borderAlpha = 0f, // the animated border below draws it instead
+            )
+            .border(
+                width = if (focused) 2.dp else 1.dp,
+                color = focusBorder,
+                shape = RoundedCornerShape(22.dp),
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                onClick = onConnect,
+            )
+            .graphicsLayer { alpha = if (enabled) 1f else 0.45f },
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                HostAvatar(name, online, os)
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            HostAvatar(name, online, os)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                address,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.5f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+            )
+            if (profileLabel != null || reserveProfileSlot) {
                 Spacer(Modifier.height(10.dp))
-                Text(
-                    name,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    address,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                )
-                if (profileLabel != null || reserveProfileSlot) {
-                    Spacer(Modifier.height(10.dp))
-                    Box(
-                        Modifier.heightIn(min = PROFILE_CHIP_SLOT),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (profileLabel != null) {
-                            ProfileChip(profileLabel, accent, prominent = profileProminent)
-                        }
+                Box(
+                    Modifier.heightIn(min = PROFILE_CHIP_SLOT),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (profileLabel != null) {
+                        ProfileChip(profileLabel, accent, prominent = profileProminent)
                     }
                 }
             }
+        }
 
-            // Trust state lives in the free top-left corner, mirroring the overflow on the right —
-            // it costs no height, and it is a state you glance at rather than read. The label is
-            // still there for TalkBack, and the trust DECISION is made in a dialog that spells all
-            // of this out; on the card it only has to say "this one is settled" vs "this one will
-            // ask something of you".
-            TrustBadge(status, Modifier.align(Alignment.TopStart))
+        // Trust state lives in the free top-left corner, mirroring the overflow on the right —
+        // it costs no height, and it is a state you glance at rather than read.
+        TrustBadge(status, Modifier.align(Alignment.TopStart))
 
-            if (onForget != null || onEdit != null || onWake != null || menuItems.isNotEmpty()) {
-                var menu by remember { mutableStateOf(false) }
-                Box(modifier = Modifier.align(Alignment.TopEnd)) {
-                    IconButton(enabled = enabled, onClick = { menu = true }) {
-                        Icon(
-                            Icons.Filled.MoreVert,
-                            contentDescription = "More",
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+        if (onForget != null || onEdit != null || onWake != null || menuItems.isNotEmpty()) {
+            var menu by remember { mutableStateOf(false) }
+            Box(modifier = Modifier.align(Alignment.TopEnd)) {
+                IconButton(enabled = enabled, onClick = { menu = true }) {
+                    Icon(
+                        Icons.Filled.MoreVert,
+                        contentDescription = "More",
+                        modifier = Modifier.size(20.dp),
+                        tint = Color.White.copy(alpha = 0.55f),
+                    )
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    if (onWake != null) {
+                        DropdownMenuItem(
+                            text = { Text("Wake host") },
+                            onClick = {
+                                menu = false
+                                onWake()
+                            },
                         )
                     }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        if (onWake != null) {
-                            DropdownMenuItem(
-                                text = { Text("Wake host") },
-                                onClick = {
-                                    menu = false
-                                    onWake()
-                                },
-                            )
-                        }
-                        if (onEdit != null) {
-                            DropdownMenuItem(
-                                text = { Text("Edit…") },
-                                onClick = {
-                                    menu = false
-                                    onEdit()
-                                },
-                            )
-                        }
-                        if (onForget != null) {
-                            DropdownMenuItem(
-                                text = { Text("Forget") },
-                                onClick = {
-                                    menu = false
-                                    onForget()
-                                },
-                            )
-                        }
-                        menuItems.forEach { item ->
-                            if (item.startsSection) HorizontalDivider()
-                            DropdownMenuItem(
-                                text = { Text(item.label) },
-                                onClick = {
-                                    menu = false
-                                    item.onClick()
-                                },
-                            )
-                        }
+                    if (onEdit != null) {
+                        DropdownMenuItem(
+                            text = { Text("Edit…") },
+                            onClick = {
+                                menu = false
+                                onEdit()
+                            },
+                        )
+                    }
+                    if (onForget != null) {
+                        DropdownMenuItem(
+                            text = { Text("Forget") },
+                            onClick = {
+                                menu = false
+                                onForget()
+                            },
+                        )
+                    }
+                    menuItems.forEach { item ->
+                        if (item.startsSection) HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text(item.label) },
+                            onClick = {
+                                menu = false
+                                item.onClick()
+                            },
+                        )
                     }
                 }
             }
@@ -233,7 +273,7 @@ private fun ProfileChip(label: String, accent: Color?, prominent: Boolean) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(tint.copy(alpha = if (prominent) 0.24f else 0.12f))
+            .background(tint.copy(alpha = if (prominent) 0.28f else 0.14f))
             .padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -246,6 +286,7 @@ private fun ProfileChip(label: String, accent: Color?, prominent: Boolean) {
             } else {
                 MaterialTheme.typography.labelMedium
             },
+            fontWeight = FontWeight.SemiBold,
             color = tint,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -264,31 +305,34 @@ private fun ProfileChip(label: String, accent: Color?, prominent: Boolean) {
  */
 private val PROFILE_CHIP_SLOT = 26.dp
 
-/** Live presence, on any dynamic scheme: green reads as "up" to everyone, and Material You's
- * primary might be any hue at all — including a green that would then mean nothing. */
-private val PRESENCE_ONLINE = Color(0xFF4ADE80)
-
 /**
  * The host's avatar (Apple-contact style) with its presence as a dot on the corner — the idiom
  * every contact list already uses, and one fewer labelled badge on a small card. It carries the
  * host's OS mark when [os] resolves to one we ship, and the host's initial otherwise.
  *
  * [online] is true when the host advertises on mDNS OR answers the reachability probe, so a
- * routed/VPN host that never advertises still reads as up. Online is a FILLED green dot, offline a
- * hollow grey ring: the difference is a shape as well as a colour, so it survives both a
- * colour-blind reader and a screenshot in greyscale. TalkBack gets the word either way.
+ * routed/VPN host that never advertises still reads as up. Online is a FILLED green dot with a
+ * soft glow, offline a hollow ring: the difference is a shape as well as a colour, so it survives
+ * both a colour-blind reader and a screenshot in greyscale. TalkBack gets the word either way.
  */
 @Composable
 fun HostAvatar(name: String, online: Boolean = false, os: String = "") {
     val letter = name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
-    val cardColor = CardDefaults.elevatedCardColors().containerColor
     val osIcon = resolveOsIcon(os)
     Box {
         Box(
             modifier = Modifier
-                .size(44.dp)
+                .size(48.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                        ),
+                    ),
+                )
+                .border(1.dp, Color.White.copy(alpha = 0.18f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             // The OS mark IS the avatar when we know the OS — it identifies the machine better than
@@ -298,25 +342,26 @@ fun HostAvatar(name: String, online: Boolean = false, os: String = "") {
                 Icon(
                     osIcon,
                     contentDescription = os,
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(26.dp),
+                    tint = Color.White,
                 )
             } else {
                 Text(
                     letter,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
                 )
             }
         }
+        // Presence: filled green when online, a hollow grey ring offline. The outer box is a ring
+        // in the card's own dark tone, which is what makes the dot read as sitting ON the avatar.
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .size(13.dp)
+                .size(14.dp)
                 .clip(CircleShape)
-                // A ring in the card's own colour is what makes the dot read as sitting ON the
-                // avatar rather than beside it.
-                .background(cardColor)
+                .background(Color(0xFF100E1D))
                 .padding(2.dp)
                 .clip(CircleShape)
                 .then(
@@ -324,8 +369,8 @@ fun HostAvatar(name: String, online: Boolean = false, os: String = "") {
                         Modifier.background(PRESENCE_ONLINE)
                     } else {
                         Modifier
-                            .background(cardColor)
-                            .border(1.5.dp, MaterialTheme.colorScheme.onSurfaceVariant, CircleShape)
+                            .background(Color(0xFF100E1D))
+                            .border(1.5.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), CircleShape)
                     },
                 )
                 .semantics { contentDescription = if (online) "Online" else "Offline" },
@@ -343,30 +388,51 @@ fun HostAvatar(name: String, online: Boolean = false, os: String = "") {
 private fun TrustBadge(status: HostStatus, modifier: Modifier = Modifier) {
     val (icon, tint) = when (status) {
         HostStatus.PAIRED -> Icons.Filled.Lock to MaterialTheme.colorScheme.primary
-        HostStatus.PAIRING -> Icons.Filled.Key to MaterialTheme.colorScheme.tertiary
-        HostStatus.TOFU -> Icons.Filled.LockOpen to MaterialTheme.colorScheme.onSurfaceVariant
+        HostStatus.PAIRING -> Icons.Filled.Key to Color(0xFFE0B23C)
+        HostStatus.TOFU -> Icons.Filled.LockOpen to Color.White.copy(alpha = 0.45f)
     }
     Icon(
         icon,
         contentDescription = status.label,
-        tint = tint.copy(alpha = 0.85f),
+        tint = tint,
         modifier = modifier.padding(14.dp).size(18.dp),
     )
 }
 
-/** Shown when there are no saved or discovered hosts. */
+/** Shown when there are no saved or discovered hosts — an inviting empty state over the aurora. */
 @Composable
 fun EmptyHostsState() {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 56.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 56.dp, horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("No hosts yet", style = MaterialTheme.typography.titleMedium)
+        Box(
+            Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.LockOpen,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(30.dp),
+            )
+        }
+        Spacer(Modifier.height(18.dp))
+        Text(
+            "No hosts yet",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White,
+        )
         Spacer(Modifier.height(8.dp))
         Text(
             "Hosts on your network show up here automatically.\nTap “Add host” to enter one by address.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = Color.White.copy(alpha = 0.55f),
             textAlign = TextAlign.Center,
         )
     }
