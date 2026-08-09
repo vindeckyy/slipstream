@@ -559,11 +559,6 @@ const LastResult: FC<{
 				{m.update_result_failed({ to: result.to, stage: result.stage ?? "?" })}
 			</p>
 			{result.error && <p>{result.error}</p>}
-			{result.log_path && (
-				<p className="text-xs text-muted-foreground">
-					{m.update_result_log()} <code>{result.log_path}</code>
-				</p>
-			)}
 		</div>
 	);
 
