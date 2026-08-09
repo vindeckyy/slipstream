@@ -131,7 +131,7 @@ dependencies {
 
     // Real backdrop blur for the floating console legends (RenderEffect on API 31+, a translucent
     // scrim below). The gamepad UI's frosted pills sample + blur whatever scrolls behind them.
-    implementation("dev.chrisbanes.haze:haze:1.6.0")
+    implementation("dev.chrisbanes.haze:haze:1.7.2")
 
     // Android TV components (we target phone + TV) land in the TV-UI milestone:
     //   implementation("androidx.tv:tv-material:1.1.0")
