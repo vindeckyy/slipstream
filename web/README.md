@@ -63,7 +63,7 @@ PORT=47992 HOST=0.0.0.0 \
 bun run lint              # tsc --noEmit
 ```
 
-The built **Nitro bun server** SSR-renders the app and is the only thing exposed on the LAN.
+The built **Nitro Bun server** SSR-renders the app and is the only thing exposed on the LAN.
 Run it on the same box as the host; it serves the console over HTTPS on `:47992` (or `$PORT`).
 
 ## Auth (backend-for-frontend)
@@ -72,35 +72,35 @@ Single-user, login-gated. Config via env (see `.env.example`):
 
 - The console requires a **login** (`SLIPSTREAM_UI_PASSWORD`). On success the server sets a
   **sealed session cookie** (h3 `useSession`, AES-GCM). `server/middleware/auth.ts` gates
-  *every* request — pages redirect to `/login`, `/api` returns 401 — and **fails closed**
+  every request. Pages redirect to `/login`, `/api` returns 401, and the server **fails closed**
   (503) if `SLIPSTREAM_UI_PASSWORD` is unset, so a misconfigured LAN server admits no one.
-- The **bearer-token admin surface of the management API is loopback-only** — the host honors a
+- The **bearer-token admin surface of the management API is loopback-only**. The host honors a
   bearer token only from a loopback peer, so the admin API is never LAN-exposed. The web server
-  holds `SLIPSTREAM_MGMT_TOKEN` server-side and injects it when proxying `/api/**` →
+  holds `SLIPSTREAM_MGMT_TOKEN` server-side and injects it when proxying `/api/**` to
   `SLIPSTREAM_MGMT_URL` (loopback; `server/routes/api/[...].ts`). **The token never reaches the
   browser**; the browser only ever holds the session cookie. (The host *also* binds the
-  **read-only** surface — host status + the game library — to the LAN so paired native clients can
+  **read-only** host status and game library to the LAN so paired native clients can
   fetch it directly over mTLS; that path uses client certs, not the token, and never touches this
   console.)
 
-So: `browser ──password──▶ web server (session cookie) ──mgmt token, server-side──▶ mgmt API`.
+The request path is `browser -> web server (session cookie) -> management API (server-side token)`.
 Run the host with a matching token: `cargo run -rp slipstream-host -- serve` +
-`SLIPSTREAM_MGMT_TOKEN=…` (or `--mgmt-token …`). `vite dev` has no gate (localhost-only) and
+`SLIPSTREAM_MGMT_TOKEN=...` (or `--mgmt-token ...`). `vite dev` has no gate (localhost-only) and
 proxies straight to the loopback mgmt API.
 
-> Toolchain notes (load-bearing): TanStack Start's `start-plugin-core` peer-requires
-> **Vite ≥ 7** — on Vite 6 the build's prerender/post-build hook silently doesn't run.
-> `@vitejs/plugin-react` must match Vite (v5 ↔ Vite 7, v6 ↔ Vite 8); it's **required even
+> These toolchain constraints are load-bearing. TanStack Start's `start-plugin-core` peer-requires
+> **Vite 7 or newer**. On Vite 6 the build's prerender/post-build hook silently doesn't run.
+> `@vitejs/plugin-react` must match Vite (v5 for Vite 7, v6 for Vite 8); it is **required even
 > for dev** (TanStack Start's dev mode needs the React Refresh runtime, else a blank
-> screen). Nitro is the server target — without it `vite build` only emits client+SSR
+> screen). Nitro is the server target. Without it `vite build` only emits client and SSR
 > bundles, no deployable server. The Nitro `bun` preset makes `.output/server/index.mjs`
 > Bun-runnable.
 
 ## Codegen
 
-Generated code is **not committed** (gitignored) — reproduced from sources:
+Generated code is **not committed**. It is reproduced from sources:
 
-- `bun run codegen` — regenerate the API client (orval) + i18n runtime (paraglide). Runs on
+- `bun run codegen` regenerates the API client (orval) and i18n runtime (paraglide). It runs on
   `bun install` (`prepare`) and before `dev`/`build` (`pre*` for orval; the Vite plugin
   compiles paraglide on dev/build).
 - After a management-API change, regenerate the spec on the Rust side first:

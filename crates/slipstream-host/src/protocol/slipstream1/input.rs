@@ -563,8 +563,8 @@ fn send_rumble(
 ///
 /// Rumble is emitted as self-terminating 0xCA v2 envelopes (`[level][seq][ttl_ms]`): the host owns
 /// the timeline, renewing an active level every ~`RUMBLE_TTL_MS × 3/10` ms and letting an
-/// abandoned one expire client-side, so "stuck rumble" is inexpressible on the wire (see
-/// `slipstream-planning/design/rumble-envelope-plan.md`). `SLIPSTREAM_RUMBLE_ENVELOPE=0` reverts to
+/// abandoned one expire client-side, so "stuck rumble" is inexpressible on the wire.
+/// `SLIPSTREAM_RUMBLE_ENVELOPE=0` reverts to
 /// legacy v1 level datagrams + the flat 500 ms refresh (bisect hatch).
 pub(super) fn input_thread(
     rx: std::sync::mpsc::Receiver<ClientInput>,

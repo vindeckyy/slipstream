@@ -9,7 +9,6 @@ on:
       - assets/**
       - scripts/ci/check-repository-policy.sh
       - .github/workflows/pages.yml
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -24,7 +23,7 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
       - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
@@ -32,9 +31,17 @@ jobs:
       - name: Install documentation dependencies
         working-directory: docs-site
         run: bun install --frozen-lockfile
+      - name: Check documentation links and API snapshot
+        working-directory: docs-site
+        run: |
+          bun run check:links
+          bun run check:openapi
       - name: Build static site
         working-directory: docs-site
         run: bun run build:pages
+      - name: Type-check documentation site
+        working-directory: docs-site
+        run: bun run lint
       - name: Prepare Pages artifact
         working-directory: docs-site
         run: touch dist/client/.nojekyll

@@ -60,22 +60,12 @@ PF_SRCDIR="$(git rev-parse --show-toplevel)" makepkg -f --holdver
 # -> slipstream-client-<ver>-<rel>-aarch64.pkg.tar.zst   (no slipstream-host package)
 ```
 
-There is no cross-compile path here: makepkg builds for `CARCH`, so this wants a real aarch64
-Arch machine (or an emulated Arch Linux ARM container, which is slow). Unlike the deb, it has
-**not** been verified end to end yet - there is no official arm64 Arch container to test in.
-Then the standard first-run (printed by the install scriptlet):
-```sh
-sudo usermod -aG input "$USER"          # virtual gamepads; re-login after
-mkdir -p ~/.config/slipstream
-cp /usr/share/slipstream/host.env.bazzite ~/.config/slipstream/host.env   # gamescope backend
-systemctl --user enable --now slipstream-host
-# Web console (if you installed the slipstream-web package): enable it, then choose a password in
-# the browser on first visit.
-systemctl --user enable --now slipstream-web
-# open https://<host-ip>:47992
-```
-NVENC/EGL come from the NVIDIA driver: `sudo pacman -S --needed nvidia-utils`. Arch's stock
-`ffmpeg` already has NVENC built in - no RPM-Fusion-style swap needed (unlike Fedora).
+There is no cross-compile path here: makepkg builds for `CARCH`, so use a real aarch64 Arch machine
+or an emulated Arch Linux ARM container. This path has not been verified end to end because there
+is no official arm64 Arch container in CI.
+
+The aarch64 package contains only the client. Launch `slipstream-client` from the application menu
+or a terminal. It does not include the host service, host configuration, or web console.
 
 ### Runtime dependency map (Fedora/Debian → Arch)
 

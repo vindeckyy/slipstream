@@ -1,5 +1,5 @@
-# The web-console-triggered host update, as a root oneshot (planning:
-# host-update-from-web-console.md §7). Started — never enabled — by the unprivileged host via
+# The web-console-triggered host update, as a root oneshot. Started but never enabled by the
+# unprivileged host via
 # `systemctl start slipstream-update.service`, authorized by the polkit rule
 # (49-slipstream-update.rules) for members of the `slipstream-update` group. systemd gives us
 # single-flight (a second start while active fails) and journal capture for free; the helper

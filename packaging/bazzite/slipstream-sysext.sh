@@ -19,8 +19,7 @@
 # Fedora major x channel under that base: .../f43/, f43-canary, f44, ...), each a SHA256SUMS +
 # SHA256SUMS.asc + versioned .raw files. There is no baked-in public default; private setups
 # typically point this at a generic package registry or a GitHub Releases-mirrored path.
-# Published historically by GitHub Actions from the same RPMs the (legacy) layering
-# path uses. The image pins ID=fedora + VERSION_ID, so after a major OS rebase the old image is
+# The image pins ID=fedora + VERSION_ID, so after a major OS rebase the old image is
 # refused (not merged broken) and `slipstream-sysext update` re-resolves against the new release.
 #
 # Trust: SHA256SUMS carries a detached OpenPGP signature (SHA256SUMS.asc) from the embedded release signing key  -
@@ -34,8 +33,7 @@ set -euo pipefail
 # Operators must set SLIPSTREAM_SYSEXT_REGISTRY (feed base URL). No public default; a wrong
 # baked-in host would 404. Example shapes:
 #   https://<registry>/api/packages/<owner>/generic/slipstream-sysext
-#   https://github.com/vindeckyy/slipstream/releases/download  (if you mirror .raw assets there)
-REGISTRY="${SLIPSTREAM_SYSEXT_REGISTRY:?set SLIPSTREAM_SYSEXT_REGISTRY to your sysext feed base URL}"
+REGISTRY="${SLIPSTREAM_SYSEXT_REGISTRY:-}"
 CONF=/etc/slipstream-sysext.conf
 EXT_DIR=/var/lib/extensions
 IMG="$EXT_DIR/slipstream.raw"
@@ -70,6 +68,10 @@ os_version_id() { . /etc/os-release; echo "${VERSION_ID%%.*}"; }
 channel() { # shellcheck disable=SC1090
   [ -f "$CONF" ] && . "$CONF"; echo "${CHANNEL:-stable}"; }
 feed_url() {
+  [ -n "$REGISTRY" ] || {
+    echo "set SLIPSTREAM_SYSEXT_REGISTRY to your sysext feed base URL" >&2
+    return 1
+  }
   local suffix=""
   [ "$(channel)" = canary ] && suffix="-canary"
   echo "$REGISTRY/f$(os_version_id)$suffix"
@@ -275,13 +277,19 @@ cmd_update() {
 
 cmd_status() {
   echo "channel:    $(channel)"
-  echo "feed:       $(feed_url)"
+  if [ -n "$REGISTRY" ]; then
+    echo "feed:       $(feed_url)"
+  else
+    echo "feed:       (not configured)"
+  fi
   echo "image:      $([ -f "$IMG" ] && du -h "$IMG" | cut -f1 || echo '(not installed)')"
   echo "merged:     $(merged && echo yes || echo no)"
   echo "installed:  $(installed_version || true)"
   # Say WHY the feed is unreadable rather than printing a blank: unreachable and
   # "signature does not verify" want very different reactions from whoever ran this.
-  if fetch_manifest 2>"$PF_TMP/status.err"; then
+  if [ -z "$REGISTRY" ]; then
+    echo "latest:     (feed not configured)"
+  elif fetch_manifest 2>"$PF_TMP/status.err"; then
     echo "latest:     $(latest | cut -d' ' -f1)"
   else
     echo "latest:     (unavailable)"

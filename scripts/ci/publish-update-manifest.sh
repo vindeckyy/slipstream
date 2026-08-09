@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Build, sign, upload, and self-verify the host UPDATE MANIFEST for one channel
-# (planning: host-update-from-web-console.md §3 — the check truth the console trusts).
+# Build, sign, upload, and self-verify the host update manifest for one channel.
 #
 # Upload target (operator-provided package registry; no public default):
 #   https://<REGISTRY>/api/packages/<OWNER>/generic/slipstream-update/<channel>/manifest.json
@@ -109,9 +108,13 @@ openssl pkeyutl -verify -pubin -inkey "$PUBPEM" -rawin -in "$MANIFEST" -sigfile 
 
 # ---- upload (manifest first, then signature) ------------------------------------------------
 : "${REGISTRY_TOKEN:?set REGISTRY_TOKEN}"
+# Credentials ride in a netrc file, not curl argv, so the token never shows up in /proc/<pid>/cmdline.
+NETRC="$WORK/.netrc"
+printf 'machine %s login %s password %s\n' "$REGISTRY" "enricobuehler" "$REGISTRY_TOKEN" > "$NETRC"
+chmod 600 "$NETRC"
 upload() { # file url
-  curl -fsS -o /dev/null --user "enricobuehler:${REGISTRY_TOKEN}" -X DELETE "$2" 2>/dev/null || true
-  curl -fsS -o /dev/null --user "enricobuehler:${REGISTRY_TOKEN}" --upload-file "$1" "$2"
+  curl -fsS -o /dev/null --netrc-file "$NETRC" -X DELETE "$2" 2>/dev/null || true
+  curl -fsS -o /dev/null --netrc-file "$NETRC" --upload-file "$1" "$2"
   echo "published: $2"
 }
 upload "$MANIFEST" "$BASE/manifest.json"

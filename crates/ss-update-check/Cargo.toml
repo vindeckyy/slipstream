@@ -1,6 +1,5 @@
-# The update-CHECK core, shared by the host and the Linux client (planning:
-# host-update-from-web-console.md §3). It exists because both products answer the same
-# question — "does a newer build exist for this box's channel?" — from the same signed
+# The update-check core is shared by the host and the Linux client. Both products answer the same
+# question, "does a newer build exist for this box's channel?", from the same signed
 # manifest, and a trust rule that lives in two places is a trust rule that will diverge.
 #
 # Deliberately check-only: no apply legs, no package managers, no privileged anything. The

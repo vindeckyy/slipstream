@@ -1,4 +1,4 @@
-# pacman install scriptlet — mirrors the RPM %post / deb postinst.
+# pacman install scriptlet. Mirrors the RPM %post and Debian postinst.
 _ensure_update_group() {
   # The (empty) opt-in group for web-console-triggered updates — nobody is auto-added.
   getent group slipstream-update >/dev/null 2>&1 || groupadd --system slipstream-update 2>/dev/null || true
@@ -20,8 +20,8 @@ slipstream-host installed.
   3. Enable the host:
        systemctl --user enable --now slipstream-host
 
-NOTE: encode is NVENC-only. Install 'nvidia-utils' on an NVIDIA host. An AMD Steam Deck is NOT
-      yet supported — it needs a VAAPI (hevc_vaapi) encoder backend (see packaging/arch/README.md).
+Encoding is selected automatically. Install 'nvidia-utils' on an NVIDIA host. AMD and Intel hosts
+use VAAPI when supported by the installed Mesa and FFmpeg stack.
 MSG
   # Firewall: stock Arch ships none (ports already open); CachyOS ships ufw; some spins (EndeavourOS)
   # enable firewalld. We install a ufw app profile AND firewalld service definitions but never touch

@@ -31,19 +31,22 @@ android {
         // ACCESS_LOCAL_NETWORK runtime permission. ConnectScreen owns that request/rationale flow;
         // don't bump past 37 without re-checking the next release's behavior changes.
         targetSdk = 37
-        val vCode = (props.getProperty("VERSION_CODE") ?: System.getenv("VERSION_CODE"))
-        versionCode = vCode?.toInt() ?: 1
-        // versionName is the single project version, threaded from CI (a vX.Y.Z release or a
-        // canary string). versionCode stays the monotonic run number (Play rejects regressions).
-        // Local dev (no VERSION_NAME) falls back to the workspace version from the root Cargo.toml —
-        // the single source of truth — so an on-device build shows the real current version, not a
-        // stale placeholder.
+        // Local builds derive both values from the workspace version. CI can override VERSION_CODE
+        // with a monotonically increasing build number.
         val workspaceVersion = runCatching {
             project.rootProject.file("../../Cargo.toml").readLines()
                 .dropWhile { !it.trim().startsWith("[workspace.package]") }
                 .firstOrNull { it.trim().startsWith("version") }
                 ?.substringAfter('=')?.trim()?.trim('"')
         }.getOrNull()
+        val defaultVersionCode = workspaceVersion
+            ?.split('.')
+            ?.mapNotNull { it.toIntOrNull() }
+            ?.takeIf { it.size == 3 }
+            ?.let { (major, minor, patch) -> major * 1_000_000 + minor * 1_000 + patch }
+            ?: 1
+        val vCode = props.getProperty("VERSION_CODE") ?: System.getenv("VERSION_CODE")
+        versionCode = vCode?.toInt() ?: defaultVersionCode
         versionName = (props.getProperty("VERSION_NAME") ?: System.getenv("VERSION_NAME"))
             ?: workspaceVersion ?: "0.0.0"
         // Ship 32-bit armeabi-v7a alongside 64-bit arm64-v8a: many Google TV / Android TV streamers

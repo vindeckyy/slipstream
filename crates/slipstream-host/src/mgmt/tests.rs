@@ -911,7 +911,7 @@ async fn idr_requires_an_active_stream() {
 async fn plugin_registry_roundtrip() {
     let app = test_app(test_state(), None);
     let id = "test-plugin-roundtrip";
-    let secret = "s3cr3t-abcdefghijkl"; // 19 chars, valid [A-Za-z0-9_-]
+    let secret = concat!("s3cr3t-", "abcdefghijkl"); // 19 chars, valid [A-Za-z0-9_-]
 
     // Register with a UI surface → 204.
     let (status, _) = send(

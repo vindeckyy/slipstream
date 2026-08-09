@@ -6879,7 +6879,7 @@
           "name": {
             "type": "string",
             "description": "The name the client supplied when pairing.",
-            "example": "Living Room iPad"
+            "example": "Living Room Tablet"
           }
         }
       },
@@ -7706,7 +7706,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Which fields this build actually enforces. Empty on a platform with no launch path (macOS),\nso the console can say so instead of offering a switch that does nothing."
+            "description": "Which fields this build actually enforces. Empty when this build has no launch path, so the\nconsole can say so instead of offering a switch that does nothing."
           },
           "settings": {
             "$ref": "#/components/schemas/SessionSettings",

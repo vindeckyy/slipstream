@@ -79,9 +79,9 @@ rpm-ostree install ./dist/slipstream-*.rpm && systemctl reboot
    rpm-ostree install \
      https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
      https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
-   # enable the COPR + install slipstream
+   # enable the COPR + install slipstream (use the repo URL from your COPR project)
    sudo wget -O /etc/yum.repos.d/_copr_slipstream.repo \
-     https://copr.fedorainfracloud.org/coprs/enricobuehler/slipstream/repo/fedora-$(rpm -E %fedora)/
+     https://copr.fedorainfracloud.org/coprs/<owner>/<project>/repo/fedora-$(rpm -E %fedora)/
    rpm-ostree install slipstream
    systemctl reboot
    ```
@@ -134,8 +134,8 @@ An RPM (or the bootc layer) installs into the host system where those just work.
 ## Building the SRPM/RPM locally (Fedora only)
 
 ```sh
-git archive --format=tar.gz --prefix=slipstream-0.3.0/ -o ~/rpmbuild/SOURCES/slipstream-0.3.0.tar.gz HEAD
+git archive --format=tar.gz --prefix=slipstream-0.23.0/ -o ~/rpmbuild/SOURCES/slipstream-0.23.0.tar.gz HEAD
 rpmbuild -ba packaging/rpm/slipstream.spec     # needs the BuildRequires from the spec
-# (0.3.0 = the spec's default %{ss_version}; the prefix and tarball name must match it)
+# The archive prefix and filename must match the spec's default %{ss_version}.
 ```
 (Not buildable on Debian/Ubuntu - use a Fedora toolbox/container or COPR.)

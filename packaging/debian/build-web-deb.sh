@@ -8,11 +8,11 @@
 # default `apt install slipstream-host` pulls the console too; it is auto-wired to the host's mgmt
 # token + identity cert via the systemd --user units (no env editing on a packaged install).
 #
-# Usage: VERSION=0.0.1~ci42.gdeadbee [DEB_ARCH=amd64] [BUN_BIN=/path/to/bun] bash packaging/debian/build-web-deb.sh
+# Usage: VERSION=0.23.0~ci42.gdeadbee [DEB_ARCH=amd64] [BUN_BIN=/path/to/bun] bash packaging/debian/build-web-deb.sh
 # Output: dist/slipstream-web_<version>_<arch>.deb
 set -euo pipefail
 
-VERSION="${VERSION:?set VERSION (e.g. 0.0.1 or 0.0.1~ci42.gdeadbee)}"
+VERSION="${VERSION:?set VERSION (e.g. 0.23.0 or 0.23.0~ci42.gdeadbee)}"
 PKG="slipstream-web"
 ROOTDIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOTDIR"

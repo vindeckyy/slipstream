@@ -1,4 +1,4 @@
-//! The Skia console UI (slipstream-planning `linux-client-rearchitecture.md` §6): an
+//! The Skia console UI: an
 //! [`Overlay`](ss_presenter::overlay::Overlay) implementation rendering on the
 //! PRESENTER's Vulkan device into offscreen RGBA images the presenter composites as one
 //! premultiplied quad. Skia never touches the swapchain, and nothing here runs while

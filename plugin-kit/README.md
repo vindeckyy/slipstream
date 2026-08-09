@@ -3,8 +3,6 @@
 The Effect-based framework slipstream plugins are built on. It owns everything that is the
 same in every plugin  -  lifecycle, config/state, the sync engine, UI serving, the CLI
 scaffold, logging  -  so a plugin is just its domain logic, its HttpApi contract, and its UI.
-The reference consumer (and the blueprint to copy) is
-[`slipstream-plugin-rom-manager`](https://github.com/vindeckyy/slipstream-plugin-rom-manager).
 
 Built on [`@slipstream/host`](../sdk) (the SDK stays the low-level host client; the kit is
 the opinionated plugin layer on top). Effect `4.x` and the SDK are peer dependencies  -

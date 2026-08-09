@@ -148,7 +148,7 @@ systemctl --user restart slipstream-host    # if the unit was already running
 ## Build a `.deb` locally
 
 ```sh
-VERSION=0.0.1 bash packaging/debian/build-deb.sh   # -> dist/slipstream-host_0.0.1_amd64.deb
+VERSION=0.23.0 bash packaging/debian/build-deb.sh   # -> dist/slipstream-host_0.23.0_amd64.deb
 ```
 
 Needs `dpkg-dev` (`dpkg-shlibdeps`, `dpkg-deb`). It builds the release binary first if missing.
@@ -161,7 +161,7 @@ build it in the noble image with FFmpeg bundled:
 ```sh
 docker build -f ci/rust-ci-noble.Dockerfile -t ss-noble ci
 docker run --rm -v "$PWD:/src" -w /src ss-noble \
-  bash -lc 'VERSION=0.0.1 BUNDLE_FFMPEG=1 bash packaging/debian/build-deb.sh'
+  bash -lc 'VERSION=0.23.0 BUNDLE_FFMPEG=1 bash packaging/debian/build-deb.sh'
 ```
 
 `BUNDLE_FFMPEG=1` needs `patchelf` and an FFmpeg install at `FFMPEG_PREFIX` (default `/opt/ffmpeg`,
@@ -178,7 +178,7 @@ rust-ci toolchain plus an Ubuntu ports arm64 multiarch sysroot. No arm64 runner 
 ```sh
 docker build -f ci/rust-ci-arm64cross.Dockerfile -t ss-arm64cross .   # repo-root context
 docker run --rm -v "$PWD:/w" -w /w ss-arm64cross \
-  bash -lc 'VERSION=0.0.1 ARCH=arm64 TARGET=aarch64-unknown-linux-gnu \
+  bash -lc 'VERSION=0.23.0 ARCH=arm64 TARGET=aarch64-unknown-linux-gnu \
               bash packaging/debian/build-client-deb.sh'
 ```
 

@@ -7,7 +7,7 @@
 //! Capture delivers packed RGB (dmabuf/CPU); this backend imports it, runs an on-GPU RGB→4:2:0
 //! compute CSC, then encodes — 8-bit BT.709 for an SDR session (`rgb2yuv.comp`), 10-bit BT.2020
 //! for an HDR one (`rgb2yuv10.comp` + an HEVC Main10 session; a 10-bit AV1 session is routed to
-//! VAAPI instead). Proven end-to-end in `slipstream-planning/design/vkenc-probe-harness`.
+//! VAAPI instead). The probe harness verifies the path end to end.
 //! Opt-in via `SLIPSTREAM_VULKAN_ENCODE`; gated to HEVC/AV1 + a device that advertises the encode op.
 //! The AV1 encode structs our pinned `ash 0.38` predates are vendored in `vk_av1_encode.rs`.
 // UNSAFE-LINT EXEMPTION (rationale + exit criteria: `unsafe_op_in_unsafe_fn` in the workspace

@@ -12,3 +12,5 @@ web/.output
 web/dist
 web/src/api/gen
 web/src/paraglide
+web/.env.local
+web/.env

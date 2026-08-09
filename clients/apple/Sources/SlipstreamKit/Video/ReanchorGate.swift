@@ -10,8 +10,6 @@
 // the last good picture on glass until a PROVEN clean re-anchor lands — an IDR (wire `FLAG_SOF`), an
 // RFI recovery anchor (`USER_FLAG_RECOVERY_ANCHOR`), or the 2nd of two intra-refresh recovery marks
 // (`USER_FLAG_RECOVERY_POINT`) — with a bounded backstop so a lost re-anchor can never freeze forever.
-// See slipstream-planning design/client-reanchor-freeze-parity.md.
-//
 // Threading: one gate per session. Its calls arrive from two threads — the pump thread (`arm` on a
 // frame-index gap / a submit failure, `poll` per iteration) and a VideoToolbox decode thread
 // (`onDecoded` per decoded frame, `onNoOutput` on a decode error). The raw Rust gate is a plain

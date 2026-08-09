@@ -17,7 +17,7 @@ tracked_text() {
     ':!scripts/ci/check-repository-policy.sh' 2>/dev/null || true
 }
 
-stale_references="$(tracked_text 'punktfunk|testflight|ko-?fi|reddit\.com')"
+stale_references="$(tracked_text 'punktfunk|testflight|ko-?fi|buymeacoffee|reddit\.com|discord\.gg|discord(app)?\.com/invite')"
 if [[ -n "$stale_references" ]]; then
   printf '%s\n' "$stale_references" >&2
   fail "stale product or third-party references remain in tracked text"

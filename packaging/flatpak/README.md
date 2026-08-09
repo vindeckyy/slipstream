@@ -2,8 +2,8 @@
 
 The native Linux **client** - the shell (crate `slipstream-client-linux`, binary
 `slipstream-client`) plus the Vulkan session binary it execs for streaming (crate
-`slipstream-client-session`, binary `slipstream-session`) - is
-built by CI (`GitHub Actions`) when enabled. There is no public Flatpak remote.
+`slipstream-client-session`, binary `slipstream-session`) - can be built as a local bundle.
+There is no public Flatpak remote.
 Produce a **single-file `.flatpak` bundle** locally (see below) and install it with
 `flatpak install --user --bundle`, or attach the bundle to a
 [GitHub Release](https://github.com/vindeckyy/slipstream/releases). If you host your own OSTree
@@ -59,21 +59,17 @@ flatpak install --user --bundle /tmp/slipstream-client.flatpak   # same command,
 
 If you later point a Flatpak remote at your own OSTree host, updates are just `flatpak update`.
 
-## Build locally / the CI fallback
+## Build locally
 
-CI builds this in a **`--privileged`** Fedora container, because `flatpak-builder` runs
-`bubblewrap`, which needs user namespaces the default Docker executor denies. **If the CI
-runner can't grant `--privileged`** (the job fails at `flatpak-builder` with
-*"Creating new namespace failed: Operation not permitted"*), build it out-of-band and publish
-by hand. The easiest place is **on the Deck itself** (it can run `org.flatpak.Builder`
-user-scope, no root):
+Build on any Linux machine with either `flatpak-builder` or `org.flatpak.Builder` installed. The
+Deck can run `org.flatpak.Builder` from Flathub without root:
 
 ```sh
 # On the Deck (or any flatpak box), one-time:
 flatpak install --user -y flathub org.flatpak.Builder
 
 # build-flatpak.sh auto-detects org.flatpak.Builder, generates cargo-sources.json (or reuses an
-# existing one - see below), builds, and exports dist/slipstream-client-<version>.flatpak:
+# existing one, see below), builds, and exports dist/slipstream-client-<version>-<arch>.flatpak:
 bash packaging/flatpak/build-flatpak.sh
 
 # Optional: attach dist/slipstream-client-*.flatpak to a GitHub Release, or copy it to your own feed.
@@ -84,10 +80,6 @@ bash packaging/flatpak/build-flatpak.sh
 > `flatpak-cargo-generator.py Cargo.lock -o packaging/flatpak/cargo-sources.json`), rsync it next
 > to the manifest, and `build-flatpak.sh` reuses it (it only regenerates when the file is absent
 > or `FORCE_GEN=1`).
-
-> The Mac build host **cannot** build a Linux flatpak (no flatpak-builder for macOS), and
-> home-worker-2 has no flatpak and no passwordless sudo to install it - so the Deck or the
-> privileged CI container are the only two viable build sites.
 
 ### aarch64
 
@@ -131,8 +123,8 @@ extension point (auto-downloaded with the runtime; no app-side codec declaration
 the desktop file, AppStream metadata, and icon under the `io.slipstream.Slipstream` application id.
 A `vulkan-headers` module supplies what the session binary's ash/Vulkan
 build needs. `cargo-sources.json` (the offline crate cache) is a pure function of
-`Cargo.lock`; CI regenerates it each build and it is **gitignored** - generate it on any box with
-network + `python3`/`aiohttp`/`tomlkit` (`build-flatpak.sh` does this automatically) and, for a
+`Cargo.lock`; the build script regenerates it when missing and it is **gitignored**. Generate it on
+any box with network + `python3`/`aiohttp`/`tomlkit` (`build-flatpak.sh` does this automatically) and, for a
 build host that lacks those (the Deck), rsync the generated file in alongside the manifest.
 
 **Offline Skia:** the session binary's Skia console UI (`ss-console-ui` → `skia-safe`) normally

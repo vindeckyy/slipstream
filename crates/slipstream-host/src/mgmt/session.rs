@@ -86,8 +86,8 @@ pub(crate) struct SessionSettingsState {
     settings: crate::session_settings::SessionSettings,
     /// Whether an operator has ever saved these settings (`false` ⇒ `settings` are the defaults).
     configured: bool,
-    /// Which fields this build actually enforces. Empty on a platform with no launch path (macOS),
-    /// so the console can say so instead of offering a switch that does nothing.
+    /// Which fields this build actually enforces. Empty when this build has no launch path, so the
+    /// console can say so instead of offering a switch that does nothing.
     enforced: Vec<String>,
 }
 

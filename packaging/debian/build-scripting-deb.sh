@@ -11,11 +11,11 @@
 # its systemd --user unit is installed but NOT auto-enabled (the runner is inert until you add
 # scripts/plugins — enable it with `systemctl --user enable --now slipstream-scripting`).
 #
-# Usage: VERSION=0.0.1~ci42.gdeadbee [DEB_ARCH=amd64] [BUN_BIN=/path/to/bun] bash packaging/debian/build-scripting-deb.sh
+# Usage: VERSION=0.23.0~ci42.gdeadbee [DEB_ARCH=amd64] [BUN_BIN=/path/to/bun] bash packaging/debian/build-scripting-deb.sh
 # Output: dist/slipstream-scripting_<version>_<arch>.deb
 set -euo pipefail
 
-VERSION="${VERSION:?set VERSION (e.g. 0.0.1 or 0.0.1~ci42.gdeadbee)}"
+VERSION="${VERSION:?set VERSION (e.g. 0.23.0 or 0.23.0~ci42.gdeadbee)}"
 PKG="slipstream-scripting"
 ROOTDIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOTDIR"

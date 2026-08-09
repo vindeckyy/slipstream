@@ -1,18 +1,18 @@
 ---
 title: Release channels
-description: How Slipstream preview builds and tagged Linux host releases are published.
+description: How Slipstream preview builds and tagged releases are published.
 ---
 
 Slipstream currently has two public distribution states:
 
 - **Preview:** the Android APK attached to the `android-preview` GitHub release. It is intended for
   testers and is not a stable store release.
-- **Tagged release:** a `vX.Y.Z` tag builds and publishes the Linux host archive, checksum, SBOM,
-  attribution file, and provenance attestation through GitHub Actions.
+- **Tagged release:** a `vX.Y.Z` tag builds and publishes the Linux host archive, Steam Deck
+  Flatpak and Decky packages, checksums, SBOM, attribution file, and provenance attestation through
+  GitHub Actions.
 
-Android debug builds run in CI. Signed APK publication requires the protected signing environment;
-store publication is a separate operator step. Steam Deck Flatpak and Decky packages can be built
-from this repository, but they do not currently have a public package feed.
+Android debug builds run in CI. The preview APK is built and signed with the Android debug key and
+uploaded manually. There is no public app store, Flatpak remote, or Decky package feed.
 
 ## Install sources
 
@@ -20,7 +20,7 @@ from this repository, but they do not currently have a public package feed.
 |---|---|
 | Linux host | Source or the Linux archive attached to a tagged GitHub release |
 | Android | Preview APK from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) |
-| Steam Deck | Local Flatpak or Decky build from the repository |
+| Steam Deck | Flatpak or Decky package attached to a tagged GitHub release |
 | Moonlight | Any Moonlight client when GameStream is explicitly enabled |
 
 Keep the host on a trusted LAN or private VPN. Do not expose management or streaming ports to the
@@ -37,10 +37,9 @@ public internet.
    ```
 
 3. The release workflow checks that the tag points at the checked-out commit, builds the Linux host,
-   generates checksums, third-party notices, an SBOM, and a provenance attestation, then publishes
-   the files to the matching GitHub Release.
-4. Android signing and store promotion happen only after the protected signing credentials and store
-   access are configured.
+   Flatpak, and Decky package, generates checksums, third-party notices, an SBOM, and a provenance
+   attestation, then publishes the files to the matching GitHub Release.
+4. Android preview publication remains a separate manual step.
 
 ## Preview builds
 

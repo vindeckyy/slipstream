@@ -1,6 +1,5 @@
-// Members of the `slipstream-update` group may START exactly one unit: the slipstream
-// root-helper oneshot that updates the slipstream packages (planning:
-// host-update-from-web-console.md §7). The group ships EMPTY — joining it is the explicit,
+// Members of the `slipstream-update` group may start exactly one unit: the root-helper oneshot that
+// updates the Slipstream packages. The group ships empty; joining it is the explicit,
 // auditable opt-in for web-console-triggered updates:
 //
 //     sudo usermod -aG slipstream-update <your user>

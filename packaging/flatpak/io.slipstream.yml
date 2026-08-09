@@ -3,9 +3,8 @@
 # slipstream-client-session, binary `slipstream-session`) that the shell execs for
 # `--connect`/`--browse`  -  both must ship or streaming from the Deck breaks (the Decky
 # wrapper launches the shell with those flags and the shell resolves its sibling
-# `slipstream-session`, see clients/linux/src/spawn.rs). Built into a single-file `.flatpak`
-# bundle and published as a GitHub release asset (see GitHub Actions
-# + packaging/flatpak/README.md).
+# `slipstream-session`, see clients/linux/src/app/spawn.rs). The build script exports both binaries in
+# a single-file `.flatpak` bundle; see packaging/flatpak/README.md.
 #
 # Why flatpak for the CLIENT (the host stays an RPM/deb  -  see packaging/README.md "Why not
 # Flatpak"): on SteamOS the Steam Deck's /usr is read-only and image-based, so a bare
@@ -183,7 +182,7 @@ modules:
   # ---------------------------------------------------------------------------------------
   # The client. cargo-sources.json is the GENERATED offline crate cache:
   #   python3 flatpak-cargo-generator.py Cargo.lock -o packaging/flatpak/cargo-sources.json
-  # (run from the repo root; the CI step does exactly this). With it present the build is fully
+  # (run from the repo root). With it present the build is fully
   # offline (CARGO_NET_OFFLINE). For quick LOCAL iteration WITHOUT regenerating it, drop the
   # cargo-sources.json source and pass  --build-args=--share=network  to flatpak-builder
   # (non-reproducible; cargo fetches from crates.io during the build).
@@ -193,7 +192,8 @@ modules:
     build-options:
       env:
         CARGO_HOME: /run/build/slipstream-client/cargo
-        CARGO_NET_OFFLINE: 'true'
+        CARGO_INCREMENTAL: '0'
+        CARGO_PROFILE_RELEASE_STRIP: symbols
         # The session binary's Skia (ss-console-ui → skia-safe) fetches prebuilt libskia in
         # its build script  -  dead in the offline sandbox. skia-bindings accepts a file://
         # override (read directly, no curl), so we point it at the archive that
@@ -208,7 +208,7 @@ modules:
       # execs for --connect/--browse. Building them together keeps skia-bindings' feature
       # unification identical to a workspace build (the pinned skia-binaries archive's
       # `pdf-textlayout-vulkan` key must match the resolved feature set).
-      - cargo --offline build --release -p slipstream-client-linux -p slipstream-client-session
+      - cargo build --release -p slipstream-client-linux -p slipstream-client-session
           -p slipstream-cli
       - install -Dm0755 target/release/slipstream-client ${FLATPAK_DEST}/bin/slipstream-client
       - install -Dm0755 target/release/slipstream-session ${FLATPAK_DEST}/bin/slipstream-session
@@ -226,15 +226,45 @@ modules:
       # which is why the deb/rpm/arch entries shipped a stock `video-display` instead).
       - install -Dm0644 packaging/linux/icons/hicolor/scalable/apps/io.slipstream.svg
           ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.slipstream.Slipstream.svg
+      - rm -rf target
     sources:
       # The repo checkout. For a Flathub/published build, replace with a pinned git source:
       #   - type: git
       #     url: https://github.com/vindeckyy/slipstream
       #     tag: vX.Y.Z
       #     commit: <sha>
-      # For ON-DECK / CI builds we build the checked-out working tree in place:
+      # Local builds use the checked-out working tree. Generated output and local secrets must not
+      # enter the Flatpak source sandbox.
       - type: dir
         path: ../..
+        skip:
+          - .git
+          - .github
+          - .claude
+          - .cursor
+          - .flatpak-build
+          - .flatpak-builder
+          - .flatpak-repo
+          - target
+          - dist
+          - docs
+          - docs-site
+          - web
+          - sdk
+          - plugin-kit
+          - plugin-index
+          - clients/apple
+          - clients/decky
+          - clients/android/.gradle
+          - clients/android/app
+          - clients/android/build
+          - clients/android/kit
+          - clients/android/native/target
+          - .env
+          - .env.local
+          - clients/android/.env
+          - clients/android/release.jks
+          - clients/android/release.keystore
       # Generated offline crate cache (see the comment block above). Remove for --share=network.
       - cargo-sources.json
       # Prebuilt Skia for skia-bindings 0.87.0 (SKIA_BINARIES_URL above). The key encodes the

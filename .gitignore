@@ -19,6 +19,11 @@ result-*
 # Local application state and credentials
 *.env.local
 web/.env.local
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
 
 # Apple and platform build output
 clients/apple/.build/

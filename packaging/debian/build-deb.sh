@@ -20,11 +20,11 @@
 # FFMPEG_PREFIX to that FFmpeg's install prefix (default /opt/ffmpeg, as the noble image sets it).
 # See packaging/debian/README.md → "Ubuntu 24.04 LTS".
 #
-# Usage: VERSION=0.0.1~ci42.gdeadbee [ARCH=amd64] [BUNDLE_FFMPEG=1] bash packaging/debian/build-deb.sh
+# Usage: VERSION=0.23.0~ci42.gdeadbee [ARCH=amd64] [BUNDLE_FFMPEG=1] bash packaging/debian/build-deb.sh
 # Output: dist/slipstream-host_<version>_<arch>.deb
 set -euo pipefail
 
-VERSION="${VERSION:?set VERSION (e.g. 0.0.1 or 0.0.1~ci42.gdeadbee)}"
+VERSION="${VERSION:?set VERSION (e.g. 0.23.0 or 0.23.0~ci42.gdeadbee)}"
 ARCH="${ARCH:-amd64}"
 PKG="slipstream-host"
 BUNDLE_FFMPEG="${BUNDLE_FFMPEG:-0}"
@@ -90,8 +90,8 @@ sed -i 's#%h/slipstream/target/release/slipstream-host#/usr/bin/slipstream-host#
 # operator copies it into ~/.config/systemd/user/slipstream-host.service.d/ when they want it.
 install -Dm0644 scripts/slipstream-host-desktop-session.conf \
     "$STAGE/usr/share/slipstream-host/slipstream-host-desktop-session.conf"
-# Install-kind + channel marker, read by the host's update-check surface (planning:
-# host-update-from-web-console.md §4.1). ONE canonical path across all package formats —
+# Install-kind + channel marker, read by the host's update-check surface. One canonical path across
+# all package formats:
 # /usr/share/slipstream/, not this package's slipstream-host/ data dir. A canary version
 # carries `~ciN`; anything else is stable.
 case "$VERSION" in

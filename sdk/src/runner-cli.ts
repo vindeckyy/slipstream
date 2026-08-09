@@ -1,21 +1,21 @@
 #!/usr/bin/env bun
-// `slipstream-scripting` — the plugin/script runner AND the `slipstream-host plugins …` package ops.
+// `slipstream-scripting` is the plugin/script runner and the `slipstream-host plugins` package CLI.
 //
 // With NO subcommand it RUNS the runner: discover the operator's scripts + slipstream-plugin-*
 // packages and supervise them (see ./runner.ts). SIGINT/SIGTERM interrupt the whole tree
 // structurally, so every plugin's finalizers run before exit. This bare form is what the systemd
 // unit launches.
 //
-// With a subcommand it manages plugin packages (the host CLI forwards `slipstream-host plugins …`
+// With a subcommand it manages plugin packages (the host CLI forwards `slipstream-host plugins`
 // here):
-//   add <name...>     install first-party plugins (catalog-sync, rom-manager); anything resolving on
-//                    the PUBLIC npm registry (slipstream-plugin-*, foreign scopes) additionally
+//   add <name...>     install plugin packages; anything resolving on
+//                    the public npm registry (slipstream-plugin-*, foreign scopes) additionally
 //                    needs --allow-public-registry
-//   remove <name…>   uninstall
+//   remove <name...>  uninstall
 //   list             list installed plugin packages
 //
 //   bun src/runner-cli.ts [--scripts DIR] [--plugins DIR] [--list]   (run the runner)
-//   bun src/runner-cli.ts add catalog-sync [--plugins DIR]           (package ops)
+//   bun src/runner-cli.ts add @example/plugin-demo [--plugins DIR]   (package ops)
 //
 // Package-op flags: --exact pins the resolved version instead of a caret range, and
 // --registry @scope=https://… maps a scope to its registry in bunfig.toml. Both exist for the
@@ -107,7 +107,7 @@ const runPkgOp = (
 	const names = positionals();
 	if (names.length === 0) {
 		console.error(
-			`usage: slipstream-host plugins ${verb} <name...>  (e.g. catalog-sync, rom-manager)`,
+			`usage: slipstream-host plugins ${verb} <name...>`,
 		);
 		process.exit(2);
 	}

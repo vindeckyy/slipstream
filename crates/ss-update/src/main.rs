@@ -1,5 +1,4 @@
-//! `ss-update` — the root helper behind triggered Linux package updates
-//! (planning: `host-update-from-web-console.md` §7, plan U2.1).
+//! `ss-update`, the root helper behind triggered Linux package updates.
 //!
 //! Two verbs, one per product:
 //!

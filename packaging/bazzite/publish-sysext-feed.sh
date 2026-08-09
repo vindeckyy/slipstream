@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Publish a slipstream sysext image into its feed on the a package registry  -
-# called by GitHub Actions after the RPM publish. A feed is one fixed URL
+# Publish a slipstream sysext image into its feed on a package registry after building the RPM.
+# A feed is one fixed URL
 # (.../slipstream-sysext/<feed>/) holding versioned .raw files plus a SHA256SUMS manifest and its
 # detached OpenPGP signature SHA256SUMS.asc; slipstream-sysext(8) on the boxes verifies that
 # signature, then uses the manifest to find + check the newest image (the layout is also exactly
@@ -37,11 +37,15 @@ fi
 REGISTRY="${REGISTRY:?set REGISTRY to your package-registry host}"
 OWNER="${OWNER:?set OWNER to the package owner}"
 KEEP="${KEEP:-0}"
-AUTH=(--user "${CURL_USER:-$OWNER}:${TOKEN:?TOKEN (write:package PAT) required}")
 BASE="https://$REGISTRY/api/packages/$OWNER/generic/slipstream-sysext/$FEED"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+# Credentials ride in a netrc file, not curl argv, so the token never shows up in /proc/<pid>/cmdline.
+NETRC="$WORK/.netrc"
+printf 'machine %s login %s password %s\n' "$REGISTRY" "${CURL_USER:-$OWNER}" "${TOKEN:?TOKEN (write:package PAT) required}" > "$NETRC"
+chmod 600 "$NETRC"
+AUTH=(--netrc-file "$NETRC")
 SUMS="$WORK/SHA256SUMS"
 SIG="$WORK/SHA256SUMS.asc"
 FETCHED="$WORK/SHA256SUMS.fetched"   # exactly what the registry served, before normalization

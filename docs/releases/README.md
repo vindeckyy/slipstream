@@ -24,15 +24,14 @@ git tag -a vX.Y.Z -m "Slipstream vX.Y.Z"
 git push origin vX.Y.Z
 ~~~
 
-The release workflow builds the host artifact, writes a SHA-256 sidecar, and creates the GitHub Release. The Pages workflow publishes the documentation when changes land on main.
+The release workflow builds the host artifacts, writes an aggregate SHA-256 manifest, and creates the GitHub Release. The Pages workflow publishes the documentation when changes land on main.
 
 ## Fixing a release
 
 Do not move an existing tag after publishing. Cut a new patch version and explain the correction in its release notes. Users can verify a downloaded artifact with:
 
 ~~~bash
-sha256sum slipstream-host-*.tar.gz
-cat slipstream-host-*.tar.gz.sha256
+sha256sum --check slipstream-*-SHA256SUMS
 ~~~
 
 The checksum file and archive must report the same digest.

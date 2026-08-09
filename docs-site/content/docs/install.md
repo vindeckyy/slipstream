@@ -33,7 +33,7 @@ Capability detail: [Support matrix](/docs/support-matrix).
 | **Ubuntu** | Build with `packaging/debian`, then `sudo apt install ./dist/slipstream-host_*.deb` | [packaging/debian](https://github.com/vindeckyy/slipstream/blob/main/packaging/debian/README.md) |
 | **Fedora** | Build with `packaging/rpm`, then `sudo dnf install ./dist/slipstream-*.rpm` | [packaging/rpm](https://github.com/vindeckyy/slipstream/blob/main/packaging/rpm/README.md) |
 | **Arch** | `cd packaging/arch && PF_SRCDIR="$(git rev-parse --show-toplevel)" makepkg -si` | [packaging/arch](https://github.com/vindeckyy/slipstream/blob/main/packaging/arch/README.md) |
-| **Bazzite** | `curl -fsSLO https://raw.githubusercontent.com/vindeckyy/slipstream/main/packaging/bazzite/slipstream-sysext.sh && sudo bash slipstream-sysext.sh install` | [packaging/bazzite](https://github.com/vindeckyy/slipstream/blob/main/packaging/bazzite/README.md) |
+| **Bazzite** | Build a sysext image, then run `sudo bash slipstream-sysext.sh install --from-file <image.raw>` | [packaging/bazzite](https://github.com/vindeckyy/slipstream/blob/main/packaging/bazzite/README.md) |
 | **SteamOS (host)** | Clone the repo, then `bash scripts/steamdeck/install.sh` | Script builds on-device |
 | **NixOS** | `nix run github:vindeckyy/slipstream#slipstream-host -- serve` or the flake module | [packaging/nix](https://github.com/vindeckyy/slipstream/blob/main/packaging/nix/README.md) |
 

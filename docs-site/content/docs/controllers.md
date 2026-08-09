@@ -105,15 +105,13 @@ not on a GameStream-only path expecting DualSense HID.
 ## When the virtual pad is not enough: VirtualHere
 
 Some devices only make sense as **themselves**: a racing wheel, HOTAS, pedals, an arcade stick, or
-any controller whose value is that it is not emulated. For those, install the first-party
-**VirtualHere** plugin. It hands a real USB device on the couch machine to the host while you
-play, and gives it back afterwards.
+any controller whose value is that it is not emulated. USB-over-IP software such as VirtualHere
+can hand the physical device from the client machine to the host.
 
 VirtualHere itself is a commercial USB-over-IP product **sold separately**; Slipstream does not
-bundle or download it. You need the USB Server on the couch and the USB Client on the host. There
-Install and configure from the [Plugins → VirtualHere](/docs/plugins#virtualhere-usb-passthrough)
-page. The console's **Diagnostics** tab (and `slipstream-plugin-virtualhere doctor`) walks the
-two-sided setup when nothing moves.
+bundle, download, or configure it. You need the USB Server on the couch and the USB Client on the
+host. The [automation recipe](/docs/automation#recipe-full-controller-passthrough-virtualhere)
+shows hooks and an SDK example for managing the handoff.
 
 Ordinary Xbox / DualSense / Deck pads should stay on the built-in virtual-gamepad path. Reach for
 VirtualHere when the game needs the real USB identity.
@@ -197,8 +195,8 @@ that the emulated type is DualSense-family when you want HID effects, and that t
 
 ### Still stuck?
 
-Start from [Troubleshooting](/docs/troubleshooting). For USB-passthrough failures, use the
-VirtualHere plugin's Diagnostics tab. For "my mouse and keyboard are stuck in the stream," that
+Start from [Troubleshooting](/docs/troubleshooting). For USB-passthrough failures, verify both
+halves of the USB-over-IP setup independently. For "my mouse and keyboard are stuck in the stream," that
 is capture working as designed: **Ctrl+Alt+Shift+Q** or **L1+R1+Start+Select** releases them
 ([Input](/docs/input#getting-your-input-back)).
 
@@ -208,7 +206,7 @@ is capture working as designed: **Ctrl+Alt+Shift+Q** or **L1+R1+Start+Select** r
 - [Client settings](/docs/client-settings) - Gamepad type, Forwarded controller, Audio
 - [Play](/docs/play) - couch / game streaming path
 - [Desktop at work](/docs/desktop-at-work) - office remote desktop path
-- [Plugins → VirtualHere](/docs/plugins#virtualhere-usb-passthrough) - real USB devices
+- [Automation](/docs/automation#recipe-full-controller-passthrough-virtualhere) - optional USB-over-IP hooks
 - [gamescope](/docs/gamescope) - Gaming Mode limits
 - [Configuration → Gamepads](/docs/configuration#gamepads) - `SLIPSTREAM_GAMEPAD`
 - [Support matrix](/docs/support-matrix) - per-client rumble / gyro / DualSense truth

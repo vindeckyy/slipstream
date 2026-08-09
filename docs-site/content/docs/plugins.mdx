@@ -1,237 +1,79 @@
 ---
 title: Plugins
-description: First-party plugins, sync your ROM collection into the game library, or hand a real USB device on the couch to the host, and how to install them.
+description: Install trusted host plugins, manage catalog sources, and build plugins with the Slipstream SDK.
 ---
 
-Plugins extend the host through the **scripting runner** (see [Events & hooks](/docs/automation)). A
-plugin runs alongside the host, reconciles titles into your [game library](/docs/game-library) as a
-provider, so they appear in the grid on every client, and can add its own page to the [web console](/docs/web-console).
+Plugins run beside the host through the optional `slipstream-scripting` service. They can react to
+host events, synchronize game-library entries, and serve a page inside the web console.
 
-Three first-party plugins today:
+No first-party plugin packages are currently published. The built-in signed catalog is empty until
+reviewed packages are available. You can add an operator-managed catalog or install a package you
+control.
 
-| Plugin | What it does |
-|---|---|
-| **ROM Manager** | Scans your ROM directories, matches each platform to an installed emulator, and syncs them into the library with box art. |
-| **VirtualHere** | Hands a real USB device on the couch, wheel, HOTAS, pad, to the host while you play, and gives it back after. Needs [VirtualHere](https://www.virtualhere.com/), sold separately. |
+## Enable the runner
 
-## Installing from the console
-
-Every plugin runs inside the **plugin runner**, a separate service that is off until you switch it
-on. Installing a plugin while it's off succeeds and starts nothing, so do this first:
-
-1. Open the [web console](/docs/web-console) -> **Plugins** -> **Installed** and look at the **Plugin
-   runner** card. If it says *Not installed*, install the runner package first (see
-   [Troubleshooting](#troubleshooting) below). If it says *Disabled*, press **Enable runner**, 
-   once per host. *Running* means you're set; *Stopped* means the runner is enabled but not up right
-   now, and its log says why (see [Troubleshooting](#troubleshooting)).
-2. Go to **Browse**, pick a plugin from the catalog and confirm. The host installs it and restarts
-   the runner, and the plugin's own page appears in the console's nav.
-
-**Sources** is the third tab: where catalogs come from.
-
-The rest of this page covers the CLI, which does the same thing, and the trust model behind the
-badges, worth reading once, because a plugin runs with the same privileges as the host.
-
-### What "Verified" means
-
-Every catalogued plugin pins **one exact version** and that version's package hash. A verified entry
-covers the exact package reviewed by Slipstream maintainers. The project and later releases require
-their own review. When a plugin releases a new version, the store keeps offering the reviewed one
-until the new release is reviewed too. Before anything is downloaded, the host re-checks the pinned
-hash against the registry, so a package that was quietly republished under the same version number
-is refused rather than installed.
-
-A catalog can also **revoke** a version. When an advisory covers an entry, the console shows the
-reason against it and won't install that version, on **Browse** as a red-ringed panel with the
-install button disabled, on **Installed** as a warning against the plugin you already have. It
-never removes running code for you; that stays your decision.
-
-Three things a plugin can be:
-
-| Badge | Where it came from |
-|---|---|
-| **Verified** | The built-in catalog. Slipstream maintainers reviewed this exact package. |
-| **External source**, *from &lt;source&gt;* | A catalog **you** added. It is still pinned and hash-checked, but curated by somebody else. Slipstream maintainers have not reviewed the code. This badge is amber, unlike the red **Unverified** badge below. |
-| **Unverified** | Installed by hand from a package spec. Nobody reviewed it and nothing pins it; the console asks you to type the name to confirm, and the plugin stays marked this way for as long as it is installed. |
-
-### Adding another catalog
-
-**Sources** -> *Add a catalog source*: a name and the URL of its index. Optionally paste the source's
-`ed25519:...` public key, with a key set, the host refuses any index from that source that isn't
-correctly signed, rather than falling back to an unsigned one.
-
-Adding a source is a trust decision you make once: its plugins become installable on this host.
-They are always attributed to it and never carry the Verified badge, which belongs to the built-in
-catalog alone.
-
-To publish a plugin to the built-in catalog, open a pull request against
-`slipstream-plugin-index`, its README covers the
-format and what review looks for.
-
-## Installing from the CLI
-
-Two commands: install the plugin, then turn the runner on. The host CLI handles the rest, creating
-the plugins directory, pointing it at the package registry, and starting the supervisor.
+Install the `slipstream-scripting` package from the same local build as the host. Then open
+**Plugins** -> **Installed** in the web console and select **Enable runner**, or run:
 
 ```sh
-slipstream-host plugins add rom-manager
-slipstream-host plugins enable           # turn the runner on (once)
-```
-
-On **SteamOS** the [host installer](/docs/steamos-host) ships the runner automatically (user-scoped
-under `~/.local`, the read-only `/usr` can't take the package). If the console reports the runner
-isn't installed on an older setup, re-run `scripts/steamdeck/update.sh` once.
-
-Open the [web console](/docs/web-console) and the plugin's page appears in the nav automatically, 
-that's the whole install.
-
-The runner is **opt-in**: `plugins add` installs, `plugins enable` turns it on. You only need
-`enable` once. The runner discovers plugins when it starts, so one installed later needs a restart
-to come up (`systemctl --user restart slipstream-scripting`, or `Restart` the `SlipstreamScripting`
-task), the console does that restart for you as part of installing.
-
-A plugin installed from the CLI shows up in the console as **Installed via CLI**: the console knows
-what is installed, but not who vouched for it. Install the same plugin from the store's Browse tab
-and it carries its catalog badge instead.
-
-### The rest of the commands
-
-| Command | What it does |
-|---|---|
-| `slipstream-host plugins add <name...>` | Install one or more plugins. |
-| `slipstream-host plugins remove <name...>` | Uninstall. |
-| `slipstream-host plugins list` | List what's installed, with versions. |
-| `slipstream-host plugins enable` | Enable + start the runner. |
-| `slipstream-host plugins disable` | Stop + disable the runner. |
-| `slipstream-host plugins status` | Is the runner enabled and running? |
-
-A bare name resolves to the first-party package, `rom-manager` installs
-`@slipstream/plugin-rom-manager`, always from Slipstream's own package registry. Any other name
-(`slipstream-plugin-*`, a foreign
-`@scope/pkg`) would install from the **public npm registry** and is refused unless you add
-`--allow-public-registry`, a guard against typos and look-alike packages pulling untrusted code
-onto your host.
-
-> Plugins are operator-installed code with operator privileges, they can launch games and run
-> commands. Install only plugins you trust, from a registry you control.
-
-## Updating and removing a plugin
-
-**Update.** The console's **Installed** tab grows an **Update to &lt;version&gt;** button whenever the
-catalog pins a newer version than the one you have; it installs through the same confirmation as a
-fresh install, and the console restarts the runner for you. There is no `plugins update` command, 
-from a terminal, re-run `slipstream-host plugins add <name>`. That installs the newest version the
-package registry has rather than the version the catalog pins, and it does **not** restart the
-runner: restart it yourself so the new code is picked up
-(`systemctl --user restart slipstream-scripting`).
-
-**Remove.** The **Uninstall** (bin) button on the **Installed** tab removes the package *and*
-restarts the runner, so the plugin stops straight away. `slipstream-host plugins remove <name>`
-removes the package only, restart the runner yourself, as above, to stop a plugin that is still
-running.
-
-Uninstalling removes the package and nothing else. A plugin's own config and cache stay where it
-wrote them, `~/.config/slipstream/plugin-state/<plugin>/`, so re-installing later picks your settings
-back up. Delete that directory yourself if you want it gone.
-
-To stop *every* plugin without uninstalling anything, turn the runner off: **Disable runner** on the
-Installed tab, or `slipstream-host plugins disable`.
-
-## ROM Manager
-
-`@slipstream/plugin-rom-manager`, point it at your ROM directories and it scans them, matches each
-platform to an installed emulator, fetches box art (SteamGridDB, or the keyless libretro thumbnails),
-and reconciles the result into your library as the `rom-manager` provider. ~25 built-in platforms
-(NES through Switch, PS1/2/PSP, Dreamcast, and more), per-game overrides, and a console page to
-configure it all.
-
-```sh
-slipstream-host plugins add rom-manager
-```
-
-Then add a root or two, from the console's **ROM Manager** page, or in the config file:
-
-`~/.config/slipstream/plugin-state/rom-manager/config.json`:
-
-```jsonc
-{
-  "roots": [
-    { "dir": "/mnt/roms/snes", "platform": "snes" },
-    { "dir": "/mnt/roms/ps1", "platform": "ps1", "excludes": ["*.sav"] }
-  ],
-  "art": { "provider": "auto", "steamGridDbKey": "" }
-}
-```
-
-`plugin-state` is where a plugin reads and writes its own files.
-
-Full options and the platform/emulator list are in
-`slipstream-plugin-rom-manager`.
-
-
-## VirtualHere (USB passthrough)
-
-`@slipstream/plugin-virtualhere`, hands a **physical USB device** on your couch machine to the
-host while you play, and gives it back afterwards. The game sees the real device, so this is the
-answer for a racing wheel, a HOTAS, pedals, an arcade stick, or any controller whose value is that
-it is not emulated.
-
-<Callout type="warn">
-This plugin drives [VirtualHere](https://www.virtualhere.com/), a commercial USB-over-IP product
-**sold separately** by VirtualHere Pty. Ltd. Nothing from VirtualHere is bundled or downloaded by
-Slipstream, you install and license it yourself. The plugin is not affiliated with or endorsed by
-VirtualHere.
-</Callout>
-
-You need both halves of VirtualHere running before the plugin is any use:
-
-- **The USB Server on the couch**, sharing the device. Free for one device; beyond that, and to run
-  the client as a service, VirtualHere requires a purchased licence.
-- **The USB Client on the host**, ideally installed as a service so it survives logging out.
-
-Run the USB Server on the couch device and the USB Client on the host.
-
-```sh
-slipstream-host plugins add virtualhere
 slipstream-host plugins enable
+slipstream-host plugins status
 ```
 
-Then open the console's **VirtualHere** page. The **Devices** tab lists whatever the couch is
-sharing; pick one and it writes a rule matching the device *by name*, which keeps working after the
-couch reboots or the device moves to another port. By default the device is handed over when video
-starts and returned when it stops, so the couch keeps its own controller the rest of the time, 
-you can widen that to the whole session, or to the entire time a client is connected.
+The runner is disabled by default. Installing a package does not start plugin code until the
+runner is enabled.
 
-If nothing happens, the **Diagnostics** tab walks the whole two-sided setup and tells you which
-part to fix. The same checks are available as `slipstream-plugin-virtualhere doctor`, which is the
-useful thing to paste into a support thread.
+## Catalog sources
 
-Full configuration is in
-`slipstream-plugin-virtualhere`.
+Open **Plugins** -> **Sources** to add a catalog name, HTTPS index URL, and optional Ed25519 public
+key. A source with a key must provide a detached signature at `<index-url>.sig`. Slipstream rejects
+an invalid signature and continues serving the last valid cached index.
+
+External sources are always identified by source in the console. Their entries do not receive the
+built-in **Verified** badge.
+
+## Install and remove packages
+
+The **Browse** tab lists packages from configured catalogs. Each catalog entry pins one exact
+version and package integrity hash. Slipstream checks both before installation.
+
+The command-line interface provides the same lifecycle controls:
+
+```sh
+slipstream-host plugins add <package>
+slipstream-host plugins list
+slipstream-host plugins remove <package>
+slipstream-host plugins disable
+```
+
+Unscoped names resolve under the `@slipstream/plugin-*` convention. Packages from the public npm
+registry require the explicit `--allow-public-registry` option. Install only packages whose source
+and release artifact you have reviewed.
+
+Removing a package leaves its state under
+`~/.config/slipstream/plugin-state/<plugin>/`. Delete that directory separately if you also want
+to remove its saved configuration.
 
 ## Troubleshooting
 
-**`slipstream-host: command not found`**, the host package installs it to `/usr/bin/slipstream-host`.
-
-**"the plugin runner isn't installed"**, the runner ships as its own package. On Ubuntu:
-`sudo apt install slipstream-scripting`. On Fedora: `sudo dnf install slipstream-scripting` from the
-[same RPM repo you installed the host from](/docs/fedora). On Arch:
-`sudo pacman -Syu slipstream-scripting` (a full `-Syu`, like every other install from that repo).
-On SteamOS, re-run `scripts/steamdeck/install.sh` (or `scripts/steamdeck/update.sh`).
-
-**The plugin doesn't show up in the console**, check the runner is actually running with
-`slipstream-host plugins status`, then look at its log:
+Check the runner and its user-service log:
 
 ```sh
+slipstream-host plugins status
 journalctl --user -u slipstream-scripting -f
 ```
 
-## Writing your own
+If the console says the runner is missing, install the `slipstream-scripting` package produced by
+the repository's Debian, RPM, Arch, Nix, or SteamOS packaging path. The package must match the host
+version.
 
-A plugin is a TypeScript module built on **`@slipstream/plugin-kit`** (`definePluginKit`), supervised
-by the runner. The kit owns lifecycle, config and state, the library sync engine, and serving the
-plugin's console page; `@slipstream/host` (`definePlugin`) is the lower-level host client underneath
-it. Start from the
-[plugin-kit README](https://github.com/vindeckyy/slipstream/blob/main/plugin-kit) and
-`slipstream-plugin-rom-manager`, which is the reference implementation, or either of the plugins
-above.
+## Write a plugin
+
+The TypeScript package `@slipstream/plugin-kit` provides lifecycle handling, configuration and
+state helpers, library reconciliation, event access, and plugin UI serving. The lower-level
+`@slipstream/host` SDK exposes the host API.
+
+Start with the
+[plugin kit](https://github.com/vindeckyy/slipstream/tree/main/plugin-kit) and the
+[plugin UI example](https://github.com/vindeckyy/slipstream/blob/main/sdk/examples/plugin-ui.ts).
+Keep credentials outside package files and declare the minimum host version your plugin supports.

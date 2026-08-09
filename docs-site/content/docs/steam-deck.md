@@ -40,21 +40,18 @@ You need three things on the Deck:
 
 ## Install the plugin
 
-The plugin is published as a ready-to-install zip on every build. You don't need the Decky CLI or a
-developer toolchain, just paste a URL into Decky:
+The repository can produce a ready-to-install zip. Build it in `clients/decky` with
+`pnpm run package`, then host the resulting file somewhere the Deck can reach:
 
 1. On the Deck, open the **Quick Access Menu** (`...`) -> the **plug** icon (Decky) -> the **gear**
    (Settings) -> enable **Developer Mode**.
 2. Open the new **Developer** tab and choose **Install Plugin from URL**.
-3. Paste a URL to a `slipstream.zip` you built (`clients/decky` -> `pnpm run package`) or downloaded
-   from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached, then
-   confirm.
+3. Paste a URL to the generated `clients/decky/out/slipstream-v<version>.zip`, then confirm.
 
 The **Slipstream** panel appears in the Quick Access Menu right away, no Deck restart needed.
 
-> **Channels.** Publish separate stable and canary zips if you want two tracks, see
-> [Release Channels](/docs/channels). For local development, sideload with `pnpm run deploy` from
-> `clients/decky`.
+There is no public Decky feed. Install a newly packaged zip from a reachable URL when updating. For
+local development, sideload with `pnpm run deploy` from `clients/decky`.
 
 ## Use it
 
@@ -107,27 +104,18 @@ input, so it is safe to hit by accident.
 
 ## Updating
 
-The plugin **checks for updates itself**, no Decky store needed. It covers **both** the plugin *and*
-the streaming client (they version independently), so when either has a newer build the panel shows an
-**Update** button (in the Quick Access Menu and on the full page). Tap it: the client updates in
-place, and if the plugin itself changed it downloads, verifies, replaces itself, and reloads, all
-without leaving Gaming Mode.
+The public repository does not currently provide a Decky or Flatpak update feed. Update the plugin
+by building or downloading a newer zip, then install its URL again through Decky -> **Developer** ->
+**Install Plugin from URL**. Decky replaces the installed copy in place.
 
-One exception: if your client isn't one the plugin can install for you (a sysext, a nix profile, a
-source build), the panel shows you the update **command** instead of a button, tap-to-install would
-only fail. A pending plugin update still gets its button.
+Update a Flatpak bundle by downloading or building a newer file and reinstalling it:
 
-The plugin check follows the [channel](/docs/channels) you installed from: a plugin installed from the
-**stable** link tracks stable releases; one installed from the **canary** link tracks `main` builds.
+```sh
+flatpak install --user --bundle slipstream-client-<version>-<arch>.flatpak
+```
 
-> **Updating the client from the terminal?** The Flatpak client is installed **per-user**, so run
-> `flatpak update --user io.slipstream.Slipstream`, **without `sudo`**. `sudo flatpak update` only touches
-> the *system* installation and silently skips the client. (Un-sudo'd `flatpak update` updates both
-> scopes, so it's the safe default.)
-
-> If the plugin **Update** button never appears (an older Decky Loader, or no network), update the
-> plugin manually: Decky -> **Developer** -> **Install Plugin from URL**, and paste the same channel
-> link again. Decky replaces the installed copy in place.
+If you configure a Flatpak remote, `flatpak update --user io.slipstream.Slipstream` updates the
+per-user installation. Do not use `sudo` for that installation.
 
 ## Troubleshooting
 

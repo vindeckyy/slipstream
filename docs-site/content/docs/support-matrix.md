@@ -3,14 +3,14 @@ title: Support matrix
 description: What actually works where, Linux host compositors, encoders, client decoders and per-client features, each cell taken from the code that decides it rather than from a feature name.
 ---
 
-This page is the one place that says **what works where**. Find your row (your host desktop, your
+This page says **what works where**. Find your row (your host desktop, your
 GPU, your client app) and read across; every cell is taken from the code path that makes the
 decision, not from a feature's name.
 
 Support in Slipstream is **non-uniform by design**. The host does not ship one capture path and one
 input path and hope your desktop cooperates. It carries a separate backend for each compositor and
 each GPU vendor, and it adapts to whatever that combination actually offers. A capability that is
-excellent on KDE can be impossible on gamescope. That is why the honest answer to "does Slipstream
+excellent on KDE can be impossible on gamescope. That is why the answer to "does Slipstream
 do X?" is usually "on which compositor, with which GPU, from which client".
 
 ## Legend
@@ -396,9 +396,9 @@ capability.
 | **Linux host** | The product host surface. What differs is not the host but the desktop under it: each compositor gets its own capture, virtual-display and input backend, and they are not equally capable. |
 | **GameStream / Moonlight plane** | Opt-in compatibility path enabled only with `serve --gamestream`. It pairs over plain HTTP with weaker legacy encryption, so keep it on a trusted LAN (see [Security](/docs/security#gamestream--moonlight-compatibility-is-the-weak-crypto-path)). Slipstream-only features are not available through this path. |
 | **Android client** (phone · TV) | Preview APK on GitHub Releases. The same app in leanback mode is the TV client. |
-| **Decky plugin** (Steam Deck) | Ships through install-from-URL rather than the Decky store, and keeps itself and the client it launches up to date. It launches the Linux session binary rather than streaming itself, and has no settings surface of its own beyond the flat values it writes into the shared client settings. |
+| **Decky plugin** (Steam Deck) | Installs from a packaged zip rather than the Decky store. Updates are manual until a public feed exists. It launches the Linux session binary rather than streaming itself. |
 | **Web console** | The full management surface: dashboard and sessions, pairing, library, displays, plugins and the plugin store, logs, stats, settings, and host updates. It cannot yet run a speed test or set a bitrate; the client apps can. |
-| **Plugins** | First-party ones (ROM Manager, VirtualHere) plus the SDK, installed from the console. See [Plugins](/docs/plugins). |
+| **Plugins** | The runner, SDK, and external catalog support are available. No first-party plugin catalog is currently published. See [Plugins](/docs/plugins). |
 | **`ss-webos`** (LG TV) | A community client in a separate repository. Nothing here can establish its state; ask that project. |
 
 ## Mixing versions
@@ -424,10 +424,10 @@ wlroots backends, on NVIDIA and AMD GPUs, with the Android and Steam Deck client
 stock Moonlight over the GameStream path. HDR on gamescope is verified end to end on Bazzite and on
 SteamOS.
 
-Cross-machine latency figures are trustworthy because a wall-clock handshake removes the clock
+Cross-machine latency figures are measured with a wall-clock handshake removes the clock
 offset between the two machines before anything is measured, so a capture-to-receipt number is valid
 across the LAN rather than only on one box. (The remaining term, receipt to actually on screen, is
-what the current measurements do not cover is the final display-present step. See
+what the current measurements do not cover: the final display-present step. See
 [Understanding the stats overlay](/docs/stats).
 
 ## What is not verified

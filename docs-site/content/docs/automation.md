@@ -227,12 +227,6 @@ triggers, USB rumble, or to use a device no emulation can stand in for, like a r
 HOTAS, hand the physical device from the couch to the host over
 [VirtualHere](https://www.virtualhere.com/) (USB-over-IP) while you play.
 
-**Use the plugin.** [VirtualHere passthrough](/docs/plugins#virtualhere-usb-passthrough) does all of
-this for you: it finds the device by name (so it survives the couch rebooting), brackets it around
-the session, gives it back if anything crashes, and tells you which half of the setup is broken when
-it isn't working. That is the supported route, and the rest of this section is only for people who
-would rather not install a plugin.
-
 **The two sides.** VirtualHere is a server/client pair, and you run both: the **server on the couch**
 (where the device is plugged in) shares it, and the **client on the host** mounts it. The client's
 `-t` flag is a one-shot IPC to the already-running client, `-t LIST` prints every visible device
@@ -254,12 +248,10 @@ Bracket it on the stream with two [hooks](#hooks-hooksjson):
 
 `couch-deck.11` is the device's address from `vhclientx86_64 -t LIST`.
 
-Know what this trades away, because the plugin exists to fix exactly these: the address is
-hard-coded, so it breaks when the couch reboots or the device moves port; and if the stream ends
-abnormally the `stream.stopped` hook never fires, leaving the device stranded on the host until
-somebody notices. There is also a
+The address is hard-coded, so it can change when the couch reboots or the device moves port. An
+abnormal stream exit can also skip the `stream.stopped` hook. The
 [`virtualhere-dualsense.ts`](https://github.com/vindeckyy/slipstream/blob/main/sdk/examples/virtualhere-dualsense.ts)
-SDK example if you want a worked script to build your own on.
+SDK example resolves devices by name and performs cleanup through the scripting runner.
 
 > VirtualHere is a commercial product, sold separately by VirtualHere Pty. Ltd., free for one
 > shared device, licensed beyond that. Slipstream is not affiliated with it.

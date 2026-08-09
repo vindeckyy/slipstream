@@ -13,3 +13,4 @@ captures/
 # Secrets
 .env
 *.jks
+*.keystore

@@ -27,7 +27,8 @@ INSTALL="rm -rf /home/deck/homebrew/plugins/$NAME \
   && systemctl restart plugin_loader"
 
 if [ -n "${DECKPASS:-}" ]; then
-  ssh "$DECK" "echo '$DECKPASS' | sudo -S sh -c '$INSTALL'"
+  # Feed the password over stdin so it never appears in the remote process arguments.
+  printf '%s\n' "$DECKPASS" | ssh "$DECK" "sudo -S sh -c '$INSTALL'"
 else
   echo "==> sudo on the Deck will prompt for ${DECK}'s password:"
   ssh -t "$DECK" "sudo sh -c '$INSTALL'"

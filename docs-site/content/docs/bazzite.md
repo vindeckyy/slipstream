@@ -35,12 +35,11 @@ maintainers ship via the [fedora-sysexts](https://fedora-sysexts.github.io/) pro
 # From a clone of this repo (or download the script from GitHub):
 #   https://raw.githubusercontent.com/vindeckyy/slipstream/main/packaging/bazzite/slipstream-sysext.sh
 curl -fsSLO https://raw.githubusercontent.com/vindeckyy/slipstream/main/packaging/bazzite/slipstream-sysext.sh
-sudo bash slipstream-sysext.sh install          # add `--channel canary` if you publish a canary feed
+sudo bash slipstream-sysext.sh install --from-file /path/to/slipstream.raw
 ```
 
-That installs from a sysext feed when you have one configured, or you can build the image locally
-with `packaging/bazzite/build-sysext.sh` and install with
-`sudo bash slipstream-sysext.sh install --from-file ...`. See
+Build the image locally with `packaging/bazzite/build-sysext.sh`. Operators with a private feed can
+set `SLIPSTREAM_SYSEXT_REGISTRY` and omit `--from-file`. See
 [`packaging/bazzite/README.md`](https://github.com/vindeckyy/slipstream/blob/main/packaging/bazzite/README.md).
 When a feed is used, the checksum manifest is OpenPGP-signed (public key baked into the script), and
 `slipstream-sysext` checks that signature before it trusts a single checksum, so it needs `gpg` on
@@ -49,10 +48,10 @@ the box, and it refuses a feed it can't verify.
 The plugin runner rides along in the image but isn't started: run
 `systemctl --user enable --now slipstream-scripting` when you want [plugins](/docs/plugins).
 
-From then on:
+For later local updates:
 
 ```sh
-sudo slipstream-sysext update     # fetch + merge the newest build
+sudo slipstream-sysext update --from-file /path/to/newer-slipstream.raw
 sudo slipstream-sysext status     # channel, installed vs latest version
 sudo slipstream-sysext remove     # unmerge and delete the image (~/.config/slipstream is kept)
 ```

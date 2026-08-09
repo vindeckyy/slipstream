@@ -1,6 +1,4 @@
-//! `slipstream-session` — the Vulkan session binary (slipstream-planning
-//! `linux-client-rearchitecture.md`, Phase 1: the software-path presenter MVP, which IS
-//! the power-user CLI build).
+//! `slipstream-session`, the Vulkan session binary and power-user CLI build.
 //!
 //! One stream session per invocation: `--connect host[:port]` (+ `--fp HEX`,
 //! `--launch id`, `--fullscreen`), exits when the session ends. Reads the same identity

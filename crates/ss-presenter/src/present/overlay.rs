@@ -1,5 +1,4 @@
-//! The presenter↔console-UI contract (slipstream-planning
-//! `linux-client-rearchitecture.md` §6.1): the presenter exposes its device and
+//! The presenter-to-console-UI contract: the presenter exposes its device and
 //! composites at most ONE sampled RGBA quad per frame; the overlay implementation
 //! (ss-console-ui, Skia) fills offscreen images on its own damage-driven schedule. No
 //! Skia type crosses this line — everything here is ash — and a `frame()` returning

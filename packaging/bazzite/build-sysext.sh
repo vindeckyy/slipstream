@@ -23,9 +23,9 @@
 # soname-coupled to their base anyway. Needs: rpm2cpio, cpio, mksquashfs (>= 4.6), matchpathcon.
 #
 # Usage:
-#   bash build-sysext.sh --version-id 43 --out dist/slipstream-0.7.1-1-x86-64.raw \
+#   bash build-sysext.sh --version-id 43 --out dist/slipstream-0.23.0-1-x86-64.raw \
 #        [--gamescope path/to/slipstream-gamescope] \
-#        dist/slipstream-0.7.1-1.fc43.x86_64.rpm dist/slipstream-web-0.7.1-1.fc43.noarch.rpm
+#        dist/slipstream-0.23.0-1.fc43.x86_64.rpm dist/slipstream-web-0.23.0-1.fc43.x86_64.rpm
 #
 # --gamescope folds in a prebuilt HDR-capable gamescope (packaging/gamescope) as
 # /usr/bin/slipstream-gamescope, which is what lets the gamescope backend stream 10-bit BT.2020 PQ.

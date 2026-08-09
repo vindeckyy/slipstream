@@ -20,8 +20,9 @@ concurrency:
 
 jobs:
   linux-host:
-    name: Linux host release
+    name: Linux release artifacts
     runs-on: ubuntu-24.04
+    timeout-minutes: 120
     environment: release
     permissions:
       contents: write
@@ -30,7 +31,7 @@ jobs:
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           fetch-depth: 0
@@ -41,24 +42,52 @@ jobs:
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           test "$(git tag --points-at HEAD "$RELEASE_TAG")" = "$RELEASE_TAG"
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor HEAD origin/main
           version="${RELEASE_TAG#v}"
-          cargo_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "slipstream-host") | .version' | head -n1)"
+          cargo_version="$(sed -n '/^\[workspace.package\]/,/^\[/{s/^version = "\([^"]*\)"/\1/p;}' Cargo.toml | head -n1)"
           test "$cargo_version" = "$version"
+          test -f "docs/releases/${RELEASE_TAG}.md"
 
       - name: Install native dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential clang libclang-dev pkg-config cmake \
+          sudo apt-get install -y build-essential clang libclang-dev pkg-config cmake jq flatpak \
+            python3-aiohttp python3-tomlkit \
             libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libavfilter-dev \
             libavdevice-dev libpipewire-0.3-dev libopus-dev libwayland-dev libxkbcommon-dev \
             libgl-dev libegl-dev libgbm-dev libvulkan-dev jq
 
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master, pinned
         with:
-          toolchain: 1.82.0
+          toolchain: 1.96.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
 
       - name: Build host
         run: cargo build --release -p slipstream-host --locked
+
+      - name: Build Decky package
+        working-directory: clients/decky
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.4 --activate
+          pnpm install --frozen-lockfile
+          pnpm test
+          pnpm run package
+
+      - name: Install Flatpak builder
+        run: |
+          flatpak remote-add --user --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.flatpak.Builder
+
+      - name: Build Flatpak bundle
+        env:
+          VERSION: ${{ env.RELEASE_TAG }}
+        run: VERSION="${VERSION#v}" bash packaging/flatpak/build-flatpak.sh
 
       - name: Prepare release files
         shell: bash
@@ -69,9 +98,15 @@ jobs:
           cp target/release/slipstream-host "release/slipstream-host-${version}-linux-x86_64"
           tar -C release -czf "release/slipstream-host-${version}-linux-x86_64.tar.gz" \
             "slipstream-host-${version}-linux-x86_64"
+          decky_version="$(node -p 'require("./clients/decky/package.json").version')"
+          test "$decky_version" = "$version"
+          test -f "dist/slipstream-client-${version}-x86_64.flatpak"
+          cp "clients/decky/out/slipstream-v${decky_version}.zip" release/
+          cp "dist/slipstream-client-${version}-x86_64.flatpak" release/
           python3 scripts/gen-third-party-notices.py \
             --out "release/slipstream-${version}-THIRD-PARTY-NOTICES.txt"
-          (cd release && sha256sum -- *) > "release/slipstream-${version}-SHA256SUMS"
+          (cd release && sha256sum -- *) > "release/.slipstream-${version}-SHA256SUMS.tmp"
+          mv "release/.slipstream-${version}-SHA256SUMS.tmp" "release/slipstream-${version}-SHA256SUMS"
 
       - name: Generate SBOM
         uses: anchore/sbom-action@d94f46e13c6c62f59525ac9a1e147a99dc0b9bf5 # v0.17.0
@@ -86,8 +121,8 @@ jobs:
         run: |
           set -euo pipefail
           version="${RELEASE_TAG#v}"
-          rm -f "release/slipstream-${version}-SHA256SUMS"
-          (cd release && sha256sum -- *) > "release/slipstream-${version}-SHA256SUMS"
+          (cd release && sha256sum -- *) > "release/.slipstream-${version}-SHA256SUMS.tmp"
+          mv "release/.slipstream-${version}-SHA256SUMS.tmp" "release/slipstream-${version}-SHA256SUMS"
 
       - name: Attest release files
         uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
@@ -98,6 +133,6 @@ jobs:
         uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2.2.2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          generate_release_notes: true
+          body_path: docs/releases/${{ env.RELEASE_TAG }}.md
           fail_on_unmatched_files: true
           files: release/*

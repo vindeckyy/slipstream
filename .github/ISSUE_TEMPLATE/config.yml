@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/vindeckyy/slipstream/security/advisories/new
+    about: Report suspected vulnerabilities privately.
+  - name: Documentation
+    url: https://vindeckyy.github.io/slipstream/
+    about: Check installation, configuration, and troubleshooting guides before filing an issue.

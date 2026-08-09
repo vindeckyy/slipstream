@@ -7,7 +7,7 @@
 # the package names the target boxes ship. The client links no NVIDIA libs — no filter
 # needed.
 #
-# Usage: VERSION=0.0.1~ci42.gdeadbee [ARCH=amd64] [TARGET=<rust triple>] \
+# Usage: VERSION=0.23.0~ci42.gdeadbee [ARCH=amd64] [TARGET=<rust triple>] \
 #          bash packaging/debian/build-client-deb.sh
 # Output: dist/slipstream-client_<version>_<arch>.deb
 #
@@ -16,7 +16,7 @@
 # ci/rust-ci-arm64cross.Dockerfile image, which carries the matching :arm64 sysroot.
 set -euo pipefail
 
-VERSION="${VERSION:?set VERSION (e.g. 0.0.1 or 0.0.1~ci42.gdeadbee)}"
+VERSION="${VERSION:?set VERSION (e.g. 0.23.0 or 0.23.0~ci42.gdeadbee)}"
 ARCH="${ARCH:-amd64}"
 TARGET="${TARGET:-}"
 PKG="slipstream-client"
@@ -90,8 +90,8 @@ sed -i 's#/usr/libexec/slipstream/ss-update#/usr/libexec/slipstream/ss-update-cl
        "$STAGE/usr/lib/systemd/system/slipstream-client-update.service"
 install -Dm0644 packaging/linux/49-slipstream-client-update.rules \
                 "$STAGE/usr/share/polkit-1/rules.d/49-slipstream-client-update.rules"
-# Install-kind + channel marker for the CLIENT, read by `slipstream-client --check-update`
-# (planning: host-update-from-web-console.md §4.1). Its own directory, matching the RPM. A
+# Install-kind + channel marker for the client, read by `slipstream-client --check-update`.
+# Its own directory matches the RPM. A
 # canary build's version carries `~ciN`; anything else is stable.
 case "$VERSION" in
   *~ci*) _pf_client_channel=canary ;;

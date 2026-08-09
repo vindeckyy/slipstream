@@ -2,16 +2,16 @@
 # Build the slipstream Linux client as a single-file `.flatpak` bundle.
 #
 # Works on the Steam Deck (org.flatpak.Builder from Flathub, user-scope, NO root) and on any
-# Linux box with flatpak + flatpak-builder. The CI does the same steps (GitHub Actions).
+# Linux box with flatpak + flatpak-builder.
 #
 # On the Deck (one-time):
 #   flatpak install --user -y flathub org.flatpak.Builder
 # Then run this script from the repo root:
 #   bash packaging/flatpak/build-flatpak.sh
-# Output: dist/slipstream-client-<version>.flatpak  (install with `flatpak install --user <file>`)
+# Output: dist/slipstream-client-<version>-<arch>.flatpak  (install with `flatpak install --user <file>`)
 #
 # Env knobs:
-#   VERSION=...        version string for the bundle name (default: git describe / 0.0.1-dev)
+#   VERSION=...        version string for the bundle name (default: git describe / 0.23.0-dev)
 #   ONLINE=1           skip offline cargo-sources.json; build with --share=network (fast local
 #                      iteration, non-reproducible). Default: offline (regenerates cargo-sources).
 #   BUILDER=...        override the flatpak-builder invocation (default: auto-detect host
@@ -29,12 +29,12 @@ cd "$ROOTDIR"
 
 APP_ID="io.slipstream.Slipstream"
 MANIFEST="packaging/flatpak/io.slipstream.yml"
-VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo 0.0.1-dev)}"
+VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo 0.23.0-dev)}"
 VERSION="${VERSION#v}"
 # `flatpak --default-arch` reports flatpak's own name for this machine (x86_64 / aarch64).
 ARCH="${ARCH:-$(flatpak --default-arch 2>/dev/null || uname -m)}"
 # Arch-suffixed so an x86_64 and an aarch64 bundle can sit in dist/ together instead of the
-# second silently overwriting the first. (CI composes its own published filename.)
+# second silently overwriting the first.
 BUNDLE="dist/slipstream-client-${VERSION}-${ARCH}.flatpak"
 
 # --- pick a flatpak-builder (host binary, or the org.flatpak.Builder flatpak on the Deck) ---
@@ -58,34 +58,41 @@ EXTRA_ARGS=()
 if [ "${ONLINE:-0}" = "1" ]; then
   echo "==> ONLINE build (cargo fetches from crates.io; non-reproducible)"
   EXTRA_ARGS+=(--build-args=--share=network)
+  EXTRA_ARGS+=(--build-args=--env=CARGO_NET_OFFLINE=false)
   # The manifest references cargo-sources.json; provide an empty list so it stays valid.
   [ -f packaging/flatpak/cargo-sources.json ] || echo '[]' > packaging/flatpak/cargo-sources.json
-elif [ -f packaging/flatpak/cargo-sources.json ] && [ "${FORCE_GEN:-0}" != "1" ]; then
-  # Reuse a cargo-sources.json that was generated elsewhere (e.g. on a dev box with network +
-  # python aiohttp/toml, then rsynced to a build host that lacks them  -  like the Deck). The
-  # offline crate cache is a pure function of Cargo.lock, so this is reproducible. FORCE_GEN=1
-  # to regenerate anyway.
-  echo "==> reusing existing packaging/flatpak/cargo-sources.json (FORCE_GEN=1 to regenerate)"
 else
-  echo "==> generating offline cargo-sources.json from Cargo.lock"
-  GEN=/tmp/flatpak-cargo-generator.py
-  if [ ! -f "$GEN" ]; then
-    GEN_URL="https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/737c0085912f9f7dabf9341d4608e2a77a51a73a/cargo/flatpak-cargo-generator.py"
-    GEN_SHA256="b373c8ab1a05378ec5d8ed0645c7b127bcec7d2f7a1798694fbc627d570d856c"
-    curl -fsSL -o "${GEN}.download" "$GEN_URL"
-    printf '%s  %s\n' "$GEN_SHA256" "${GEN}.download" | sha256sum --check --status
-    mv "${GEN}.download" "$GEN"
+  # Default: cargo stays offline (CARGO_NET_OFFLINE=true), fetching every crate from the
+  # cargo-sources.json archive flatpak-builder feeds it. The manifest no longer hardcodes the
+  # flag so the ONLINE override above actually takes effect.
+  EXTRA_ARGS+=(--build-args=--env=CARGO_NET_OFFLINE=true)
+  if [ -f packaging/flatpak/cargo-sources.json ] && [ "${FORCE_GEN:-0}" != "1" ]; then
+    # Reuse a cargo-sources.json that was generated elsewhere (e.g. on a dev box with network +
+    # python aiohttp/toml, then rsynced to a build host that lacks them  -  like the Deck). The
+    # offline crate cache is a pure function of Cargo.lock, so this is reproducible. FORCE_GEN=1
+    # to regenerate anyway.
+    echo "==> reusing existing packaging/flatpak/cargo-sources.json (FORCE_GEN=1 to regenerate)"
+  else
+    echo "==> generating offline cargo-sources.json from Cargo.lock"
+    GEN=/tmp/flatpak-cargo-generator.py
+    if [ ! -f "$GEN" ]; then
+      GEN_URL="https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/737c0085912f9f7dabf9341d4608e2a77a51a73a/cargo/flatpak-cargo-generator.py"
+      GEN_SHA256="b373c8ab1a05378ec5d8ed0645c7b127bcec7d2f7a1798694fbc627d570d856c"
+      curl -fsSL -o "${GEN}.download" "$GEN_URL"
+      printf '%s  %s\n' "$GEN_SHA256" "${GEN}.download" | sha256sum --check --status
+      mv "${GEN}.download" "$GEN"
+    fi
+    # Needs python3 + aiohttp + tomlkit. On a host that lacks them (e.g. the Deck), generate on the
+    # Mac / a dev box instead and rsync the result next to the manifest (reused by the branch above).
+    python3 "$GEN" Cargo.lock -o packaging/flatpak/cargo-sources.json
   fi
-  # Needs python3 + aiohttp + tomlkit. On a host that lacks them (e.g. the Deck), generate on the
-  # Mac / a dev box instead and rsync the result next to the manifest (reused by the branch above).
-  python3 "$GEN" Cargo.lock -o packaging/flatpak/cargo-sources.json
 fi
 
 # --- build into a local ostree repo, then export a single-file bundle --------------------
 echo "==> flatpak-builder ($APP_ID, version $VERSION, arch $ARCH)"
-# --default-branch=stable matches CI / the hosted repo ref, so a locally-built install can also
 # A hosted remote can use the stable branch; local builds keep the same default branch.
 "${FPB[@]}" --user --force-clean --disable-rofiles-fuse \
+  --delete-build-dirs \
   --default-branch=stable \
   --arch="$ARCH" \
   --install-deps-from=flathub \

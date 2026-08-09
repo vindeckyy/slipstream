@@ -3,20 +3,18 @@ title: Updating the Host
 description: How to see when a newer Slipstream host is available, the web console's update card, and the update command for every install method.
 ---
 
-The web console tells you when a newer host is out. The **Host** page has an **Updates** card
-showing the version you run, the channel you follow (stable or canary), how this host was
-installed, and, once a newer release exists, the exact command that updates it. The
-"update available" state also fires an `update.available` event on the host
-[event stream](/docs/automation), and a successful update fires `update.applied` (with `from`
-and `to`) once the host is back up, so hooks and scripts can react to both.
+The **Host** page has an **Updates** card showing the installed version, channel, install method,
+and the command appropriate for that installation. The public project does not currently publish
+a signed update manifest. Without an operator-managed feed, the card reports that no release has
+been published instead of claiming the host is current.
 
 Your channel comes from the repository this host installs from, see
 [Release Channels](/docs/channels) for what each track means and how to move a host between
 them. The Updates card never switches channels for you.
 
-The check is a small signed manifest the host fetches from the Slipstream release feed and
-verifies against keys built into the host itself, a tampered or replayed feed is rejected, and
-the console will tell you when a check failed rather than silently showing stale facts.
+Operators can set `SLIPSTREAM_UPDATE_FEED` to an HTTPS endpoint that serves the signed channel
+manifests. The host verifies those manifests against its built-in keys and rejects tampered or
+replayed data.
 
 ## Updating, per install method
 
@@ -26,9 +24,9 @@ The console shows the right one of these automatically; for reference:
 |---|---|
 | Ubuntu (apt) | rebuild/install a newer `.deb`, or `sudo apt install --only-upgrade slipstream-host` if you mirror packages locally |
 | Fedora (dnf) | rebuild/install a newer RPM, or `sudo dnf upgrade slipstream` if you mirror packages locally |
-| Bazzite sysext (recommended) | `sudo slipstream-sysext update` |
+| Bazzite sysext (recommended) | install a newer local image with `sudo slipstream-sysext update --from-file <image.raw>`, or configure a private feed |
 | Bazzite / Fedora Atomic rpm-ostree layer | see below, `rpm-ostree upgrade` alone is not enough (staged, reboot to finish) |
-| Arch / CachyOS (pacman) | `sudo pacman -Syu` (a normal full system upgrade) |
+| Arch / CachyOS (pacman) | build a newer package and install it with `sudo pacman -U <package>`, or use `sudo pacman -Syu` with a configured repository |
 | Steam Deck (on-device build) | `bash ~/slipstream/scripts/steamdeck/update.sh --pull` |
 | NixOS (flake) | `nix flake update slipstream` in your flake directory, then rebuild your system |
 
@@ -115,7 +113,7 @@ lands in `~/.config/slipstream/logs/update-steamos.log`.
 ## Updating a client
 
 This page is about the host. The Android preview is updated by downloading the latest APK from
-GitHub Releases. The Decky panel has its own **Update** button on a Steam Deck. The per-platform table is in
+GitHub Releases. Decky and Flatpak bundles are updated by reinstalling a newer package. The per-platform table is in
 [Install a Client -> Keeping a client up to date](/docs/install-client#keeping-a-client-up-to-date).
 A host and a client don't have to be on the same version, but keeping them close is the least
 surprising.

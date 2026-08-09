@@ -1,9 +1,8 @@
 Wire-compatible with X.Y.x — existing pairings and clients keep working. <one sentence on how
 older/newer clients negotiate or fall back, so nobody fears updating.>
 
-<Optional: one or two sentences naming the headline change of this release — this whole lead-in
-(everything above the first `##`) is what the Discord #releases embed shows, so make it read as a
-standalone summary.>
+<Optional: one or two sentences naming the headline change of this release. Everything above the
+first `##` appears at the top of the release page, so make it a standalone summary.>
 
 ## Highlights
 

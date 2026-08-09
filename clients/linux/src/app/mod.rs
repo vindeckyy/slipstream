@@ -1,5 +1,4 @@
-//! The application shell as a relm4 component tree (phase 5 of slipstream-planning
-//! `linux-client-rearchitecture.md`): [`AppModel`] owns the window, navigation, trust
+//! The application shell is a relm4 component tree. [`AppModel`] owns the window, navigation, trust
 //! gate, and the spawned session child's lifecycle; the hosts page is a child component
 //! ([`crate::ui_hosts`]); dialogs (trust, settings, library) are plain GTK invoked from
 //! `update`. Every stream runs in the `slipstream-session` Vulkan binary — the shell
@@ -9,7 +8,7 @@ pub(crate) mod cli;
 pub(crate) mod shortcuts;
 pub(crate) mod spawn;
 
-use crate::app::spawn::{self, SpawnOpts};
+use crate::app::spawn::SpawnOpts;
 use crate::trust::{self, Settings};
 use crate::ui::hosts::{ConnectRequest, HostsMsg, HostsOutput, HostsPage};
 use adw::prelude::*;

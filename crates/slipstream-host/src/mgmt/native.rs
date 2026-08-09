@@ -39,7 +39,7 @@ pub(crate) struct ArmNativePairing {
 #[derive(Serialize, ToSchema)]
 pub(crate) struct NativeClient {
     /// The name the client supplied when pairing.
-    #[schema(example = "Living Room iPad")]
+    #[schema(example = "Living Room Tablet")]
     name: String,
     /// Hex SHA-256 of the client certificate — its stable id here.
     fingerprint: String,

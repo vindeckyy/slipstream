@@ -12,10 +12,9 @@ flagged explicitly. For the higher-level packaging rationale ("why not Flatpak",
 > NVENC, from RPM Fusion **nonfree**), `opus`, and `libei`.
 > Source: `packaging/README.md`, `packaging/rpm/slipstream.spec`.
 
-> ⚠️ **COPR note (Path C only).** The legacy layering path's commands reference a COPR project
-> named `enricobuehler/slipstream` that is operator-run and may not be published (see
-> `packaging/copr/README.md`); prefer a local RPM from `../rpm/README.md` or a GitHub Release
-> asset. Paths A (sysext) and B (bootc) don't involve the COPR at all.
+> **COPR note (Path C only).** No public COPR is assumed. Use a local RPM from
+> `../rpm/README.md` or a GitHub Release asset when one is attached. Paths A (sysext) and B
+> (bootc) do not involve COPR.
 
 ---
 
@@ -25,7 +24,7 @@ There are three paths on Bazzite, driven by different files in `packaging/`:
 
 | Path | Driven by | What it does | Best for |
 |---|---|---|---|
-| **A - systemd-sysext** ✅ recommended | `packaging/bazzite/slipstream-sysext.sh` + `build-sysext.sh` (published by `GitHub Actions`) | Overlays the host onto `/usr` as a system extension - no layering, no reboot, one-command updates | Everyone; the default |
+| **A - systemd-sysext** | `packaging/bazzite/slipstream-sysext.sh` + `build-sysext.sh` | Overlays the host onto `/usr` as a system extension, with no layering or reboot | Operators with a local image or configured feed |
 | **B - bootc / OCI image** | `packaging/bootc/Containerfile` | Bakes slipstream into a `FROM bazzite-nvidia` image once; you `bootc switch` any number of hosts onto it | Fleets, reproducible appliances, no per-host drift |
 | **C - rpm-ostree layering** (legacy) | `packaging/rpm/` + a local RPM | Layers the `slipstream` RPM onto your deployment with `rpm-ostree install` | Only if you specifically want the RPM database to own the files |
 
@@ -36,26 +35,34 @@ is one command with **no reboot** (layering needs one per update). It's the mech
 Atomic maintainers ship via [fedora-sysexts](https://fedora-sysexts.github.io/). All paths require
 the **same first-run setup** (sections 3-6).
 
-### Path A - systemd-sysext (recommended)
+### Path A - systemd-sysext
 
 Run on the Bazzite host:
 
 ```sh
 # One-time bootstrap; afterwards the tool is on PATH as `slipstream-sysext` (it ships inside
-# the image). `--channel canary` for rolling main-branch builds instead of releases.
+# the image).
 curl -fsSLO https://raw.githubusercontent.com/vindeckyy/slipstream/main/packaging/bazzite/slipstream-sysext.sh
-sudo bash slipstream-sysext.sh install
+
+# Install a locally built image:
+sudo bash slipstream-sysext.sh install --from-file ./slipstream.raw
+
+# Or install from a feed you run yourself (replace the registry URL):
+sudo env SLIPSTREAM_SYSEXT_REGISTRY=https://your-host.example/slipstream-sysext \
+  bash slipstream-sysext.sh install
 ```
 
-This installs from a sysext feed when configured (host + tray + **web console**,
-SHA-256-verified against a signed manifest), or use `--from-file` with a locally built image.
-installs it as `/var/lib/extensions/slipstream.raw`, merges it, and immediately applies what the
+This installs from a configured sysext feed (host + tray + **web console**, SHA-256-verified
+against a signed manifest) or from a locally built image. It writes
+`/var/lib/extensions/slipstream.raw`, merges it, and immediately applies what the
 RPM scriptlets would have (udev reload, sysctl) plus the two `/etc` files a sysext can't carry
 (the gamescope-session drop-in and the tray autostart entry, staged under
 `/usr/share/slipstream/etc/`). No reboot at any point. Day-2:
 
 ```sh
-sudo slipstream-sysext update    # fetch + merge the newest build (then restart the user service)
+sudo slipstream-sysext update --from-file ./slipstream.raw  # merge a newer local build
+sudo env SLIPSTREAM_SYSEXT_REGISTRY=https://packages.example.com/slipstream-sysext \
+  slipstream-sysext update      # fetch from a configured feed
 sudo slipstream-sysext status    # merged?, installed vs latest, channel/feed
 sudo slipstream-sysext remove    # unmerge + delete; ~/.config/slipstream is left alone
 ```
@@ -73,7 +80,7 @@ Details worth knowing:
 - The image embeds `ID=fedora` + `VERSION_ID` (matched through Bazzite's `ID_LIKE`), so after a
   **major Bazzite rebase** (F43 → F44) the old image is **refused** instead of merging
   soname-broken binaries - `slipstream-sysext update` then fetches the image built for the new
-  base (feeds exist per Fedora major, from the same CI matrix as the RPM groups).
+  base. An operator-managed feed must provide an image for each supported Fedora major.
 - SELinux labels are baked into the image at build time (squashfs pseudo-xattrs computed from
   the targeted policy) - without them udev couldn't read the gamepad rule under enforcing.
   Validated live on Bazzite 43.
@@ -113,12 +120,8 @@ rpm-ostree install \
   https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
   https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
 
-# 2. Enable the slipstream COPR repo  ⚠️ requires the COPR to be published (see callout above)
-sudo wget -O /etc/yum.repos.d/_copr_slipstream.repo \
-  https://copr.fedorainfracloud.org/coprs/enricobuehler/slipstream/repo/fedora-$(rpm -E %fedora)/
-
-# 3. Layer slipstream and reboot to activate the new deployment.
-rpm-ostree install slipstream
+# 2. Build or download the host and web RPMs, then layer the local files.
+rpm-ostree install ./slipstream-*.rpm ./slipstream-web-*.rpm
 systemctl reboot
 ```
 
@@ -349,8 +352,7 @@ sudo firewall-cmd --reload
 control port (UDP 9777) + mDNS + the mgmt/library API (TCP 47990, HTTPS + mTLS). Enable both if the
 host runs `serve --gamestream` (both planes). The
 per-port breakdown below is for reference (or for opening ports by hand); the ports are the code
-constants (`crates/slipstream-host/src/gamestream/mod.rs`, `mgmt.rs`) and the GameStream-host port-map
-(slipstream-planning: `gamestream-host-plan.md`).
+constants (`crates/slipstream-host/src/protocol/gamestream/mod.rs`, `crates/slipstream-host/src/mgmt.rs`).
 
 **GameStream / Moonlight ports** (fixed; Moonlight derives them from the HTTP base). These only apply
 when the host runs `serve --gamestream` (the bundled unit's default); on a bare-`serve` native-only
@@ -506,8 +508,8 @@ Debian/Ubuntu - the host links system FFmpeg/PipeWire and won't build there), pe
 `packaging/README.md`:
 
 ```sh
-git archive --format=tar.gz --prefix=slipstream-0.3.0/ \
-  -o ~/rpmbuild/SOURCES/slipstream-0.3.0.tar.gz HEAD    # 0.3.0 = the spec's default version
+git archive --format=tar.gz --prefix=slipstream-0.23.0/ \
+  -o ~/rpmbuild/SOURCES/slipstream-0.23.0.tar.gz HEAD    # 0.23.0 = the spec's default version
 rpmbuild -ba packaging/rpm/slipstream.spec    # needs the spec's BuildRequires + RPM Fusion
 ```
 

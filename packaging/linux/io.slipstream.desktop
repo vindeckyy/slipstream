@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Slipstream
-Comment=Stream a remote slipstream host
+Comment=Stream games from a remote Slipstream host
 Exec=slipstream-client %u
 Icon=io.slipstream
 Terminal=false

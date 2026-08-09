@@ -61,7 +61,7 @@
 
   <!-- Bump on each release; the version/date should track the published bundle. -->
   <releases>
-    <release version="0.0.1" date="2026-06-15">
+    <release version="0.23.0" date="2026-08-09">
       <description>
         <p>Initial flatpak packaging of the native Linux client for the Steam Deck and Wayland desktops.</p>
       </description>

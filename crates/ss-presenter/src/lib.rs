@@ -1,5 +1,5 @@
-//! The Vulkan session presenter (slipstream-planning `linux-client-rearchitecture.md`,
-//! Phase 1): an SDL3 window + ash swapchain that presents the shared session pump's
+//! The Vulkan session presenter: an SDL3 window and ash swapchain that present the shared
+//! session pump's
 //! decoded frames, captures input on the `ui_stream` state-machine contract, and reports
 //! the unified stats window on stdout. No UI toolkit anywhere in the dependency tree.
 //!

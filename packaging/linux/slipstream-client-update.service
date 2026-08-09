@@ -1,5 +1,5 @@
-# The client-triggered package update, as a root oneshot (planning:
-# host-update-from-web-console.md §7). Started — never enabled — by the unprivileged client via
+# The client-triggered package update, as a root oneshot. Started but never enabled by the
+# unprivileged client via
 # `systemctl start slipstream-client-update.service` (which is what `slipstream-client
 # --apply-update`, and so the Decky plugin's one-tap update, runs), authorised by the polkit
 # rule (49-slipstream-client-update.rules) for members of the `slipstream-update` group. systemd

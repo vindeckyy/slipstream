@@ -3,7 +3,7 @@ Type=Application
 Name=slipstream host status
 Comment=Tray icon showing the slipstream host service status
 # --autostart exits silently unless this user actually runs a host (~/.config/slipstream exists or
-# the slipstream-host user unit is enabled) — the package installs this for every desktop user.
+# the slipstream-host user unit is enabled). The package installs this for every desktop user.
 Exec=/usr/bin/slipstream-tray --autostart
 Icon=slipstream-tray
 # Autostart-only: not a launcher entry (launch it from a terminal as `slipstream-tray` if wanted).

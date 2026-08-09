@@ -1,6 +1,4 @@
-//! Shared, UI-agnostic client plumbing, extracted verbatim from the GTK client
-//! (design: slipstream-planning `linux-client-rearchitecture.md`, Phase 0) so the desktop
-//! shells and the Vulkan session binary build on one Linux implementation.
+//! Shared, UI-agnostic client plumbing used by the desktop shells and Vulkan session binary.
 //!
 //! Nothing here may depend on a UI toolkit: the presenter contract is `session`'s
 //! channels (`SessionHandle`) and `video`'s `DecodedImage` (RGBA bytes, dmabuf fds +

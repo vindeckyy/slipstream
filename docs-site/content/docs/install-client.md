@@ -12,8 +12,8 @@ found on the network](/docs/troubleshooting#the-host-isnt-found-on-the-network).
 Already installed? Skip to [Keeping a client up to date](#keeping-a-client-up-to-date) or
 [Removing a client](#removing-a-client).
 
-> The Android link below is the current preview channel. Host releases and future stable client
-> channels are published from version tags. See
+> The Android link below is the current preview channel. Tagged releases currently publish Linux
+> host artifacts; client packages use separate distribution paths. See
 > [Release Channels](/docs/channels).
 
 ## Pick your device
@@ -28,8 +28,10 @@ Already installed? Skip to [Keeping a client up to date](#keeping-a-client-up-to
 
 The Android client is currently distributed as a preview APK. Sideload the
 [Android APK](https://github.com/vindeckyy/slipstream/releases/download/android-preview/slipstream-android.apk)
-or build from `clients/android/`. Download the accompanying checksum and verify it before copying
-the APK to the tablet, then allow installs from your browser or file manager the first time.
+or build from `clients/android/`. Download the accompanying
+[checksum](https://github.com/vindeckyy/slipstream/releases/download/android-preview/slipstream-android.apk.sha256)
+and verify it before copying the APK to the tablet, then allow installs from your browser or file
+manager the first time.
 
 ```sh
 sha256sum -c slipstream-android.apk.sha256
@@ -54,10 +56,8 @@ stream **without dropping to the desktop**. Follow the **[Steam Deck (Decky) gui
 , it walks through Decky Loader, the plugin, and the one-time client install.
 
 > The plugin doesn't decode video itself, it drives the Flatpak `slipstream-client` installed on
-> the Deck. If your client isn't one the plugin can update for you (a sysext, a nix profile, a source
-> build), the panel shows you the update command instead of an **Update** button. The Gaming Mode
-> panel comes from the plugin, so a client on its own won't add it. The Decky guide covers installing
-> both, so start there.
+> the Deck. Public client packages are updated manually using the steps below. The Gaming Mode panel
+> comes from the plugin, so a client on its own won't add it. The Decky guide covers installing both.
 
 For **Desktop Mode** (or to add the client to Game Mode as a non-Steam app yourself), install the
 Flatpak; it carries its own libadwaita + SDL3 and survives SteamOS updates:
@@ -79,15 +79,15 @@ connects over GameStream with no slipstream-specific software. See
 
 ## Keeping a client up to date
 
-Every platform is released from one tag. A client and a host don't have to be on the same version,
-but keeping them close is the least surprising. (Updating the **host** is its own page:
+The host and clients use separate release channels. A client and a host don't have to be on the
+same version, but keeping them close is the least surprising. (Updating the **host** is its own page:
 [Updating](/docs/updating).)
 
 | Client | How it updates |
 |---|---|
 | **Android** | Download the current preview APK from GitHub Releases and install it over the existing app |
-| **Steam Deck (Decky)** | the panel's **Update** button, see [Steam Deck -> Updating](/docs/steam-deck#updating) |
-| **Steam Deck (Flatpak alone)** | `flatpak update --user io.slipstream.Slipstream`, **without `sudo`** |
+| **Steam Deck (Decky)** | Install a newer packaged zip from a reachable URL, see [Steam Deck -> Updating](/docs/steam-deck#updating) |
+| **Steam Deck (Flatpak alone)** | Download the newer `.flatpak` bundle and reinstall it with `flatpak install --user --bundle`, without `sudo` |
 
 ## Removing a client
 

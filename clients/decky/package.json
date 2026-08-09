@@ -1,6 +1,6 @@
 {
   "name": "slipstream-decky",
-  "version": "0.0.1",
+  "version": "0.23.0",
   "packageManager": "pnpm@10.12.4",
   "description": "SteamOS / Steam Deck Gaming-Mode launcher for the Slipstream streaming client.",
   "type": "module",
@@ -8,9 +8,9 @@
     "build": "rollup -c",
     "watch": "rollup -c -w",
     "typecheck": "tsc --noEmit --skipLibCheck",
-    "package": "pnpm build && bash scripts/package.sh",
+    "package": "rollup -c && bash scripts/package.sh",
     "deploy": "bash scripts/deploy.sh",
-    "test": "pnpm typecheck"
+    "test": "tsc --noEmit --skipLibCheck"
   },
   "keywords": [
     "decky",

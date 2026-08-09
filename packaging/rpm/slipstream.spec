@@ -18,11 +18,11 @@
 
 Name:           slipstream
 # Version/Release are overridable so CI can stamp a rolling snapshot: a canary main build passes
-#   --define "ss_version 0.3.0" --define "ss_release 0.ci42.gdeadbee"
+#   --define "ss_version 0.23.0" --define "ss_release 0.ci42.gdeadbee"
 # (Release starting "0." sorts BEFORE the eventual "1" release; the canary base stays one minor
 # ahead of the latest stable), a vX.Y.Z release tag passes the clean version with "ss_release 1".
-# A plain `rpmbuild` (or COPR) with no defines builds 0.3.0-1.
-Version:        %{?ss_version}%{!?ss_version:0.3.0}
+# A plain `rpmbuild` (or COPR) with no defines builds 0.23.0-1.
+Version:        %{?ss_version}%{!?ss_version:0.23.0}
 Release:        %{?ss_release}%{!?ss_release:1}%{?dist}
 Summary:        Low-latency desktop/game streaming host (Moonlight-compatible + slipstream/1)
 
@@ -305,8 +305,8 @@ sed -i 's#%h/slipstream/target/release/slipstream-host#%{_bindir}/slipstream-hos
 # the operator copies it into ~/.config/systemd/user/slipstream-host.service.d/ when they want it.
 install -Dm0644 scripts/slipstream-host-desktop-session.conf %{buildroot}%{_datadir}/%{name}/slipstream-host-desktop-session.conf
 
-# Install-kind + channel marker, read by the host's update-check surface (planning:
-# host-update-from-web-console.md §4.1). `ss_channel` is defined by build-rpm.sh (canary
+# Install-kind + channel marker, read by the host's update-check surface. `ss_channel` is defined
+# by build-rpm.sh (canary
 # when the release override starts `0.ci`); a plain local rpmbuild is stable.
 printf 'dnf %{?ss_channel}%{!?ss_channel:stable}\n' > %{buildroot}%{_datadir}/%{name}/install-kind
 
@@ -397,7 +397,7 @@ install -Dm0755 packaging/bazzite/kde-desktop-setup.sh %{buildroot}%{_datadir}/%
 # packages when the BASE changes, so a frozen Bazzite base pins slipstream forever. The script
 # forces a re-resolve of just this layer (--uninstall + --install of the same names in one
 # transaction). It is exactly the command ss-update-check hands an rpm-ostree host
-# (`sudo /usr/share/slipstream/update-slipstream.sh`, crates/ss-update-check/src/detect.rs), so it
+# (`sudo /usr/share/slipstream/update-slipstream.sh`, crates/ss-update-check/src/check/detect.rs), so it
 # has to exist at that path  -  an ostree box has no repo checkout to run it from. It only shells
 # out to rpm-ostree/rpm/systemctl, so the installed copy is self-contained. Top level, not
 # bazzite/, because the hint (and any Fedora-Atomic host) names that path.
@@ -597,6 +597,8 @@ echo "then enable the runner: systemctl --user enable --now slipstream-scripting
 %endif
 
 %changelog
+* Sat Aug 09 2026 slipstream <packages@unom.io> - 0.23.0-1
+- Public release: packaged host, Decky plugin, Flatpak client, updated RPM layout.
 * Fri Jul 17 2026 slipstream <packages@unom.io> - 0.0.1-3
 - Add slipstream-scripting subpackage (plugin/script runner, --with scripting; bun-bundled Effect SDK).
 * Mon Jun 15 2026 slipstream <packages@unom.io> - 0.0.1-2

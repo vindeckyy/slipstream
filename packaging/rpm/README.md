@@ -86,21 +86,16 @@ udev/group, `host.env`, the Steam session unit, firewall, verify.)
 
 ## Updates
 
-```sh
-rpm-ostree upgrade            # pulls the newest slipstream with the system update
-systemctl reboot             # rpm-ostree changes apply on reboot
-```
-
-Layered packages are re-resolved against their repos on every `rpm-ostree upgrade`, so the box
-tracks new builds automatically (Bazzite's auto-update timer does this for you). To pin or stop
-tracking: `rpm-ostree override` / `rpm-ostree uninstall slipstream`.
+There is no public RPM repository. Build or download newer RPM files, install them with the same
+`rpm-ostree install` command, and reboot. A privately configured RPM repository can participate in
+normal `rpm-ostree upgrade` transactions.
 
 ## Build an RPM locally
 
 ```sh
-PF_VERSION=0.0.1 bash packaging/rpm/build-rpm.sh                # host + client
-PF_VERSION=0.0.1 PF_WITH_WEB=1 bash packaging/rpm/build-rpm.sh  # + slipstream-web (needs bun on PATH)
-# -> dist/slipstream-0.0.1-1.fcNN.x86_64.rpm  (+ slipstream-web-0.0.1-1.fcNN.x86_64.rpm with PF_WITH_WEB=1;
+PF_VERSION=0.23.0 bash packaging/rpm/build-rpm.sh                # host + client
+PF_VERSION=0.23.0 PF_WITH_WEB=1 bash packaging/rpm/build-rpm.sh  # + slipstream-web (needs bun on PATH)
+# -> dist/slipstream-0.23.0-1.fcNN.x86_64.rpm  (+ slipstream-web-0.23.0-1.fcNN.x86_64.rpm with PF_WITH_WEB=1;
 #    the web subpackage vendors a bun binary, so it's arch-specific, not noarch)
 ```
 
@@ -109,10 +104,10 @@ Run it inside the Fedora 43 builder image so the deps resolve and match Bazzite:
 ```sh
 docker build -f ci/fedora-rpm.Dockerfile -t slipstream-fedora-rpm ci
 docker run --rm -v "$PWD:/src" -w /src slipstream-fedora-rpm \
-  bash -lc 'git config --global --add safe.directory /src && PF_VERSION=0.0.1 bash packaging/rpm/build-rpm.sh'
+  bash -lc 'git config --global --add safe.directory /src && PF_VERSION=0.23.0 bash packaging/rpm/build-rpm.sh'
 ```
 
-A plain `rpmbuild`/COPR build with no `ss_version`/`ss_release` defines produces `0.3.0-1` (the
+A plain `rpmbuild`/COPR build with no `ss_version`/`ss_release` defines produces `0.23.0-1` (the
 spec defaults).
 
 ### aarch64 - the client RPM
@@ -129,8 +124,8 @@ arm64 machine (or an emulated arm64 container, which is very slow):
 docker build --platform linux/arm64 -f ci/fedora-rpm.Dockerfile -t slipstream-fedora-rpm-arm64 ci
 docker run --rm --platform linux/arm64 -v "$PWD:/src" -w /src slipstream-fedora-rpm-arm64 \
   bash -lc 'git config --global --add safe.directory /src && \
-            PF_VERSION=0.0.1 PF_WITHOUT_HOST=1 bash packaging/rpm/build-rpm.sh'
-# -> dist/slipstream-client-0.0.1-1.fcNN.aarch64.rpm
+            PF_VERSION=0.23.0 PF_WITHOUT_HOST=1 bash packaging/rpm/build-rpm.sh'
+# -> dist/slipstream-client-0.23.0-1.fcNN.aarch64.rpm
 ```
 
 `PF_WITHOUT_HOST=1` works on x86_64 too, if you only want the client RPM. The flag is orthogonal

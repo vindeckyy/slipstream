@@ -1,9 +1,7 @@
 # slipstream-session
 
-The Vulkan session binary: one stream per invocation in an SDL3 window - no UI toolkit,
-no widgets, terminal stats. The power-user / gamescope stream client, and the stage-2
-presenter of the Linux client re-architecture (slipstream-planning:
-`linux-client-rearchitecture.md`).
+The Vulkan session binary runs one stream per invocation in an SDL3 window, with no UI toolkit or
+widgets. It provides terminal statistics and serves as the power-user and gamescope client.
 
 This binary is deliberately dumb: a renderer the front-ends call INTO - the GTK shell
 (`slipstream-client`) and the `slipstream` CLI spawn it through the

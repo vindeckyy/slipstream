@@ -77,7 +77,7 @@ assets are attached, then install it:
 ```sh
 git clone https://github.com/vindeckyy/slipstream.git && cd slipstream
 # Build (needs dpkg-dev). Prefer the noble+BUNDLE_FFMPEG path for a 24.04-26.04-compatible host:
-# VERSION=0.0.1 BUNDLE_FFMPEG=1 bash packaging/debian/build-deb.sh
+# VERSION=0.23.0 BUNDLE_FFMPEG=1 bash packaging/debian/build-deb.sh
 # Or follow packaging/debian/README.md for the Docker build that CI uses.
 sudo apt install ./dist/slipstream-host_*.deb
 ```

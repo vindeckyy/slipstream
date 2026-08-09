@@ -39,15 +39,11 @@ You need **[Decky Loader](https://decky.xyz/)** and the **`io.slipstream.Slipstr
 read-only, so the flatpak (which bundles libadwaita/SDL3) is the canonical client. Discovery uses
 `avahi-browse`, which ships on SteamOS/Bazzite.
 
-**Recommended - install from URL**: in Decky → Settings → **Developer Mode** →
-**Install Plugin from URL**, paste a URL to a `slipstream.zip` you built (`pnpm run package`) or
+**Recommended - install from URL**: in Decky -> Settings -> **Developer Mode** ->
+**Install Plugin from URL**, paste a URL to `slipstream-v<version>.zip` built by `pnpm run package` or
 downloaded from [GitHub Releases](https://github.com/vindeckyy/slipstream/releases) when attached.
-For local development, use `pnpm run deploy` instead. The plugin can **self-update** when you publish
-a feed it knows about, without
-the Decky store - when a newer build exists, an **Update** button appears and drives Decky
-Loader's own (SHA-256-verified) install. Installs and updates can take a couple of minutes on some
-networks: Decky's installer also contacts its plugin store first, which may be slow or blackholed
-before the actual download proceeds.
+For local development, use `pnpm run deploy` instead. The repository does not currently publish a
+Decky update feed, so install a newer zip through the same **Install Plugin from URL** screen.
 
 ### Updating the client
 
@@ -57,16 +53,13 @@ kind so the answer is never a mystery:
 
 | Install | Update |
 | --- | --- |
-| **Flatpak** (the usual Deck client) | One tap. `flatpak update --user io.slipstream.Slipstream` - a per-user install, which is why `sudo flatpak update` never touches it. |
-| **.deb / .rpm** (and rpm-ostree, which stages for the next reboot) | One tap, *after* an explicit opt-in: `sudo usermod -aG slipstream-update $USER`. The tap starts a fixed, parameterless root oneshot (`slipstream-client-update.service`) through polkit - nothing about the request is attacker-influenceable, and the payload comes from your distro's own signed repositories. |
-| **pacman** | Same, plus the root-owned `PACMAN_FULL_SYSUPGRADE=1` in `/etc/slipstream/update.conf` - a partial upgrade is against Arch doctrine, so the only thing the helper will run is a full `pacman -Syu`. |
-| **sysext, nix, a source build** | The plugin shows the command and stops. There is no feed behind those installs, and a button that can only fail is worse than one honest line. |
+| **Flatpak bundle** (the usual Deck client) | Download or build a newer bundle, then run `flatpak install --user --bundle <file>`. A configured Flatpak remote can use `flatpak update --user io.slipstream.Slipstream`. |
+| **.deb / .rpm / pacman** | Install a newer package manually, or update through the repository you configured. |
+| **sysext, nix, a source build** | Rebuild and reinstall through the same method used for the current client. |
 
-Whether a *newer* client exists is the client's own answer (`slipstream-client --check-update`),
-read from the Ed25519-signed per-channel manifest the host's update check already trusts -
-`SLIPSTREAM_UPDATE_CHECK=0` disables the check, `SLIPSTREAM_UPDATE_APPLY=0` keeps the check but
-never offers to install. A client too old to have that mode is reported as such rather than as
-up to date.
+With a signed update manifest configured, `slipstream-client --check-update` reports whether a
+newer native package exists. `SLIPSTREAM_UPDATE_CHECK=0` disables the check, while
+`SLIPSTREAM_UPDATE_APPLY=0` keeps the check but never offers to install.
 
 ## Build & sideload (development)
 
@@ -98,11 +91,10 @@ restart is required for an out-of-band install to appear.
 | `bin/slipstreamrun.sh` | The launch wrapper the Steam shortcut runs (so the window is focusable); maps `PF_LAUNCH`/`PF_BROWSE`/`PF_MGMT` to `--launch`/`--browse`/`--mgmt`. An older flatpak ignores the flags harmlessly (plain stream / hosts page). |
 | `main.py` | Backend: `discover` (via `avahi-browse`) / `pair` / `library` (headless flatpak `--library`, TSV) / pins store (`decky-pinned.json`) / settings / `kill_stream` / `check_update` (with an explicit CA-bundle search - Decky's embedded Python has no usable default TLS roots on SteamOS). |
 | `scripts/test-backend.py` | Stdlib-only checks for the backend's pure parsers (TSV, error classes, avahi TXT) + the pins round trip. |
-| `plugin.json` · `update.json` | Decky manifest; CI-baked update channel. |
+| `plugin.json` | Decky manifest. |
 
-## Limitations / next steps
+## Limitations
 
-- No manual "add host by IP" entry yet (discovery is mDNS-only).
 - No in-stream overlay inside the plugin - the client owns the session once launched.
 - Pairing needs the operator to **arm pairing on the host** so it shows the PIN; the plugin can't arm
   it remotely.

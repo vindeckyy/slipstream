@@ -1,6 +1,5 @@
-//! The shell↔session handoff: every stream runs in the spawned `slipstream-session`
-//! Vulkan binary (the legacy in-process presenter is gone — phase 5 of
-//! slipstream-planning `linux-client-rearchitecture.md`). What is left here is the
+//! The shell-to-session handoff: every stream runs in the spawned `slipstream-session`
+//! Vulkan binary. What is left here is the
 //! TRANSLATION: a [`ConnectRequest`] becomes a `ConnectPlan`, and the session's typed
 //! lifecycle events become the [`AppMsg`]s the relm4 app consumes — spinner until
 //! `{"ready":true}`, banner from the `{"error"|"ended": …}` line, exit code 3 +

@@ -6,8 +6,7 @@ set. An HDR game therefore reaches every capture consumer already tone-mapped do
 why the slipstream gamescope backend has always streamed 8-bit, even though games *can* render
 HDR on a headless gamescope today (`--hdr-enabled --hdr-debug-force-support`).
 
-The patches here add the missing half, and nothing else. See
-`slipstream-planning/design/gamescope-hdr-virtual-output.md` for the full design.
+The patches here add the missing capture path and no unrelated behavior.
 
 | Patch | What | Upstream? |
 |---|---|---|
@@ -125,8 +124,8 @@ must not be decided twice.
 
 | Channel | Built by | Notes |
 |---|---|---|
-| Bazzite / Fedora Atomic | `GitHub Actions` → `build-sysext.sh --gamescope` | Inside the matching Fedora container, per major - the binary is soname-coupled to its base exactly like the RPM |
-| Arch / SteamOS | `GitHub Actions` → `makepkg` on `./PKGBUILD` | Its own pkgbase in the same pacman repo; `pacman -S slipstream-gamescope` |
+| Bazzite / Fedora Atomic | `build-sysext.sh --gamescope` | Run inside the matching Fedora container, per major. The binary is soname-coupled to its base exactly like the RPM. |
+| Arch / SteamOS | `makepkg` on `./PKGBUILD` | Its own pkgbase for a pacman repository; install with `pacman -S slipstream-gamescope`. |
 | NixOS | `packaging/nix/gamescope.nix` (an `overrideAttrs` on nixpkgs' gamescope) | The one path that does NOT call the script - nixpkgs already solves the submodules, and a nix closure names every library it links |
 | Anything else | the script, by hand | See *Building* above |
 

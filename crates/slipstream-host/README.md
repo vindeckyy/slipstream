@@ -84,6 +84,5 @@ src/
 ## Related
 
 - **[`slipstream-core`](../slipstream-core/README.md)** - the shared protocol · FEC · crypto core
-- **[Clients](../../clients/)** - the apps that connect (Apple · Linux · Android · probe)
+- **[Clients](../../clients/)** - the supported Android and Linux clients, plus protocol probes
 - **[Packaging](../../packaging/README.md)** & **[docs](../../docs-site/content/docs/)** - install & operate
-- **slipstream-planning** (internal planning repo) - architecture rationale and deep-dive plans

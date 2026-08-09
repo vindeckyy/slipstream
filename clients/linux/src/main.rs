@@ -1,8 +1,7 @@
 //! `slipstream-client` — the native Linux slipstream/1 desktop shell (relm4/libadwaita).
 //!
-//! Hosts, pairing/trust, settings, and the desktop library page; every stream (and the
-//! console game library) runs in the spawned `slipstream-session` Vulkan binary — the
-//! shell never touches video (slipstream-planning `linux-client-rearchitecture.md`).
+//! Hosts, pairing, trust, settings, and the desktop library page. Every stream runs in the
+//! spawned `slipstream-session` Vulkan binary; the shell never touches video.
 #![forbid(unsafe_code)]
 
 // The UI-agnostic plumbing lives in `ss-client-core`, shared with the session binary.
@@ -20,8 +19,6 @@ mod cli;
 // "Create shortcut…" — the desktop-entry writer (design/client-deep-links.md §5).
 #[cfg(target_os = "linux")]
 mod shortcuts;
-#[cfg(target_os = "linux")]
-mod spawn;
 #[cfg(target_os = "linux")]
 mod ui_hosts;
 #[cfg(target_os = "linux")]

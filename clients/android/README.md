@@ -89,9 +89,9 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
 ```
 
-The release artifact is a universal signed APK containing `arm64-v8a`, `armeabi-v7a`, and
-`x86_64`. The release workflow publishes a signed APK only when the signing key is configured in the
-protected release environment. Local builds remain sideload-only.
+The preview artifact is a universal APK containing `arm64-v8a`, `armeabi-v7a`, and `x86_64`.
+A release operator builds and uploads it to GitHub Releases. Local debug builds use the Android
+debug key and remain sideload-only.
 
 ## Related
 

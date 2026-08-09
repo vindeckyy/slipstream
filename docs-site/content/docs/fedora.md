@@ -1,6 +1,6 @@
 ---
 title: Fedora
-description: Install the Slipstream host on Fedora from the RPM registry.
+description: Build and install the Slipstream host RPM on Fedora.
 ---
 
 Install a Slipstream host on **Fedora** by building an RPM from this repo, or by installing a

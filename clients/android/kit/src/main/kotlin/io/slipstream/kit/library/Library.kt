@@ -173,7 +173,7 @@ fun mtlsHttpClient(certPem: String, keyPem: String, host: String, fpHex: String)
         .build()
 }
 
-/** Parse a PKCS#8 PEM private key (rcgen emits `-----BEGIN PRIVATE KEY-----`), trying EC then RSA/Ed25519. */
+/** Parse an unencrypted PKCS#8 PEM private key emitted by rcgen, trying EC then RSA/Ed25519. */
 private fun parsePrivateKey(pem: String): PrivateKey {
     val body = pem
         .replace(Regex("-----BEGIN [A-Z ]*PRIVATE KEY-----"), "")

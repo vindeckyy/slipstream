@@ -1,0 +1,4 @@
+# Exact historical false positives. New findings in these files remain visible.
+c583f83db7464e97941acc27d148589ca7e2562d:clients/android/kit/src/main/kotlin/io/slipstream/kit/library/Library.kt:private-key:176
+c583f83db7464e97941acc27d148589ca7e2562d:crates/slipstream-host/src/mgmt/tests.rs:generic-api-key:899
+7c2418336642bb6d5cc47d1ebf9d66ecb4728073:docs-site/content/docs/ci.md:generic-api-key:63

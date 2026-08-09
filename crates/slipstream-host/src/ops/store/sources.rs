@@ -18,22 +18,16 @@ pub(crate) const OFFICIAL_NAME: &str = "slipstream";
 
 /// The built-in source's index URL.
 ///
-/// Served straight out of the index repo over GitHub's anonymous raw endpoint: real HTTPS with a
-/// real certificate, no new vhost to stand up, and "merged to main" *is* "published". The document
-/// is signed, so the transport is not what we're trusting; swapping this for a dedicated static
-/// host later is a one-constant change with no protocol impact.
-///
-/// One consequence worth knowing: CI signs *after* the merge, so between a merge and the signature
-/// commit the index is newer than its `.sig`. That window fails **closed**: the signature check
-/// rejects the document and hosts keep serving their last good copy, marked stale.
+/// Served from this repository over GitHub's anonymous raw endpoint. The detached signature, not
+/// the transport location, establishes trust.
 pub(crate) const OFFICIAL_URL: &str =
-    "https://raw.githubusercontent.com/vindeckyy/slipstream-plugin-index/main/v1/index.json";
+    "https://raw.githubusercontent.com/vindeckyy/slipstream/main/plugin-index/v1/index.json";
 
 /// Pinned signing keys for the built-in source. **Two slots** so a key rotation is "sign with the
 /// new key, ship a host that trusts both, retire the old one" instead of a flag day where old
 /// hosts lose the catalog. An empty slot is ignored.
 pub(crate) const OFFICIAL_KEYS: [&str; 2] = [
-    "ed25519:V7KKMg8sq2A2TW7D/GFWaM0ruAvigpld9r93JdWcQHw=",
+    "ed25519:4qdKXPwXEgbU8Ck4BuxqF4D0L22V39uD3TaBwx1vRe0=",
     "", // rotation slot
 ];
 
@@ -237,6 +231,16 @@ mod tests {
         for k in OFFICIAL_KEYS.iter().filter(|k| !k.is_empty()) {
             PublicKey::parse(k).expect("compiled-in official key must parse");
         }
+    }
+
+    #[test]
+    fn published_index_signature_verifies() {
+        let bytes = include_bytes!("../../../../../plugin-index/v1/index.json");
+        let signature = include_str!("../../../../../plugin-index/v1/index.json.sig");
+        let keys = Source::official().keys();
+
+        super::super::index::verify_signature(bytes, signature, &keys)
+            .expect("published index signature must match the compiled-in key");
     }
 
     #[test]

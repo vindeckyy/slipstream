@@ -186,13 +186,13 @@ Install plugins only from sources you trust, and prefer Verified catalog entries
 
 ## Reporting a vulnerability
 
-Found a security issue? **Email [security@slipstream.com](mailto:security@slipstream.com).** Please
-don't open a public issue, pull request, or chat post for a suspected vulnerability. That exposes
-other users before a fix is available.
+Use GitHub's
+[private vulnerability report](https://github.com/vindeckyy/slipstream/security/advisories/new).
+Do not open a public issue or discussion for a suspected vulnerability.
 
 Helpful things to include:
 
-- The component and version, e.g. `slipstream-host 0.22.3`, and which client.
+- The component and version, e.g. `slipstream-host 0.23.0`, and which client.
 - The impact, and the attacker's position (same LAN, a paired client, a local service account,
   admin, ...).
 - Steps to reproduce, a proof-of-concept, or a crash/log if you have one.
