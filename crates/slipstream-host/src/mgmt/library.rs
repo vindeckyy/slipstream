@@ -151,6 +151,39 @@ pub(crate) async fn create_custom_game(
     }
 }
 
+/// Get one custom library entry (operator-only)
+///
+/// Returns the full stored `CustomEntry` including the `detect` and `prep` fields the shared
+/// catalog deliberately never serializes (they name local host paths and commands), so the
+/// console's edit form can round-trip them. 404 when the bare custom id is unknown; 409 when a
+/// provider owns the entry (edit it through its reconcile, not here).
+#[utoipa::path(
+    get,
+    path = "/library/custom/{id}",
+    tag = "library",
+    operation_id = "getCustomGame",
+    params(("id" = String, Path, description = "The custom entry id (without the `custom:` prefix)")),
+    responses(
+        (status = OK, description = "The stored manual entry", body = crate::library::CustomEntry),
+        (status = UNAUTHORIZED, description = "Missing or invalid bearer token", body = ApiError),
+        (status = NOT_FOUND, description = "No custom entry with that id", body = ApiError),
+        (status = CONFLICT, description = "Entry is owned by a provider", body = ApiError),
+    )
+)]
+pub(crate) async fn get_custom_game(Path(id): Path<String>) -> Response {
+    match crate::library::get_custom(&id) {
+        Some(entry) if entry.provider.is_some() => api_error(
+            StatusCode::CONFLICT,
+            &format!(
+                "entry is owned by provider `{}` — edit it through its reconcile",
+                entry.provider.as_deref().unwrap_or_default()
+            ),
+        ),
+        Some(entry) => Json(entry).into_response(),
+        None => api_error(StatusCode::NOT_FOUND, "no custom entry with that id"),
+    }
+}
+
 /// Update a custom library entry
 #[utoipa::path(
     put,

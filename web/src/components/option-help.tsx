@@ -1,5 +1,6 @@
 import { CircleHelp } from "lucide-react";
 import type { OptionHTMLAttributes, ReactNode } from "react";
+import { useId } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
 	Tooltip,
@@ -135,4 +136,180 @@ export function HelpOption({
 				: children
 			: children;
 	return <option {...props}>{label}</option>;
+}
+
+/** When a change to a setting takes effect. */
+export type SettingEffect =
+	| "immediate"
+	| "next-session"
+	| "next-connect"
+	| "restart-required";
+
+/** Localized label for one effect timing. */
+export function settingEffectLabel(effect: SettingEffect): string {
+	switch (effect) {
+		case "immediate":
+			return m.setting_effect_immediate();
+		case "next-session":
+			return m.setting_effect_next_session();
+		case "next-connect":
+			return m.setting_effect_next_connect();
+		case "restart-required":
+			return m.setting_effect_restart_required();
+	}
+}
+
+/** Small visible badge showing when a setting takes effect. */
+export function SettingEffectBadge({
+	effect,
+	className,
+}: {
+	effect: SettingEffect;
+	className?: string;
+}) {
+	return (
+		<Badge variant="outline" className={cn("font-normal", className)}>
+			{settingEffectLabel(effect)}
+		</Badge>
+	);
+}
+
+/** Accessibility attributes the control should spread onto the rendered input/select. */
+export type SettingControlA11y = {
+	"aria-describedby"?: string;
+	"aria-invalid"?: true;
+};
+
+export type SettingFieldProps = {
+	id?: string;
+	label: string;
+	hint?: ReactNode;
+	help?: string;
+	recommended?: ReactNode;
+	effect?: SettingEffect;
+	error?: string;
+	warning?: string;
+	disabledReason?: string;
+	group?: boolean;
+	children: (a11y: SettingControlA11y) => ReactNode;
+	className?: string;
+};
+
+/** Guidance id set shared by `SettingField` and its rendered helper texts. */
+export function settingFieldIds(prefix: string) {
+	return {
+		label: `${prefix}-label`,
+		hint: `${prefix}-hint`,
+		effect: `${prefix}-effect`,
+		error: `${prefix}-error`,
+		warning: `${prefix}-warning`,
+		disabled: `${prefix}-disabled`,
+	};
+}
+
+/**
+ * One labeled setting: label, optional inline hint, help tip, recommendation,
+ * visible effect timing, and inline error/warning/disabled-reason text.
+ *
+ * `children` receives the accessibility attributes the control must spread, so
+ * errors and effect text are announced instead of living only in `title`.
+ * Without `group`, `id` pairs the label with a single control; with `group`,
+ * a `<fieldset>`/`<legend>` wraps a set of controls (button groups, toggles).
+ */
+export function SettingField({
+	id,
+	label,
+	hint,
+	help,
+	recommended,
+	effect,
+	error,
+	warning,
+	disabledReason,
+	group = false,
+	children,
+	className,
+}: SettingFieldProps) {
+	const base = useId();
+	const controlId = id ?? base;
+	const ids = settingFieldIds(controlId);
+
+	const describedBy = [
+		hint ? ids.hint : null,
+		effect ? ids.effect : null,
+		warning ? ids.warning : null,
+		error ? ids.error : null,
+		disabledReason ? ids.disabled : null,
+	]
+		.filter(Boolean)
+		.join(" ") || undefined;
+
+	const a11y: SettingControlA11y = {
+		"aria-describedby": describedBy,
+		...(error ? { "aria-invalid": true } : {}),
+	};
+
+	const guidance = (
+		<>
+			{hint ? (
+				<p id={ids.hint} className="text-xs text-muted-foreground">
+					{hint}
+				</p>
+			) : null}
+			{effect ? <SettingEffectBadge effect={effect} /> : null}
+			{disabledReason ? (
+				<p id={ids.disabled} className="text-xs text-muted-foreground">
+					{disabledReason}
+				</p>
+			) : null}
+			{warning ? (
+				<p
+					id={ids.warning}
+					role="status"
+					className="rounded-md border border-warning/40 bg-warning/10 px-2.5 py-1.5 text-xs text-[var(--warning)]"
+				>
+					{warning}
+				</p>
+			) : null}
+			{error ? (
+				<p
+					id={ids.error}
+					role="alert"
+					className="rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-1.5 text-xs text-destructive"
+				>
+					{error}
+				</p>
+			) : null}
+		</>
+	);
+
+	if (group) {
+		return (
+			<fieldset className={cn("min-w-0 space-y-1.5", className)}>
+				<legend
+					id={ids.label}
+					className="flex items-center gap-1.5 text-sm font-medium leading-snug text-foreground"
+				>
+					{label}
+					{help ? <HelpTip label={label} text={help} /> : null}
+				</legend>
+				{recommended ? <RecommendedMark value={recommended} /> : null}
+				{guidance}
+				{children(a11y)}
+			</fieldset>
+		);
+	}
+
+	return (
+		<div className={cn("min-w-0 space-y-1.5", className)}>
+			<OptionLabel
+				label={label}
+				help={help}
+				recommended={recommended}
+				htmlFor={controlId}
+			/>
+			{guidance}
+			{children(a11y)}
+		</div>
+	);
 }

@@ -139,6 +139,14 @@ pub(crate) async fn get_session_settings() -> Json<SessionSettingsState> {
 pub(crate) async fn set_session_settings(
     ApiJson(settings): ApiJson<crate::session_settings::SessionSettings>,
 ) -> Response {
+    let field_errors = settings.field_errors();
+    if !field_errors.is_empty() {
+        let fields = field_errors
+            .into_iter()
+            .map(|(field, message)| super::shared::ApiFieldError { field, message })
+            .collect();
+        return super::shared::api_validation_error("invalid session settings", fields);
+    }
     if let Err(e) = crate::session_settings::store().set(settings) {
         return api_error(
             StatusCode::INTERNAL_SERVER_ERROR,

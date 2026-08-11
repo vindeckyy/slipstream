@@ -46,10 +46,22 @@ import type {
 	Preset,
 	Topology,
 } from "@/api/gen/model";
-import { HelpTip, RecommendedMark } from "@/components/option-help";
+import {
+	HelpTip,
+	RecommendedMark,
+	SettingEffectBadge,
+} from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { apiErrorMessage } from "@/lib/errors";
@@ -389,34 +401,49 @@ const DisplayForm: FC<{
 	const anyCustomSelected = customPresets.some(customSelected);
 
 	// Save the currently-in-force behavior (built-in OR hand-edited) as a new named preset.
-	const saveAsPreset = () => {
-		const name = prompt(m.display_preset_name())?.trim();
-		if (!name) return; // cancelled or empty
-		createPreset.mutate(
-			{
-				data: {
-					name,
-					fields: effective,
-					game_session: draft.game_session ?? "auto",
-				},
-			},
-			{ onSuccess: invalidateSettings },
-		);
+	const [presetDialog, setPresetDialog] = useState<{
+		mode: "create" | "rename";
+		preset?: CustomPreset;
+	} | null>(null);
+	const [presetName, setPresetName] = useState("");
+
+	const openCreatePreset = () => {
+		setPresetName("");
+		setPresetDialog({ mode: "create" });
 	};
-	const renamePreset = (p: CustomPreset) => {
-		const name = prompt(m.display_preset_name(), p.name)?.trim();
-		if (!name) return;
-		updatePreset.mutate(
-			{
-				id: p.id,
-				data: {
-					name,
-					fields: p.fields,
-					game_session: p.game_session ?? "auto",
+	const openRenamePreset = (p: CustomPreset) => {
+		setPresetName(p.name);
+		setPresetDialog({ mode: "rename", preset: p });
+	};
+
+	const commitPresetName = () => {
+		const name = presetName.trim();
+		if (!name || !presetDialog) return;
+		if (presetDialog.mode === "create") {
+			createPreset.mutate(
+				{
+					data: {
+						name,
+						fields: effective,
+						game_session: draft.game_session ?? "auto",
+					},
 				},
-			},
-			{ onSuccess: invalidateSettings },
-		);
+				{ onSuccess: invalidateSettings },
+			);
+		} else if (presetDialog.preset) {
+			updatePreset.mutate(
+				{
+					id: presetDialog.preset.id,
+					data: {
+						name,
+						fields: presetDialog.preset.fields,
+						game_session: presetDialog.preset.game_session ?? "auto",
+					},
+				},
+				{ onSuccess: invalidateSettings },
+			);
+		}
+		setPresetDialog(null);
 	};
 	const updatePresetToCurrent = (p: CustomPreset) =>
 		updatePreset.mutate(
@@ -461,6 +488,7 @@ const DisplayForm: FC<{
 								label={m.display_preset()}
 								text="Applies on the next connect. A live session keeps the display it opened on. Default is the safe baseline for most setups; pick Custom only when you need to tune each axis."
 							/>
+							<SettingEffectBadge effect="next-connect" />
 						</div>
 						<p className="text-xs leading-relaxed text-muted-foreground">
 							One-click policy for the next client connect.
@@ -590,7 +618,7 @@ const DisplayForm: FC<{
 						variant="outline"
 						disabled={busy || presetBusy}
 						title="Capture the current effective display behavior as a named preset."
-						onClick={saveAsPreset}
+						onClick={openCreatePreset}
 					>
 						<Plus className="mr-1 size-4" />
 						{m.display_preset_save_as()}
@@ -605,7 +633,7 @@ const DisplayForm: FC<{
 								selected={customSelected(p)}
 								busy={busy || presetBusy}
 								onApply={() => applyCustomPreset(p)}
-								onRename={() => renamePreset(p)}
+								onRename={() => openRenamePreset(p)}
 								onUpdate={() => updatePresetToCurrent(p)}
 								onDelete={() => removePreset(p)}
 							/>
@@ -950,6 +978,43 @@ const DisplayForm: FC<{
 				{m.display_pending_note()}
 			</p>
 			{error && <p className="text-sm text-[var(--warning)]">{error}</p>}
+
+			<Dialog
+				open={presetDialog !== null}
+				onOpenChange={(open) => !open && setPresetDialog(null)}
+			>
+				<DialogContent className="max-w-sm">
+					<DialogHeader>
+						<DialogTitle>
+							{presetDialog?.mode === "rename"
+								? m.display_preset_rename_title()
+								: m.display_preset_save_as()}
+						</DialogTitle>
+						<DialogDescription>{m.display_preset_name_help()}</DialogDescription>
+					</DialogHeader>
+					<Input
+						id="preset-name"
+						autoFocus
+						value={presetName}
+						placeholder={m.display_preset_name()}
+						onChange={(e) => setPresetName(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter" && presetName.trim()) {
+								e.preventDefault();
+								commitPresetName();
+							}
+						}}
+					/>
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setPresetDialog(null)}>
+							{m.common_cancel()}
+						</Button>
+						<Button disabled={!presetName.trim()} onClick={commitPresetName}>
+							{m.common_save()}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 };

@@ -2,7 +2,10 @@ import Section from "@unom/ui/section";
 import { toast } from "@unom/ui/toast";
 import { LogOut } from "lucide-react";
 import type { FC } from "react";
-import { OptionLabel } from "@/components/option-help";
+import {
+	OptionLabel,
+	SettingEffectBadge,
+} from "@/components/option-help";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { changeLocale, type Locale, locales, useLocale } from "@/lib/i18n";
@@ -21,6 +24,12 @@ const THEME_OPTIONS: readonly {
 	{ value: "light", label: () => m.settings_theme_light() },
 	{ value: "dark", label: () => m.settings_theme_dark() },
 ];
+
+/** Localized display name per locale, with the code as secondary text. */
+const LANGUAGE_NAMES: Record<Locale, () => string> = {
+	en: () => "English",
+	de: () => "Deutsch",
+};
 
 // Settings reads no host API (locale, theme, logout), so it's a single
 // presentational section — no container/view split needed.
@@ -71,25 +80,39 @@ export const SectionSettings: FC = () => {
 										key={l}
 										variant={l === current ? "secondary" : "ghost"}
 										size="sm"
-										className="h-8 min-h-8 uppercase"
+										className="h-8 min-h-8"
 										aria-pressed={l === current}
 										onClick={() => changeLocale(l)}
 									>
-										{l}
+										{LANGUAGE_NAMES[l]()}
+										<span
+											className={cn(
+												"ml-1.5 text-xs uppercase opacity-60",
+												l === current && "opacity-80",
+											)}
+										>
+											{l}
+										</span>
 									</Button>
 								))}
 							</div>
+							<p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+								{m.settings_local_prefs_note()}
+							</p>
 						</CardContent>
 					</Card>
 
 					<Card>
 						<CardHeader className="space-y-1">
-							<OptionLabel
-								label={m.settings_theme()}
-								help={m.settings_theme_help()}
-								recommended={m.settings_theme_system()}
-								labelClassName="text-base tracking-tight font-semibold"
-							/>
+							<div className="flex items-center gap-2">
+								<OptionLabel
+									label={m.settings_theme()}
+									help={m.settings_theme_help()}
+									recommended={m.settings_theme_system()}
+									labelClassName="text-base tracking-tight font-semibold"
+								/>
+								<SettingEffectBadge effect="immediate" />
+							</div>
 						</CardHeader>
 						<CardContent>
 							<div
@@ -116,7 +139,7 @@ export const SectionSettings: FC = () => {
 					<Card>
 						<CardHeader className="space-y-1">
 							<OptionLabel
-								label={m.action_logout()}
+								label={m.settings_account()}
 								help={m.settings_logout_help()}
 								labelClassName="text-base tracking-tight font-semibold"
 							/>

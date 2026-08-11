@@ -9,7 +9,7 @@ import {
 	useSetLibraryScanner,
 } from "@/api/gen/library/library";
 import type { ScannerInfo } from "@/api/gen/model/scannerInfo";
-import { HelpTip, RecommendedMark } from "@/components/option-help";
+import { HelpTip, RecommendedMark, SettingEffectBadge } from "@/components/option-help";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -92,7 +92,10 @@ export const SourceToggles: FC<{
 }> = ({ scanners, busyId, onToggle }) => (
 	<Card>
 		<CardHeader className="pb-3">
-			<CardTitle className="text-base">{m.library_sources_title()}</CardTitle>
+			<div className="flex flex-wrap items-center gap-2">
+				<CardTitle className="text-base">{m.library_sources_title()}</CardTitle>
+				<SettingEffectBadge effect="immediate" />
+			</div>
 			<CardDescription>{m.library_sources_help()}</CardDescription>
 		</CardHeader>
 		<CardContent>

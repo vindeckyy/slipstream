@@ -9,7 +9,7 @@ import {
 	useGetSessionSettings,
 	useSetSessionSettings,
 } from "@/api/gen/session/session";
-import { HelpTip, RecommendedMark } from "@/components/option-help";
+import { HelpTip, RecommendedMark, SettingEffectBadge } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -83,6 +83,7 @@ export const SessionGameCard: FC = () => {
 						label={m.session_game_title()}
 						text={m.session_game_help()}
 					/>
+					<SettingEffectBadge effect="next-session" />
 				</div>
 				<p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
 					Separate from display keep-alive: this governs the launched game, that

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useBlocker } from "@tanstack/react-router";
 import Section from "@unom/ui/section";
 import { toast } from "@unom/ui/toast";
 import {
@@ -23,17 +23,28 @@ import {
 	getCaptureMethods,
 	getCompositors,
 	getHeadlessCompositors,
-	getHostConfig,
 	headlessCompositorsQueryKey,
 	hostConfigQueryKey,
-	restartHost,
-	setHostConfig,
-	type HostConfigFile,
 } from "@/api/host-config";
+import {
+	getGetHostConfigQueryKey,
+	getHostConfig,
+	restartHost,
+	useSetHostConfig,
+} from "@/api/gen/host/host";
+import type {
+	ApiError,
+	HostConfigFile,
+	HostConfigState,
+} from "@/api/gen/model";
 import {
 	HelpOption,
 	HelpTip,
 	RecommendedMark,
+	settingEffectLabel,
+	SettingEffectBadge,
+	SettingField,
+	type SettingEffect,
 } from "@/components/option-help";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -45,7 +56,6 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocale } from "@/lib/i18n";
@@ -66,6 +76,12 @@ import {
 	restoreConfigDraft,
 	writeConfigDraft,
 } from "./draft-session";
+import {
+	normalizeHostConfig,
+	serializeHostConfigDraft,
+	type HostConfigDraft,
+} from "./host-config-draft";
+import { validateHostConfigDraft } from "./host-config-validation";
 import { RestartOffer } from "./RestartOffer";
 
 const fieldControlClass =
@@ -91,6 +107,7 @@ function CapabilitySelect({
 	loadingLabel,
 	onChange,
 	className,
+	disabled,
 }: {
 	id: string;
 	value: string;
@@ -99,6 +116,7 @@ function CapabilitySelect({
 	loadingLabel: string;
 	onChange: (value: string) => void;
 	className?: string;
+	disabled?: boolean;
 }) {
 	const marks = {
 		detected: m.config_option_detected(),
@@ -109,6 +127,7 @@ function CapabilitySelect({
 			id={id}
 			className={className}
 			value={value}
+			disabled={disabled}
 			onChange={(e) => onChange(e.target.value)}
 		>
 			{loading ? (
@@ -144,73 +163,6 @@ function FieldGroup({
 				</legend>
 			) : null}
 			<div className={cn("divide-y divide-border/80", title && "-mt-1")}>
-				{children}
-			</div>
-		</fieldset>
-	);
-}
-
-function Row({
-	label,
-	hint,
-	help,
-	recommended,
-	htmlFor,
-	controlWidth = "md",
-	children,
-}: {
-	label: string;
-	hint?: string;
-	help?: string;
-	recommended?: string;
-	htmlFor?: string;
-	controlWidth?: "sm" | "md";
-	children: ReactNode;
-}) {
-	const labelId = useId();
-	const hintId = useId();
-	const recommendedId = useId();
-	const describedBy = [hint ? hintId : null, recommended ? recommendedId : null]
-		.filter(Boolean)
-		.join(" ");
-
-	return (
-		<fieldset
-			aria-describedby={describedBy || undefined}
-			className="m-0 grid gap-2 border-0 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-6 sm:px-4 sm:py-3.5"
-		>
-			<legend className="sr-only">{label}</legend>
-			<div className="min-w-0 space-y-1">
-				<div className="flex items-center gap-1.5">
-					<Label
-						id={labelId}
-						htmlFor={htmlFor}
-						className="text-sm font-medium leading-snug text-foreground"
-					>
-						{label}
-					</Label>
-					{help ? <HelpTip label={label} text={help} /> : null}
-				</div>
-				{hint ? (
-					<p
-						id={hintId}
-						className="text-xs leading-relaxed text-muted-foreground"
-					>
-						{hint}
-					</p>
-				) : null}
-				{recommended ? (
-					<div id={recommendedId}>
-						<RecommendedMark value={recommended} />
-					</div>
-				) : null}
-			</div>
-			<div
-				className={cn(
-					"flex w-full justify-start sm:justify-end",
-					controlWidth === "sm" ? "sm:min-w-28" : "sm:min-w-56",
-				)}
-			>
 				{children}
 			</div>
 		</fieldset>
@@ -278,26 +230,34 @@ function ToggleRow(props: {
 	hint?: string;
 	help?: string;
 	recommended?: string;
+	effect?: SettingEffect;
+	disabled?: boolean;
 	checked: boolean;
 	onChange: (v: boolean) => void;
 }) {
 	const id = useId();
 	return (
-		<Row
+		<SettingField
+			id={id}
 			label={props.label}
 			hint={props.hint}
 			help={props.help}
 			recommended={props.recommended}
-			htmlFor={id}
-			controlWidth="sm"
+			effect={props.effect}
 		>
-			<Switch
-				id={id}
-				checked={props.checked}
-				onCheckedChange={props.onChange}
-				className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-			/>
-		</Row>
+			{(a11y) => (
+				<div className="flex justify-start sm:justify-end">
+					<Switch
+						id={id}
+						checked={props.checked}
+						disabled={props.disabled}
+						onCheckedChange={props.onChange}
+						{...a11y}
+						className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+					/>
+				</div>
+			)}
+		</SettingField>
 	);
 }
 
@@ -340,22 +300,38 @@ export const SectionConfig: FC = () => {
 		retry: false,
 	});
 
-	const [draft, setDraft] = useState<HostConfigFile | null>(null);
+	const [draft, setDraft] = useState<HostConfigDraft | null>(null);
+	const [seeded, setSeeded] = useState(false);
 	const [mode, setMode] = useState<ConfigMode>("recommended");
 	const [showRestartOffer, setShowRestartOffer] = useState(false);
 	const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
-	const [seeded, setSeeded] = useState(false);
 
 	useEffect(() => {
 		if (!q.data || seeded) return;
-		const saved = readConfigDraft<HostConfigFile>();
-		setDraft(restoreConfigDraft(q.data.settings, saved));
+		const baseline = normalizeHostConfig(q.data.settings);
+		const saved = readConfigDraft<HostConfigDraft>();
+		if (saved) {
+			setDraft({
+				...baseline,
+				...saved,
+				general: { ...baseline.general, ...saved.general },
+				input: { ...baseline.input, ...saved.input },
+				audio_video: { ...baseline.audio_video, ...saved.audio_video },
+				network: { ...baseline.network, ...saved.network },
+				encoders: { ...baseline.encoders, ...saved.encoders },
+			});
+		} else {
+			setDraft(baseline);
+		}
 		setSeeded(true);
 	}, [q.data, seeded]);
 
 	const dirty = useMemo(() => {
 		if (!q.data || !draft) return false;
-		return JSON.stringify(draft) !== JSON.stringify(q.data.settings);
+		return (
+			JSON.stringify(serializeHostConfigDraft(draft)) !==
+			JSON.stringify(q.data.settings)
+		);
 	}, [draft, q.data]);
 
 	useEffect(() => {
@@ -364,29 +340,42 @@ export const SectionConfig: FC = () => {
 		else clearConfigDraft();
 	}, [draft, dirty, q.data, seeded]);
 
-	// When the server snapshot updates and there is no session draft, stay in sync.
 	useEffect(() => {
 		if (!q.data || !seeded || dirty) return;
-		if (readConfigDraft<HostConfigFile>()) return;
-		setDraft(structuredClone(q.data.settings));
+		if (readConfigDraft<HostConfigDraft>()) return;
+		setDraft(normalizeHostConfig(structuredClone(q.data.settings)));
 	}, [q.data, seeded, dirty]);
 
-	const save = useMutation({
-		mutationFn: setHostConfig,
-		onSuccess: (state) => {
-			qc.setQueryData(hostConfigQueryKey, state);
-			setDraft(structuredClone(state.settings));
-			clearConfigDraft();
-			setShowRestartOffer(true);
-			toast.success(m.config_saved());
-		},
-		onError: (e: Error) => {
-			toast.error(e.message || m.config_save_failed());
+	const fieldErrors = useMemo(
+		() => (draft ? validateHostConfigDraft(draft) : {}),
+		[draft],
+	);
+	const hasErrors = Object.keys(fieldErrors).length > 0;
+
+	useBlocker({
+		shouldBlockFn: () => !confirm(m.config_discard_confirm()),
+		enableBeforeUnload: () => dirty,
+		disabled: !dirty,
+	});
+
+	const save = useSetHostConfig({
+		mutation: {
+			onSuccess: (state: HostConfigState) => {
+				qc.setQueryData(hostConfigQueryKey, state);
+				setDraft(normalizeHostConfig(state.settings));
+				clearConfigDraft();
+				setShowRestartOffer(true);
+				toast.success(m.config_saved());
+			},
+			onError: (e: ApiError | null) => {
+				const message = e && "error" in e ? e.error : m.config_save_failed();
+				toast.error(message);
+			},
 		},
 	});
 
 	const restart = useMutation({
-		mutationFn: restartHost,
+		mutationFn: () => restartHost(),
 		onSuccess: () => {
 			setRestartConfirmOpen(false);
 			setShowRestartOffer(false);
@@ -488,7 +477,7 @@ export const SectionConfig: FC = () => {
 		);
 	}
 
-	const patch = (fn: (d: HostConfigFile) => void) => {
+	const patch = (fn: (d: HostConfigDraft) => void) => {
 		setDraft((prev) => {
 			if (!prev) return prev;
 			const next = structuredClone(prev);
@@ -499,27 +488,38 @@ export const SectionConfig: FC = () => {
 
 	const onSave = () => {
 		if (!q.data) return;
-		const payload = structuredClone(draft);
+		const issues = validateHostConfigDraft(draft);
+		if (Object.keys(issues).length > 0) {
+			toast.error(m.config_validation_blocked());
+			return;
+		}
+		const payload = serializeHostConfigDraft(draft);
 		// Moonlight broadcast is owned by Host. Keep a current server value in this
 		// payload so a stale Configuration draft cannot undo a Host-page change.
-		payload.network.gamestream = q.data.settings.network.gamestream;
-		save.mutate(payload);
+		payload.network!.gamestream = q.data.settings.network?.gamestream ?? null;
+		save.mutate({ data: payload });
 	};
 
 	const onDiscard = () => {
 		if (!confirm(m.config_discard_confirm())) return;
 		if (!q.data) return;
 		clearConfigDraft();
-		setDraft(structuredClone(q.data.settings));
+		setDraft(normalizeHostConfig(structuredClone(q.data.settings)));
 		setShowRestartOffer(false);
 	};
 
 	const moonlightOn = draft.network.gamestream ?? false;
+	const sourceIsPortal = draft.audio_video.video_source === "portal";
 	const gamescopePathRelevant =
 		draft.audio_video.gamescope_hdr &&
 		(!draft.audio_video.compositor ||
 			draft.audio_video.compositor === "gamescope" ||
 			draft.audio_video.headless_compositor === "gamescope");
+
+	const err = (field: string) => fieldErrors[field];
+	const restartEffect = "restart-required" as const;
+	const nextSessionEffect = "next-session" as const;
+	const immediateEffect = "immediate" as const;
 
 	return (
 		<Section maxWidth={false}>
@@ -554,7 +554,7 @@ export const SectionConfig: FC = () => {
 							</Button>
 							<Button
 								type="button"
-								disabled={!dirty || save.isPending}
+								disabled={!dirty || save.isPending || hasErrors}
 								onClick={onSave}
 								aria-busy={save.isPending || undefined}
 								aria-describedby="config-save-status"
@@ -570,11 +570,13 @@ export const SectionConfig: FC = () => {
 							aria-live="polite"
 							className="text-right text-xs text-muted-foreground"
 						>
-							{save.isPending
-								? m.common_loading()
-								: dirty
-									? m.display_unsaved_hint()
-									: m.display_all_saved()}
+							{hasErrors
+								? m.config_validation_blocked()
+								: save.isPending
+									? m.common_loading()
+									: dirty
+										? m.display_unsaved_hint()
+										: m.display_all_saved()}
 						</p>
 					</div>
 				</header>
@@ -607,13 +609,20 @@ export const SectionConfig: FC = () => {
 					aria-busy={save.isPending || undefined}
 					className={cn(
 						"flex flex-col gap-2 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between",
-						dirty
-							? "border-warning/40 bg-warning/10"
-							: "border-border/70 bg-muted/20",
+						hasErrors
+							? "border-destructive/40 bg-destructive/5"
+							: dirty
+								? "border-warning/40 bg-warning/10"
+								: "border-border/70 bg-muted/20",
 					)}
 				>
 					<div className="flex min-w-0 items-start gap-3">
-						{dirty ? (
+						{hasErrors ? (
+							<CircleAlert
+								className="mt-0.5 size-4 shrink-0 text-destructive"
+								aria-hidden="true"
+							/>
+						) : dirty ? (
 							<CircleAlert
 								className="mt-0.5 size-4 shrink-0 text-[var(--warning)]"
 								aria-hidden="true"
@@ -626,14 +635,20 @@ export const SectionConfig: FC = () => {
 						)}
 						<div className="min-w-0 space-y-0.5">
 							<p className="text-sm font-medium">
-								{dirty ? m.display_unsaved() : m.display_all_saved()}
+								{hasErrors
+									? m.config_validation_blocked()
+									: dirty
+										? m.display_unsaved()
+										: m.display_all_saved()}
 							</p>
 							<p className="min-w-0 break-words text-xs leading-relaxed text-muted-foreground">
 								{save.isPending
 									? m.common_loading()
-									: dirty
-										? m.display_unsaved_hint()
-										: m.display_all_saved()}
+									: hasErrors
+										? m.config_validation_hint()
+										: dirty
+											? m.display_unsaved_hint()
+											: m.display_all_saved()}
 							</p>
 						</div>
 					</div>
@@ -654,8 +669,8 @@ export const SectionConfig: FC = () => {
 							aria-hidden="true"
 						/>
 						<p className="min-w-0 text-destructive">
-							{save.error instanceof Error && save.error.message
-								? save.error.message
+							{save.error && "error" in save.error
+								? save.error.error
 								: m.common_error()}
 						</p>
 					</div>
@@ -716,49 +731,59 @@ export const SectionConfig: FC = () => {
 							description={m.config_intro()}
 						>
 							<FieldGroup title={m.host_identity()}>
-								<Row
+								<SettingField
+									id="cfg-rec-host-name"
 									label={m.host_hostname()}
 									hint={m.config_host_name_hint()}
 									help={m.config_host_name_help()}
 									recommended={m.config_host_name_recommended()}
-									htmlFor="cfg-rec-host-name"
+									effect={nextSessionEffect}
+									error={err("general.host_name")}
 								>
-									<Input
-										id="cfg-rec-host-name"
-										className={fieldControlClass}
-										value={draft.general.host_name ?? ""}
-										placeholder={m.config_host_name_placeholder()}
-										onChange={(e) =>
-											patch((d) => {
-												d.general.host_name = e.target.value || null;
-											})
-										}
-									/>
-								</Row>
-								<Row
+									{(a11y) => (
+										<Input
+											id="cfg-rec-host-name"
+											className={fieldControlClass}
+											value={draft.general.host_name}
+											placeholder={m.config_host_name_placeholder()}
+											{...a11y}
+											onChange={(e) =>
+												patch((d) => {
+													d.general.host_name = e.target.value;
+												})
+											}
+										/>
+									)}
+								</SettingField>
+								<SettingField
+									id="cfg-rec-video-source"
 									label={m.config_video_source()}
 									hint={m.config_video_source_hint()}
 									help={m.config_video_source_help()}
 									recommended={m.config_video_source_virtual()}
-									htmlFor="cfg-rec-video-source"
+									effect={nextSessionEffect}
+									error={err("audio_video.video_source")}
 								>
-									<FieldSelect
-										id="cfg-rec-video-source"
-										value={draft.audio_video.video_source ?? "virtual"}
-										onChange={(e) =>
-											patch((d) => {
-												d.audio_video.video_source = e.target.value || null;
-											})
-										}
-									>
-										<HelpOption value="virtual" recommended>
-											{m.config_video_source_virtual()}
-										</HelpOption>
-										<HelpOption value="portal">
-											{m.config_video_source_portal()}
-										</HelpOption>
-									</FieldSelect>
-								</Row>
+									{(a11y) => (
+										<FieldSelect
+											id="cfg-rec-video-source"
+											value={draft.audio_video.video_source}
+											{...a11y}
+											onChange={(e) =>
+												patch((d) => {
+													d.audio_video.video_source = e.target.value;
+												})
+											}
+										>
+											<HelpOption value="virtual" recommended>
+												{m.config_video_source_virtual()}
+											</HelpOption>
+											<HelpOption value="portal">
+												{m.config_video_source_portal()}
+											</HelpOption>
+										</FieldSelect>
+									)}
+								</SettingField>
 							</FieldGroup>
 
 							<FieldGroup title={m.config_network()}>
@@ -767,6 +792,7 @@ export const SectionConfig: FC = () => {
 									hint={m.config_mdns_hint()}
 									help={m.config_mdns_help()}
 									recommended={m.config_on()}
+									effect={nextSessionEffect}
 									checked={draft.network.mdns}
 									onChange={(v) =>
 										patch((d) => {
@@ -774,67 +800,73 @@ export const SectionConfig: FC = () => {
 										})
 									}
 								/>
-								<Row
+								<SettingField
 									label={m.config_moonlight()}
 									hint={m.config_moonlight_hint()}
 									help={m.config_moonlight_help_readonly()}
+									effect={restartEffect}
 								>
-									<div className="flex w-full flex-col items-stretch gap-2 sm:w-56 sm:items-end">
-										<div className="flex items-center gap-2 text-sm">
-											<span
-												aria-hidden
+									{() => (
+										<div className="flex w-full flex-col items-stretch gap-2 sm:w-56 sm:items-end">
+											<div className="flex items-center gap-2 text-sm">
+												<span
+													aria-hidden
+													className={cn(
+														"size-2 rounded-full",
+														moonlightOn
+															? "bg-success"
+															: "bg-muted-foreground/40",
+													)}
+												/>
+												<span className="text-muted-foreground">
+													{moonlightOn
+														? m.config_moonlight_on()
+														: m.config_moonlight_off()}
+												</span>
+											</div>
+											<Link
+												to="/host"
 												className={cn(
-													"size-2 rounded-full",
-													moonlightOn
-														? "bg-success"
-														: "bg-muted-foreground/40",
+													buttonVariants({ variant: "outline" }),
+													"w-full justify-center",
 												)}
-											/>
-											<span className="text-muted-foreground">
-												{moonlightOn
-													? m.config_moonlight_on()
-													: m.config_moonlight_off()}
-											</span>
+											>
+												{m.config_moonlight_open_host()}
+											</Link>
 										</div>
-										<Link
-											to="/host"
-											className={cn(
-												buttonVariants({ variant: "outline" }),
-												"w-full justify-center",
-											)}
-										>
-											{m.config_moonlight_open_host()}
-										</Link>
-									</div>
-								</Row>
-								<Row
+									)}
+								</SettingField>
+								<SettingField
+									id="cfg-rec-clipboard"
 									label={m.config_clipboard()}
 									hint={m.config_clipboard_hint()}
-									help={m.config_clipboard_hint()}
+									help={m.config_clipboard_help()}
 									recommended={m.config_clipboard_off()}
-									htmlFor="cfg-rec-clipboard"
+									effect={nextSessionEffect}
 								>
-									<FieldSelect
-										id="cfg-rec-clipboard"
-										value={draft.clipboard}
-										onChange={(e) =>
-											patch((d) => {
-												d.clipboard =
-													e.target.value as HostConfigFile["clipboard"];
-											})
-										}
-									>
-										<HelpOption value="off" recommended>
-											{m.config_clipboard_off()}
-										</HelpOption>
-										<HelpOption value="text-only">
-											{m.config_clipboard_text_only()}
-										</HelpOption>
-										<HelpOption value="on">
-											{m.config_clipboard_on()}
-										</HelpOption>
-									</FieldSelect>
-								</Row>
+									{(a11y) => (
+										<FieldSelect
+											id="cfg-rec-clipboard"
+											value={draft.clipboard}
+											{...a11y}
+											onChange={(e) =>
+												patch((d) => {
+													d.clipboard = e.target.value;
+												})
+											}
+										>
+											<HelpOption value="off" recommended>
+												{m.config_clipboard_off()}
+											</HelpOption>
+											<HelpOption value="text-only">
+												{m.config_clipboard_text_only()}
+											</HelpOption>
+											<HelpOption value="on">
+												{m.config_clipboard_on()}
+											</HelpOption>
+										</FieldSelect>
+									)}
+								</SettingField>
 							</FieldGroup>
 
 							<FieldGroup title={m.config_input()}>
@@ -843,10 +875,24 @@ export const SectionConfig: FC = () => {
 									hint={m.config_pen_hint()}
 									help={m.config_pen_help()}
 									recommended={m.config_on()}
+									effect={nextSessionEffect}
 									checked={draft.input.pen}
 									onChange={(v) =>
 										patch((d) => {
 											d.input.pen = v;
+										})
+									}
+								/>
+								<ToggleRow
+									label={m.config_hide_host_cursor()}
+									hint={m.config_hide_host_cursor_hint()}
+									help={m.config_hide_host_cursor_help()}
+									recommended={m.config_on()}
+									effect={nextSessionEffect}
+									checked={draft.input.hide_host_cursor}
+									onChange={(v) =>
+										patch((d) => {
+											d.input.hide_host_cursor = v;
 										})
 									}
 								/>
@@ -858,6 +904,7 @@ export const SectionConfig: FC = () => {
 									hint={m.config_ten_bit_hint()}
 									help={m.config_ten_bit_help()}
 									recommended={m.config_on()}
+									effect={nextSessionEffect}
 									checked={draft.audio_video.ten_bit}
 									onChange={(v) =>
 										patch((d) => {
@@ -870,6 +917,7 @@ export const SectionConfig: FC = () => {
 									hint={m.config_four_four_four_hint()}
 									help={m.config_four_four_four_help()}
 									recommended={m.config_on()}
+									effect={nextSessionEffect}
 									checked={draft.audio_video.four_four_four}
 									onChange={(v) =>
 										patch((d) => {
@@ -882,6 +930,7 @@ export const SectionConfig: FC = () => {
 									hint={m.config_gamescope_hdr_hint()}
 									help={m.config_gamescope_hdr_help()}
 									recommended={m.config_on()}
+									effect={nextSessionEffect}
 									checked={draft.audio_video.gamescope_hdr}
 									onChange={(v) =>
 										patch((d) => {
@@ -894,7 +943,8 @@ export const SectionConfig: FC = () => {
 									hint={m.config_audio_fec_hint()}
 									help={m.config_audio_fec_help()}
 									recommended={m.config_on()}
-									checked={draft.audio_video.audio_fec ?? true}
+									effect={nextSessionEffect}
+									checked={draft.audio_video.audio_fec}
 									onChange={(v) =>
 										patch((d) => {
 											d.audio_video.audio_fec = v;
@@ -904,61 +954,66 @@ export const SectionConfig: FC = () => {
 							</FieldGroup>
 
 							<FieldGroup title={m.config_encoders()}>
-								<Row
+								<SettingField
+									id="cfg-rec-encoder"
 									label={m.config_encoder()}
 									hint={m.config_encoder_hint()}
 									help={m.config_encoder_help()}
 									recommended={m.config_encoder_auto()}
-									htmlFor="cfg-rec-encoder"
+									effect={nextSessionEffect}
+									error={err("encoders.encoder")}
 								>
-									<FieldSelect
-										id="cfg-rec-encoder"
-										value={draft.encoders.encoder || "auto"}
-										onChange={(e) =>
-											patch((d) => {
-												d.encoders.encoder = e.target.value;
-											})
-										}
-									>
-										<HelpOption
-											value="auto"
-											recommended
-											title={m.config_encoder_auto_title()}
+									{(a11y) => (
+										<FieldSelect
+											id="cfg-rec-encoder"
+											value={draft.encoders.encoder}
+											{...a11y}
+											onChange={(e) =>
+												patch((d) => {
+													d.encoders.encoder = e.target.value;
+												})
+											}
 										>
-											{m.config_encoder_auto()}
-										</HelpOption>
-										<HelpOption
-											value="nvenc"
-											title={m.config_encoder_nvenc_title()}
-										>
-											NVENC
-										</HelpOption>
-										<HelpOption
-											value="amf"
-											title={m.config_encoder_amf_title()}
-										>
-											AMF
-										</HelpOption>
-										<HelpOption
-											value="qsv"
-											title={m.config_encoder_qsv_title()}
-										>
-											QSV
-										</HelpOption>
-										<HelpOption
-											value="vaapi"
-											title={m.config_encoder_vaapi_title()}
-										>
-											VAAPI
-										</HelpOption>
-										<HelpOption
-											value="software"
-											title={m.config_encoder_software_title()}
-										>
-											{m.config_encoder_software()}
-										</HelpOption>
-									</FieldSelect>
-								</Row>
+											<HelpOption
+												value="auto"
+												recommended
+												title={m.config_encoder_auto_title()}
+											>
+												{m.config_encoder_auto()}
+											</HelpOption>
+											<HelpOption
+												value="nvenc"
+												title={m.config_encoder_nvenc_title()}
+											>
+												NVENC
+											</HelpOption>
+											<HelpOption
+												value="amf"
+												title={m.config_encoder_amf_title()}
+											>
+												AMF
+											</HelpOption>
+											<HelpOption
+												value="qsv"
+												title={m.config_encoder_qsv_title()}
+											>
+												QSV
+											</HelpOption>
+											<HelpOption
+												value="vaapi"
+												title={m.config_encoder_vaapi_title()}
+											>
+												VAAPI
+											</HelpOption>
+											<HelpOption
+												value="software"
+												title={m.config_encoder_software_title()}
+											>
+												{m.config_encoder_software()}
+											</HelpOption>
+										</FieldSelect>
+									)}
+								</SettingField>
 							</FieldGroup>
 						</ConfigCard>
 						<ConfigCard
@@ -966,108 +1021,117 @@ export const SectionConfig: FC = () => {
 							description={m.config_stream_profiles_hint()}
 						>
 							<FieldGroup title={m.config_stream_profiles()}>
-								<Row
+								<SettingField
+									id="cfg-rec-performance-profile"
 									label={m.config_performance_profile()}
 									hint={m.config_performance_profile_hint()}
 									help={m.config_profile_low_latency_help()}
 									recommended={m.config_profile_balanced()}
-									htmlFor="cfg-rec-performance-profile"
+									effect={restartEffect}
 								>
-									<FieldSelect
-										id="cfg-rec-performance-profile"
-										value={draft.performance_profile}
-										onChange={(e) =>
-											patch((d) => {
-												d.performance_profile =
-													e.target.value as HostConfigFile["performance_profile"];
-											})
-										}
-									>
-										<HelpOption
-											value="balanced"
-											recommended
-											title={m.config_profile_balanced_help()}
+									{(a11y) => (
+										<FieldSelect
+											id="cfg-rec-performance-profile"
+											value={draft.performance_profile}
+											{...a11y}
+											onChange={(e) =>
+												patch((d) => {
+													d.performance_profile = e.target.value;
+												})
+											}
 										>
-											{m.config_profile_balanced()}
-										</HelpOption>
-										<HelpOption
-											value="low_latency"
-											title={m.config_profile_low_latency_help()}
-										>
-											{m.config_profile_low_latency()}
-										</HelpOption>
-									</FieldSelect>
-								</Row>
-								<Row
+											<HelpOption
+												value="balanced"
+												recommended
+												title={m.config_profile_balanced_help()}
+											>
+												{m.config_profile_balanced()}
+											</HelpOption>
+											<HelpOption
+												value="low_latency"
+												title={m.config_profile_low_latency_help()}
+											>
+												{m.config_profile_low_latency()}
+											</HelpOption>
+										</FieldSelect>
+									)}
+								</SettingField>
+								<SettingField
+									id="cfg-rec-latency-profile"
 									label={m.config_latency_profile()}
 									hint={m.config_latency_profile_hint()}
 									help={m.config_profile_low_latency_help()}
 									recommended={m.config_profile_balanced()}
-									htmlFor="cfg-rec-latency-profile"
+									effect={restartEffect}
 								>
-									<FieldSelect
-										id="cfg-rec-latency-profile"
-										value={draft.latency_profile}
-										onChange={(e) =>
-											patch((d) => {
-												d.latency_profile =
-													e.target.value as HostConfigFile["latency_profile"];
-											})
-										}
-									>
-										<HelpOption
-											value="balanced"
-											recommended
-											title={m.config_profile_balanced_help()}
+									{(a11y) => (
+										<FieldSelect
+											id="cfg-rec-latency-profile"
+											value={draft.latency_profile}
+											{...a11y}
+											onChange={(e) =>
+												patch((d) => {
+													d.latency_profile = e.target.value;
+												})
+											}
 										>
-											{m.config_profile_balanced()}
-										</HelpOption>
-										<HelpOption
-											value="low_latency"
-											title={m.config_profile_low_latency_help()}
-										>
-											{m.config_profile_low_latency()}
-										</HelpOption>
-									</FieldSelect>
-								</Row>
-								<Row
+											<HelpOption
+												value="balanced"
+												recommended
+												title={m.config_profile_balanced_help()}
+											>
+												{m.config_profile_balanced()}
+											</HelpOption>
+											<HelpOption
+												value="low_latency"
+												title={m.config_profile_low_latency_help()}
+											>
+												{m.config_profile_low_latency()}
+											</HelpOption>
+										</FieldSelect>
+									)}
+								</SettingField>
+								<SettingField
+									id="cfg-rec-network-policy"
 									label={m.config_network_policy()}
 									hint={m.config_network_policy_hint()}
 									help={m.config_profile_auto_help()}
 									recommended={m.config_profile_auto()}
-									htmlFor="cfg-rec-network-policy"
+									effect={nextSessionEffect}
 								>
-									<FieldSelect
-										id="cfg-rec-network-policy"
-										value={draft.network_policy}
-										onChange={(e) =>
-											patch((d) => {
-												d.network_policy =
-													e.target.value as HostConfigFile["network_policy"];
-											})
-										}
-									>
-										<HelpOption
-											value="auto"
-											recommended
-											title={m.config_profile_auto_help()}
+									{(a11y) => (
+										<FieldSelect
+											id="cfg-rec-network-policy"
+											value={draft.network_policy}
+											{...a11y}
+											onChange={(e) =>
+												patch((d) => {
+													d.network_policy = e.target.value;
+												})
+											}
 										>
-											{m.config_profile_auto()}
-										</HelpOption>
-										<HelpOption
-											value="lan"
-											title={m.config_profile_lan_help()}
-										>
-											{m.config_profile_lan()}
-										</HelpOption>
-										<HelpOption
-											value="wan"
-											title={m.config_profile_wan_help()}
-										>
-											{m.config_profile_wan()}
-										</HelpOption>
-									</FieldSelect>
-								</Row>
+											<HelpOption
+												value="auto"
+												recommended
+												title={m.config_profile_auto_help()}
+											>
+												{m.config_profile_auto()}
+											</HelpOption>
+											<HelpOption
+												value="lan"
+												title={m.config_profile_lan_help()}
+											>
+												{m.config_profile_lan()}
+											</HelpOption>
+											<HelpOption
+												value="wan"
+												title={m.config_profile_wan_help()}
+											>
+												{m.config_profile_wan()}
+											</HelpOption>
+										</FieldSelect>
+									)}
+								</SettingField>
 							</FieldGroup>
 						</ConfigCard>
 					</div>
@@ -1128,31 +1192,37 @@ export const SectionConfig: FC = () => {
 										description={m.config_general_card_desc()}
 									>
 										<FieldGroup title={m.host_identity()}>
-											<Row
+											<SettingField
+												id="cfg-host-name"
 												label={m.host_hostname()}
 												hint={m.config_host_name_hint()}
 												help={m.config_host_name_help()}
 												recommended={m.config_host_name_recommended()}
-												htmlFor="cfg-host-name"
+												effect={nextSessionEffect}
+												error={err("general.host_name")}
 											>
-												<Input
-													id="cfg-host-name"
-													className={fieldControlClass}
-													value={draft.general.host_name ?? ""}
-													placeholder={m.config_host_name_placeholder()}
-													title={m.config_host_name_title()}
-													onChange={(e) =>
-														patch((d) => {
-															d.general.host_name = e.target.value || null;
-														})
-													}
-												/>
-											</Row>
+												{(a11y) => (
+													<Input
+														id="cfg-host-name"
+														className={fieldControlClass}
+														value={draft.general.host_name}
+														placeholder={m.config_host_name_placeholder()}
+														title={m.config_host_name_title()}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.general.host_name = e.target.value;
+															})
+														}
+													/>
+												)}
+											</SettingField>
 											<ToggleRow
 												label={m.config_perf()}
 												hint={m.config_perf_hint()}
 												help={m.config_perf_help()}
 												recommended={m.config_off()}
+												effect={restartEffect}
 												checked={draft.general.perf}
 												onChange={(v) =>
 													patch((d) => {
@@ -1170,47 +1240,66 @@ export const SectionConfig: FC = () => {
 										description={m.config_input_card_desc()}
 									>
 										<FieldGroup title={m.config_input_routing_group()}>
-											<Row
+											<SettingField
+												id="cfg-gamepad"
 												label={m.config_gamepad()}
 												hint={m.config_gamepad_hint()}
 												help={m.config_gamepad_help()}
 												recommended={m.config_gamepad_recommended()}
-												htmlFor="cfg-gamepad"
+												effect={nextSessionEffect}
 											>
-												<Input
-													id="cfg-gamepad"
-													className={fieldControlClass}
-													value={draft.input.gamepad ?? ""}
-													placeholder={m.config_gamepad_placeholder()}
-													title={m.config_gamepad_title()}
-													onChange={(e) =>
-														patch((d) => {
-															d.input.gamepad = e.target.value || null;
-														})
-													}
-												/>
-											</Row>
-												<ToggleRow
-													label={m.config_pen()}
-													hint={m.config_pen_hint()}
-													help={m.config_pen_help()}
-													recommended={m.config_on()}
-													checked={draft.input.pen}
-													onChange={(v) =>
-														patch((d) => {
-															d.input.pen = v;
-														})
-													}
-												/>
+												{(a11y) => (
+													<Input
+														id="cfg-gamepad"
+														className={fieldControlClass}
+														value={draft.input.gamepad}
+														placeholder={m.config_gamepad_placeholder()}
+														title={m.config_gamepad_title()}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.input.gamepad = e.target.value;
+															})
+														}
+													/>
+												)}
+											</SettingField>
+											<ToggleRow
+												label={m.config_pen()}
+												hint={m.config_pen_hint()}
+												help={m.config_pen_help()}
+												recommended={m.config_on()}
+												effect={nextSessionEffect}
+												checked={draft.input.pen}
+												onChange={(v) =>
+													patch((d) => {
+														d.input.pen = v;
+													})
+												}
+											/>
 											<ToggleRow
 												label={m.config_gamescope_grab()}
 												hint={m.config_gamescope_grab_hint()}
 												help={m.config_gamescope_grab_help()}
 												recommended={m.config_off()}
+												effect={nextSessionEffect}
 												checked={draft.input.gamescope_grab_cursor}
 												onChange={(v) =>
 													patch((d) => {
 														d.input.gamescope_grab_cursor = v;
+													})
+												}
+											/>
+											<ToggleRow
+												label={m.config_hide_host_cursor()}
+												hint={m.config_hide_host_cursor_hint()}
+												help={m.config_hide_host_cursor_help()}
+												recommended={m.config_on()}
+												effect={nextSessionEffect}
+												checked={draft.input.hide_host_cursor}
+												onChange={(v) =>
+													patch((d) => {
+														d.input.hide_host_cursor = v;
 													})
 												}
 											/>
@@ -1225,190 +1314,210 @@ export const SectionConfig: FC = () => {
 										advanced
 									>
 										<FieldGroup title={m.config_capture_display_group()}>
-											<Row
+											<SettingField
+												id="cfg-video-source"
 												label={m.config_video_source()}
 												hint={m.config_video_source_hint()}
 												help={m.config_video_source_help()}
 												recommended={m.config_video_source_virtual()}
-												htmlFor="cfg-video-source"
+												effect={nextSessionEffect}
+												error={err("audio_video.video_source")}
 											>
-												<FieldSelect
-													id="cfg-video-source"
-													value={draft.audio_video.video_source ?? ""}
-													onChange={(e) =>
-														patch((d) => {
-															d.audio_video.video_source =
-																e.target.value || null;
-														})
-													}
-												>
-													<HelpOption
-														value=""
-														title={m.config_video_source_default_title()}
+												{(a11y) => (
+													<FieldSelect
+														id="cfg-video-source"
+														value={draft.audio_video.video_source}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.audio_video.video_source = e.target.value;
+															})
+														}
 													>
-														{m.config_video_source_default()}
-													</HelpOption>
-													<HelpOption
-														value="virtual"
-														recommended
-														title={m.config_video_source_virtual_title()}
-													>
-														{m.config_video_source_virtual()}
-													</HelpOption>
-													<HelpOption
-														value="portal"
-														title={m.config_video_source_portal_title()}
-													>
-														{m.config_video_source_portal()}
-													</HelpOption>
-												</FieldSelect>
-											</Row>
-											<Row
+														<HelpOption value="virtual" recommended>
+															{m.config_video_source_virtual()}
+														</HelpOption>
+														<HelpOption value="portal">
+															{m.config_video_source_portal()}
+														</HelpOption>
+													</FieldSelect>
+												)}
+											</SettingField>
+											<SettingField
+												id="cfg-capture-method"
 												label={m.config_capture_method()}
 												hint={m.config_capture_method_hint()}
 												help={m.config_capture_method_help()}
 												recommended={m.config_profile_auto()}
-												htmlFor="cfg-capture-method"
+												effect={nextSessionEffect}
+												error={err("audio_video.capture_method")}
+												disabledReason={
+													sourceIsPortal
+														? undefined
+														: m.config_capture_method_disabled_reason()
+												}
 											>
-												<CapabilitySelect
-													id="cfg-capture-method"
-													value={draft.audio_video.capture_method ?? "auto"}
-													options={captureOptions}
-													loading={captureQ.isPending && !captureQ.data}
-													loadingLabel={m.common_loading()}
-													onChange={(value) =>
-														patch((d) => {
-															d.audio_video.capture_method = value || null;
-														})
-													}
-												/>
-											</Row>
-											<Row
+												{(a11y) => (
+													<CapabilitySelect
+														id="cfg-capture-method"
+														value={draft.audio_video.capture_method}
+														options={captureOptions}
+														loading={captureQ.isPending && !captureQ.data}
+														loadingLabel={m.common_loading()}
+														disabled={!sourceIsPortal}
+														{...a11y}
+														onChange={(value) =>
+															patch((d) => {
+																d.audio_video.capture_method = value;
+															})
+														}
+													/>
+												)}
+											</SettingField>
+											<SettingField
+												id="cfg-compositor"
 												label={m.config_virtual_compositor()}
 												hint={m.config_virtual_compositor_hint()}
 												help={m.config_virtual_compositor_help()}
 												recommended={m.config_compositor_auto_detect()}
-												htmlFor="cfg-compositor"
+												effect={nextSessionEffect}
+												error={err("audio_video.compositor")}
+												disabledReason={
+													sourceIsPortal
+														? m.config_compositor_disabled_reason()
+														: undefined
+												}
 											>
-												<CapabilitySelect
-													id="cfg-compositor"
-													value={draft.audio_video.compositor ?? ""}
-													options={compositorOptions}
-													loading={
-														compositorsQ.isPending && !compositorsQ.data
-													}
-													loadingLabel={m.common_loading()}
-													onChange={(value) =>
-														patch((d) => {
-															d.audio_video.compositor = value || null;
-														})
-													}
-												/>
-											</Row>
-											<Row
+												{(a11y) => (
+													<CapabilitySelect
+														id="cfg-compositor"
+														value={draft.audio_video.compositor}
+														options={compositorOptions}
+														loading={
+															compositorsQ.isPending && !compositorsQ.data
+														}
+														loadingLabel={m.common_loading()}
+														disabled={sourceIsPortal}
+														{...a11y}
+														onChange={(value) =>
+															patch((d) => {
+																d.audio_video.compositor = value;
+															})
+														}
+													/>
+												)}
+											</SettingField>
+											<SettingField
+												id="cfg-headless-compositor"
 												label={m.config_headless()}
 												hint={m.config_headless_hint()}
 												help={m.config_headless_help()}
 												recommended={m.config_headless_recommended()}
-												htmlFor="cfg-headless-compositor"
+												effect={nextSessionEffect}
+												error={err("audio_video.headless_compositor")}
 											>
-												<CapabilitySelect
-													id="cfg-headless-compositor"
-													value={
-														draft.audio_video.headless_compositor ?? "off"
-													}
-													options={headlessOptions}
-													loading={headlessQ.isPending && !headlessQ.data}
-													loadingLabel={m.common_loading()}
-													onChange={(value) =>
-														patch((d) => {
-															d.audio_video.headless_compositor =
-																value === "off" ? null : value || null;
-														})
-													}
-												/>
-											</Row>
+												{(a11y) => (
+													<CapabilitySelect
+														id="cfg-headless-compositor"
+														value={draft.audio_video.headless_compositor}
+														options={headlessOptions}
+														loading={
+															headlessQ.isPending && !headlessQ.data
+														}
+														loadingLabel={m.common_loading()}
+														{...a11y}
+														onChange={(value) =>
+															patch((d) => {
+																d.audio_video.headless_compositor = value;
+															})
+														}
+													/>
+												)}
+											</SettingField>
 										</FieldGroup>
 
 										<FieldGroup title={m.config_stream_prefs_group()}>
-											<Row
+											<SettingField
+												id="cfg-max-fps"
 												label={m.config_max_fps()}
 												hint={m.config_max_fps_hint()}
 												help={m.config_max_fps_help()}
 												recommended={m.config_max_fps_recommended()}
-												htmlFor="cfg-max-fps"
-												controlWidth="sm"
+												effect={nextSessionEffect}
+												error={err("audio_video.max_fps")}
 											>
-												<Input
-													id="cfg-max-fps"
-													className={cn(fieldControlClass, "sm:w-28")}
-													type="number"
-													min={15}
-													max={480}
-													value={draft.audio_video.max_fps ?? ""}
-													title={m.config_max_fps_title()}
-													onChange={(e) =>
-														patch((d) => {
-															const n = Number(e.target.value);
-															d.audio_video.max_fps = e.target.value
-																? n
-																: null;
-														})
-													}
-												/>
-											</Row>
-											<Row
+												{(a11y) => (
+													<Input
+														id="cfg-max-fps"
+														className={cn(fieldControlClass, "sm:w-28")}
+														type="number"
+														min={15}
+														max={240}
+														value={draft.audio_video.max_fps}
+														title={m.config_max_fps_title()}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.audio_video.max_fps = e.target.value;
+															})
+														}
+													/>
+												)}
+											</SettingField>
+											<SettingField
+												id="cfg-pipewire-latency"
 												label={m.config_pipewire_latency()}
 												hint={m.config_pipewire_latency_hint()}
 												help={m.config_pipewire_latency_help()}
 												recommended={m.config_pipewire_latency_recommended()}
-												htmlFor="cfg-pipewire-latency"
-												controlWidth="sm"
+												effect={nextSessionEffect}
+												error={err("audio_video.pipewire_latency_ms")}
 											>
-												<Input
-													id="cfg-pipewire-latency"
-													className={cn(fieldControlClass, "sm:w-28")}
-													type="number"
-													min={1}
-													max={40}
-													value={draft.audio_video.pipewire_latency_ms ?? ""}
-													onChange={(e) =>
-														patch((d) => {
-															const n = Number(e.target.value);
-															d.audio_video.pipewire_latency_ms = e.target
-																.value
-																? n
-																: null;
-														})
-													}
-												/>
-											</Row>
-											<Row
+												{(a11y) => (
+													<Input
+														id="cfg-pipewire-latency"
+														className={cn(fieldControlClass, "sm:w-28")}
+														type="number"
+														min={1}
+														max={40}
+														value={draft.audio_video.pipewire_latency_ms}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.audio_video.pipewire_latency_ms =
+																	e.target.value;
+															})
+														}
+													/>
+												)}
+											</SettingField>
+											<SettingField
+												id="cfg-capture-max-age"
 												label={m.config_capture_age()}
 												hint={m.config_capture_age_hint()}
 												help={m.config_capture_age_help()}
 												recommended={m.config_capture_age_recommended()}
-												htmlFor="cfg-capture-max-age"
-												controlWidth="sm"
+												effect={nextSessionEffect}
+												error={err("audio_video.capture_max_age_ms")}
 											>
-												<Input
-													id="cfg-capture-max-age"
-													className={cn(fieldControlClass, "sm:w-28")}
-													type="number"
-													min={1}
-													max={500}
-													value={draft.audio_video.capture_max_age_ms ?? ""}
-													onChange={(e) =>
-														patch((d) => {
-															const n = Number(e.target.value);
-															d.audio_video.capture_max_age_ms = e.target
-																.value
-																? n
-																: null;
-														})
-													}
-												/>
-											</Row>
+												{(a11y) => (
+													<Input
+														id="cfg-capture-max-age"
+														className={cn(fieldControlClass, "sm:w-28")}
+														type="number"
+														min={1}
+														max={500}
+														value={draft.audio_video.capture_max_age_ms}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.audio_video.capture_max_age_ms =
+																	e.target.value;
+															})
+														}
+													/>
+												)}
+											</SettingField>
 										</FieldGroup>
 
 										<FieldGroup title={m.config_audio_group()}>
@@ -1417,75 +1526,78 @@ export const SectionConfig: FC = () => {
 												hint={m.config_audio_fec_hint()}
 												help={m.config_audio_fec_help_advanced()}
 												recommended={m.config_on()}
-												checked={draft.audio_video.audio_fec ?? true}
+												effect={nextSessionEffect}
+												checked={draft.audio_video.audio_fec}
 												onChange={(v) =>
 													patch((d) => {
 														d.audio_video.audio_fec = v;
 													})
 												}
 											/>
-											<Row
+											<SettingField
+												id="cfg-audio-gain"
 												label={m.config_audio_gain()}
 												hint={m.config_audio_gain_hint()}
 												help={m.config_audio_gain_help()}
 												recommended={m.config_audio_gain_recommended()}
-												htmlFor="cfg-audio-gain"
-												controlWidth="sm"
+												effect={nextSessionEffect}
+												error={err("audio_video.audio_gain")}
 											>
-												<Input
-													id="cfg-audio-gain"
-													className={cn(fieldControlClass, "sm:w-28")}
-													type="number"
-													min={0}
-													max={4}
-													step={0.1}
-													value={draft.audio_video.audio_gain ?? ""}
-													onChange={(e) =>
-														patch((d) => {
-															const n = Number(e.target.value);
-															d.audio_video.audio_gain = e.target.value
-																? n
-																: null;
-														})
-													}
-												/>
-											</Row>
-											<Row
+												{(a11y) => (
+													<Input
+														id="cfg-audio-gain"
+														className={cn(fieldControlClass, "sm:w-28")}
+														type="number"
+														min={0}
+														max={4}
+														step={0.1}
+														value={draft.audio_video.audio_gain}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.audio_video.audio_gain = e.target.value;
+															})
+														}
+													/>
+												)}
+											</SettingField>
+											<SettingField
+												id="cfg-audio-capture"
 												label={m.config_audio_capture()}
 												hint={m.config_audio_capture_hint()}
 												help={m.config_audio_capture_help()}
 												recommended={m.config_audio_capture_stream_sink()}
-												htmlFor="cfg-audio-capture"
-												controlWidth="sm"
+												effect={nextSessionEffect}
+												error={err("audio_video.audio_capture")}
 											>
-												<FieldSelect
-													id="cfg-audio-capture"
-													className={cn(fieldControlClass, "sm:w-40")}
-													value={
-														draft.audio_video.audio_capture ?? "stream-sink"
-													}
-													onChange={(e) =>
-														patch((d) => {
-															d.audio_video.audio_capture =
-																e.target.value || null;
-														})
-													}
-												>
-													<HelpOption
-														value="stream-sink"
-														recommended
-														title={m.config_audio_capture_stream_sink_help()}
+												{(a11y) => (
+													<FieldSelect
+														id="cfg-audio-capture"
+														className={cn(fieldControlClass, "sm:w-40")}
+														value={draft.audio_video.audio_capture}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.audio_video.audio_capture = e.target.value;
+															})
+														}
 													>
-														{m.config_audio_capture_stream_sink()}
-													</HelpOption>
-													<HelpOption
-														value="monitor"
-														title={m.config_audio_capture_monitor_help()}
-													>
-														{m.config_audio_capture_monitor()}
-													</HelpOption>
-												</FieldSelect>
-											</Row>
+														<HelpOption
+															value="stream-sink"
+															recommended
+															title={m.config_audio_capture_stream_sink_help()}
+														>
+															{m.config_audio_capture_stream_sink()}
+														</HelpOption>
+														<HelpOption
+															value="monitor"
+															title={m.config_audio_capture_monitor_help()}
+														>
+															{m.config_audio_capture_monitor()}
+														</HelpOption>
+													</FieldSelect>
+												)}
+											</SettingField>
 										</FieldGroup>
 
 										<FieldGroup title={m.config_hdr_audio()}>
@@ -1494,6 +1606,7 @@ export const SectionConfig: FC = () => {
 												hint={m.config_ten_bit_hint()}
 												help={m.config_ten_bit_help_advanced()}
 												recommended={m.config_on()}
+												effect={nextSessionEffect}
 												checked={draft.audio_video.ten_bit}
 												onChange={(v) =>
 													patch((d) => {
@@ -1506,6 +1619,7 @@ export const SectionConfig: FC = () => {
 												hint={m.config_four_four_four_hint()}
 												help={m.config_four_four_four_help_advanced()}
 												recommended={m.config_on()}
+												effect={nextSessionEffect}
 												checked={draft.audio_video.four_four_four}
 												onChange={(v) =>
 													patch((d) => {
@@ -1518,6 +1632,7 @@ export const SectionConfig: FC = () => {
 												hint={m.config_gamescope_hdr_hint()}
 												help={m.config_gamescope_hdr_help_advanced()}
 												recommended={m.config_on()}
+												effect={nextSessionEffect}
 												checked={draft.audio_video.gamescope_hdr}
 												onChange={(v) =>
 													patch((d) => {
@@ -1532,6 +1647,8 @@ export const SectionConfig: FC = () => {
 												hint={m.config_gamescope_splash_hint()}
 												help={m.config_gamescope_splash_help()}
 												recommended={m.config_on()}
+												effect={nextSessionEffect}
+												disabled={!gamescopePathRelevant}
 												checked={draft.audio_video.gamescope_splash}
 												onChange={(v) =>
 													patch((d) => {
@@ -1539,47 +1656,57 @@ export const SectionConfig: FC = () => {
 													})
 												}
 											/>
-											<Row
+											<SettingField
+												id="cfg-vdisplay-multiplier"
 												label={m.config_vdisplay_multiplier()}
 												hint={m.config_vdisplay_multiplier_hint()}
 												help={m.config_vdisplay_multiplier_help()}
 												recommended={m.config_vdisplay_multiplier_1()}
-												htmlFor="cfg-vdisplay-multiplier"
+												effect={nextSessionEffect}
+												error={err("audio_video.vdisplay_hz_mult")}
 											>
-												<FieldSelect
-													id="cfg-vdisplay-multiplier"
-													value={String(draft.audio_video.vdisplay_hz_mult)}
-													onChange={(e) =>
-														patch((d) => {
-															d.audio_video.vdisplay_hz_mult = Number(
-																e.target.value,
-															);
-														})
-													}
-												>
-													<HelpOption value="1" recommended>
-														{m.config_vdisplay_multiplier_1()}
-													</HelpOption>
-													<HelpOption value="2">
-														{m.config_vdisplay_multiplier_2()}
-													</HelpOption>
-													<HelpOption value="3">
-														{m.config_vdisplay_multiplier_3()}
-													</HelpOption>
-													<HelpOption value="4">
-														{m.config_vdisplay_multiplier_4()}
-													</HelpOption>
-												</FieldSelect>
-											</Row>
-											{gamescopePathRelevant ? (
-												<Row
-													label={m.config_gamescope_sdr_nits()}
-													hint={m.config_gamescope_sdr_nits_hint()}
-													help={m.config_gamescope_sdr_nits_help()}
-													recommended={m.config_blank_gamescope_default()}
-													htmlFor="cfg-gamescope-sdr-nits"
-													controlWidth="sm"
-												>
+												{(a11y) => (
+													<FieldSelect
+														id="cfg-vdisplay-multiplier"
+														value={draft.audio_video.vdisplay_hz_mult}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.audio_video.vdisplay_hz_mult =
+																	e.target.value;
+															})
+														}
+													>
+														<HelpOption value="1" recommended>
+															{m.config_vdisplay_multiplier_1()}
+														</HelpOption>
+														<HelpOption value="2">
+															{m.config_vdisplay_multiplier_2()}
+														</HelpOption>
+														<HelpOption value="3">
+															{m.config_vdisplay_multiplier_3()}
+														</HelpOption>
+														<HelpOption value="4">
+															{m.config_vdisplay_multiplier_4()}
+														</HelpOption>
+													</FieldSelect>
+												)}
+											</SettingField>
+											<SettingField
+												id="cfg-gamescope-sdr-nits"
+												label={m.config_gamescope_sdr_nits()}
+												hint={m.config_gamescope_sdr_nits_hint()}
+												help={m.config_gamescope_sdr_nits_help()}
+												recommended={m.config_blank_gamescope_default()}
+												effect={nextSessionEffect}
+												error={err("audio_video.gamescope_sdr_nits")}
+												disabledReason={
+													gamescopePathRelevant
+														? undefined
+														: m.config_gamescope_sdr_nits_disabled_reason()
+												}
+											>
+												{(a11y) => (
 													<Input
 														id="cfg-gamescope-sdr-nits"
 														className={cn(fieldControlClass, "sm:w-32")}
@@ -1587,18 +1714,18 @@ export const SectionConfig: FC = () => {
 														min={1}
 														max={10000}
 														step={1}
-														value={draft.audio_video.gamescope_sdr_nits ?? ""}
+														disabled={!gamescopePathRelevant}
+														value={draft.audio_video.gamescope_sdr_nits}
+														{...a11y}
 														onChange={(e) =>
 															patch((d) => {
-																d.audio_video.gamescope_sdr_nits = e.target
-																	.value
-																	? Number(e.target.value)
-																	: null;
+																d.audio_video.gamescope_sdr_nits =
+																	e.target.value;
 															})
 														}
 													/>
-												</Row>
-											) : null}
+												)}
+											</SettingField>
 										</FieldGroup>
 									</ConfigCard>
 								</TabsContent>
@@ -1615,6 +1742,7 @@ export const SectionConfig: FC = () => {
 												hint={m.config_mdns_hint()}
 												help={m.config_mdns_help()}
 												recommended={m.config_on()}
+												effect={nextSessionEffect}
 												checked={draft.network.mdns}
 												onChange={(v) =>
 													patch((d) => {
@@ -1622,72 +1750,79 @@ export const SectionConfig: FC = () => {
 													})
 												}
 											/>
-											<Row
+											<SettingField
 												label={m.config_moonlight()}
 												hint={m.config_moonlight_hint()}
 												help={m.config_moonlight_help_readonly_network()}
+												effect={restartEffect}
 											>
-												<div className="flex w-full flex-col items-stretch gap-2 sm:w-56 sm:items-end">
-													<div className="flex items-center gap-2 text-sm">
-														<span
-															aria-hidden
+												{() => (
+													<div className="flex w-full flex-col items-stretch gap-2 sm:w-56 sm:items-end">
+														<div className="flex items-center gap-2 text-sm">
+															<span
+																aria-hidden
+																className={cn(
+																	"size-2 rounded-full",
+																	moonlightOn
+																		? "bg-success"
+																		: "bg-muted-foreground/40",
+																)}
+															/>
+															<span className="text-muted-foreground">
+																{moonlightOn
+																	? m.config_moonlight_on()
+																	: m.config_moonlight_off()}
+															</span>
+														</div>
+														<Link
+															to="/host"
 															className={cn(
-																"size-2 rounded-full",
-																moonlightOn
-																	? "bg-success"
-																	: "bg-muted-foreground/40",
+																buttonVariants({ variant: "outline" }),
+																"w-full justify-center",
 															)}
-														/>
-														<span className="text-muted-foreground">
-															{moonlightOn
-																? m.config_moonlight_on()
-																: m.config_moonlight_off()}
-														</span>
+														>
+															{m.config_moonlight_open_host()}
+														</Link>
 													</div>
-													<Link
-														to="/host"
-														className={cn(
-															buttonVariants({ variant: "outline" }),
-															"w-full justify-center",
-														)}
-													>
-														{m.config_moonlight_open_host()}
-													</Link>
-												</div>
-											</Row>
-											<Row
+												)}
+											</SettingField>
+											<SettingField
+												id="cfg-clipboard"
 												label={m.config_clipboard()}
 												hint={m.config_clipboard_hint()}
-												help={m.config_clipboard_hint()}
+												help={m.config_clipboard_help()}
 												recommended={m.config_clipboard_off()}
-												htmlFor="cfg-clipboard"
+												effect={nextSessionEffect}
 											>
-												<FieldSelect
-													id="cfg-clipboard"
-													value={draft.clipboard}
-													onChange={(e) =>
-														patch((d) => {
-															d.clipboard =
-																e.target.value as HostConfigFile["clipboard"];
-														})
-													}
-												>
-													<HelpOption value="off" recommended>
-														{m.config_clipboard_off()}
-													</HelpOption>
-													<HelpOption value="text-only">
-														{m.config_clipboard_text_only()}
-													</HelpOption>
-													<HelpOption value="on">
-														{m.config_clipboard_on()}
-													</HelpOption>
-												</FieldSelect>
-											</Row>
+												{(a11y) => (
+													<FieldSelect
+														id="cfg-clipboard"
+														value={draft.clipboard}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.clipboard = e.target.value;
+															})
+														}
+													>
+														<HelpOption value="off" recommended>
+															{m.config_clipboard_off()}
+														</HelpOption>
+														<HelpOption value="text-only">
+															{m.config_clipboard_text_only()}
+														</HelpOption>
+														<HelpOption value="on">
+															{m.config_clipboard_on()}
+														</HelpOption>
+													</FieldSelect>
+												)}
+											</SettingField>
 											<ToggleRow
 												label={m.config_chacha20()}
 												hint={m.config_chacha20_hint()}
 												help={m.config_chacha20_help()}
 												recommended={m.config_on()}
+												effect={nextSessionEffect}
 												checked={draft.network.chacha20}
 												onChange={(v) =>
 													patch((d) => {
@@ -1695,138 +1830,149 @@ export const SectionConfig: FC = () => {
 													})
 												}
 											/>
-											<Row
+											<SettingField
+												id="cfg-fec"
 												label={m.config_fec()}
 												hint={m.config_fec_hint()}
 												help={m.config_fec_help()}
 												recommended={m.config_fec_recommended()}
-												htmlFor="cfg-fec"
-												controlWidth="sm"
+												effect={nextSessionEffect}
+												error={err("network.fec_pct")}
 											>
-												<Input
-													id="cfg-fec"
-													className={cn(fieldControlClass, "sm:w-28")}
-													type="number"
-													min={0}
-													max={90}
-													value={draft.network.fec_pct ?? ""}
-													title={m.config_fec_title()}
-													onChange={(e) =>
-														patch((d) => {
-															d.network.fec_pct = e.target.value
-																? Number(e.target.value)
-																: null;
-														})
-													}
-												/>
-											</Row>
+												{(a11y) => (
+													<Input
+														id="cfg-fec"
+														className={cn(fieldControlClass, "sm:w-28")}
+														type="number"
+														min={0}
+														max={90}
+														value={draft.network.fec_pct}
+														title={m.config_fec_title()}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.network.fec_pct = e.target.value;
+															})
+														}
+													/>
+												)}
+											</SettingField>
 										</FieldGroup>
 										<FieldGroup title={m.config_stream_profiles()}>
 											<p className="text-sm leading-relaxed text-muted-foreground">
 												{m.config_stream_profiles_hint()}
 											</p>
-											<Row
+											<SettingField
+												id="cfg-performance-profile"
 												label={m.config_performance_profile()}
 												hint={m.config_performance_profile_hint()}
 												help={m.config_profile_low_latency_help()}
 												recommended={m.config_profile_balanced()}
-												htmlFor="cfg-performance-profile"
+												effect={restartEffect}
 											>
-												<FieldSelect
-													id="cfg-performance-profile"
-													value={draft.performance_profile}
-													onChange={(e) =>
-														patch((d) => {
-															d.performance_profile =
-																e.target.value as HostConfigFile["performance_profile"];
-														})
-													}
-												>
-													<HelpOption
-														value="balanced"
-														recommended
-														title={m.config_profile_balanced_help()}
+												{(a11y) => (
+													<FieldSelect
+														id="cfg-performance-profile"
+														value={draft.performance_profile}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.performance_profile = e.target.value;
+															})
+														}
 													>
-														{m.config_profile_balanced()}
-													</HelpOption>
-													<HelpOption
-														value="low_latency"
-														title={m.config_profile_low_latency_help()}
-													>
-														{m.config_profile_low_latency()}
-													</HelpOption>
-												</FieldSelect>
-											</Row>
-											<Row
+														<HelpOption
+															value="balanced"
+															recommended
+															title={m.config_profile_balanced_help()}
+														>
+															{m.config_profile_balanced()}
+														</HelpOption>
+														<HelpOption
+															value="low_latency"
+															title={m.config_profile_low_latency_help()}
+														>
+															{m.config_profile_low_latency()}
+														</HelpOption>
+													</FieldSelect>
+												)}
+											</SettingField>
+											<SettingField
+												id="cfg-latency-profile"
 												label={m.config_latency_profile()}
 												hint={m.config_latency_profile_hint()}
 												help={m.config_profile_low_latency_help()}
 												recommended={m.config_profile_balanced()}
-												htmlFor="cfg-latency-profile"
+												effect={restartEffect}
 											>
-												<FieldSelect
-													id="cfg-latency-profile"
-													value={draft.latency_profile}
-													onChange={(e) =>
-														patch((d) => {
-															d.latency_profile =
-																e.target.value as HostConfigFile["latency_profile"];
-														})
-													}
-												>
-													<HelpOption
-														value="balanced"
-														recommended
-														title={m.config_profile_balanced_help()}
+												{(a11y) => (
+													<FieldSelect
+														id="cfg-latency-profile"
+														value={draft.latency_profile}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.latency_profile = e.target.value;
+															})
+														}
 													>
-														{m.config_profile_balanced()}
-													</HelpOption>
-													<HelpOption
-														value="low_latency"
-														title={m.config_profile_low_latency_help()}
-													>
-														{m.config_profile_low_latency()}
-													</HelpOption>
-												</FieldSelect>
-											</Row>
-											<Row
+														<HelpOption
+															value="balanced"
+															recommended
+															title={m.config_profile_balanced_help()}
+														>
+															{m.config_profile_balanced()}
+														</HelpOption>
+														<HelpOption
+															value="low_latency"
+															title={m.config_profile_low_latency_help()}
+														>
+															{m.config_profile_low_latency()}
+														</HelpOption>
+													</FieldSelect>
+												)}
+											</SettingField>
+											<SettingField
+												id="cfg-network-policy"
 												label={m.config_network_policy()}
 												hint={m.config_network_policy_hint()}
 												help={m.config_profile_auto_help()}
 												recommended={m.config_profile_auto()}
-												htmlFor="cfg-network-policy"
+												effect={nextSessionEffect}
 											>
-												<FieldSelect
-													id="cfg-network-policy"
-													value={draft.network_policy}
-													onChange={(e) =>
-														patch((d) => {
-															d.network_policy =
-																e.target.value as HostConfigFile["network_policy"];
-														})
-													}
-												>
-													<HelpOption
-														value="auto"
-														recommended
-														title={m.config_profile_auto_help()}
+												{(a11y) => (
+													<FieldSelect
+														id="cfg-network-policy"
+														value={draft.network_policy}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.network_policy = e.target.value;
+															})
+														}
 													>
-														{m.config_profile_auto()}
-													</HelpOption>
-													<HelpOption
-														value="lan"
-														title={m.config_profile_lan_help()}
-													>
-														{m.config_profile_lan()}
-													</HelpOption>
-													<HelpOption
-														value="wan"
-														title={m.config_profile_wan_help()}
-													>
-														{m.config_profile_wan()}
-													</HelpOption>
-												</FieldSelect>
-											</Row>
+														<HelpOption
+															value="auto"
+															recommended
+															title={m.config_profile_auto_help()}
+														>
+															{m.config_profile_auto()}
+														</HelpOption>
+														<HelpOption
+															value="lan"
+															title={m.config_profile_lan_help()}
+														>
+															{m.config_profile_lan()}
+														</HelpOption>
+														<HelpOption
+															value="wan"
+															title={m.config_profile_wan_help()}
+														>
+															{m.config_profile_wan()}
+														</HelpOption>
+													</FieldSelect>
+												)}
+											</SettingField>
 										</FieldGroup>
 									</ConfigCard>
 								</TabsContent>
@@ -1838,129 +1984,132 @@ export const SectionConfig: FC = () => {
 										advanced
 									>
 										<FieldGroup title={m.config_encoder_path_group()}>
-											<Row
+											<SettingField
+												id="cfg-encoder"
 												label={m.config_encoder()}
 												hint={m.config_encoder_hint()}
 												help={m.config_encoder_help()}
 												recommended={m.config_encoder_auto()}
-												htmlFor="cfg-encoder"
+												effect={nextSessionEffect}
+												error={err("encoders.encoder")}
 											>
-												<FieldSelect
-													id="cfg-encoder"
-													value={draft.encoders.encoder}
-													onChange={(e) =>
-														patch((d) => {
-															d.encoders.encoder = e.target.value;
-														})
-													}
-												>
-													<HelpOption
-														value="auto"
-														recommended
-														title={m.config_encoder_auto_title()}
+												{(a11y) => (
+													<FieldSelect
+														id="cfg-encoder"
+														value={draft.encoders.encoder}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.encoders.encoder = e.target.value;
+															})
+														}
 													>
-														{m.config_encoder_auto()}
-													</HelpOption>
-													<HelpOption
-														value="nvenc"
-														title={m.config_encoder_nvenc_title()}
-													>
-														NVENC
-													</HelpOption>
-													<HelpOption
-														value="amf"
-														title={m.config_encoder_amf_title()}
-													>
-														AMF
-													</HelpOption>
-													<HelpOption
-														value="qsv"
-														title={m.config_encoder_qsv_title()}
-													>
-														QSV
-													</HelpOption>
-													<HelpOption
-														value="vaapi"
-														title={m.config_encoder_vaapi_title()}
-													>
-														VAAPI
-													</HelpOption>
-													<HelpOption
-														value="software"
-														title={m.config_encoder_software_title()}
-													>
-														{m.config_encoder_software()}
-													</HelpOption>
-												</FieldSelect>
-											</Row>
-											<Row
+														<HelpOption
+															value="auto"
+															recommended
+															title={m.config_encoder_auto_title()}
+														>
+															{m.config_encoder_auto()}
+														</HelpOption>
+														<HelpOption
+															value="nvenc"
+															title={m.config_encoder_nvenc_title()}
+														>
+															NVENC
+														</HelpOption>
+														<HelpOption
+															value="amf"
+															title={m.config_encoder_amf_title()}
+														>
+															AMF
+														</HelpOption>
+														<HelpOption
+															value="qsv"
+															title={m.config_encoder_qsv_title()}
+														>
+															QSV
+														</HelpOption>
+														<HelpOption
+															value="vaapi"
+															title={m.config_encoder_vaapi_title()}
+														>
+															VAAPI
+														</HelpOption>
+														<HelpOption
+															value="software"
+															title={m.config_encoder_software_title()}
+														>
+															{m.config_encoder_software()}
+														</HelpOption>
+													</FieldSelect>
+												)}
+											</SettingField>
+											<SettingField
+												id="cfg-render-adapter"
 												label={m.config_render_adapter()}
 												hint={m.config_render_adapter_hint()}
 												help={m.config_render_adapter_help()}
 												recommended={m.config_render_adapter_recommended()}
-												htmlFor="cfg-render-adapter"
+												effect={nextSessionEffect}
+												error={err("encoders.render_adapter")}
 											>
-												<Input
-													id="cfg-render-adapter"
-													className={fieldControlClass}
-													value={draft.encoders.render_adapter ?? ""}
-													title={m.config_render_adapter_title()}
-													placeholder={m.config_render_adapter_placeholder()}
-													onChange={(e) =>
-														patch((d) => {
-															d.encoders.render_adapter =
-																e.target.value || null;
-														})
-													}
-												/>
-											</Row>
-											<Row
+												{(a11y) => (
+													<Input
+														id="cfg-render-adapter"
+														className={fieldControlClass}
+														value={draft.encoders.render_adapter}
+														title={m.config_render_adapter_title()}
+														placeholder={m.config_render_adapter_placeholder()}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.encoders.render_adapter = e.target.value;
+															})
+														}
+													/>
+												)}
+											</SettingField>
+											<SettingField
+												id="cfg-zerocopy"
 												label={m.config_zerocopy()}
 												hint={m.config_zerocopy_hint()}
 												help={m.config_zerocopy_help()}
 												recommended={m.config_zerocopy_vendor_default()}
-												htmlFor="cfg-zerocopy"
+												effect={nextSessionEffect}
 											>
-												<FieldSelect
-													id="cfg-zerocopy"
-													value={
-														draft.encoders.zerocopy === null ||
-														draft.encoders.zerocopy === undefined
-															? ""
-															: draft.encoders.zerocopy
-																? "1"
-																: "0"
-													}
-													onChange={(e) =>
-														patch((d) => {
-															d.encoders.zerocopy =
-																e.target.value === ""
-																	? null
-																	: e.target.value === "1";
-														})
-													}
-												>
-													<HelpOption
-														value=""
-														recommended
-														title={m.config_zerocopy_vendor_default_title()}
+												{(a11y) => (
+													<FieldSelect
+														id="cfg-zerocopy"
+														value={draft.encoders.zerocopy}
+														{...a11y}
+														onChange={(e) =>
+															patch((d) => {
+																d.encoders.zerocopy = e.target.value;
+															})
+														}
 													>
-														{m.config_zerocopy_vendor_default()}
-													</HelpOption>
-													<HelpOption
-														value="1"
-														title={m.config_zerocopy_on_title()}
-													>
-														{m.config_on()}
-													</HelpOption>
-													<HelpOption
-														value="0"
-														title={m.config_zerocopy_off_title()}
-													>
-														{m.config_off()}
-													</HelpOption>
-												</FieldSelect>
-											</Row>
+														<HelpOption
+															value=""
+															recommended
+															title={m.config_zerocopy_vendor_default_title()}
+														>
+															{m.config_zerocopy_vendor_default()}
+														</HelpOption>
+														<HelpOption
+															value="1"
+															title={m.config_zerocopy_on_title()}
+														>
+															{m.config_on()}
+														</HelpOption>
+														<HelpOption
+															value="0"
+															title={m.config_zerocopy_off_title()}
+														>
+															{m.config_off()}
+														</HelpOption>
+													</FieldSelect>
+												)}
+											</SettingField>
 										</FieldGroup>
 									</ConfigCard>
 								</TabsContent>

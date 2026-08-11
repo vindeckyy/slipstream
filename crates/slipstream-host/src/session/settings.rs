@@ -110,6 +110,25 @@ impl SessionSettings {
             .clamp(MIN_GRACE_SECS, MAX_GRACE_SECS);
         self
     }
+
+    /// Ordered field-keyed validation issues for operator input. API writes reject out-of-range
+    /// values instead of silently clamping; file loads still use [`Self::sanitized`].
+    pub fn field_errors(&self) -> Vec<(String, String)> {
+        let mut errors = Vec::new();
+        if self.version != 1 {
+            errors.push((
+                "version".to_string(),
+                format!("version must be 1 (got {})", self.version),
+            ));
+        }
+        if !(MIN_GRACE_SECS..=MAX_GRACE_SECS).contains(&self.disconnect_grace_seconds) {
+            errors.push((
+                "disconnect_grace_seconds".to_string(),
+                format!("must be between {MIN_GRACE_SECS} and {MAX_GRACE_SECS}"),
+            ));
+        }
+        errors
+    }
 }
 
 /// The store: the loaded file value (`None` when no file exists) behind its path.
@@ -240,6 +259,21 @@ mod tests {
         }
         .sanitized();
         assert_eq!(high.disconnect_grace_seconds, MAX_GRACE_SECS);
+    }
+
+    #[test]
+    fn field_errors_reject_out_of_range_grace() {
+        let bad = SessionSettings {
+            disconnect_grace_seconds: 9,
+            ..Default::default()
+        };
+        let errors = bad.field_errors();
+        assert!(errors.iter().any(|(f, _)| f == "disconnect_grace_seconds"));
+        let ok = SessionSettings {
+            disconnect_grace_seconds: 10,
+            ..Default::default()
+        };
+        assert!(ok.field_errors().is_empty());
     }
 
     #[test]

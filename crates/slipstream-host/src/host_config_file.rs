@@ -171,7 +171,9 @@ pub struct AudioVideoConfig {
     /// Headless session spawner (`SLIPSTREAM_HEADLESS_COMPOSITOR`):
     /// `off` | `auto` | `labwc` | `krfb` | `gamescope`.
     pub headless_compositor: Option<String>,
-    /// Cap encode FPS (`SLIPSTREAM_MAX_FPS`).
+    /// Cap encode FPS (`SLIPSTREAM_MAX_FPS`). Runtime clamps to 240.
+    #[serde(default)]
+    #[schema(minimum = 15, maximum = 240)]
     pub max_fps: Option<u32>,
     /// Prefer 10-bit encode when the client asks (`SLIPSTREAM_10BIT`). Default on.
     #[serde(default = "default_true")]
@@ -211,6 +213,7 @@ pub struct AudioVideoConfig {
     pub gamescope_splash: bool,
     /// Virtual-display refresh multiplier (`SLIPSTREAM_VDISPLAY_HZ_MULT`), from 1x to 4x.
     #[serde(default = "one")]
+    #[schema(minimum = 1, maximum = 4)]
     pub vdisplay_hz_mult: u32,
     /// SDR luminance inside an HDR Gamescope session (`SLIPSTREAM_GAMESCOPE_SDR_NITS`).
     #[serde(default)]
@@ -253,6 +256,8 @@ pub struct NetworkConfig {
     #[serde(default = "default_true")]
     pub mdns: bool,
     /// FEC percentage for the native plane (`SLIPSTREAM_FEC_PCT`), when set.
+    #[serde(default)]
+    #[schema(minimum = 0, maximum = 90)]
     pub fec_pct: Option<u32>,
 }
 
@@ -315,16 +320,33 @@ impl HostConfigFile {
     /// Loading an older file still uses [`Self::sanitized`] for compatibility, but API writes
     /// should report the offending fields instead of silently changing the requested settings.
     pub fn validate(&self) -> Vec<String> {
-        let mut errors = Vec::new();
+        self.field_errors().into_iter().map(|(_, m)| m).collect()
+    }
+
+    /// Ordered field-keyed validation issues, e.g. `("audio_video.max_fps", …)`.
+    /// The management layer maps these onto the API `fields` envelope so the console
+    /// can anchor each error to its control.
+    pub fn field_errors(&self) -> Vec<(String, String)> {
+        let mut errors: Vec<(String, String)> = Vec::new();
+        let mut push = |field: &str, message: String| errors.push((field.to_string(), message));
         if self.version != 1 {
-            errors.push(format!("version must be 1 (got {})", self.version));
+            push(
+                "version",
+                format!("version must be 1 (got {})", self.version),
+            );
         }
         if let Some(name) = self.general.host_name.as_deref() {
             if name.chars().count() > 128 {
-                errors.push("general.host_name must be at most 128 characters".into());
+                push(
+                    "general.host_name",
+                    "must be at most 128 characters".into(),
+                );
             }
             if name.chars().any(char::is_control) {
-                errors.push("general.host_name must not contain control characters".into());
+                push(
+                    "general.host_name",
+                    "must not contain control characters".into(),
+                );
             }
         }
         if let Some(value) = self.audio_video.video_source.as_deref() {
@@ -332,7 +354,7 @@ impl HostConfigFile {
                 value.trim().to_ascii_lowercase().as_str(),
                 "virtual" | "portal"
             ) {
-                errors.push("audio_video.video_source must be virtual or portal".into());
+                push("audio_video.video_source", "must be virtual or portal".into());
             }
         }
         if let Some(value) = self.audio_video.capture_method.as_deref() {
@@ -340,7 +362,10 @@ impl HostConfigFile {
                 value.trim().to_ascii_lowercase().as_str(),
                 "auto" | "portal" | "kwin" | "wlr" | "kms" | "x11" | "nvfbc"
             ) {
-                errors.push("audio_video.capture_method is not a supported backend".into());
+                push(
+                    "audio_video.capture_method",
+                    "is not a supported backend".into(),
+                );
             }
         }
         if let Some(value) = self.audio_video.compositor.as_deref() {
@@ -359,7 +384,10 @@ impl HostConfigFile {
                     | "hypr"
                     | "gamescope"
             ) {
-                errors.push("audio_video.compositor is not a supported backend".into());
+                push(
+                    "audio_video.compositor",
+                    "is not a supported backend".into(),
+                );
             }
         }
         if let Some(value) = self.audio_video.headless_compositor.as_deref() {
@@ -367,35 +395,56 @@ impl HostConfigFile {
                 value.trim().to_ascii_lowercase().as_str(),
                 "off" | "auto" | "labwc" | "krfb" | "gamescope"
             ) {
-                errors.push("audio_video.headless_compositor is not a supported backend".into());
+                push(
+                    "audio_video.headless_compositor",
+                    "is not a supported backend".into(),
+                );
             }
         }
         if let Some(value) = self.audio_video.max_fps {
-            if !(15..=480).contains(&value) {
-                errors.push("audio_video.max_fps must be between 15 and 480".into());
+            if !(15..=240).contains(&value) {
+                push(
+                    "audio_video.max_fps",
+                    format!("must be between 15 and 240 (got {value})"),
+                );
             }
         }
         if let Some(value) = self.audio_video.pipewire_latency_ms {
             if !(1..=40).contains(&value) {
-                errors.push("audio_video.pipewire_latency_ms must be between 1 and 40".into());
+                push(
+                    "audio_video.pipewire_latency_ms",
+                    "must be between 1 and 40".into(),
+                );
             }
         }
         if let Some(value) = self.audio_video.capture_max_age_ms {
             if !(1..=500).contains(&value) {
-                errors.push("audio_video.capture_max_age_ms must be between 1 and 500".into());
+                push(
+                    "audio_video.capture_max_age_ms",
+                    "must be between 1 and 500".into(),
+                );
             }
         }
         if !(1..=4).contains(&self.audio_video.vdisplay_hz_mult) {
-            errors.push("audio_video.vdisplay_hz_mult must be between 1 and 4".into());
+            push(
+                "audio_video.vdisplay_hz_mult",
+                "must be between 1 and 4".into(),
+            );
         }
         if let Some(value) = self.audio_video.gamescope_sdr_nits {
             if !(1..=10_000).contains(&value) {
-                errors.push("audio_video.gamescope_sdr_nits must be between 1 and 10000".into());
+                push(
+                    "audio_video.gamescope_sdr_nits",
+                    "must be between 1 and 10000".into(),
+                );
             }
         }
         if let Some(value) = self.audio_video.audio_gain {
             if !(0.0..=4.0).contains(&value) || !value.is_finite() {
-                errors.push("audio_video.audio_gain must be between 0 and 4".into());
+                push(
+                    "audio_video.audio_gain",
+                    "must be between 0 and 4".into(),
+                );
             }
         }
         if let Some(value) = self.audio_video.audio_capture.as_deref() {
@@ -403,12 +452,15 @@ impl HostConfigFile {
                 value.trim().to_ascii_lowercase().as_str(),
                 "stream-sink" | "monitor"
             ) {
-                errors.push("audio_video.audio_capture must be stream-sink or monitor".into());
+                push(
+                    "audio_video.audio_capture",
+                    "must be stream-sink or monitor".into(),
+                );
             }
         }
         if let Some(value) = self.network.fec_pct {
             if value > 90 {
-                errors.push("network.fec_pct must be between 0 and 90".into());
+                push("network.fec_pct", "must be between 0 and 90".into());
             }
         }
         let encoder = self.encoders.encoder.trim().to_ascii_lowercase();
@@ -416,7 +468,7 @@ impl HostConfigFile {
             encoder.as_str(),
             "auto" | "nvenc" | "amf" | "qsv" | "vaapi" | "software"
         ) {
-            errors.push("encoders.encoder is not a supported encoder".into());
+            push("encoders.encoder", "is not a supported encoder".into());
         }
         if self
             .encoders
@@ -424,7 +476,10 @@ impl HostConfigFile {
             .as_deref()
             .is_some_and(|value| value.chars().any(char::is_control))
         {
-            errors.push("encoders.render_adapter must not contain control characters".into());
+            push(
+                "encoders.render_adapter",
+                "must not contain control characters".into(),
+            );
         }
         errors
     }
@@ -437,7 +492,7 @@ impl HostConfigFile {
             self.encoders.encoder = self.encoders.encoder.trim().to_ascii_lowercase();
         }
         if let Some(fps) = self.audio_video.max_fps {
-            self.audio_video.max_fps = Some(fps.clamp(15, 480));
+            self.audio_video.max_fps = Some(fps.clamp(15, 240));
         }
         if let Some(value) = self.audio_video.pipewire_latency_ms {
             self.audio_video.pipewire_latency_ms = Some(value.clamp(1, 40));
@@ -446,6 +501,9 @@ impl HostConfigFile {
             self.audio_video.capture_max_age_ms = Some(value.clamp(1, 500));
         }
         self.audio_video.vdisplay_hz_mult = self.audio_video.vdisplay_hz_mult.clamp(1, 4);
+        if let Some(gain) = self.audio_video.audio_gain {
+            self.audio_video.audio_gain = gain.is_finite().then(|| gain.clamp(0.0, 4.0));
+        }
         if let Some(value) = self.audio_video.gamescope_sdr_nits {
             self.audio_video.gamescope_sdr_nits = Some(value.clamp(1, 10_000));
         }
@@ -863,7 +921,23 @@ mod tests {
         let mut cfg = HostConfigFile::default();
         cfg.audio_video.max_fps = Some(9999);
         let s = cfg.sanitized();
-        assert_eq!(s.audio_video.max_fps, Some(480));
+        assert_eq!(s.audio_video.max_fps, Some(240));
+    }
+
+    #[test]
+    fn sanitize_clamps_audio_gain() {
+        let mut cfg = HostConfigFile::default();
+        cfg.audio_video.audio_gain = Some(-2.5);
+        assert_eq!(cfg.sanitized().audio_video.audio_gain, Some(0.0));
+        let mut cfg = HostConfigFile::default();
+        cfg.audio_video.audio_gain = Some(99.0);
+        assert_eq!(cfg.sanitized().audio_video.audio_gain, Some(4.0));
+        let mut cfg = HostConfigFile::default();
+        cfg.audio_video.audio_gain = Some(f32::NAN);
+        assert_eq!(cfg.sanitized().audio_video.audio_gain, None);
+        let mut cfg = HostConfigFile::default();
+        cfg.audio_video.audio_gain = Some(f32::INFINITY);
+        assert_eq!(cfg.sanitized().audio_video.audio_gain, None);
     }
 
     #[test]
@@ -882,10 +956,13 @@ mod tests {
         cfg.audio_video.capture_method = Some("broken".into());
         cfg.audio_video.max_fps = Some(1);
         cfg.network.fec_pct = Some(91);
+        let fields = cfg.field_errors();
+        assert_eq!(fields.len(), 3);
+        assert!(fields.iter().any(|(f, _)| f == "audio_video.capture_method"));
+        assert!(fields.iter().any(|(f, _)| f == "audio_video.max_fps"));
+        assert!(fields.iter().any(|(f, _)| f == "network.fec_pct"));
+        // The legacy summary keeps the full message text.
         let errors = cfg.validate();
         assert_eq!(errors.len(), 3);
-        assert!(errors.iter().any(|e| e.contains("capture_method")));
-        assert!(errors.iter().any(|e| e.contains("max_fps")));
-        assert!(errors.iter().any(|e| e.contains("fec_pct")));
     }
 }

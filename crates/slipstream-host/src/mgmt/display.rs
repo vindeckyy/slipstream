@@ -132,9 +132,14 @@ pub(crate) async fn get_display_settings() -> Json<DisplaySettingsState> {
 pub(crate) async fn set_display_settings(
     ApiJson(policy): ApiJson<crate::vdisplay::policy::DisplayPolicy>,
 ) -> Response {
-    let policy = policy;
-    // `keep_alive: forever` (the gaming-rig preset) is honored by the Linux display registry and
-    // freed via `POST /display/release`.
+    let field_errors = policy.field_errors();
+    if !field_errors.is_empty() {
+        let fields = field_errors
+            .into_iter()
+            .map(|(field, message)| super::shared::ApiFieldError { field, message })
+            .collect();
+        return super::shared::api_validation_error("invalid display policy", fields);
+    }
     if let Err(e) = crate::vdisplay::policy::prefs().set(policy) {
         return api_error(
             StatusCode::INTERNAL_SERVER_ERROR,

@@ -41,8 +41,13 @@ pub(crate) async fn get_hooks() -> Json<crate::hooks::HooksConfig> {
     )
 )]
 pub(crate) async fn set_hooks(ApiJson(cfg): ApiJson<crate::hooks::HooksConfig>) -> Response {
-    if let Err(e) = cfg.validate() {
-        return api_error(StatusCode::BAD_REQUEST, &e);
+    let field_errors = cfg.field_errors();
+    if !field_errors.is_empty() {
+        let fields = field_errors
+            .into_iter()
+            .map(|(field, message)| ApiFieldError { field, message })
+            .collect();
+        return api_validation_error("invalid hook configuration", fields);
     }
     match crate::hooks::store().set(cfg) {
         Ok(()) => {

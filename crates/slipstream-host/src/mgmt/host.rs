@@ -720,11 +720,15 @@ pub(crate) async fn get_host_config() -> Json<HostConfigState> {
 pub(crate) async fn set_host_config(
     ApiJson(settings): ApiJson<crate::host_config_file::HostConfigFile>,
 ) -> Response {
-    let errors = settings.validate();
-    if !errors.is_empty() {
-        return api_error(
-            StatusCode::BAD_REQUEST,
-            &format!("invalid host configuration: {}", errors.join("; ")),
+    let field_errors = settings.field_errors();
+    if !field_errors.is_empty() {
+        let fields = field_errors
+            .into_iter()
+            .map(|(field, message)| super::shared::ApiFieldError { field, message })
+            .collect();
+        return super::shared::api_validation_error(
+            "invalid host configuration",
+            fields,
         );
     }
     if let Err(e) = crate::host_config_file::store().set(settings) {

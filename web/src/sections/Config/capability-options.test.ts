@@ -1,6 +1,6 @@
 import { deepStrictEqual, strictEqual } from "node:assert/strict";
 import { describe, test } from "node:test";
-import type { HostConfigFile } from "@/api/host-config";
+import type { HostConfigFile } from "@/api/gen/model";
 import {
 	buildCaptureMethodOptions,
 	buildCompositorOptions,
@@ -106,12 +106,12 @@ describe("config draft session marker", () => {
 		};
 
 		const restored = restoreConfigDraft(baseline, saved);
-		strictEqual(restored.general.host_name, "Draft host");
-		strictEqual(restored.audio_video.gamescope_sdr_nits, 450);
-		strictEqual(restored.input.pen, true);
-		strictEqual(restored.network.mdns, true);
+		strictEqual(restored.general!.host_name, "Draft host");
+		strictEqual(restored.audio_video!.gamescope_sdr_nits, 450);
+		strictEqual(restored.input!.pen, true);
+		strictEqual(restored.network!.mdns, true);
 		strictEqual(restored.network_policy, "wan");
-		strictEqual(baseline.general.host_name, null);
+		strictEqual(baseline.general!.host_name, null);
 	});
 });
 

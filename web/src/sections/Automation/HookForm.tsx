@@ -121,6 +121,9 @@ export const HookForm: FC<{
 	const [draft, setDraft] = useState<HookEntry>(EMPTY);
 	const [kind, setKind] = useState<"run" | "webhook">("run");
 	const [filtered, setFiltered] = useState(false);
+	// String buffers for the numeric fields so blank stays distinct from `0`/defaults.
+	const [timeoutText, setTimeoutText] = useState("");
+	const [debounceText, setDebounceText] = useState("");
 
 	// Re-seed whenever a different hook is opened (the dialog stays mounted between edits).
 	useEffect(() => {
@@ -128,25 +131,52 @@ export const HookForm: FC<{
 		setDraft(value);
 		setKind(value.webhook ? "webhook" : "run");
 		setFiltered(!!value.filter);
+		setTimeoutText(value.timeout_s == null ? "" : String(value.timeout_s));
+		setDebounceText(value.debounce_ms ? String(value.debounce_ms) : "");
 	}, [value]);
 
 	const set = (patch: Partial<HookEntry>) =>
 		setDraft((d) => ({ ...d, ...patch }));
 
 	const action = kind === "run" ? (draft.run ?? "") : (draft.webhook ?? "");
-	const ready = draft.on.trim().length > 0 && action.trim().length > 0;
+	const webhookUrl = kind === "webhook" ? action : "";
+	const webhookSchemeError =
+		kind === "webhook" &&
+		webhookUrl.trim().length > 0 &&
+		!webhookUrl.trim().startsWith("http://") &&
+		!webhookUrl.trim().startsWith("https://")
+			? "Webhook URLs must start with http:// or https://"
+			: undefined;
+	const ready =
+		draft.on.trim().length > 0 &&
+		action.trim().length > 0 &&
+		!webhookSchemeError &&
+		(!timeoutText.trim() || Number.isInteger(Number(timeoutText)) && Number(timeoutText) >= 1 && Number(timeoutText) <= 600) &&
+		(!debounceText.trim() || Number.isInteger(Number(debounceText)) && Number(debounceText) >= 0);
 
 	const commit = () => {
 		// Emit exactly one action field, and drop an unticked filter entirely — leaving `{}` behind
 		// would read as "filter on nothing" to anyone reading the config file later.
+		// An enabled filter with every field blank also means "filter on nothing": omit it.
+		const filter = filtered
+			? (() => {
+					const client = draft.filter?.client?.trim();
+					const app = draft.filter?.app?.trim();
+					return client || app ? { client, app } : undefined;
+				})()
+			: undefined;
 		const out: HookEntry = {
 			on: draft.on.trim(),
 			...(kind === "run"
 				? { run: action.trim(), webhook: null }
 				: { webhook: action.trim(), run: null }),
-			...(filtered && draft.filter ? { filter: draft.filter } : {}),
-			...(draft.debounce_ms ? { debounce_ms: draft.debounce_ms } : {}),
-			...(draft.timeout_s ? { timeout_s: draft.timeout_s } : {}),
+			...(filter ? { filter } : {}),
+			...(debounceText.trim()
+				? { debounce_ms: Number(debounceText) }
+				: {}),
+			// Blank timeout means "host default (30s)": omit the field so the backend's
+			// `default_timeout_s()` supplies it.
+			...(timeoutText.trim() ? { timeout_s: Number(timeoutText) } : {}),
 			...(kind === "webhook" && draft.hmac_secret_file
 				? { hmac_secret_file: draft.hmac_secret_file }
 				: {}),
@@ -234,11 +264,17 @@ export const HookForm: FC<{
 								)
 							}
 						/>
-						<p className="text-xs text-muted-foreground">
-							{kind === "run"
-								? m.automation_action_run_help()
-								: m.automation_action_webhook_help()}
-						</p>
+						{webhookSchemeError ? (
+							<p role="alert" className="text-xs text-destructive">
+								{webhookSchemeError}
+							</p>
+						) : (
+							<p className="text-xs text-muted-foreground">
+								{kind === "run"
+									? m.automation_action_run_help()
+									: m.automation_action_webhook_help()}
+							</p>
+						)}
 					</fieldset>
 
 					{kind === "webhook" && (
@@ -327,10 +363,8 @@ export const HookForm: FC<{
 								id="hook-debounce"
 								type="number"
 								min={0}
-								value={draft.debounce_ms ?? 0}
-								onChange={(e) =>
-									set({ debounce_ms: Number(e.target.value) || 0 })
-								}
+								value={debounceText}
+								onChange={(e) => setDebounceText(e.target.value)}
 							/>
 						</div>
 						{kind === "run" && (
@@ -346,10 +380,9 @@ export const HookForm: FC<{
 									type="number"
 									min={1}
 									max={600}
-									value={draft.timeout_s ?? 30}
-									onChange={(e) =>
-										set({ timeout_s: Number(e.target.value) || 30 })
-									}
+									value={timeoutText}
+									placeholder="30"
+									onChange={(e) => setTimeoutText(e.target.value)}
 								/>
 							</div>
 						)}

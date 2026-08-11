@@ -1,6 +1,6 @@
 /** Browser-session draft for the Configuration page (sessionStorage only). */
 
-import type { HostConfigFile } from "@/api/host-config";
+import type { HostConfigFile } from "@/api/gen/model";
 
 export const CONFIG_DRAFT_MARKER_KEY = "slipstream.config.draft.marker";
 export const CONFIG_DRAFT_PAYLOAD_KEY = "slipstream.config.draft.payload";

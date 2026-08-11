@@ -136,6 +136,9 @@ pub(crate) fn plugin_may_access(method: &Method, path: &str) -> bool {
     let denied = path == "/api/v1/hooks"
         || path == "/api/v1/store"
         || path.starts_with("/api/v1/store/")
+        // The full custom entry (detect + prep) names local host paths/commands; a plugin can
+        // write those via reconcile but must not read arbitrary entries back out.
+        || (method == Method::GET && path.starts_with("/api/v1/library/custom/"))
         || path == "/api/v1/pair"
         || path.starts_with("/api/v1/pair/")
         || path == "/api/v1/native/pair"

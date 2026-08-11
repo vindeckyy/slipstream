@@ -1,17 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "@unom/ui/toast";
 import { Radio } from "lucide-react";
 import { useState, type FC } from "react";
 import {
+	getGetHostConfigQueryKey,
 	getHostConfig,
-	hostConfigQueryKey,
-	restartHost,
 	setMoonlightBroadcast,
-	type HostConfigState,
-} from "@/api/host-config";
+	useSetMoonlightBroadcast,
+} from "@/api/gen/host/host";
+import type {
+	ApiError,
+	HostConfigState,
+} from "@/api/gen/model";
 import { getGetHostInfoQueryKey } from "@/api/gen/host/host";
 import type { HostInfo } from "@/api/gen/model/hostInfo";
-import { HelpTip } from "@/components/option-help";
+import { HelpTip, SettingEffectBadge } from "@/components/option-help";
 import { Badge } from "@/components/ui/badge";
 import {
 	Card,
@@ -27,45 +29,34 @@ import { cn } from "@/lib/utils";
 export const MoonlightCard: FC<{ host: HostInfo }> = ({ host }) => {
 	const queryClient = useQueryClient();
 	const config = useQuery({
-		queryKey: hostConfigQueryKey,
+		queryKey: getGetHostConfigQueryKey(),
 		queryFn: getHostConfig,
 		staleTime: 5_000,
 	});
 	const [requested, setRequested] = useState<boolean | null>(null);
-	const toggle = useMutation({
-		mutationFn: async (enabled: boolean) => {
-			const state = await setMoonlightBroadcast(enabled);
-			await restartHost();
-			return { state, enabled };
+	const toggle = useSetMoonlightBroadcast({
+		mutation: {
+			onSuccess: (state: HostConfigState) => {
+				setRequested(null);
+				queryClient.setQueryData(getGetHostConfigQueryKey(), state);
+				void queryClient.invalidateQueries({
+					queryKey: getGetHostInfoQueryKey(),
+					refetchType: "all",
+				});
+			},
+			onError: () => setRequested(null),
 		},
-		onMutate: (enabled) => setRequested(enabled),
-		onSuccess: ({ state, enabled }: { state: HostConfigState; enabled: boolean }) => {
-			setRequested(null);
-			queryClient.setQueryData(hostConfigQueryKey, state);
-			void queryClient.invalidateQueries({
-				queryKey: getGetHostInfoQueryKey(),
-				refetchType: "all",
-			});
-			toast.success(
-				enabled
-					? "Moonlight broadcast enabled. Restarting host."
-					: "Moonlight broadcast disabled. Restarting host.",
-			);
-		},
-		onError: () => setRequested(null),
 	});
 
-	const configured = config.data?.settings.network.gamestream ?? null;
+	const configured = config.data?.settings.network?.gamestream ?? null;
 	const desired = requested ?? configured ?? host.gamestream;
 	const busy = config.isLoading || toggle.isPending;
-	const statusText = toggle.isPending
-		? "Restarting host..."
-		: host.gamestream === desired
-			? host.gamestream
-				? "Broadcasting to Moonlight clients"
-				: "Moonlight broadcast is off"
-			: "Waiting for host restart";
-	const error = toggle.error ?? (config.isError ? config.error : null);
+	const error =
+		toggle.error && "error" in toggle.error
+			? toggle.error.error
+			: config.isError
+				? "Could not load host configuration."
+				: null;
 
 	return (
 		<Card className="overflow-hidden">
@@ -75,8 +66,9 @@ export const MoonlightCard: FC<{ host: HostInfo }> = ({ host }) => {
 					Moonlight broadcast
 					<HelpTip
 						label="Moonlight broadcast"
-						text="Enables the GameStream compatibility plane and LAN discovery for Moonlight clients. The host restarts to apply the switch. Use it only on a trusted network."
+						text="Enables the GameStream compatibility plane and LAN discovery for Moonlight clients. The change is stored and needs a host restart to take effect. Use it only on a trusted network."
 					/>
+					<SettingEffectBadge effect="restart-required" />
 				</CardTitle>
 				<CardDescription>
 					Make this host visible to Moonlight clients with one switch.
@@ -94,7 +86,7 @@ export const MoonlightCard: FC<{ host: HostInfo }> = ({ host }) => {
 						id="moonlight-broadcast"
 						checked={desired}
 						disabled={busy || config.isError}
-						onCheckedChange={(enabled) => toggle.mutate(enabled)}
+						onCheckedChange={(enabled) => toggle.mutate({ data: { enabled } })}
 						aria-label="Broadcast to Moonlight clients"
 						className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 					/>
@@ -107,13 +99,18 @@ export const MoonlightCard: FC<{ host: HostInfo }> = ({ host }) => {
 							host.gamestream ? "bg-success" : "bg-muted-foreground/40",
 						)}
 					/>
-					<span className="text-muted-foreground">{statusText}</span>
+					<span className="text-muted-foreground">
+						{host.gamestream
+							? "Broadcasting to Moonlight clients"
+							: "Moonlight broadcast is off"}
+						{host.gamestream !== desired ? " (stored, awaiting restart)" : ""}
+					</span>
 					{host.gamestream ? <Badge variant="secondary">Active</Badge> : null}
 					{toggle.isPending ? <Spinner className="size-4" /> : null}
 				</div>
 				{error ? (
 					<p role="alert" className="text-sm text-destructive">
-						{error instanceof Error ? error.message : "Could not update Moonlight broadcast."}
+						{error}
 					</p>
 				) : null}
 			</CardContent>

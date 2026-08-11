@@ -318,10 +318,14 @@ impl DisplayPolicy {
     }
 
     /// Clamp fields to their valid ranges (called on write). `max_displays` to `1..=16` (the
-    /// ss-vdisplay connector ceiling / a sane Linux bound).
+    /// ss-vdisplay connector ceiling / a sane Linux bound) and `keep_alive.duration.seconds` to
+    /// `10..=86400` (the same reconnect window as session settings grace).
     pub fn sanitized(mut self) -> Self {
         self.version = 1;
         self.max_displays = self.max_displays.clamp(1, 16);
+        if let KeepAlive::Duration { seconds } = &mut self.keep_alive {
+            *seconds = (*seconds).clamp(10, 86_400);
+        }
         // A picker that clears its selection sends `""`; that means "no pin", not "match the
         // monitor named empty string" — same normalization the env knob does.
         self.capture_monitor = self
@@ -329,6 +333,33 @@ impl DisplayPolicy {
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty());
         self
+    }
+
+    /// Ordered field-keyed validation issues for operator input. API writes reject out-of-range
+    /// values instead of silently clamping; file loads still use [`Self::sanitized`].
+    pub fn field_errors(&self) -> Vec<(String, String)> {
+        let mut errors = Vec::new();
+        if self.version != 1 {
+            errors.push((
+                "version".to_string(),
+                format!("version must be 1 (got {})", self.version),
+            ));
+        }
+        if !(1..=16).contains(&self.max_displays) {
+            errors.push((
+                "max_displays".to_string(),
+                "must be between 1 and 16".to_string(),
+            ));
+        }
+        if let KeepAlive::Duration { seconds } = self.keep_alive {
+            if !(10..=86_400).contains(&seconds) {
+                errors.push((
+                    "keep_alive.seconds".to_string(),
+                    "must be between 10 and 86400".to_string(),
+                ));
+            }
+        }
+        errors
     }
 }
 
@@ -794,6 +825,48 @@ mod tests {
         }
         .sanitized();
         assert_eq!(p.max_displays, 16);
+    }
+
+    #[test]
+    fn sanitize_clamps_duration_keep_alive() {
+        let p = DisplayPolicy {
+            keep_alive: KeepAlive::Duration { seconds: 2 },
+            ..DisplayPolicy::default()
+        }
+        .sanitized();
+        assert_eq!(p.keep_alive, KeepAlive::Duration { seconds: 10 });
+        let p = DisplayPolicy {
+            keep_alive: KeepAlive::Duration { seconds: 999_999 },
+            ..DisplayPolicy::default()
+        }
+        .sanitized();
+        assert_eq!(p.keep_alive, KeepAlive::Duration { seconds: 86_400 });
+    }
+
+    #[test]
+    fn field_errors_reject_out_of_range_writes() {
+        let bad = DisplayPolicy {
+            max_displays: 0,
+            keep_alive: KeepAlive::Duration { seconds: 9 },
+            ..DisplayPolicy::default()
+        };
+        let errors = bad.field_errors();
+        assert!(errors.iter().any(|(f, _)| f == "max_displays"));
+        assert!(errors.iter().any(|(f, _)| f == "keep_alive.seconds"));
+        // Off and Forever remain the explicit zero/pinned choices.
+        let off = DisplayPolicy {
+            keep_alive: KeepAlive::Off,
+            ..DisplayPolicy::default()
+        };
+        assert!(off.field_errors().iter().all(|(f, _)| f != "keep_alive.seconds"));
+        let forever = DisplayPolicy {
+            keep_alive: KeepAlive::Forever,
+            ..DisplayPolicy::default()
+        };
+        assert!(forever
+            .field_errors()
+            .iter()
+            .all(|(f, _)| f != "keep_alive.seconds"));
     }
 
     #[test]

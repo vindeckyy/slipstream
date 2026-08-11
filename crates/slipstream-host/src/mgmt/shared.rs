@@ -15,10 +15,21 @@ pub(crate) use serde::{Deserialize, Serialize};
 pub(crate) use std::sync::Arc;
 pub(crate) use utoipa::ToSchema;
 
+/// One field-level validation problem, keyed by the dotted setting path
+/// (e.g. `audio_video.max_fps`) so the console can anchor the error to the control.
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct ApiFieldError {
+    pub field: String,
+    pub message: String,
+}
+
 /// Error envelope for every non-2xx response.
 #[derive(Serialize, Deserialize, ToSchema)]
 pub(crate) struct ApiError {
     error: String,
+    /// Field-keyed validation issues, present only on 400 validation failures.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fields: Option<Vec<ApiFieldError>>,
 }
 
 pub(crate) fn api_error(status: StatusCode, message: &str) -> Response {
@@ -26,6 +37,19 @@ pub(crate) fn api_error(status: StatusCode, message: &str) -> Response {
         status,
         Json(ApiError {
             error: message.to_string(),
+            fields: None,
+        }),
+    )
+        .into_response()
+}
+
+/// 400 with a summary plus field-keyed issues the console can render at each control.
+pub(crate) fn api_validation_error(summary: &str, fields: Vec<ApiFieldError>) -> Response {
+    (
+        StatusCode::BAD_REQUEST,
+        Json(ApiError {
+            error: summary.to_string(),
+            fields: Some(fields),
         }),
     )
         .into_response()

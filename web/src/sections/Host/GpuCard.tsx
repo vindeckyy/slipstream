@@ -8,7 +8,7 @@ import {
 	useSetGpuPreference,
 } from "@/api/gen/gpu/gpu";
 import type { GpuState } from "@/api/gen/model";
-import { HelpTip, RecommendedMark } from "@/components/option-help";
+import { HelpTip, RecommendedMark, SettingEffectBadge } from "@/components/option-help";
 import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -110,6 +110,7 @@ export const GpuCard: FC<{
 							label={m.host_gpus()}
 							text="Chooses which GPU capture and encode use. Changes apply to the next session, not one that is already streaming."
 						/>
+						<SettingEffectBadge effect="next-session" />
 					</div>
 					<p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
 						{m.host_gpus_help()}

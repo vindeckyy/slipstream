@@ -133,23 +133,34 @@ impl HooksConfig {
     /// Validate for the mgmt PUT: structural errors are rejected (the config would silently do
     /// nothing or something surprising); unknown kinds are accepted (additive event catalog).
     pub fn validate(&self) -> Result<(), String> {
+        self.field_errors()
+            .into_iter()
+            .next()
+            .map(|(_, message)| Err(message))
+            .unwrap_or(Ok(()))
+    }
+
+    /// Ordered field-keyed validation issues (`hooks[0].webhook`, …) for the API `fields` envelope.
+    pub fn field_errors(&self) -> Vec<(String, String)> {
+        let mut errors = Vec::new();
         for (i, h) in self.hooks.iter().enumerate() {
-            let at = |msg: &str| format!("hooks[{i}]: {msg}");
+            let field = |suffix: &str| format!("hooks[{i}]{suffix}");
             if h.on.trim().is_empty() {
-                return Err(at("`on` must be an event kind or `domain.*` pattern"));
+                errors.push((field(".on"), "must be an event kind or `domain.*` pattern".into()));
             }
             if h.run.as_deref().is_none_or(|r| r.trim().is_empty())
                 && h.webhook.as_deref().is_none_or(|w| w.trim().is_empty())
             {
-                return Err(at("needs `run` and/or `webhook`"));
+                errors.push((field(""), "needs `run` and/or `webhook`".into()));
             }
             if let Some(url) = h.webhook.as_deref().filter(|w| !w.trim().is_empty()) {
                 if !url.starts_with("https://") && !url.starts_with("http://") {
-                    return Err(at("`webhook` must be an http(s):// URL"));
+                    errors.push((field(".webhook"), "must be an http(s):// URL".into()));
                 }
                 if webhook_host_is_internal(url) {
-                    return Err(at(
-                        "`webhook` must not target a loopback/link-local/metadata host",
+                    errors.push((
+                        field(".webhook"),
+                        "must not target a loopback/link-local/metadata host".into(),
                     ));
                 }
                 // A signed webhook over plaintext http:// sends the HMAC'd event body in the clear.
@@ -162,10 +173,13 @@ impl HooksConfig {
                 }
             }
             if h.timeout_s == 0 || h.timeout_s > MAX_TIMEOUT_S {
-                return Err(at(&format!("`timeout_s` must be 1–{MAX_TIMEOUT_S}")));
+                errors.push((
+                    field(".timeout_s"),
+                    format!("must be 1–{MAX_TIMEOUT_S}"),
+                ));
             }
         }
-        Ok(())
+        errors
     }
 }
 

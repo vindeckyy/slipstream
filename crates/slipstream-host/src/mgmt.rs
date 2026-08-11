@@ -239,6 +239,7 @@ fn api_router_parts() -> (Router<Arc<MgmtState>>, utoipa::openapi::OpenApi) {
                 .routes(routes!(library::set_library_scanner))
                 .routes(routes!(library::create_custom_game))
                 .routes(routes!(
+                    library::get_custom_game,
                     library::update_custom_game,
                     library::delete_custom_game
                 ))

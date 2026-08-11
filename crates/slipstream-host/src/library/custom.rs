@@ -349,6 +349,13 @@ pub fn delete_provider(provider: &str) -> Result<usize> {
     Ok(removed)
 }
 
+/// The stored manual entry with `id`, or `None` when absent. The console's edit form needs the
+/// full `CustomEntry` (including `detect` and `prep`) to round-trip a save — the shared catalog
+/// deliberately never serializes those fields.
+pub fn get_custom(id: &str) -> Option<CustomEntry> {
+    load_custom().into_iter().find(|e| e.id == id)
+}
+
 /// The prep/undo steps for a library id — `custom:<id>` entries only (the other stores have no
 /// per-title config surface; a GameStream `apps.json` entry carries its own `prep` instead).
 pub fn prep_for(library_id: &str) -> Vec<crate::hooks::PrepCmd> {

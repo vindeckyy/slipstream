@@ -1470,6 +1470,67 @@
       }
     },
     "/api/v1/library/custom/{id}": {
+      "get": {
+        "tags": [
+          "library"
+        ],
+        "summary": "Get one custom library entry (operator-only)",
+        "description": "Returns the full stored `CustomEntry` including the `detect` and `prep` fields the shared\ncatalog deliberately never serializes (they name local host paths and commands), so the\nconsole's edit form can round-trip them. 404 when the bare custom id is unknown; 409 when a\nprovider owns the entry (edit it through its reconcile, not here).",
+        "operationId": "getCustomGame",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The custom entry id (without the `custom:` prefix)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The stored manual entry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomEntry"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No custom entry with that id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Entry is owned by a provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
       "put": {
         "tags": [
           "library"
@@ -4228,6 +4289,32 @@
         "properties": {
           "error": {
             "type": "string"
+          },
+          "fields": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ApiFieldError"
+            },
+            "description": "Field-keyed validation issues, present only on 400 validation failures."
+          }
+        }
+      },
+      "ApiFieldError": {
+        "type": "object",
+        "description": "One field-level validation problem, keyed by the dotted setting path\n(e.g. `audio_video.max_fps`) so the console can anchor the error to the control.",
+        "required": [
+          "field",
+          "message"
+        ],
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
           }
         }
       },
@@ -4513,8 +4600,9 @@
               "null"
             ],
             "format": "int32",
-            "description": "Cap encode FPS (`SLIPSTREAM_MAX_FPS`).",
-            "minimum": 0
+            "description": "Cap encode FPS (`SLIPSTREAM_MAX_FPS`). Runtime clamps to 240.",
+            "maximum": 240,
+            "minimum": 15
           },
           "pipewire_latency_ms": {
             "type": [
@@ -4534,7 +4622,8 @@
             "type": "integer",
             "format": "int32",
             "description": "Virtual-display refresh multiplier (`SLIPSTREAM_VDISPLAY_HZ_MULT`), from 1x to 4x.",
-            "minimum": 0
+            "maximum": 4,
+            "minimum": 1
           },
           "video_source": {
             "type": [
@@ -6939,6 +7028,7 @@
             ],
             "format": "int32",
             "description": "FEC percentage for the native plane (`SLIPSTREAM_FEC_PCT`), when set.",
+            "maximum": 90,
             "minimum": 0
           },
           "gamestream": {

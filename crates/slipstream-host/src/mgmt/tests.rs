@@ -1714,17 +1714,29 @@ async fn hooks_get_shape_and_put_validation() {
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
     assert!(
-        json["error"].as_str().unwrap().contains("run"),
+        json["error"].as_str().unwrap().contains("invalid"),
         "error names the problem: {json}"
     );
+    assert!(
+        json["fields"]
+            .as_array()
+            .is_some_and(|f| f.iter().any(|e| e["field"].as_str() == Some("hooks[0]"))),
+        "field-keyed error: {json}"
+    );
 
-    // Non-http(s) webhook.
-    let (s, _) = send(
+    // Non-http(s) webhook → field-keyed 400.
+    let (s, json) = send(
         &app,
         put(serde_json::json!({"hooks": [{"on": "pairing.*", "webhook": "ftp://x"}]})),
     )
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert!(
+        json["fields"]
+            .as_array()
+            .is_some_and(|f| f.iter().any(|e| e["field"].as_str() == Some("hooks[0].webhook"))),
+        "webhook field-keyed error: {json}"
+    );
 
     // Wrong bearer → 401 (the hooks surface is admin-lane).
     let mut req = get_req("/api/v1/hooks");
