@@ -337,10 +337,7 @@ impl HostConfigFile {
         }
         if let Some(name) = self.general.host_name.as_deref() {
             if name.chars().count() > 128 {
-                push(
-                    "general.host_name",
-                    "must be at most 128 characters".into(),
-                );
+                push("general.host_name", "must be at most 128 characters".into());
             }
             if name.chars().any(char::is_control) {
                 push(
@@ -354,7 +351,10 @@ impl HostConfigFile {
                 value.trim().to_ascii_lowercase().as_str(),
                 "virtual" | "portal"
             ) {
-                push("audio_video.video_source", "must be virtual or portal".into());
+                push(
+                    "audio_video.video_source",
+                    "must be virtual or portal".into(),
+                );
             }
         }
         if let Some(value) = self.audio_video.capture_method.as_deref() {
@@ -441,10 +441,7 @@ impl HostConfigFile {
         }
         if let Some(value) = self.audio_video.audio_gain {
             if !(0.0..=4.0).contains(&value) || !value.is_finite() {
-                push(
-                    "audio_video.audio_gain",
-                    "must be between 0 and 4".into(),
-                );
+                push("audio_video.audio_gain", "must be between 0 and 4".into());
             }
         }
         if let Some(value) = self.audio_video.audio_capture.as_deref() {
@@ -958,7 +955,9 @@ mod tests {
         cfg.network.fec_pct = Some(91);
         let fields = cfg.field_errors();
         assert_eq!(fields.len(), 3);
-        assert!(fields.iter().any(|(f, _)| f == "audio_video.capture_method"));
+        assert!(fields
+            .iter()
+            .any(|(f, _)| f == "audio_video.capture_method"));
         assert!(fields.iter().any(|(f, _)| f == "audio_video.max_fps"));
         assert!(fields.iter().any(|(f, _)| f == "network.fec_pct"));
         // The legacy summary keeps the full message text.

@@ -1732,9 +1732,9 @@ async fn hooks_get_shape_and_put_validation() {
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
     assert!(
-        json["fields"]
-            .as_array()
-            .is_some_and(|f| f.iter().any(|e| e["field"].as_str() == Some("hooks[0].webhook"))),
+        json["fields"].as_array().is_some_and(|f| f
+            .iter()
+            .any(|e| e["field"].as_str() == Some("hooks[0].webhook"))),
         "webhook field-keyed error: {json}"
     );
 

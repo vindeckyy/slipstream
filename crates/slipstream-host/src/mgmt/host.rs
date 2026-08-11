@@ -726,10 +726,7 @@ pub(crate) async fn set_host_config(
             .into_iter()
             .map(|(field, message)| super::shared::ApiFieldError { field, message })
             .collect();
-        return super::shared::api_validation_error(
-            "invalid host configuration",
-            fields,
-        );
+        return super::shared::api_validation_error("invalid host configuration", fields);
     }
     if let Err(e) = crate::host_config_file::store().set(settings) {
         return api_error(

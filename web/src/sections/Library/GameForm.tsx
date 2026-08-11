@@ -27,6 +27,10 @@ import { Input } from "@/components/ui/input";
 import { apiErrorMessage } from "@/lib/errors";
 import { m } from "@/paraglide/messages";
 import { customId } from "./helpers";
+import {
+	isOptionalWholeNumber,
+	parseOptionalWholeNumber,
+} from "./library-form-validation";
 
 interface FormState {
 	title: string;
@@ -141,10 +145,6 @@ function toInput(f: FormState): CustomInput {
 			.filter(Boolean);
 		return items.length ? items : undefined;
 	};
-	const int = (s: string) => {
-		const n = Number.parseInt(s.trim(), 10);
-		return Number.isFinite(n) ? n : undefined;
-	};
 	const command = f.command.trim();
 	const detect: DetectHint = {
 		install_dir: trim(f.installDir),
@@ -172,11 +172,11 @@ function toInput(f: FormState): CustomInput {
 		description: trim(f.description),
 		developer: trim(f.developer),
 		publisher: trim(f.publisher),
-		release_year: int(f.releaseYear),
+		release_year: parseOptionalWholeNumber(f.releaseYear, 65535),
 		genres: list(f.genres),
 		tags: list(f.tags),
 		region: trim(f.region),
-		players: int(f.players),
+		players: parseOptionalWholeNumber(f.players, 255),
 	};
 }
 
@@ -199,30 +199,50 @@ export const GameFormSection: FC<{
 		qc.invalidateQueries({ queryKey: getGetLibraryQueryKey() });
 
 	// Edit mode fetches the full stored entry so `detect` and `prep` round-trip.
-	const detail = useGetCustomGame(
-		target === "new" ? "" : customId(target),
-		{ query: { enabled: target !== "new" } },
-	);
+	const detailId = target === "new" ? null : customId(target);
+	const detail = useGetCustomGame(detailId ?? "", {
+		query: { enabled: detailId !== null },
+	});
 	const detailError = detail.error
-		? apiErrorMessage(detail.error) ?? "Could not load this entry."
+		? (apiErrorMessage(detail.error) ?? "Could not load this entry.")
 		: undefined;
+	const detailEntry =
+		detailId !== null && detail.data?.id === detailId ? detail.data : undefined;
 	const initial: FormState =
 		target === "new"
 			? emptyForm
-			: detail.data
-				? formFromCustom(detail.data)
-				: formFrom(target);
+			: detailEntry
+				? formFromCustom(detailEntry)
+				: emptyForm;
 
+	const [loadedDetailId, setLoadedDetailId] = useState<string | null>(
+		target === "new" ? "new" : null,
+	);
 	const [form, setForm] = useState<FormState>(initial);
 	useEffect(() => {
-		if (target === "new") return;
-		if (detail.data) setForm(formFromCustom(detail.data));
-	}, [detail.data, target]);
+		if (detailId === null) {
+			if (loadedDetailId !== "new") {
+				setForm(emptyForm);
+				setLoadedDetailId("new");
+			}
+			return;
+		}
+		if (detail.data?.id !== detailId || loadedDetailId === detailId) return;
+		setForm(formFromCustom(detail.data));
+		setLoadedDetailId(detailId);
+	}, [detail.data, detailId, loadedDetailId]);
+	const detailReady =
+		detailId === null
+			? loadedDetailId === "new"
+			: loadedDetailId === detailId && detailEntry !== undefined;
 
 	const set = (key: keyof FormState) => (value: string) =>
 		setForm((f) => ({ ...f, [key]: value }));
 
-	const setPrep = (index: number, patch: Partial<{ do: string; undo: string }>) =>
+	const setPrep = (
+		index: number,
+		patch: Partial<{ do: string; undo: string }>,
+	) =>
 		setForm((f) => ({
 			...f,
 			prep: f.prep.map((row, i) => (i === index ? { ...row, ...patch } : row)),
@@ -237,15 +257,10 @@ export const GameFormSection: FC<{
 
 	// URL-ish art fields accept web URLs, data URLs, proxy paths, and local host paths —
 	// the host treats them as free-form sources, so no `type="url"` constraint.
-	const releaseYearNum = Number.parseInt(form.releaseYear, 10);
-	const releaseYearValid =
-		form.releaseYear.trim() === "" ||
-		(Number.isInteger(releaseYearNum) && releaseYearNum >= 0 && releaseYearNum <= 65535);
-	const playersNum = Number.parseInt(form.players, 10);
-	const playersValid =
-		form.players.trim() === "" ||
-		(Number.isInteger(playersNum) && playersNum >= 0 && playersNum <= 255);
-	const ready = form.title.trim().length > 0 && releaseYearValid && playersValid;
+	const releaseYearValid = isOptionalWholeNumber(form.releaseYear, 65535);
+	const playersValid = isOptionalWholeNumber(form.players, 255);
+	const ready =
+		form.title.trim().length > 0 && releaseYearValid && playersValid;
 
 	const handleSubmit = (e: FormEvent) => {
 		e.preventDefault();
@@ -285,232 +300,261 @@ export const GameFormSection: FC<{
 				</Button>
 			</CardHeader>
 			<CardContent>
-				<form onSubmit={handleSubmit} className="space-y-4">
-					<Field
-						id="title"
-						label={m.library_field_title()}
-						value={form.title}
-						onChange={set("title")}
-						help={m.library_field_title_help()}
-						required
-					/>
-					<Field
-						id="portrait"
-						label={m.library_field_portrait()}
-						value={form.portrait}
-						onChange={set("portrait")}
-						help={m.library_field_portrait_help()}
-						recommended={m.library_field_portrait_recommended()}
-					/>
-					<Field
-						id="hero"
-						label={m.library_field_hero()}
-						value={form.hero}
-						onChange={set("hero")}
-						help={m.library_field_hero_help()}
-						recommended={m.library_field_hero_recommended()}
-					/>
-					<Field
-						id="header"
-						label={m.library_field_header()}
-						value={form.header}
-						onChange={set("header")}
-						help={m.library_field_header_help()}
-						recommended={m.library_field_header_recommended()}
-					/>
-					<Field
-						id="logo"
-						label={m.library_field_logo()}
-						value={form.logo}
-						onChange={set("logo")}
-						help={m.library_field_logo_help()}
-						recommended={m.library_field_logo_recommended()}
-					/>
-					<Field
-						id="command"
-						label={m.library_field_command()}
-						value={form.command}
-						onChange={set("command")}
-						help={m.library_field_command_help()}
-						recommended={m.library_field_command_recommended()}
-					/>
-					<fieldset className="space-y-4 rounded-lg border border-border/70 bg-muted/20 p-3 sm:p-4">
-						<legend className="sr-only">{m.library_details_legend()}</legend>
-						<p
-							aria-hidden
-							className="text-sm font-medium tracking-tight text-foreground"
+				{!detailReady ? (
+					detail.error ? (
+						<div
+							role="alert"
+							className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
 						>
-							{m.library_details_legend()}
-						</p>
-						<Field
-							id="platform"
-							label={m.library_field_platform()}
-							value={form.platform}
-							onChange={set("platform")}
-							help={m.library_field_platform_help()}
-							recommended={m.library_field_platform_recommended()}
-						/>
-						<Field
-							id="description"
-							label={m.library_field_description()}
-							value={form.description}
-							onChange={set("description")}
-							help={m.library_field_description_help()}
-							recommended={m.library_field_description_recommended()}
-						/>
-						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-							<Field
-								id="developer"
-								label={m.library_field_developer()}
-								value={form.developer}
-								onChange={set("developer")}
-								help={m.library_field_developer_help()}
-							/>
-							<Field
-								id="publisher"
-								label={m.library_field_publisher()}
-								value={form.publisher}
-								onChange={set("publisher")}
-								help={m.library_field_publisher_help()}
-							/>
-						</div>
-						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-							<Field
-								id="releaseYear"
-								label={m.library_field_release_year()}
-								value={form.releaseYear}
-								onChange={set("releaseYear")}
-								help={m.library_field_release_year_help()}
-								recommended={m.library_field_release_year_recommended()}
-								error={
-									releaseYearValid
-										? undefined
-										: m.library_field_release_year_error()
-								}
-							/>
-							<Field
-								id="players"
-								label={m.library_field_players()}
-								value={form.players}
-								onChange={set("players")}
-								help={m.library_field_players_help()}
-								recommended={m.library_field_players_recommended()}
-								error={
-									playersValid ? undefined : m.library_field_players_error()
-								}
-							/>
-						</div>
-						<Field
-							id="region"
-							label={m.library_field_region()}
-							value={form.region}
-							onChange={set("region")}
-							help={m.library_field_region_help()}
-							recommended={m.library_field_region_recommended()}
-						/>
-						<Field
-							id="genres"
-							label={m.library_field_genres()}
-							value={form.genres}
-							onChange={set("genres")}
-							help={m.library_field_genres_help()}
-							recommended={m.library_field_genres_recommended()}
-						/>
-						<Field
-							id="tags"
-							label={m.library_field_tags()}
-							value={form.tags}
-							onChange={set("tags")}
-							help={m.library_field_tags_help()}
-							recommended={m.library_field_tags_recommended()}
-						/>
-					</fieldset>
-
-					<fieldset className="space-y-4 rounded-lg border border-border/70 bg-muted/20 p-3 sm:p-4">
-						<legend className="sr-only">{m.library_advanced_legend()}</legend>
-						<p
-							aria-hidden
-							className="text-sm font-medium tracking-tight text-foreground"
-						>
-							{m.library_advanced_legend()}
-						</p>
-						<Field
-							id="installDir"
-							label={m.library_field_install_dir()}
-							value={form.installDir}
-							onChange={set("installDir")}
-							help={m.library_field_install_dir_help()}
-						/>
-						<Field
-							id="exe"
-							label={m.library_field_exe()}
-							value={form.exe}
-							onChange={set("exe")}
-							help={m.library_field_exe_help()}
-						/>
-						<Field
-							id="processName"
-							label={m.library_field_process_name()}
-							value={form.processName}
-							onChange={set("processName")}
-							help={m.library_field_process_name_help()}
-						/>
-						<div className="space-y-2">
-							<OptionLabel
-								label={m.library_field_prep()}
-								help={m.library_field_prep_help()}
-							/>
-							{form.prep.map((row, index) => (
-								<div
-									key={index}
-									className="grid gap-2 rounded-lg border border-border/70 bg-muted/10 p-2 sm:grid-cols-[1fr_1fr_auto] sm:items-center"
-								>
-									<Input
-										value={row.do}
-										placeholder={m.library_field_prep_do()}
-										onChange={(e) => setPrep(index, { do: e.target.value })}
-									/>
-									<Input
-										value={row.undo}
-										placeholder={m.library_field_prep_undo()}
-										onChange={(e) =>
-											setPrep(index, { undo: e.target.value })
-										}
-									/>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										aria-label={m.library_field_prep_remove()}
-										onClick={() => removePrep(index)}
-									>
-										<X className="size-4" />
-									</Button>
-								</div>
-							))}
-							<Button type="button" variant="outline" size="sm" onClick={addPrep}>
-								{m.library_field_prep_add()}
+							<p>{detailError ?? m.common_error()}</p>
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() => void detail.refetch()}
+							>
+								{m.common_retry()}
 							</Button>
 						</div>
-					</fieldset>
-
-					{error && (
-						<p
-							role="alert"
-							className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+					) : (
+						<div
+							role="status"
+							className="flex min-h-40 items-center justify-center text-sm text-muted-foreground"
 						>
-							{error}
-						</p>
-					)}
-					<div className="flex flex-wrap gap-2">
-						<Button type="submit" disabled={!ready || isSaving}>
-							{mode === "edit" ? m.library_save() : m.library_create()}
-						</Button>
-						<Button type="button" variant="outline" onClick={onCancel}>
-							{m.library_cancel()}
-						</Button>
-					</div>
-				</form>
+							{m.common_loading()}
+						</div>
+					)
+				) : (
+					<form onSubmit={handleSubmit} className="space-y-4">
+						<Field
+							id="title"
+							label={m.library_field_title()}
+							value={form.title}
+							onChange={set("title")}
+							help={m.library_field_title_help()}
+							required
+						/>
+						<Field
+							id="portrait"
+							label={m.library_field_portrait()}
+							value={form.portrait}
+							onChange={set("portrait")}
+							help={m.library_field_portrait_help()}
+							recommended={m.library_field_portrait_recommended()}
+						/>
+						<Field
+							id="hero"
+							label={m.library_field_hero()}
+							value={form.hero}
+							onChange={set("hero")}
+							help={m.library_field_hero_help()}
+							recommended={m.library_field_hero_recommended()}
+						/>
+						<Field
+							id="header"
+							label={m.library_field_header()}
+							value={form.header}
+							onChange={set("header")}
+							help={m.library_field_header_help()}
+							recommended={m.library_field_header_recommended()}
+						/>
+						<Field
+							id="logo"
+							label={m.library_field_logo()}
+							value={form.logo}
+							onChange={set("logo")}
+							help={m.library_field_logo_help()}
+							recommended={m.library_field_logo_recommended()}
+						/>
+						<Field
+							id="command"
+							label={m.library_field_command()}
+							value={form.command}
+							onChange={set("command")}
+							help={m.library_field_command_help()}
+							recommended={m.library_field_command_recommended()}
+						/>
+						<fieldset className="space-y-4 rounded-lg border border-border/70 bg-muted/20 p-3 sm:p-4">
+							<legend className="sr-only">{m.library_details_legend()}</legend>
+							<p
+								aria-hidden
+								className="text-sm font-medium tracking-tight text-foreground"
+							>
+								{m.library_details_legend()}
+							</p>
+							<Field
+								id="platform"
+								label={m.library_field_platform()}
+								value={form.platform}
+								onChange={set("platform")}
+								help={m.library_field_platform_help()}
+								recommended={m.library_field_platform_recommended()}
+							/>
+							<Field
+								id="description"
+								label={m.library_field_description()}
+								value={form.description}
+								onChange={set("description")}
+								help={m.library_field_description_help()}
+								recommended={m.library_field_description_recommended()}
+							/>
+							<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+								<Field
+									id="developer"
+									label={m.library_field_developer()}
+									value={form.developer}
+									onChange={set("developer")}
+									help={m.library_field_developer_help()}
+								/>
+								<Field
+									id="publisher"
+									label={m.library_field_publisher()}
+									value={form.publisher}
+									onChange={set("publisher")}
+									help={m.library_field_publisher_help()}
+								/>
+							</div>
+							<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+								<Field
+									id="releaseYear"
+									label={m.library_field_release_year()}
+									value={form.releaseYear}
+									onChange={set("releaseYear")}
+									help={m.library_field_release_year_help()}
+									recommended={m.library_field_release_year_recommended()}
+									error={
+										releaseYearValid
+											? undefined
+											: m.library_field_release_year_error()
+									}
+								/>
+								<Field
+									id="players"
+									label={m.library_field_players()}
+									value={form.players}
+									onChange={set("players")}
+									help={m.library_field_players_help()}
+									recommended={m.library_field_players_recommended()}
+									error={
+										playersValid ? undefined : m.library_field_players_error()
+									}
+								/>
+							</div>
+							<Field
+								id="region"
+								label={m.library_field_region()}
+								value={form.region}
+								onChange={set("region")}
+								help={m.library_field_region_help()}
+								recommended={m.library_field_region_recommended()}
+							/>
+							<Field
+								id="genres"
+								label={m.library_field_genres()}
+								value={form.genres}
+								onChange={set("genres")}
+								help={m.library_field_genres_help()}
+								recommended={m.library_field_genres_recommended()}
+							/>
+							<Field
+								id="tags"
+								label={m.library_field_tags()}
+								value={form.tags}
+								onChange={set("tags")}
+								help={m.library_field_tags_help()}
+								recommended={m.library_field_tags_recommended()}
+							/>
+						</fieldset>
+
+						<fieldset className="space-y-4 rounded-lg border border-border/70 bg-muted/20 p-3 sm:p-4">
+							<legend className="sr-only">{m.library_advanced_legend()}</legend>
+							<p
+								aria-hidden
+								className="text-sm font-medium tracking-tight text-foreground"
+							>
+								{m.library_advanced_legend()}
+							</p>
+							<Field
+								id="installDir"
+								label={m.library_field_install_dir()}
+								value={form.installDir}
+								onChange={set("installDir")}
+								help={m.library_field_install_dir_help()}
+							/>
+							<Field
+								id="exe"
+								label={m.library_field_exe()}
+								value={form.exe}
+								onChange={set("exe")}
+								help={m.library_field_exe_help()}
+							/>
+							<Field
+								id="processName"
+								label={m.library_field_process_name()}
+								value={form.processName}
+								onChange={set("processName")}
+								help={m.library_field_process_name_help()}
+							/>
+							<div className="space-y-2">
+								<OptionLabel
+									label={m.library_field_prep()}
+									help={m.library_field_prep_help()}
+								/>
+								{form.prep.map((row, index) => (
+									<div
+										key={index}
+										className="grid gap-2 rounded-lg border border-border/70 bg-muted/10 p-2 sm:grid-cols-[1fr_1fr_auto] sm:items-center"
+									>
+										<Input
+											value={row.do}
+											placeholder={m.library_field_prep_do()}
+											onChange={(e) => setPrep(index, { do: e.target.value })}
+										/>
+										<Input
+											value={row.undo}
+											placeholder={m.library_field_prep_undo()}
+											onChange={(e) => setPrep(index, { undo: e.target.value })}
+										/>
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											aria-label={m.library_field_prep_remove()}
+											onClick={() => removePrep(index)}
+										>
+											<X className="size-4" />
+										</Button>
+									</div>
+								))}
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={addPrep}
+								>
+									{m.library_field_prep_add()}
+								</Button>
+							</div>
+						</fieldset>
+
+						{error && (
+							<p
+								role="alert"
+								className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+							>
+								{error}
+							</p>
+						)}
+						<div className="flex flex-wrap gap-2">
+							<Button type="submit" disabled={!ready || isSaving}>
+								{mode === "edit" ? m.library_save() : m.library_create()}
+							</Button>
+							<Button type="button" variant="outline" onClick={onCancel}>
+								{m.library_cancel()}
+							</Button>
+						</div>
+					</form>
+				)}
 			</CardContent>
 		</Card>
 	);
@@ -543,7 +587,11 @@ const Field: FC<{
 			onChange={(e) => onChange(e.target.value)}
 		/>
 		{error ? (
-			<p id={`lib-${id}-error`} role="alert" className="text-xs text-destructive">
+			<p
+				id={`lib-${id}-error`}
+				role="alert"
+				className="text-xs text-destructive"
+			>
 				{error}
 			</p>
 		) : null}

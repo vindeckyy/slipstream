@@ -146,7 +146,10 @@ impl HooksConfig {
         for (i, h) in self.hooks.iter().enumerate() {
             let field = |suffix: &str| format!("hooks[{i}]{suffix}");
             if h.on.trim().is_empty() {
-                errors.push((field(".on"), "must be an event kind or `domain.*` pattern".into()));
+                errors.push((
+                    field(".on"),
+                    "must be an event kind or `domain.*` pattern".into(),
+                ));
             }
             if h.run.as_deref().is_none_or(|r| r.trim().is_empty())
                 && h.webhook.as_deref().is_none_or(|w| w.trim().is_empty())
@@ -173,10 +176,7 @@ impl HooksConfig {
                 }
             }
             if h.timeout_s == 0 || h.timeout_s > MAX_TIMEOUT_S {
-                errors.push((
-                    field(".timeout_s"),
-                    format!("must be 1–{MAX_TIMEOUT_S}"),
-                ));
+                errors.push((field(".timeout_s"), format!("must be 1–{MAX_TIMEOUT_S}")));
             }
         }
         errors

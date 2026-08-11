@@ -858,7 +858,10 @@ mod tests {
             keep_alive: KeepAlive::Off,
             ..DisplayPolicy::default()
         };
-        assert!(off.field_errors().iter().all(|(f, _)| f != "keep_alive.seconds"));
+        assert!(off
+            .field_errors()
+            .iter()
+            .all(|(f, _)| f != "keep_alive.seconds"));
         let forever = DisplayPolicy {
             keep_alive: KeepAlive::Forever,
             ..DisplayPolicy::default()
