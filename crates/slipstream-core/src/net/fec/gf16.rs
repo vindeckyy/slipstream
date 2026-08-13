@@ -44,7 +44,7 @@ impl ErasureCoder for Gf16Coder {
         validate_encode_shape(data)?;
         let k = data.len();
         let shard_len = data[0].len();
-        if shard_len % 2 != 0 {
+        if !shard_len.is_multiple_of(2) {
             return Err(FecError::Config("GF(2^16) shard length must be even"));
         }
         let mut guard = self.enc.lock().unwrap_or_else(|p| p.into_inner());
@@ -152,7 +152,7 @@ impl ErasureCoder for Gf16Coder {
         if have.iter().all(|h| *h) {
             return Ok(()); // nothing missing — no codec work, no copies
         }
-        if data[0].len() % 2 != 0 {
+        if !data[0].len().is_multiple_of(2) {
             return Err(FecError::Config("GF(2^16) shard length must be even"));
         }
         let data_count = data.len();

@@ -93,11 +93,10 @@ pub fn decide(
 /// The effective `mode_conflict` policy for this host: the console value, or `Separate` when no
 /// value is configured. Shared by the native and GameStream admission paths.
 pub fn effective_conflict() -> ModeConflict {
-    let conflict = policy::prefs()
+    policy::prefs()
         .configured_effective()
         .map(|e| e.mode_conflict)
-        .unwrap_or(ModeConflict::Separate);
-    conflict
+        .unwrap_or(ModeConflict::Separate)
 }
 
 /// Resolve the admission decision for a connecting native session from the effective policy and

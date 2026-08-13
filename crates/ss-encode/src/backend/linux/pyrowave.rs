@@ -427,7 +427,7 @@ impl PyroWaveEncoder {
         bitrate_bps: u64,
         chroma: crate::ChromaFormat,
     ) -> Result<Self> {
-        if !chroma.is_444() && (width % 2 != 0 || height % 2 != 0) {
+        if !chroma.is_444() && (!width.is_multiple_of(2) || !height.is_multiple_of(2)) {
             bail!("pyrowave 4:2:0 needs even dimensions (got {width}x{height})");
         }
         // Checked against the chroma actually being opened, NOT hardcoded 4:4:4. The 4:2:0 block

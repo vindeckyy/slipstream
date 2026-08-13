@@ -710,6 +710,10 @@ fn mic_pw_thread(
     result
 }
 
+// Thread entry point: the channels and `Arc` atomics arrive flat by value (moved into the
+// spawned thread). Bundling them into a params struct would only relocate the list at the single
+// call site without clarifying ownership.
+#[allow(clippy::too_many_arguments)]
 fn pw_thread(
     tx: std::sync::mpsc::SyncSender<Vec<f32>>,
     quit_rx: pipewire::channel::Receiver<Terminate>,

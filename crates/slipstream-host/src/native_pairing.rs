@@ -128,9 +128,9 @@ impl NativePairing {
 
     /// Record a successful pairing (re-pairing the same fingerprint just updates the name). The name
     /// is sanitized (untrusted); a persist failure rolls the in-memory store back. Pins the
-    /// fingerprint in the store FIRST, then clears any pending knock for it and wakes parked waiters
-    ///  -  an order [`Self::wait_for_decision`] relies on (a woken waiter must observe the fully
-    /// settled state: paired = true, no longer pending).
+    /// fingerprint in the store FIRST, then clears any pending knock for it and wakes parked
+    /// waiters - an order [`Self::wait_for_decision`] relies on (a woken waiter must observe the
+    /// fully settled state: paired = true, no longer pending).
     pub fn add(&self, name: &str, fp_hex: &str) -> Result<()> {
         self.store.add(name, fp_hex)?;
         self.approval.admit_and_clear(fp_hex);

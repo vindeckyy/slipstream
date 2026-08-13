@@ -500,7 +500,7 @@ pub fn validate_dimensions(codec: Codec, width: u32, height: u32) -> Result<()> 
         anyhow::bail!("invalid encode resolution {width}x{height}: dimensions must be non-zero");
     }
     // NVENC requires even dimensions for the chroma subsampling it does internally.
-    if width % 2 != 0 || height % 2 != 0 {
+    if !width.is_multiple_of(2) || !height.is_multiple_of(2) {
         anyhow::bail!("invalid encode resolution {width}x{height}: dimensions must be even");
     }
     // PyroWave's 5-level wavelet decomposition needs ≥ 4·2⁵ px per axis (upstream

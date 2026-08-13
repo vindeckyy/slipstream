@@ -5992,7 +5992,7 @@
       },
       "GameSession": {
         "type": "string",
-        "description": "How a session that **launches a game** (a library id on the Hello / apps.json / Decky pin) is\nserved (`design/gamemode-and-dedicated-sessions.md` §5.2). Orthogonal to the preset/lifecycle axes\n- a top-level [`DisplayPolicy`] field, NOT part of [`EffectivePolicy`], so a preset never clobbers\nit. Linux-only in effect.",
+        "description": "How a session that **launches a game** (a library id on the Hello / apps.json / Decky pin) is\nserved (`design/gamemode-and-dedicated-sessions.md` §5.2). Orthogonal to the preset/lifecycle\naxes - a top-level [`DisplayPolicy`] field, NOT part of [`EffectivePolicy`], so a preset never\nclobbers it. Linux-only in effect.",
         "enum": [
           "auto",
           "dedicated"

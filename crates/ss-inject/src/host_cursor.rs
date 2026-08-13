@@ -15,11 +15,9 @@ impl PlatformHide {
     /// Best-effort hide. Returns `None` when the platform cannot hide (caller still holds the
     /// refcount share; stream continues).
     pub fn acquire() -> Option<Self> {
-        {
-            let inner = linux::Inner::acquire()?;
-            host_cursor_flag::set_hidden_for_stream(true);
-            return Some(Self { inner });
-        }
+        let inner = linux::Inner::acquire()?;
+        host_cursor_flag::set_hidden_for_stream(true);
+        Some(Self { inner })
     }
 }
 
@@ -36,7 +34,7 @@ mod linux {
     use std::process::Command;
 
     pub(super) enum Inner {
-        Xfixes(XfixesHide),
+        Xfixes(Box<XfixesHide>),
         Theme(ThemeHide),
     }
 
@@ -64,7 +62,7 @@ mod linux {
             }
             if let Some(x) = XfixesHide::try_acquire() {
                 tracing::info!("host cursor hide: XFixesHideCursor (X11)");
-                return Some(Self::Xfixes(x));
+                return Some(Self::Xfixes(Box::new(x)));
             }
             tracing::warn!(
                 "host cursor hide: no X11 display and not a supported Wayland desktop; streaming continues"

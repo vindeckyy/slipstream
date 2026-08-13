@@ -32,14 +32,22 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master, pinned
         with:
-          toolchain: 1.82.0
+          toolchain: 1.96.0
           components: rustfmt, clippy
 
       - run: cargo fmt --all --check
       # The full workspace contains platform clients with separate system SDK requirements.
       # Keep this required gate on the portable core crates and their focused test suites.
-      - run: cargo clippy -p slipstream-core -p ss-host-config -p ss-update-check --all-targets --locked -- -D warnings
-      - run: cargo test -p slipstream-core -p ss-host-config -p ss-update-check --locked
+      # The MSRV tracks the pinned toolchain (rust-toolchain.toml): the vendored FEC backend uses
+      # the GFNI target feature and several deps ship edition-2024 builds, so 1.82 is no longer
+      # reachable. slipstream-core is exercised with its `quic` feature (the slipstream/1 control
+      # plane: handshake, pairing, control/datagram codecs, clipboard transport) — the
+      # default-feature build never compiles those modules, so their tests and clippy gates must
+      # be explicit.
+      - run: cargo clippy -p slipstream-core --features quic --all-targets --locked -- -D warnings
+      - run: cargo clippy -p ss-host-config -p ss-update-check --all-targets --locked -- -D warnings
+      - run: cargo test -p slipstream-core --features quic --locked
+      - run: cargo test -p ss-host-config -p ss-update-check --locked
       - run: cargo check -p slipstream-host --locked
       - run: cargo test -p slipstream-host --locked
       - name: Verify generated C header

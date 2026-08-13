@@ -59,7 +59,7 @@ pub fn loopback_pair(
 impl Transport for LoopbackTransport {
     fn send(&self, packet: &[u8]) -> std::io::Result<bool> {
         let n = self.tx.sent.fetch_add(1, Ordering::Relaxed);
-        if self.tx.drop_period != 0 && (n % self.tx.drop_period as u64) == 0 {
+        if self.tx.drop_period != 0 && n.is_multiple_of(self.tx.drop_period as u64) {
             // Deterministically drop in flight (the 1st of each `drop_period` group). This models
             // NETWORK loss (the packet left the sender, then vanished), not a local send-buffer
             // drop — so it still reports `Ok(true)`: the host sent it; the recv/FEC side handles

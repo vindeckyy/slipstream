@@ -396,7 +396,7 @@ impl Config {
     /// Validate every invariant the hot path and the reassembler rely on. Rejecting here
     /// is what keeps the receive-side parser's allocations bounded.
     pub fn validate(&self) -> Result<()> {
-        if self.shard_payload == 0 || self.shard_payload % 2 != 0 {
+        if self.shard_payload == 0 || !self.shard_payload.is_multiple_of(2) {
             return Err(SlipstreamError::InvalidArg(
                 "shard_payload must be even and > 0",
             ));

@@ -33,8 +33,9 @@ reviewed batches, then run the security and license checks before publishing.
 
 ## Prerequisites
 
-The development and release toolchain is pinned exactly in `rust-toolchain.toml`. CI also checks
-the portable crates against the workspace MSRV declared in `Cargo.toml`.
+The development and release toolchain is pinned exactly in `rust-toolchain.toml`, and the
+portable-crate CI job uses the same version; the workspace `rust-version` tracks that pin (the
+vendored FEC GFNI backend and edition-2024 dependencies rule out older toolchains).
 
 The workspace links system libraries, so a bare `cargo build --workspace` fails on a stock machine.
 GitHub Actions runs on Ubuntu 24.04 and installs the authoritative dependency set in
@@ -66,8 +67,10 @@ Use `--locked` as CI does:
 
 ```sh
 cargo fmt --all --check
-cargo clippy -p slipstream-core -p ss-host-config -p ss-update-check --all-targets --locked -- -D warnings
-cargo test -p slipstream-core -p ss-host-config -p ss-update-check -p slipstream-host --locked
+cargo clippy -p slipstream-core --features quic --all-targets --locked -- -D warnings
+cargo clippy -p ss-host-config -p ss-update-check --all-targets --locked -- -D warnings
+cargo test -p slipstream-core --features quic --locked
+cargo test -p ss-host-config -p ss-update-check -p slipstream-host --locked
 cargo check -p slipstream-host --locked
 ```
 

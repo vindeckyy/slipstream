@@ -393,6 +393,10 @@ pub(super) async fn run(
 /// plane, measured — never assumed); variation is an EWMA of the RTT deltas; capacity comes
 /// from the latest speed-test probe burst (0 = not yet measured). On a state change, the new
 /// state's policy is published to the send path.
+// Measurement-window state: three shared refs (state machine, policy, QUIC connection), three
+// sample scalars, and three `&mut` EWMA/feed accumulators. Bundling them would hide which are
+// mutated in place versus read.
+#[allow(clippy::too_many_arguments)]
 fn feed_transport(
     state: &Arc<std::sync::Mutex<crate::transport_state::TransportStateMachine>>,
     policy: &Arc<crate::transport_state::TransportPolicyShared>,

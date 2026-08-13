@@ -409,10 +409,8 @@ impl VirtualDisplay for KwinDisplay {
             // In-process first; fall back to kscreen-doctor if the compositor doesn't answer in budget.
             Box::new(move || {
                 crate::monitor_hold::restore(hold);
-                if !disabled.is_empty() {
-                    if !crate::kwin_output_mgmt::reenable_outputs(&disabled) {
-                        reenable_outputs_kscreen(&disabled);
-                    }
+                if !disabled.is_empty() && !crate::kwin_output_mgmt::reenable_outputs(&disabled) {
+                    reenable_outputs_kscreen(&disabled);
                 }
             }) as Box<dyn FnOnce() + Send>
         });

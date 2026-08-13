@@ -28,7 +28,7 @@ pub struct OsInfo {
 /// Detect (once) and return the host's OS identity.
 pub fn detect() -> &'static OsInfo {
     static OS: OnceLock<OsInfo> = OnceLock::new();
-    OS.get_or_init(|| linux_os_info())
+    OS.get_or_init(linux_os_info)
 }
 
 /// `ID_LIKE` ancestors worth keeping as the chain's middle token — the distros clients plausibly

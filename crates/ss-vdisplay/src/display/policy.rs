@@ -158,9 +158,9 @@ pub struct Layout {
 }
 
 /// How a session that **launches a game** (a library id on the Hello / apps.json / Decky pin) is
-/// served (`design/gamemode-and-dedicated-sessions.md` §5.2). Orthogonal to the preset/lifecycle axes
-/// - a top-level [`DisplayPolicy`] field, NOT part of [`EffectivePolicy`], so a preset never clobbers
-/// it. Linux-only in effect.
+/// served (`design/gamemode-and-dedicated-sessions.md` §5.2). Orthogonal to the preset/lifecycle
+/// axes - a top-level [`DisplayPolicy`] field, NOT part of [`EffectivePolicy`], so a preset never
+/// clobbers it. Linux-only in effect.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum GameSession {

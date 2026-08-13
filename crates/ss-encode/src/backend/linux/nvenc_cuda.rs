@@ -507,7 +507,7 @@ fn retrieve_loop(
         // In two-thread mode the host loop's `wait_us` wraps a non-blocking poll, so the real
         // encode wait (scheduling + ASIC) is measured by NO timer there — sample it here instead
         // (same SLIPSTREAM_PERF cadence as the submit split).
-        let sample = ss_host_config::config().perf && jobs % 120 == 0;
+        let sample = ss_host_config::config().perf && jobs.is_multiple_of(120);
         jobs += 1;
         let t0 = std::time::Instant::now();
         // SAFETY: `job.bs` is one of the session's pool bitstreams a prior `encode_picture`
@@ -1805,7 +1805,7 @@ impl Encoder for NvencCudaEncoder {
         // copy (the zero-copy-registration target), blend = cursor overlay kernel (0 without a
         // cursor), map/pic = the NVENC map_input_resource / encode_picture launches. The host
         // loop's `submit_us` folds all four together; this is what splits them apart.
-        let sample = ss_host_config::config().perf && self.frames % 120 == 0;
+        let sample = ss_host_config::config().perf && self.frames.is_multiple_of(120);
         self.frames += 1;
 
         // Stream-ordered fast path (§7 LN2): enqueue the copy + blend with no CPU sync and let the

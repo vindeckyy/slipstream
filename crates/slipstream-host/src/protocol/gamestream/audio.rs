@@ -412,7 +412,7 @@ fn audio_body(
             // close the block with 2 parity packets (RTP seqs continue past the block, like
             // Sunshine — the client places parity by the FEC header, not the RTP seq).
             if fec {
-                if seq % FEC_DATA_SHARDS as u16 == 0 {
+                if seq.is_multiple_of(FEC_DATA_SHARDS as u16) {
                     fec_block.clear();
                     fec_base_seq = seq;
                     fec_base_ts = timestamp;
@@ -450,7 +450,7 @@ fn audio_body(
             // GameStream's audio RTP timestamp ticks by packetDuration (ms), not by samples.
             timestamp = timestamp.wrapping_add(frame_ms as u32);
             sent += 1;
-            if sent % 400 == 0 {
+            if sent.is_multiple_of(400) {
                 tracing::debug!(sent, "audio: streaming");
             }
 

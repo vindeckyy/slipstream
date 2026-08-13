@@ -342,7 +342,7 @@ impl Reassembler {
             // Slice-granularity sentinel: `frame_bytes` is the block's BASE byte offset —
             // shard-aligned by contract, and the block's whole range must fit the negotiated
             // frame budget (placement re-checks against the live buffer too).
-            if frame_bytes % shard_bytes != 0
+            if !frame_bytes.is_multiple_of(shard_bytes)
                 || frame_bytes + data_shards * shard_bytes > lim.max_frame_bytes
                 || block_idx + 1 >= slice_block_cap
             {

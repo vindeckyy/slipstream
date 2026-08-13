@@ -3527,7 +3527,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                             // The overlap measurement the Phase-3 gate needs (sampled): how
                             // early the first slice reached the send thread vs. the whole
                             // encode  -  the win is roughly their difference per AU.
-                            if sent % 120 == 0 {
+                            if sent.is_multiple_of(120) {
                                 tracing::info!(
                                     first_slice_us = first_chunk_us,
                                     encode_us,

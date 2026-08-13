@@ -92,8 +92,10 @@ described there is tied to the host and client paths in this repository.
 Run the portable Rust checks used by CI:
 
     cargo fmt --all --check
-    cargo clippy -p slipstream-core -p ss-host-config -p ss-update-check --all-targets --locked -- -D warnings
-    cargo test -p slipstream-core -p ss-host-config -p ss-update-check -p slipstream-host --locked
+    cargo clippy -p slipstream-core --features quic --all-targets --locked -- -D warnings
+    cargo clippy -p ss-host-config -p ss-update-check --all-targets --locked -- -D warnings
+    cargo test -p slipstream-core --features quic --locked
+    cargo test -p ss-host-config -p ss-update-check -p slipstream-host --locked
     cargo check -p slipstream-host --locked
 
 The web console and documentation site use Bun. Each directory has its own lockfile and validation

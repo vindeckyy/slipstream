@@ -1253,7 +1253,7 @@ impl EiState {
         let bit = kind_bit(ev.kind);
         let first = self.seen_kinds & bit == 0;
         self.seen_kinds |= bit;
-        let loud = first || n <= 5 || n % 600 == 0;
+        let loud = first || n <= 5 || n.is_multiple_of(600);
         let Some(idx) = self.device_for(cap) else {
             if loud {
                 tracing::warn!(

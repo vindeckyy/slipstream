@@ -509,7 +509,7 @@ fn session_thread(
         while !stop.load(Ordering::Relaxed) {
             tokio::time::sleep(Duration::from_millis(200)).await;
             ticks = ticks.wrapping_add(1);
-            if ticks % 25 == 0 {
+            if ticks.is_multiple_of(25) {
                 if let Some((dc, _, vconn)) = &tracked {
                     persist_scale_change(dc, vconn, &scale_key, &mut known).await;
                 }
@@ -944,7 +944,7 @@ fn current_mode_full(state: &CurrentState, connector: &str) -> Option<(String, i
 /// enough). Without a read-back, never claim above 60  -  over-pacing floods the encode loop with
 /// repeated frames and scroll motion looks like jumps.
 fn conservative_mutter_hz(requested: u32) -> u32 {
-    requested.min(60).max(1)
+    requested.clamp(1, 60)
 }
 
 /// Round DisplayConfig's current refresh for `connector` into an integer Hz for `preferred_mode`.

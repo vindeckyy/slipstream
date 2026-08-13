@@ -3,7 +3,7 @@
 //! Unlike the uinput X-Box-360 pad ([`super::gamepad`]), which only carries buttons + axes + a
 //! rumble back-channel, a UHID device presents a *real* DualSense HID interface to the kernel:
 //! `hid-playstation` binds it (matched by VID `054C`/PID `0CE6`) and exposes the full controller
-//!  -  gamepad, motion sensors, touchpad, lightbar + player LEDs, and adaptive triggers  -  to games.
+//! (gamepad, motion sensors, touchpad, lightbar + player LEDs, and adaptive triggers) to games.
 //! The host writes HID **input** reports (report `0x01`, our controller state) and reads HID
 //! **output** reports (report `0x02`, a game's rumble/LED/trigger feedback) back, which it
 //! forwards to the client as [`slipstream_core::quic::HidOutput`].

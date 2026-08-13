@@ -264,11 +264,7 @@ pub(super) fn audio_thread(
                             pts_ns,
                             &opus_buf[..n],
                         );
-                        if conn.send_datagram(d.into()).is_err() {
-                            false
-                        } else {
-                            true
-                        }
+                        conn.send_datagram(d.into()).is_ok()
                     };
                     if !ok {
                         break 'session; // connection gone

@@ -487,7 +487,7 @@ impl VkSlotBlend {
                 .context("create descriptor pool")?;
 
             // The shader + one pipeline per MODE (spec constant 0).
-            if CURSOR_SPV.len() % 4 != 0 {
+            if !CURSOR_SPV.len().is_multiple_of(4) {
                 anyhow::bail!("cursor_blend.spv is not word-aligned");
             }
             let words: Vec<u32> = CURSOR_SPV

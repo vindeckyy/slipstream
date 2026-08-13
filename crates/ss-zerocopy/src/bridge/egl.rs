@@ -333,7 +333,7 @@ impl Nv12Blit {
         // synchronous call; every created name is owned by `guard` until the struct exists.
         unsafe {
             ensure!(
-                width % 2 == 0 && height % 2 == 0,
+                width.is_multiple_of(2) && height.is_multiple_of(2),
                 "NV12 convert needs even dimensions (got {width}x{height})"
             );
             // Declared before every GL name so it drops LAST on unwind — after the CUDA registrations
@@ -525,7 +525,7 @@ impl Yuv444Blit {
         // synchronous call; every created name is owned by `guard` until the struct exists.
         unsafe {
             ensure!(
-                width % 2 == 0 && height % 2 == 0,
+                width.is_multiple_of(2) && height.is_multiple_of(2),
                 "YUV444 convert needs even dimensions (got {width}x{height})"
             );
             let full_range =
@@ -924,7 +924,7 @@ impl EglImporter {
         // write / CUDA_ERROR_ILLEGAL_ADDRESS that poisons the shared context). Reject here, matching
         // the guards `Nv12Blit::new`/`Yuv444Blit::new` already carry.
         anyhow::ensure!(
-            width % 2 == 0 && height % 2 == 0,
+            width.is_multiple_of(2) && height.is_multiple_of(2),
             "LINEAR NV12 needs even dimensions (got {width}x{height})"
         );
         cuda::make_current()?;

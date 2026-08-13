@@ -32,9 +32,10 @@ fn now_ns() -> u64 {
 /// wire timestamps (`capture_ns` / `deadline`) are compared against `SystemTime`/`Instant` wall
 /// clocks  -  mixing domains there would make every frame look stale or in the future.
 fn mono_ns() -> u64 {
-    // SAFETY: `clock_gettime` is a pure read of a kernel clock into a caller-provided struct; the
-    // pointer is to a live local, `clockid_t` is a valid clock, and the call has no side effects.
     let mut ts = std::mem::MaybeUninit::<libc::timespec>::uninit();
+    // SAFETY: `clock_gettime` is a pure read of a kernel clock into the caller-provided `ts`
+    // (`MaybeUninit<timespec>`); the pointer is to that live local, `CLOCK_MONOTONIC` is a valid
+    // `clockid_t`, and the call has no side effects. On return `rc == 0` means `ts` is initialized.
     let rc = unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, ts.as_mut_ptr()) };
     if rc == 0 {
         // SAFETY: `clock_gettime` returned 0 → `ts` was fully initialized.
@@ -94,6 +95,7 @@ fn producer_pts_to_wall(producer_pts: u64) -> Option<u64> {
 ///     refill happens at least `pool.len()` frame periods after the previous occupant was handed
 ///     out), AND
 ///   - the consumer has taken at least one frame since that fill (`taken` advanced).
+///
 /// Under the depth-one pipeline (the documented normal state), a taken frame's pixels are read for
 /// at most ~2 frame periods (take + the ≤1-interval phase-lock hold before submit), so a buffer
 /// refilled ≥3 periods later is safe to overwrite; the take-guard additionally forbids reuse while

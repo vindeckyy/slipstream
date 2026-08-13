@@ -625,7 +625,7 @@ impl VkBridge {
         pool: &cuda::BufferPool,
     ) -> Result<DeviceBuffer> {
         anyhow::ensure!(
-            offset % 4 == 0 && stride % 4 == 0,
+            offset.is_multiple_of(4) && stride.is_multiple_of(4),
             "LINEAR dmabuf offset/stride not word-aligned ({offset}/{stride})"
         );
         // Exportable-buffer NV12 layout the shader writes: 4-aligned Y pitch, UV plane (⌈h/2⌉

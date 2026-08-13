@@ -3,8 +3,8 @@
 # formatting rules shift and `cargo fmt --all --check` starts failing on files nobody touched
 # (format drift). An exact pin makes rustfmt/rustc identical for every contributor and CI, so
 # formatting only ever changes in a deliberate bump-this-line-and-reformat commit.
-# Local builds and release CI honor this pin. The portable-crate CI job also checks the declared
-# workspace MSRV separately.
+# Local builds, release CI, and the portable-crate CI job all honor this pin; the workspace
+# `rust-version` tracks it (the vendored FEC GFNI backend and edition-2024 deps rule out older).
 [toolchain]
 channel = "1.96.0"
 components = ["rustfmt", "clippy"]

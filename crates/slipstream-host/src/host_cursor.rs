@@ -44,10 +44,8 @@ impl Drop for StreamHold {
         }
         let mut st = state().lock().unwrap_or_else(|e| e.into_inner());
         st.count = st.count.saturating_sub(1);
-        if st.count == 0 {
-            if st.platform.take().is_some() {
-                tracing::info!("restored the host OS cursor (no live sessions)");
-            }
+        if st.count == 0 && st.platform.take().is_some() {
+            tracing::info!("restored the host OS cursor (no live sessions)");
         }
     }
 }
