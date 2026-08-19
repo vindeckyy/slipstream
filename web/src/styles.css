@@ -97,6 +97,13 @@
 	--neutral-highlight: var(--border);
 	--error: var(--destructive);
 
+	--chart-1: oklch(0.62 0.17  18);
+	--chart-2: oklch(0.62 0.15 160);
+	--chart-3: oklch(0.62 0.13 230);
+	--chart-4: oklch(0.72 0.14  75);
+	--chart-5: oklch(0.62 0.15 290);
+	--chart-6: oklch(0.58 0.12 200);
+
 	--font-display: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
 	--font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
 	--font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
@@ -161,6 +168,36 @@
 	--info-foreground: #061017;
 	--destructive: oklch(0.68 0.19 18);
 	--destructive-foreground: #0d1117;
+
+	--surface-canvas: var(--background);
+	--surface-panel: var(--card);
+	--surface-overlay: var(--popover);
+	--surface-inset: var(--muted);
+	--surface-selected: var(--secondary);
+	--surface-hover: color-mix(in oklab, var(--card) 88%, var(--foreground));
+	--surface-pressed: color-mix(in oklab, var(--card) 82%, var(--foreground));
+	--surface-disabled: color-mix(
+		in oklab,
+		var(--card) 84%,
+		var(--muted-foreground)
+	);
+	--outline-subtle: color-mix(in oklab, var(--border) 45%, transparent);
+	--outline-strong: color-mix(in oklab, var(--border) 80%, var(--foreground));
+	--success-subtle: color-mix(in oklab, var(--success) 16%, var(--card));
+	--warning-subtle: color-mix(in oklab, var(--warning) 16%, var(--card));
+	--info-subtle: color-mix(in oklab, var(--info) 16%, var(--card));
+	--destructive-subtle: color-mix(
+		in oklab,
+		var(--destructive) 16%,
+		var(--card)
+	);
+
+	--chart-1: oklch(0.68 0.18  18);
+	--chart-2: oklch(0.68 0.16 160);
+	--chart-3: oklch(0.68 0.14 230);
+	--chart-4: oklch(0.78 0.14  75);
+	--chart-5: oklch(0.68 0.16 290);
+	--chart-6: oklch(0.65 0.13 200);
 }
 
 
@@ -233,6 +270,12 @@
 	--color-surface-disabled: var(--surface-disabled);
 	--color-outline-subtle: var(--outline-subtle);
 	--color-outline-strong: var(--outline-strong);
+	--color-chart-1: var(--chart-1);
+	--color-chart-2: var(--chart-2);
+	--color-chart-3: var(--chart-3);
+	--color-chart-4: var(--chart-4);
+	--color-chart-5: var(--chart-5);
+	--color-chart-6: var(--chart-6);
 
 
 	--color-main: var(--main);

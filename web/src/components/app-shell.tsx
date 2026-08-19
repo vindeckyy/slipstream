@@ -61,7 +61,7 @@ const statusQueryOptions = {
 /** Keycap nav: crisp top edge, subtle bottom shadow, press travel. The active key is
     lit cyan (ON AIR) with a mono silkscreen label — not a side border. */
 const navItemClass =
-	"group relative flex min-h-8 items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] leading-snug text-muted-foreground outline-none shadow-[0_1px_0_rgba(0,0,0,0.35),inset_0_1px_0_color-mix(in_oklab,var(--card)_85%,white)] transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:bg-muted/70 focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1 focus-visible:ring-offset-card active:shadow-none active:translate-y-px";
+	"group relative flex min-h-8 items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] leading-snug text-muted-foreground outline-none shadow-[0_1px_0_rgba(0,0,0,0.35),inset_0_1px_0_color-mix(in_oklab,var(--card)_85%,white)] transition-[color,background-color,box-shadow,transform] duration-150 ease-out motion-reduce:transition-none motion-reduce:transform-none hover:bg-muted/70 hover:text-foreground focus-visible:bg-muted/70 focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1 focus-visible:ring-offset-card active:shadow-none active:translate-y-px";
 
 const navItemActiveClass =
 	"bg-primary/12 text-foreground font-medium hover:bg-primary/15";
@@ -85,7 +85,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 			    fold. overflow-y-auto lets the nav itself scroll on very short viewports. */}
 				<aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col overflow-y-auto border-r border-border/80 bg-card sm:flex">
 					{/* Chassis top: the ASCII wordmark as a silkscreened label on a brushed strip. */}
-					<div className="flex flex-col gap-6 border-b border-border/70 bg-muted/30 px-3 pb-4 pt-4">
+					<div className="flex flex-col gap-5 border-b border-border/70 bg-muted/30 px-3 pb-3.5 pt-3.5">
 						<Link
 							to="/"
 							aria-label={m.app_name()}
@@ -98,7 +98,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 							initial={{ opacity: 0 }}
 							animate={{ opacity: 1 }}
 							transition={{ duration: 0.18 }}
-							className="flex flex-col gap-4"
+							className="flex flex-col gap-3.5"
 							aria-label={m.app_name()}
 						>
 							{NAV_GROUPS.map(({ id, label, itemIds }) => (

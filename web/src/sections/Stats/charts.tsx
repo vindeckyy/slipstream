@@ -46,20 +46,20 @@ const legendStyle = { fontSize: 12, paddingTop: 4 } as const;
 const STAGE_COLORS: Record<string, string> = {
 	// `queue` (native pipeline's first stage) needs its own hue — without it, it fell back to
 	// PALETTE[0], which is capture's exact purple, making the bottom two bands indistinguishable.
-	queue: "#64748b",
-	capture: "#0891b2",
-	submit: "#22a2f2",
-	encode: "#f2a922",
-	packetize: "#1fb6a8",
-	send: "#f25c8a",
+	queue: "var(--chart-6)",
+	capture: "var(--chart-3)",
+	submit: "var(--chart-5)",
+	encode: "var(--chart-4)",
+	packetize: "var(--chart-2)",
+	send: "var(--chart-1)",
 };
 const PALETTE = [
-	"#0891b2",
-	"#22a2f2",
-	"#f2a922",
-	"#1fb6a8",
-	"#f25c8a",
-	"#9b6cf3",
+	"var(--chart-1)",
+	"var(--chart-2)",
+	"var(--chart-3)",
+	"var(--chart-4)",
+	"var(--chart-5)",
+	"var(--chart-6)",
 ];
 
 /** True only after the first client-side effect — gates recharts off the server render. */
