@@ -91,20 +91,23 @@ export const LibraryGrid: FC<{
 			refetch={library.refetch}
 		>
 			{games.length === 0 ? (
-				<Card>
+				<Card className="border-dashed">
 					{/* `flush`, not a bare `p-8`: the default `sm:pt-0` would survive the override
 					    (tailwind-merge only resolves conflicts within a variant) and eat the top
 					    inset at ≥640px — see the CardContent doc comment. */}
 					<CardContent
 						flush
-						className="flex flex-col items-center gap-3 p-10 text-center sm:p-12"
+						className="flex flex-col items-center gap-4 p-10 text-center sm:p-12"
 					>
-						<span className="flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
+						<span className="flex size-12 items-center justify-center rounded-xl border border-border/50 bg-muted/40 text-muted-foreground shadow-sm">
 							<Library className="size-5" aria-hidden />
 						</span>
-						<p className="max-w-sm text-sm text-muted-foreground">
-							{m.library_empty()}
-						</p>
+						<div className="max-w-sm space-y-1">
+							<p className="text-sm font-medium text-foreground">No games yet</p>
+							<p className="text-sm leading-relaxed text-muted-foreground">
+								{m.library_empty()}
+							</p>
+						</div>
 					</CardContent>
 				</Card>
 			) : (
