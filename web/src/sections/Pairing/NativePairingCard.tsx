@@ -119,7 +119,7 @@ export const NativePairingCard: FC<{
 								</div>
 								<RecommendedMark value="Stay on this page until the client confirms, then check Paired devices below." />
 							</div>
-							<div className="rounded-xl border border-border/70 bg-muted/30 py-6 text-center font-mono text-4xl font-semibold tracking-[0.3em] tabular-nums">
+							<div className="rounded-xl border border-primary/20 bg-primary/5 py-7 text-center font-mono text-5xl font-bold tracking-[0.35em] tabular-nums shadow-[inset_0_1px_2px_rgba(0,0,0,0.08)]">
 								{d.pin}
 							</div>
 							{d.expires_in_secs != null && (

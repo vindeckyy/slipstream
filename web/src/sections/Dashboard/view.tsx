@@ -192,10 +192,10 @@ const SessionSummaryCard: FC<{ status: RuntimeStatus }> = ({ status }) => {
 				{/* The monitor screen: a recessed bezel panel, darker than the card, with a
 				    faint CRT scanline wash. */}
 				<div
-					className="flex min-h-40 flex-col justify-center gap-4 rounded-lg border border-border/60 bg-background/70 p-4 shadow-[inset_0_1px_3px_rgba(0,0,0,0.25)]"
+					className="flex min-h-40 flex-col justify-center gap-4 rounded-lg border border-border/50 bg-muted/20 p-4 shadow-[inset_0_1px_2px_rgba(0,0,0,0.18)] backdrop-blur-[0.5px]"
 					style={{
 						backgroundImage:
-							"repeating-linear-gradient(0deg, transparent 0px, transparent 3px, color-mix(in oklab, var(--foreground) 6%, transparent) 3px, color-mix(in oklab, var(--foreground) 6%, transparent) 4px)",
+							"repeating-linear-gradient(0deg, transparent 0px, transparent 3px, color-mix(in oklab, var(--foreground) 4.5%, transparent) 3px, color-mix(in oklab, var(--foreground) 4.5%, transparent) 4px)",
 					}}
 				>
 					{status.stream ? (

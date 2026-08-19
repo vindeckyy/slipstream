@@ -47,8 +47,8 @@ export const GettingStartedCard: FC<GettingStartedProps> = ({
 	onDismiss,
 }) => {
 	return (
-		<Card className="overflow-hidden ring-[var(--ss-action)]/25">
-			<CardHeader className="border-b border-border/60 bg-muted/15 pb-4 sm:pb-4">
+		<Card className="overflow-hidden border-[var(--ss-action)]/30 ring-1 ring-[var(--ss-action)]/20 shadow-sm">
+			<CardHeader className="border-b border-border/60 bg-muted/20 pb-4 sm:pb-4">
 				<CardTitle className="tracking-tight">
 					{m.getting_started_title()}
 				</CardTitle>
@@ -127,7 +127,7 @@ const StepRow: FC<{
 	badge?: ReactNode;
 	secondary?: ReactNode;
 }> = ({ to, icon, label, help, badge, secondary }) => (
-	<li className="rounded-lg border border-border/60 bg-background/50">
+	<li className="rounded-lg border border-border/60 bg-card shadow-sm transition-colors hover:border-border/80 hover:bg-muted/20">
 		<Link
 			to={to}
 			className={cn(
