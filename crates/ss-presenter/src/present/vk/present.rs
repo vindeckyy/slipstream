@@ -213,12 +213,29 @@ impl Presenter {
                     height: v.height,
                 };
                 let ten_bit = f.is_p010();
-                // No crop: `dmabuf::import` already creates the plane images at the frame
-                // size over the surface's real stride, so 0..1 spans exactly the picture.
+                // Defensive crop: dmabuf import is at visible size, but some encoders
+                // (NVENC/VAAPI/SW at 1080) emit 1088 coded rows without a crop signal.
+                // If visible height is not 16-aligned, treat the coded height as the
+                // 16-aligned ceiling and scale UVs to hide the 8-row green padding.
+                let uv_scale = if v.height % 16 != 0 || v.width % 64 != 0 {
+                    let cw = if v.width % 64 != 0 {
+                        (v.width + 63) & !63
+                    } else {
+                        v.width
+                    };
+                    let ch = if v.height % 16 != 0 {
+                        (v.height + 15) & !15
+                    } else {
+                        v.height
+                    };
+                    [v.width as f32 / cw as f32, v.height as f32 / ch as f32]
+                } else {
+                    [1.0, 1.0]
+                };
                 self.record_csc(
                     v.framebuffer,
                     extent,
-                    [1.0, 1.0],
+                    uv_scale,
                     f.color,
                     if ten_bit { 10 } else { 8 },
                     ten_bit,
@@ -250,12 +267,26 @@ impl Presenter {
                 // pool is the coded size (1080 → 1088 rows). Scale the UVs to the visible
                 // crop or the alignment padding — the last picture row, replicated by the
                 // encoder — is stretched into the bottom of the image.
+                // Defensive: some decoders (Android MediaCodec, VideoToolbox, or older FFmpeg)
+                // report coded==visible even when height is not 16-aligned (1080 vs 1088).
+                // In that case derive the coded size from alignment so tvOS/Android TV still
+                // crops the 8-row padding even if the bitstream signal was missed.
+                let coded_w = if f.coded_width == f.width && f.width % 64 != 0 {
+                    (f.width + 63) & !63
+                } else {
+                    f.coded_width
+                };
+                let coded_h = if f.coded_height == f.height && f.height % 16 != 0 {
+                    (f.height + 15) & !15
+                } else {
+                    f.coded_height
+                };
                 self.record_csc(
                     v.framebuffer,
                     extent,
                     [
-                        f.width as f32 / f.coded_width as f32,
-                        f.height as f32 / f.coded_height as f32,
+                        f.width as f32 / coded_w as f32,
+                        f.height as f32 / coded_h as f32,
                     ],
                     f.color,
                     if ten_bit { 10 } else { 8 },

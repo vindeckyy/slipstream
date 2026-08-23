@@ -102,6 +102,7 @@ mod tests {
 
     #[test]
     fn default_is_balanced() {
+        // SAFETY: `remove_var` is unsafe because it races with other threads reading env; this test is single-threaded and the var is test-local.
         unsafe {
             std::env::remove_var("SLIPSTREAM_LATENCY_PROFILE");
         }
@@ -110,6 +111,7 @@ mod tests {
 
     #[test]
     fn low_latency_pins_the_contract() {
+        // SAFETY: `set_var` is unsafe because it races with env reads; this test owns the var and runs single-threaded in `cargo test`.
         unsafe {
             std::env::set_var("SLIPSTREAM_LATENCY_PROFILE", "low_latency");
         }
@@ -123,6 +125,7 @@ mod tests {
         assert!(cfg.subframe_capability_gated);
         assert!(cfg.prefer_zero_copy);
         assert!(profile.recovery_after_reference_drop());
+        // SAFETY: `remove_var` is unsafe due to env race; test-local var, single-threaded.
         unsafe {
             std::env::remove_var("SLIPSTREAM_LATENCY_PROFILE");
         }
@@ -130,6 +133,7 @@ mod tests {
 
     #[test]
     fn balanced_keeps_the_existing_shape() {
+        // SAFETY: `remove_var` is unsafe due to env race; these vars are test-local and the test is single-threaded.
         unsafe {
             std::env::remove_var("SLIPSTREAM_LATENCY_PROFILE");
             std::env::remove_var("SLIPSTREAM_VBV_FRAMES");
@@ -152,10 +156,12 @@ mod tests {
 
     #[test]
     fn unknown_profile_value_falls_back_to_balanced() {
+        // SAFETY: `set_var` is unsafe due to env race; test-local var, single-threaded.
         unsafe {
             std::env::set_var("SLIPSTREAM_LATENCY_PROFILE", "warp-speed");
         }
         assert_eq!(LatencyProfile::from_env(), LatencyProfile::Balanced);
+        // SAFETY: `remove_var` is unsafe due to env race; test-local var, single-threaded.
         unsafe {
             std::env::remove_var("SLIPSTREAM_LATENCY_PROFILE");
         }

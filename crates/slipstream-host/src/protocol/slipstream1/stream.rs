@@ -623,18 +623,31 @@ fn send_msg_until_stop(
 ) -> bool {
     let blocked_at = std::time::Instant::now();
     loop {
+        // Reserve occupancy before handing the message to the receiver. A receiver can consume a
+        // synchronously sent message before try_send returns, so incrementing after a successful
+        // send races with the dequeue-side decrement and can wrap the counter to u64::MAX.
+        let n = backlog
+            .inflight
+            .fetch_add(1, Ordering::Relaxed)
+            .saturating_add(1);
         match tx.try_send(msg) {
             Ok(()) => {
-                // Phase 5: occupancy bookkeeping  -  this frame is in the channel now.
+                // Phase 5: occupancy bookkeeping - this frame is reserved in the channel now.
                 backlog
                     .blocked_us
                     .fetch_add(blocked_at.elapsed().as_micros() as u64, Ordering::Relaxed);
-                let n = backlog.inflight.fetch_add(1, Ordering::Relaxed) + 1;
                 backlog.max_inflight.fetch_max(n, Ordering::Relaxed);
                 return true;
             }
-            Err(std::sync::mpsc::TrySendError::Disconnected(_)) => return false,
+            Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {
+                // The reservation never entered the channel.
+                backlog.inflight.fetch_sub(1, Ordering::Relaxed);
+                return false;
+            }
             Err(std::sync::mpsc::TrySendError::Full(mut returned)) => {
+                // This attempt did not enter the channel. Reserve again on the next try so a
+                // blocked frame is counted once, rather than once per retry.
+                backlog.inflight.fetch_sub(1, Ordering::Relaxed);
                 // Phase 1a: the channel was ever Full for this frame  -  the artifact's
                 // backpressure flag (a pure bool on the record; free when unarmed).
                 match &mut returned {

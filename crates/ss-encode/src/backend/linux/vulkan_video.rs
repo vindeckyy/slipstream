@@ -147,14 +147,16 @@ fn parse_rgb_request(raw: Option<&str>) -> Option<bool> {
     }
 }
 
-/// True-extent RGB-direct at unaligned modes (default ON; `SLIPSTREAM_VULKAN_RGB_TRUE_EXTENT=0`
-/// restores the padded-copy staging): direct-import the visible-size capture with the TRUE-SIZE
-/// source `codedExtent` — RADV derives nonzero VCN firmware padding from it, so the EFC is told
-/// the source lacks the alignment rows (see [`RgbDirect::true_extent`]). Guarded-tested on Van
-/// Gogh 2026-07-21 (kernel clean, and the fastest 1080p encode path measured); the EFC only
-/// exists on Mesa ≥ 26, where the `codedExtent`-driven `session_init` is guaranteed.
+/// True-extent RGB-direct at unaligned modes (default OFF; `SLIPSTREAM_VULKAN_RGB_TRUE_EXTENT=1`
+/// enables the direct-import with TRUE-SIZE source `codedExtent` — RADV derives nonzero VCN
+/// firmware padding from it, so the EFC is told the source lacks the alignment rows
+/// (see [`RgbDirect::true_extent`]). Requires Mesa ≥24.2 for `codedExtent`-driven
+/// `session_init` and EFC on Mesa ≥26; defaulting OFF restores the validated padded-copy
+/// staging which explicitly duplicates the bottom rows into the 64x16 alignment padding
+/// (`record_pad_blit`) and avoids green garbage on older drivers when the firmware padding
+/// is zero.
 fn rgb_true_extent_request() -> bool {
-    std::env::var("SLIPSTREAM_VULKAN_RGB_TRUE_EXTENT").as_deref() != Ok("0")
+    std::env::var("SLIPSTREAM_VULKAN_RGB_TRUE_EXTENT").as_deref() == Ok("1")
 }
 
 /// Live RGB-direct session config: the chroma-siting bits the session was created with
@@ -169,8 +171,8 @@ struct RgbDirect {
     /// with the edge rows/columns duplicated into the padding (transfer-only, no shader) and
     /// encoded from there. Aligned modes keep the true zero-copy import.
     padded: bool,
-    /// The default unaligned-mode source strategy (`SLIPSTREAM_VULKAN_RGB_TRUE_EXTENT=0` falls
-    /// back to `padded`): direct-import the visible-size buffer and pass the TRUE-SIZE source
+    /// The default unaligned-mode source strategy (`SLIPSTREAM_VULKAN_RGB_TRUE_EXTENT=1` enables
+    /// `true_extent`): direct-import the visible-size buffer and pass the TRUE-SIZE source
     /// `codedExtent` — RADV then programs nonzero firmware padding from it (Mesa ≥ 24.2
     /// derives `session_init` padding from `srcPictureResource.codedExtent`; see
     /// [`VulkanVideoEncoder::native_nv12`]), telling the VCN the source lacks the alignment
@@ -998,7 +1000,7 @@ impl VulkanVideoEncoder {
                     ) =>
                         "active(true-extent: unaligned mode, direct import with the true-size \
                          source codedExtent — RADV firmware padding covers the alignment rows; \
-                         SLIPSTREAM_VULKAN_RGB_TRUE_EXTENT=0 restores the padded copy)",
+                         SLIPSTREAM_VULKAN_RGB_TRUE_EXTENT=1 required, default is padded-copy)",
                     (_, _, Some(RgbDirect { padded: false, .. })) => "active",
                     (_, _, Some(RgbDirect { padded: true, .. })) =>
                         "active(padded-copy: mode is not 64x16-aligned — staging blit + edge \
