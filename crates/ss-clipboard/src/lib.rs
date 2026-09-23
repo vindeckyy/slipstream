@@ -14,12 +14,13 @@ use std::sync::Arc;
 use slipstream_core::quic::ClipOffer;
 
 /// Implementation tree under `backend/`; public path remains [`host`].
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 mod backend;
 
-/// The Linux backends (`ext-data-control-v1` and Mutter direct) behind one `HostClipboard`, plus
-/// the backend-agnostic [`host::session`] coordinator.
-#[cfg(target_os = "linux")]
+/// The Linux backends (`ext-data-control-v1` and Mutter direct) and the Windows backend
+/// (sequence polling + eager writes) behind one `HostClipboard`, plus the
+/// backend-agnostic [`host::session`] coordinator.
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 pub mod host {
     pub use crate::backend::host::*;
 }
@@ -52,11 +53,11 @@ pub fn enabled() -> bool {
 }
 
 /// Whether the host should advertise `HOST_CAP_CLIPBOARD` in the `Welcome`: the operator policy
-/// enables it and the Linux host has a backend. A host whose compositor lacks data-control still
-/// advertises it and answers a later enable with `BACKEND_UNAVAILABLE`, so the client can surface
-/// why it is unavailable.
+/// enables it and the host has a backend (Linux data-control/Mutter, Windows polling). A host
+/// whose compositor lacks data-control still advertises it and answers a later enable with
+/// `BACKEND_UNAVAILABLE`, so the client can surface why it is unavailable.
 pub fn cap_advertised() -> bool {
-    enabled() && cfg!(target_os = "linux")
+    enabled() && cfg!(any(target_os = "linux", target_os = "windows"))
 }
 
 /// A command from the session control loop into the host clipboard coordinator
@@ -93,14 +94,14 @@ pub async fn start(
 ) -> ClipCoord {
     let (cmd_tx, cmd_rx) = tokio::sync::mpsc::unbounded_channel();
     let (offer_tx, offer_rx) = tokio::sync::mpsc::unbounded_channel();
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     let available = if has_compositor && enabled() {
         host::session::start(conn, clip_enabled, cmd_rx, offer_tx).await
     } else {
         drop((conn, clip_enabled, cmd_rx, offer_tx));
         false
     };
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     let available = {
         let _ = (conn, clip_enabled, cmd_rx, offer_tx, has_compositor);
         false

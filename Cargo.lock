@@ -4137,6 +4137,7 @@ dependencies = [
  "tracing",
  "wayland-client",
  "wayland-protocols",
+ "windows",
 ]
 
 [[package]]
@@ -4205,6 +4206,7 @@ dependencies = [
  "ss-paths",
  "tempfile",
  "tracing",
+ "windows",
 ]
 
 [[package]]

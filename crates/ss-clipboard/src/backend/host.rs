@@ -20,6 +20,10 @@
 mod mutter;
 #[cfg(target_os = "linux")]
 mod wayland;
+/// Windows clipboard backend (sequence polling + eager writes).
+#[cfg(target_os = "windows")]
+#[path = "windows.rs"]
+mod windows;
 
 pub mod session;
 
@@ -58,6 +62,10 @@ pub enum PasteResponder {
     /// trailing `SelectionWriteDone` call that Mutter's transfer requires.
     #[cfg(target_os = "linux")]
     Channel(tokio::sync::oneshot::Sender<Vec<u8>>),
+    /// Windows: hand the fetched bytes to the backend's eager writer task, which installs
+    /// them into the system clipboard with `SetClipboardData` (see `windows::set_offer`).
+    #[cfg(target_os = "windows")]
+    WindowsEager(tokio::sync::oneshot::Sender<Vec<u8>>),
 }
 
 impl PasteResponder {
@@ -70,6 +78,10 @@ impl PasteResponder {
             }
             #[cfg(target_os = "linux")]
             PasteResponder::Channel(tx) => {
+                let _ = tx.send(bytes);
+            }
+            #[cfg(target_os = "windows")]
+            PasteResponder::WindowsEager(tx) => {
                 let _ = tx.send(bytes);
             }
         }
@@ -92,6 +104,9 @@ pub enum HostClipboard {
     DataControl(wayland::ClipboardBackend),
     #[cfg(target_os = "linux")]
     Mutter(mutter::MutterClipboard),
+    /// Windows sequence-polling + eager-write backend.
+    #[cfg(target_os = "windows")]
+    Windows(windows::WindowsClipboard),
 }
 
 impl HostClipboard {
@@ -120,6 +135,16 @@ impl HostClipboard {
             })?;
             Ok((HostClipboard::Mutter(m), rx))
         }
+        #[cfg(target_os = "windows")]
+        {
+            let (b, rx) = windows::WindowsClipboard::open()
+                .map_err(|e| e.context("no clipboard backend (Windows clipboard unavailable)"))?;
+            Ok((HostClipboard::Windows(b), rx))
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+        {
+            anyhow::bail!("no clipboard backend on this platform")
+        }
     }
 
     /// The current host selection's wire MIMEs (empty = nothing to offer).
@@ -129,6 +154,10 @@ impl HostClipboard {
             HostClipboard::DataControl(b) => b.current_wire_mimes(),
             #[cfg(target_os = "linux")]
             HostClipboard::Mutter(m) => m.current_wire_mimes(),
+            #[cfg(target_os = "windows")]
+            HostClipboard::Windows(b) => b.current_wire_mimes(),
+            #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+            _ => Vec::new(),
         }
     }
 
@@ -142,6 +171,10 @@ impl HostClipboard {
                 m.set_offer(wire_mimes);
                 Ok(())
             }
+            #[cfg(target_os = "windows")]
+            HostClipboard::Windows(b) => b.set_offer(wire_mimes),
+            #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+            _ => anyhow::bail!("no clipboard backend on this platform"),
         }
     }
 
@@ -155,6 +188,10 @@ impl HostClipboard {
                 m.clear_offer();
                 Ok(())
             }
+            #[cfg(target_os = "windows")]
+            HostClipboard::Windows(b) => b.clear_offer(),
+            #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+            _ => anyhow::bail!("no clipboard backend on this platform"),
         }
     }
 
@@ -175,6 +212,15 @@ impl HostClipboard {
             }
             #[cfg(target_os = "linux")]
             HostClipboard::Mutter(m) => m.read_current(wire_mime).await,
+            #[cfg(target_os = "windows")]
+            HostClipboard::Windows(_) => {
+                let wire = wire_mime.to_string();
+                tokio::task::spawn_blocking(move || windows::read_wire_format(&wire))
+                    .await
+                    .map_err(|e| anyhow::anyhow!("windows clipboard read join: {e}"))?
+            }
+            #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+            _ => anyhow::bail!("no clipboard backend on this platform"),
         }
     }
 }

@@ -45,6 +45,7 @@ pub fn enumerate() -> Vec<GpuInfo> {
             vram_bytes,
             handle: GpuHandle {
                 render_node: Some(PathBuf::from(format!("/dev/dri/{node}"))),
+                dxgi_luid: None,
             },
         });
     }
@@ -54,14 +55,55 @@ pub fn enumerate() -> Vec<GpuInfo> {
 
 /// Enumerate GPUs on non-Linux hosts.
 ///
-/// Baseline returns an empty inventory so selection degrades to `None` and the host
-/// takes the software-encode path. The Windows DXGI adapter enumeration (vendor/device
-/// id, VRAM, LUID) lands with the platform todo; it fills this in without changing callers.
-#[cfg(not(target_os = "linux"))]
+/// Windows: DXGI adapter enumeration (vendor/device id, dedicated VRAM, LUID) — the
+/// same inventory shape as Linux, so selection, preference matching, and the console's
+/// "in use" display work unchanged. Other platforms: empty inventory (software path).
+#[cfg(target_os = "windows")]
 pub fn enumerate() -> Vec<crate::types::GpuInfo> {
     let mut out = Vec::new();
-    // Keep the post-enumeration invariant (stable ids assigned once) so the DXGI
-    // implementation inherits it by construction rather than rediscovering it.
+    // SAFETY: factory/adapter enumeration takes no raw memory — every out-param is a
+    // live local, and adapters are reference-counted. `GetDesc` returns its struct by
+    // value; each adapter outlives its desc. No frame or device is created.
+    unsafe {
+        let Ok(factory) = windows::Win32::Graphics::Dxgi::CreateDXGIFactory1::<
+            windows::Win32::Graphics::Dxgi::IDXGIFactory1,
+        >() else {
+            return out;
+        };
+        let mut index = 0u32;
+        while let Ok(adapter) = factory.EnumAdapters1(index) {
+            // Software (WARP) adapters report vendor 0x1414 — skip them so auto-select
+            // never prefers a rasterizer over real hardware.
+            if let Ok(desc) = adapter.GetDesc() {
+                if desc.VendorId != 0x1414 && desc.VendorId != 0 {
+                    out.push(crate::types::GpuInfo {
+                        id: String::new(),
+                        name: String::from_utf16_lossy(&desc.Description)
+                            .trim_end_matches('\0')
+                            .to_string(),
+                        vendor_id: desc.VendorId,
+                        device_id: desc.DeviceId,
+                        occurrence: 0,
+                        vram_bytes: desc.DedicatedVideoMemory as u64,
+                        handle: crate::types::GpuHandle {
+                            render_node: None,
+                            dxgi_luid: Some(
+                                ((desc.AdapterLuid.HighPart as u64) << 32)
+                                    | desc.AdapterLuid.LowPart as u64,
+                            ),
+                        },
+                    });
+                }
+            }
+            index += 1;
+        }
+    }
     crate::types::assign_ids(&mut out);
     out
+}
+
+/// Enumerate GPUs on hosts with no backend yet: empty inventory (software path).
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
+pub fn enumerate() -> Vec<crate::types::GpuInfo> {
+    Vec::new()
 }
