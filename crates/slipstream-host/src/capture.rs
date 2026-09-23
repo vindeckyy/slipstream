@@ -6,9 +6,7 @@
 //! and hand ss-capture the pre-resolved facts it needs, so the capturer never reaches back into
 //! the orchestrator.
 
-#[cfg(target_os = "linux")]
-use anyhow::Context;
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 
 #[cfg(target_os = "linux")]
 use crate::session_plan::CaptureBackend;
@@ -105,14 +103,65 @@ pub fn open_portal_monitor(
 /// - `kms` — DRM primary-plane dma-buf capture
 /// - `nvfbc` — NVIDIA NvFBC shared-CUDA capture
 ///
-/// Non-Linux baseline: no desktop capturer yet (WGC/DXGI land with the capture todo) —
-/// fails loudly so the console reports it honestly instead of serving a black stream.
+/// Windows: WGC first, DXGI fallback — honoring `SLIPSTREAM_CAPTURE_METHOD` /
+/// [`CaptureBackend::resolve`] the same way the Linux auto-order does. An explicit pin
+/// (`wgc`/`dxgi`) fails loudly instead of falling back; `auto` (the default) tries WGC
+/// then DXGI. Anything else (`portal`, `kwin`, …) is a Linux backend and is refused with
+/// the spellings that work here. `want_hdr`/`want_metadata_cursor` are accepted and
+/// ignored: both backends deliver 8-bit SDR with the cursor embedded (see the
+/// `ss-capture` Windows module docs).
 #[cfg(not(target_os = "linux"))]
 pub fn open_desktop_capture(
-    _want_hdr: bool,
+    want_hdr: bool,
     _want_metadata_cursor: bool,
 ) -> Result<Box<dyn Capturer>> {
-    bail!("no desktop capture backend on this platform yet (Windows support in progress)")
+    use crate::session_plan::CaptureBackend;
+    if want_hdr {
+        tracing::warn!("HDR capture is unavailable on Windows yet — streaming SDR");
+    }
+    let explicit = ss_host_config::config()
+        .capture_method
+        .as_deref()
+        .filter(|m| !m.eq_ignore_ascii_case("auto"))
+        .is_some();
+    let pin = ss_vdisplay::capture_monitor();
+    let mut errors = Vec::new();
+    // `resolve()` answers Wgc for `auto`; expand that to the full preference chain here
+    // so an explicit `dxgi` still routes correctly and `auto` degrades WGC → DXGI.
+    let candidates = match CaptureBackend::resolve() {
+        CaptureBackend::Wgc if !explicit => vec![CaptureBackend::Wgc, CaptureBackend::Dxgi],
+        backend => vec![backend],
+    };
+    for backend in candidates {
+        let opened = match backend {
+            CaptureBackend::Wgc => ss_capture::open_wgc_desktop_for_monitor(pin.as_deref())
+                .context("open WGC desktop capturer"),
+            CaptureBackend::Dxgi => ss_capture::open_dxgi_desktop_for_monitor(pin.as_deref())
+                .context("open DXGI desktop capturer"),
+            other => Err(anyhow::anyhow!(
+                "capture backend '{}' is Linux-only on this host (use wgc|dxgi|auto)",
+                other.as_str(),
+            )),
+        };
+        match opened {
+            Ok(c) => {
+                tracing::info!(backend = backend.as_str(), "desktop capture selected");
+                return Ok(c);
+            }
+            Err(e) => {
+                tracing::debug!(backend = backend.as_str(), error = %format!("{e:#}"),
+                    "desktop capture candidate rejected");
+                errors.push(format!("{}: {e:#}", backend.as_str()));
+                if explicit {
+                    break;
+                }
+            }
+        }
+    }
+    bail!(
+        "desktop capture: every compatible candidate failed ({})",
+        errors.join("; ")
+    )
 }
 
 /// Non-Linux baseline: no portal capturer (WGC lands with the capture todo).
