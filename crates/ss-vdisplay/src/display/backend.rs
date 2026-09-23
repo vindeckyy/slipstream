@@ -68,6 +68,10 @@ pub struct VirtualOutput {
     /// capturer must hold frames until that renegotiation lands. Linux-only.
     #[cfg(target_os = "linux")]
     pub expect_exact_dims: bool,
+    /// The Windows head (`\\.\DISPLAYn`) this output mirrors, set by the Windows mirror
+    /// backend. The host capture resolves the WGC/DXGI source from it, so the display
+    /// choice lives in exactly one place. `None` everywhere else.
+    pub windows_head: Option<String>,
 }
 
 impl VirtualOutput {
@@ -89,6 +93,7 @@ impl VirtualOutput {
             pool_gen: None,
             #[cfg(target_os = "linux")]
             expect_exact_dims: false,
+            windows_head: None,
         }
     }
 }

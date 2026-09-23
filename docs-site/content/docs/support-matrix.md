@@ -48,8 +48,10 @@ capability worked yesterday and not today, restart the host before believing the
 
 ## Host platform
 
-Slipstream hosts on **Linux only**. Android and Steam Deck are client platforms. There is
-no configuration that turns a phone or Deck into a host.
+Slipstream hosts on **Linux** and on **Windows**. Android and Steam Deck are client platforms.
+There is no configuration that turns a phone or Deck into a host. The Windows host is capture,
+encode, and input on a Windows desktop; its display, codec, and HDR limits are in
+[Windows (Host)](/docs/windows-host). The tables in this section are the Linux desktops.
 
 ### Display and capture
 
@@ -201,6 +203,14 @@ newer on AMD, Arc and newer on Intel).
 
 **4:4:4 across the whole project:** only HEVC and PyroWave can carry it, only NVENC and PyroWave can
 produce it when a native client requests it. GameStream sessions are always 4:2:0.
+
+**Windows encode** is a different advertisement from the table above. NVIDIA uses the direct-SDK
+NVENC path with D3D11 BGRA input. The host advertises the codecs that probe named, and **H.264
+only** when the probe does not answer — it does not fall open to the Linux superset. `auto` uses
+openh264 unless the selected GPU is NVIDIA and the probe succeeded. AMF, Quick Sync, VAAPI, Vulkan
+Video, and PyroWave are not Windows backends. 10-bit stays off because capture is 8-bit BGRA, even
+when the GPU reports a 10-bit encode cap. HEVC 4:4:4 follows that same probe. See
+[Windows (Host)](/docs/windows-host).
 
 ### How the host picks a backend
 
@@ -394,6 +404,7 @@ capability.
 |---|---|
 | **Protocol core**, `slipstream-core`, the C ABI, FEC and crypto | Stable. Both the wire format and the embeddable C surface are versioned contracts (see below) and are changed reluctantly. |
 | **Linux host** | The product host surface. What differs is not the host but the desktop under it: each compositor gets its own capture, virtual-display and input backend, and they are not equally capable. |
+| **Windows host** | Capture, NVENC or software encode, mirror (or an optional indirect display), WASAPI, and `SendInput` are in the tree. It has not been run on a Windows GPU in CI. See [Windows (Host)](/docs/windows-host). |
 | **GameStream / Moonlight plane** | Opt-in compatibility path enabled only with `serve --gamestream`. It pairs over plain HTTP with weaker legacy encryption, so keep it on a trusted LAN (see [Security](/docs/security#gamestream--moonlight-compatibility-is-the-weak-crypto-path)). Slipstream-only features are not available through this path. |
 | **Android client** (phone · TV) | Preview APK on GitHub Releases. The same app in leanback mode is the TV client. |
 | **Decky plugin** (Steam Deck) | Installs from a packaged zip rather than the Decky store. Updates are manual until a public feed exists. It launches the Linux session binary rather than streaming itself. |
@@ -451,6 +462,9 @@ whose caveat *is* "nobody has run this on real hardware". A wrong ✅ is worse t
 - **HDR when mirroring a real monitor on KDE, sway or Hyprland.** By construction it is SDR. Only
   gamescope's virtual output and the GNOME portal mirror carry HDR, but nothing states that as a
   deliberate decision rather than a gap.
+- **The Windows host on a real GPU and display.** The crate graph cross-compiles. Capture, NVENC,
+  the indirect-display plug, and qWAVE have not been exercised on Windows hardware from this
+  repository.
 
 Where this page and another page disagree, this one is the one that was checked against the code.
 The unverified cases are listed below.

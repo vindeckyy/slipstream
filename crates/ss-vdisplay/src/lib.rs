@@ -138,6 +138,9 @@ pub enum Compositor {
     /// virtual-input path yet needs its own IPC (`hyprctl`) and portal (xdph) — see
     /// `design/hyprland-support.md`.
     Hyprland,
+    /// Windows desktop — mirror of a real head at the client's mode today (the IDD virtual
+    /// display lands separately). The only backend a Windows host drives.
+    Windows,
 }
 
 impl Compositor {
@@ -150,6 +153,7 @@ impl Compositor {
             Compositor::Mutter => "mutter",
             Compositor::Gamescope => "gamescope",
             Compositor::Hyprland => "hyprland",
+            Compositor::Windows => "windows",
         }
     }
 
@@ -161,6 +165,7 @@ impl Compositor {
             Compositor::Mutter => "Mutter / GNOME",
             Compositor::Gamescope => "gamescope",
             Compositor::Hyprland => "Hyprland",
+            Compositor::Windows => "Windows desktop",
         }
     }
 
@@ -176,6 +181,7 @@ impl Compositor {
             // A client asking for `wlroots`/`hyprland` gets whichever of the two is the live session
             // (`pick_compositor` (host `native`) resolves the family).
             Compositor::Hyprland => P::Wlroots,
+            Compositor::Windows => P::Windows,
         }
     }
 
@@ -188,17 +194,19 @@ impl Compositor {
             P::Wlroots => Compositor::Wlroots,
             P::Mutter => Compositor::Mutter,
             P::Gamescope => Compositor::Gamescope,
+            P::Windows => Compositor::Windows,
         })
     }
 
     /// Every backend, in a stable display order (for enumeration / UIs).
-    pub fn all() -> [Compositor; 5] {
+    pub fn all() -> [Compositor; 6] {
         [
             Compositor::Kwin,
             Compositor::Gamescope,
             Compositor::Mutter,
             Compositor::Wlroots,
             Compositor::Hyprland,
+            Compositor::Windows,
         ]
     }
 }
@@ -245,13 +253,36 @@ pub fn available() -> Vec<Compositor> {
                         Compositor::Mutter => mutter::is_available(),
                         Compositor::Wlroots => wlroots::is_available(),
                         Compositor::Hyprland => hyprland::is_available(),
+                        // A Linux host never drives the Windows backend (an explicit pin
+                        // naming it fails at `detect` with the accepted names).
+                        Compositor::Windows => false,
                     }
             })
             .collect()
     }
     #[cfg(not(target_os = "linux"))]
     {
-        Vec::new()
+        // Windows: the desktop backend is usable when the box has a head to mirror
+        // (an explicit pin counts too — same rule as the Linux live/pinned logic).
+        // Other platforms: no backend.
+        #[cfg(target_os = "windows")]
+        {
+            let pinned = ss_host_config::config()
+                .compositor
+                .as_deref()
+                .and_then(compositor_from_pin);
+            if pinned == Some(Compositor::Windows)
+                || windows::has_heads()
+                || (windows::use_virtual_display() && windows::idd_driver_present())
+            {
+                return vec![Compositor::Windows];
+            }
+            Vec::new()
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            Vec::new()
+        }
     }
 }
 
@@ -266,6 +297,7 @@ fn compositor_from_pin(v: &str) -> Option<Compositor> {
         "wlroots" | "sway" | "wlr" | "river" => Compositor::Wlroots,
         "mutter" | "gnome" => Compositor::Mutter,
         "gamescope" => Compositor::Gamescope,
+        "windows" | "win" | "wgc" | "dxgi" => Compositor::Windows,
         _ => return None,
     })
 }
@@ -321,7 +353,38 @@ pub fn detect() -> Result<Compositor> {
             )
         }
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "windows")]
+    {
+        // An explicit pin wins (validated against the known names); otherwise the Windows
+        // desktop backend is the default when the box has a head to mirror.
+        if let Some(v) = ss_host_config::config().compositor.as_deref() {
+            return compositor_from_pin(v).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "unknown SLIPSTREAM_COMPOSITOR '{v}' (windows|kwin|wlroots|hyprland|mutter|gamescope)"
+                )
+            });
+        }
+        if windows::use_virtual_display() {
+            if windows::idd_driver_present() {
+                return Ok(Compositor::Windows);
+            }
+            anyhow::bail!(
+                "SLIPSTREAM_VIRTUAL_DISPLAY requests an indirect display, but no compatible \
+                 driver is installed. Install the RustDesk indirect display driver \
+                 (device interface {{781EF630-72B2-11d2-B852-00C04EAF5272}}) or unset the \
+                 variable to mirror a physical monitor"
+            );
+        }
+        if windows::has_heads() {
+            return Ok(Compositor::Windows);
+        }
+        anyhow::bail!(
+            "no usable Windows desktop: no attached monitors (a service running in session 0 \
+             with no interactive desktop cannot stream; run the host in the user session, or \
+             set SLIPSTREAM_VIRTUAL_DISPLAY=idd with an indirect display driver installed)"
+        )
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     {
         anyhow::bail!(
             "no virtual-display backend on this platform yet (Windows support in progress)"
@@ -415,14 +478,33 @@ pub fn open(compositor: Compositor) -> Result<Box<dyn VirtualDisplay>> {
             Compositor::Mutter => Ok(Box::new(mutter::MutterDisplay::new()?)),
             Compositor::Wlroots => Ok(Box::new(wlroots::WlrootsDisplay::new()?)),
             Compositor::Hyprland => Ok(Box::new(hyprland::HyprlandDisplay::new()?)),
+            // A Linux host never drives the Windows backend; an explicit pin naming it
+            // is a configuration error, not a silent fallback.
+            Compositor::Windows => anyhow::bail!(
+                "the Windows desktop backend cannot run on Linux (SLIPSTREAM_COMPOSITOR=windows)"
+            ),
         }
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "windows")]
+    {
+        match compositor {
+            Compositor::Windows => {
+                if windows::use_virtual_display() {
+                    Ok(Box::new(windows::WindowsIddDisplay::new()?))
+                } else {
+                    Ok(Box::new(windows::WindowsMirrorDisplay::new()?))
+                }
+            }
+            other => anyhow::bail!(
+                "compositor '{}' is Linux-only on this host (Windows drives the windows backend)",
+                other.id(),
+            ),
+        }
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     {
         let _ = compositor;
-        anyhow::bail!(
-            "no virtual-display backend on this platform yet (Windows support in progress)"
-        )
+        anyhow::bail!("no virtual-display backend on this platform yet")
     }
 }
 
@@ -456,14 +538,39 @@ pub fn probe(compositor: Compositor) -> Result<()> {
             // gamescope spawns its own nested session per `create`; Mutter is D-Bus on demand;
             // wlroots creates the output on demand — nothing to pre-check beyond "Linux".
             Compositor::Gamescope | Compositor::Mutter | Compositor::Wlroots => Ok(()),
+            // A Linux host never drives the Windows backend (an explicit pin naming it
+            // fails at `detect` with the accepted names).
+            Compositor::Windows => anyhow::bail!(
+                "the Windows desktop backend cannot run on Linux (SLIPSTREAM_COMPOSITOR=windows)"
+            ),
         }
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "windows")]
+    {
+        match compositor {
+            Compositor::Windows
+                if windows::use_virtual_display() && windows::idd_driver_present() =>
+            {
+                Ok(())
+            }
+            Compositor::Windows if windows::use_virtual_display() => {
+                anyhow::bail!(
+                    "indirect display requested but no compatible driver is installed \
+                     (RustDesk IddDriver, interface {{781EF630-72B2-11d2-B852-00C04EAF5272}})"
+                )
+            }
+            Compositor::Windows if windows::has_heads() => Ok(()),
+            Compositor::Windows => anyhow::bail!("windows desktop has no attached monitors"),
+            other => anyhow::bail!(
+                "compositor '{}' is Linux-only on this host (Windows drives the windows backend)",
+                other.id(),
+            ),
+        }
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     {
         let _ = compositor;
-        anyhow::bail!(
-            "no virtual-display backend on this platform yet (Windows support in progress)"
-        )
+        anyhow::bail!("no virtual-display backend on this platform yet")
     }
 }
 
@@ -686,6 +793,12 @@ mod wlroots;
 #[cfg(target_os = "linux")]
 #[path = "display/linux/headless.rs"]
 pub mod headless;
+
+/// Windows desktop backend: GDI monitor enumeration, the mirror-at-mode display, and
+/// the optional indirect-display plug (`SLIPSTREAM_VIRTUAL_DISPLAY=idd`).
+#[cfg(target_os = "windows")]
+#[path = "display/windows.rs"]
+pub mod windows;
 
 #[cfg(target_os = "linux")]
 pub use headless::{

@@ -175,13 +175,30 @@ pub fn open_portal_monitor(
 
 /// Non-Linux baseline: no virtual-output capturer yet (the IDD display + WGC capture land
 /// with the vdisplay/capture todos).
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 pub fn capture_virtual_output(
     _vout: crate::vdisplay::VirtualOutput,
     _want: OutputFormat,
     _capture: crate::session_plan::CaptureBackend,
 ) -> Result<Box<dyn Capturer>> {
     bail!("no virtual-output capture backend on this platform yet (Windows support in progress)")
+}
+
+/// Windows: capture the mirrored head the display backend resolved (`VirtualOutput::
+/// windows_head`) with WGC. The display already committed the client's mode, so no
+/// renegotiation wait — the first frame arrives at the negotiated size.
+#[cfg(target_os = "windows")]
+pub fn capture_virtual_output(
+    vout: crate::vdisplay::VirtualOutput,
+    _want: OutputFormat,
+    _capture: crate::session_plan::CaptureBackend,
+) -> Result<Box<dyn Capturer>> {
+    let Some(head) = vout.windows_head else {
+        bail!("Windows virtual output carries no head identity (not a mirror display?)")
+    };
+    ss_capture::open_wgc_desktop_for_monitor(Some(&head))
+        .map(|c| c as Box<dyn Capturer>)
+        .context("capture the mirrored Windows head")
 }
 
 #[cfg(target_os = "linux")]

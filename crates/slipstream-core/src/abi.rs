@@ -1216,6 +1216,8 @@ pub const SLIPSTREAM_COMPOSITOR_WLROOTS: u32 = 2;
 pub const SLIPSTREAM_COMPOSITOR_MUTTER: u32 = 3;
 /// gamescope (spawned nested).
 pub const SLIPSTREAM_COMPOSITOR_GAMESCOPE: u32 = 4;
+/// Windows desktop (mirror or IDD virtual display).
+pub const SLIPSTREAM_COMPOSITOR_WINDOWS: u32 = 5;
 
 /// Gamepad-backend preference for [`slipstream_connect_ex2`] (`gamepad` arg): which virtual pad
 /// the host creates for this session's controllers. Precedence host-side: an explicit client

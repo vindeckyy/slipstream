@@ -157,6 +157,8 @@ pub fn apply_input_env(chosen: Compositor, dedicated_launch: bool) -> Option<Gam
         // Hyprland kept `zwlr_virtual_pointer_v1` + `zwp_virtual_keyboard_v1` (D4) — same wlr
         // injector as sway/river, no code change.
         Compositor::Wlroots | Compositor::Hyprland => "wlr",
+        // Windows always injects through SendInput (ss-inject honors this spelling).
+        Compositor::Windows => "windows",
     };
     std::env::set_var("SLIPSTREAM_INPUT_BACKEND", backend);
     drop(_env_guard);
@@ -207,12 +209,31 @@ pub fn resolve_gamescope_route(
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+/// Windows input routing: `SendInput` is the only backend, so record it in the
+/// shared knob (operators + `ss-inject`'s resolver read the same value) and return no
+/// gamescope route — there is no gamescope here.
+#[cfg(target_os = "windows")]
+#[must_use = "the resolved gamescope route must reach the backend instance (set_gamescope_route)"]
+pub fn apply_input_env(_chosen: Compositor, _dedicated_launch: bool) -> Option<GamescopeRoute> {
+    std::env::set_var("SLIPSTREAM_INPUT_BACKEND", "windows");
+    None
+}
+
+#[cfg(target_os = "windows")]
+#[must_use = "the resolved gamescope route must reach the backend instance (set_gamescope_route)"]
+pub fn resolve_gamescope_route(
+    _chosen: Compositor,
+    _dedicated_launch: bool,
+) -> Option<GamescopeRoute> {
+    None
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 pub fn apply_input_env(_chosen: Compositor, _dedicated_launch: bool) -> Option<GamescopeRoute> {
     None
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 pub fn resolve_gamescope_route(
     _chosen: Compositor,
     _dedicated_launch: bool,

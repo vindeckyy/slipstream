@@ -64,11 +64,16 @@ fn set_socket_buffers(socket: &UdpSocket, send_target: usize, recv_target: usize
     // The kernel reports back the (possibly clamped, Linux-doubled) granted size.
     let granted = sock.send_buffer_size().unwrap_or(0);
     if granted < send_target / 4 {
+        #[cfg(target_os = "linux")]
+        let knob = "raise net.core.wmem_max / net.core.rmem_max";
+        #[cfg(target_os = "windows")]
+        let knob = "Windows granted less than requested; large IDR bursts may drop";
+        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+        let knob = "raise the OS UDP socket-buffer cap";
         tracing::warn!(
             granted_kb = granted / 1024,
             target_kb = send_target / 1024,
-            "UDP socket buffer capped well below target — high-resolution streaming may drop \
-             frames; raise net.core.wmem_max / net.core.rmem_max (Linux) for clean 4K/5K"
+            "{knob} — high-resolution streaming may drop frames"
         );
     }
 }
@@ -116,8 +121,13 @@ pub(crate) fn dscp_enabled() -> bool {
 }
 
 /// RAII token retained by the transport while a media socket is active. Linux applies DSCP through
-/// the socket option itself, so this token remains inert and [`set_media_qos`] returns `None`.
+/// the socket option itself, so this token stays unconstructed and [`set_media_qos`] returns
+/// `None`. Windows holds the qWAVE flow open for the socket's life — closing the handle removes
+/// the DSCP marking.
 pub struct QosFlow {
+    #[cfg(target_os = "windows")]
+    _keep: qwave::Session,
+    #[cfg(not(target_os = "windows"))]
     _never: std::convert::Infallible,
 }
 
@@ -132,7 +142,170 @@ pub fn set_media_qos(socket: &UdpSocket, class: MediaClass) -> Option<QosFlow> {
         return None;
     }
     apply_media_qos(socket, class);
+    #[cfg(target_os = "windows")]
+    if let Some(session) = qwave::attach(socket, class) {
+        return Some(QosFlow { _keep: session });
+    }
     None
+}
+
+/// qWAVE (`qwave.dll`) flow for a connected UDP socket. Windows ignores `IP_TOS` unless a QoS
+/// flow is attached; the DLL is resolved at runtime so a missing system component is a skip,
+/// not a link failure. The session is `Send` because the socket and the flow live on the send
+/// thread that holds the [`QosFlow`] guard.
+#[cfg(target_os = "windows")]
+mod qwave {
+    use super::MediaClass;
+    use std::ffi::c_void;
+    use std::net::UdpSocket;
+    use std::os::windows::io::AsRawSocket;
+
+    #[repr(C)]
+    struct QosVersion {
+        major: u16,
+        minor: u16,
+    }
+
+    struct Api {
+        create: unsafe extern "system" fn(*const QosVersion, *mut *mut c_void) -> i32,
+        add:
+            unsafe extern "system" fn(*mut c_void, usize, *const c_void, u32, u32, *mut u32) -> i32,
+        set_flow: unsafe extern "system" fn(
+            *mut c_void,
+            u32,
+            u32,
+            u32,
+            *const u32,
+            u32,
+            *mut c_void,
+        ) -> i32,
+        remove: unsafe extern "system" fn(*mut c_void, usize, u32, u32) -> i32,
+        close: unsafe extern "system" fn(*mut c_void) -> i32,
+    }
+
+    pub(super) struct Session {
+        handle: *mut c_void,
+        flow: u32,
+        socket: usize,
+        api: &'static Api,
+    }
+
+    // SAFETY: the handle is an opaque qWAVE object. After `attach` returns, the only use is
+    // `Drop`, which takes `&mut self` and therefore cannot race a shared reference. The
+    // transport stores the session behind the socket that is itself `Sync`; no `&Session`
+    // method touches the pointer, so sharing the guard across threads does not share a qWAVE
+    // call. Drop still runs exactly once.
+    unsafe impl Send for Session {}
+    // SAFETY: see the `Send` impl above — no `&Session` method touches the qWAVE pointer,
+    // so a shared reference cannot race a qWAVE call. Drop still runs exactly once.
+    unsafe impl Sync for Session {}
+
+    impl Drop for Session {
+        fn drop(&mut self) {
+            // SAFETY: `handle` was returned by `QOSCreateHandle` and the flow id by
+            // `QOSAddSocketToFlow` on this socket. Both are released once, here.
+            unsafe {
+                let _ = (self.api.remove)(self.handle, self.socket, self.flow, 0);
+                let _ = (self.api.close)(self.handle);
+            }
+        }
+    }
+
+    fn api() -> Option<&'static Api> {
+        static TABLE: std::sync::OnceLock<Option<Api>> = std::sync::OnceLock::new();
+        TABLE
+            .get_or_init(|| {
+                // SAFETY: `qwave.dll` is a Windows system library. Symbols are the documented
+                // qWAVE exports; each pointer is copied out before the library is leaked for
+                // the process lifetime.
+                unsafe {
+                    let lib = libloading::Library::new("qwave.dll").ok()?;
+                    let create = lib
+                        .get::<unsafe extern "system" fn(*const QosVersion, *mut *mut c_void) -> i32>(
+                            b"QOSCreateHandle\0",
+                        )
+                        .ok()?;
+                    let add = lib
+                        .get::<unsafe extern "system" fn(
+                            *mut c_void,
+                            usize,
+                            *const c_void,
+                            u32,
+                            u32,
+                            *mut u32,
+                        ) -> i32>(b"QOSAddSocketToFlow\0")
+                        .ok()?;
+                    let set_flow = lib
+                        .get::<unsafe extern "system" fn(
+                            *mut c_void,
+                            u32,
+                            u32,
+                            u32,
+                            *const u32,
+                            u32,
+                            *mut c_void,
+                        ) -> i32>(b"QOSSetFlow\0")
+                        .ok()?;
+                    let remove = lib
+                        .get::<unsafe extern "system" fn(*mut c_void, usize, u32, u32) -> i32>(
+                            b"QOSRemoveSocketFromFlow\0",
+                        )
+                        .ok()?;
+                    let close = lib
+                        .get::<unsafe extern "system" fn(*mut c_void) -> i32>(b"QOSCloseHandle\0")
+                        .ok()?;
+                    let api = Api {
+                        create: *create,
+                        add: *add,
+                        set_flow: *set_flow,
+                        remove: *remove,
+                        close: *close,
+                    };
+                    std::mem::forget(lib);
+                    Some(api)
+                }
+            })
+            .as_ref()
+    }
+
+    pub(super) fn attach(socket: &UdpSocket, class: MediaClass) -> Option<Session> {
+        let api = api()?;
+        let raw = socket.as_raw_socket() as usize;
+        let version = QosVersion { major: 1, minor: 0 };
+        let mut handle: *mut c_void = std::ptr::null_mut();
+        // SAFETY: `version`/`handle` are live locals. `QOSCreateHandle` writes the handle on
+        // success. The socket value is the connected UDP socket's `SOCKET`. A null destination
+        // marks every datagram on that socket. `QOS_NON_ADAPTIVE_FLOW` (0x2) keeps the flow
+        // from throttling the media rate. DSCP is the same code point `apply_media_qos` put
+        // in `IP_TOS` (the high 6 bits, unshifted — qWAVE takes the 6-bit value).
+        unsafe {
+            if (api.create)(&version, &mut handle) == 0 || handle.is_null() {
+                return None;
+            }
+            let mut flow = 0u32;
+            let traffic = match class {
+                MediaClass::Video => 3, // QOSTrafficTypeAudioVideo
+                MediaClass::Audio => 4, // QOSTrafficTypeVoice
+            };
+            if (api.add)(handle, raw, std::ptr::null(), traffic, 0x2, &mut flow) == 0 {
+                let _ = (api.close)(handle);
+                return None;
+            }
+            let dscp = class.dscp();
+            if (api.set_flow)(handle, flow, 2, 4, &dscp, 0, std::ptr::null_mut()) == 0 {
+                tracing::debug!(
+                    ?class,
+                    "QOSSetFlow DSCP failed — flow stays at the traffic type"
+                );
+            }
+            Some(Session {
+                handle,
+                flow,
+                socket: raw,
+                api,
+            })
+        }
+    }
 }
 
 /// The unconditional QoS application, factored out of [`set_media_qos`] so it is directly testable
