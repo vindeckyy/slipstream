@@ -31,6 +31,7 @@ pub struct ScannerInfo {
 /// platform-gated exactly like their provider modules in `library.rs` — keep the two in sync when
 /// adding a store.
 fn scanner_defs() -> Vec<(&'static str, &'static str)> {
+    #[cfg_attr(not(target_os = "linux"), allow(unused_mut))]
     let mut defs = vec![("steam", "Steam")];
     #[cfg(target_os = "linux")]
     {

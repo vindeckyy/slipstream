@@ -79,6 +79,14 @@ pub fn open_audio_capture(channels: u32) -> Result<Box<dyn AudioCapturer>> {
     linux::PwAudioCapturer::open(channels).map(|c| Box::new(c) as Box<dyn AudioCapturer>)
 }
 
+/// Non-Linux baseline: no system-audio capture yet (WASAPI loopback lands with the audio
+/// todo). Returns an error so sessions degrade to video-only instead of failing to build.
+#[cfg(not(target_os = "linux"))]
+pub fn open_audio_capture(channels: u32) -> Result<Box<dyn AudioCapturer>> {
+    let _ = channels;
+    anyhow::bail!("no audio capture backend on this platform yet (Windows support in progress)")
+}
+
 /// Park a capturer at session end. Linux: store it in the persistent slot so the next session
 /// reuses it (no PipeWire thread churn).
 pub fn park_audio_capture(
@@ -167,6 +175,15 @@ pub(crate) fn mic_legacy_buffer() -> bool {
 #[cfg(target_os = "linux")]
 pub fn open_virtual_mic(channels: u32) -> Result<Box<dyn VirtualMic>> {
     linux::PwMicSource::open(channels).map(|m| Box::new(m) as Box<dyn VirtualMic>)
+}
+
+/// Non-Linux baseline: no virtual microphone yet (lands with the audio todo).
+#[cfg(not(target_os = "linux"))]
+pub fn open_virtual_mic(channels: u32) -> Result<Box<dyn VirtualMic>> {
+    let _ = channels;
+    anyhow::bail!(
+        "no virtual-microphone backend on this platform yet (Windows support in progress)"
+    )
 }
 
 #[cfg(target_os = "linux")]

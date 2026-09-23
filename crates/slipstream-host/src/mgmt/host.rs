@@ -389,8 +389,26 @@ pub(crate) struct AvailableCaptureMethod {
     )
 )]
 pub(crate) async fn list_capture_methods() -> Json<Vec<AvailableCaptureMethod>> {
+    // Non-Linux baseline: the Windows sources resolve by name but cannot open yet (the WGC/DXGI
+    // capturers land with the capture todo) — listed as unavailable so the console is honest.
     #[cfg(not(target_os = "linux"))]
-    let list = Vec::new();
+    let list = vec![
+        AvailableCaptureMethod {
+            id: "auto".into(),
+            label: "Auto".into(),
+            available: true,
+        },
+        AvailableCaptureMethod {
+            id: crate::session_plan::CaptureBackend::Wgc.as_str().into(),
+            label: "Windows Graphics Capture".into(),
+            available: false,
+        },
+        AvailableCaptureMethod {
+            id: crate::session_plan::CaptureBackend::Dxgi.as_str().into(),
+            label: "DXGI Desktop Duplication".into(),
+            available: false,
+        },
+    ];
     #[cfg(target_os = "linux")]
     let list = {
         let portal_ok = std::env::var_os("XDG_RUNTIME_DIR").is_some();

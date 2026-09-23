@@ -31,6 +31,14 @@ pub(crate) fn running_process_names() -> Vec<String> {
 #[path = "detect/linux.rs"]
 mod platform;
 
+#[cfg(target_os = "windows")]
+#[path = "detect/windows.rs"]
+mod platform;
+
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
+#[path = "detect/fallback.rs"]
+mod platform;
+
 /// A known competing GameStream/Moonlight host.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Product {

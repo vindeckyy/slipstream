@@ -39,18 +39,32 @@ fn command_for(spec: &LaunchSpec) -> Option<String> {
             .then(|| format!("steam steam://rungameid/{}", spec.value)),
         "lutris_id" => (!spec.value.is_empty() && spec.value.bytes().all(|b| b.is_ascii_digit()))
             .then(|| format!("lutris lutris:rungameid/{}", spec.value)),
+        #[cfg(target_os = "linux")]
         "heroic" => heroic_command(&spec.value),
+        #[cfg(not(target_os = "linux"))]
+        "heroic" => None,
         "command" => (!spec.value.trim().is_empty()).then(|| spec.value.clone()),
         _ => None,
     }
 }
 
 /// The child a session launch produced.
-#[cfg(target_os = "linux")]
 pub struct SpawnedLaunch {
     pub child: std::process::Child,
     /// Whether the child leads its own process group.
     pub group_leader: bool,
+}
+
+/// Non-Linux baseline: title launch lands with the platform todo (Windows process
+/// creation + session placement). Fails loudly so the console reports it honestly.
+#[cfg(not(target_os = "linux"))]
+pub fn launch_session_command(
+    _compositor: crate::vdisplay::Compositor,
+    _cmd: &str,
+) -> Result<SpawnedLaunch> {
+    anyhow::bail!(
+        "title launch is not supported on this platform yet (Windows support in progress)"
+    )
 }
 
 /// Launch a resolved shell command into the live Linux session for the session's compositor.

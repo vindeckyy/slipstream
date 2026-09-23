@@ -1,7 +1,10 @@
+#[cfg(target_os = "linux")]
 use crate::types::{assign_ids, GpuHandle, GpuInfo, VENDOR_AMD, VENDOR_INTEL, VENDOR_NVIDIA};
+#[cfg(target_os = "linux")]
 use std::path::PathBuf;
 
 /// Enumerate Linux render nodes and their PCI ids from sysfs.
+#[cfg(target_os = "linux")]
 pub fn enumerate() -> Vec<GpuInfo> {
     let mut nodes: Vec<String> = std::fs::read_dir("/dev/dri")
         .map(|rd| {
@@ -46,5 +49,19 @@ pub fn enumerate() -> Vec<GpuInfo> {
         });
     }
     assign_ids(&mut out);
+    out
+}
+
+/// Enumerate GPUs on non-Linux hosts.
+///
+/// Baseline returns an empty inventory so selection degrades to `None` and the host
+/// takes the software-encode path. The Windows DXGI adapter enumeration (vendor/device
+/// id, VRAM, LUID) lands with the platform todo; it fills this in without changing callers.
+#[cfg(not(target_os = "linux"))]
+pub fn enumerate() -> Vec<crate::types::GpuInfo> {
+    let mut out = Vec::new();
+    // Keep the post-enumeration invariant (stable ids assigned once) so the DXGI
+    // implementation inherits it by construction rather than rediscovering it.
+    crate::types::assign_ids(&mut out);
     out
 }

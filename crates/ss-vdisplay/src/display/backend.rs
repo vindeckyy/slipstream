@@ -55,16 +55,12 @@ pub struct VirtualOutput {
     /// **reused** kept display (`design/gamemode-and-dedicated-sessions.md` A2), so the pipeline builder
     /// can [`registry::mark_failed(gen)`](crate::registry::mark_failed) if the first frame
     /// fails on it — tearing the corpse down so the retry loop's next acquire creates fresh instead of
-    /// re-wedging on the same dead node. `None` on a fresh create / non-poolable output. Linux-only (the
-    /// keep-alive pool is Linux).
-    #[cfg(target_os = "linux")]
+    /// re-wedging on the same dead node. `None` on a fresh create / non-poolable output.
     pub reused_gen: Option<u64>,
     /// The registry pool generation of this display (fresh AND reused — unlike `reused_gen`), so a
     /// mid-stream mode-switch rebuild can [`registry::retire`](crate::registry::retire) the
     /// display it supersedes instead of leaving it to accumulate under a linger/forever keep-alive
     /// policy (`design/midstream-resolution-resize.md` H4). `None` for non-poolable outputs.
-    /// Linux-only (the keep-alive pool is Linux).
-    #[cfg(target_os = "linux")]
     pub pool_gen: Option<u64>,
     /// The backend created the output at a SACRIFICIAL mode and the producer will renegotiate the
     /// live stream to `preferred_mode`'s dims (KWin's screencast only rebuilds its format offer —
@@ -89,9 +85,7 @@ impl VirtualOutput {
             preferred_mode,
             keepalive,
             ownership: DisplayOwnership::Owned,
-            #[cfg(target_os = "linux")]
             reused_gen: None,
-            #[cfg(target_os = "linux")]
             pool_gen: None,
             #[cfg(target_os = "linux")]
             expect_exact_dims: false,

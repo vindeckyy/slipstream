@@ -447,6 +447,21 @@ fn flatten_env(ev: &crate::events::HostEvent) -> Vec<(String, String)> {
 /// file, refuse to run it unless it is owned by the host user (or root) and not
 /// group/world-writable — a world-writable hook script is privilege escalation bait. A bare
 /// command name (`systemctl`, `curl`) is left to PATH.
+///
+/// Non-Unix baseline: no ownership check yet (the Windows DACL equivalent lands with the
+/// platform todo) — every command passes.
+#[cfg(not(unix))]
+fn exec_path_check(cmd: &str) -> Result<(), String> {
+    if cmd.split_whitespace().next().is_none() {
+        return Err("empty command".into());
+    }
+    Ok(())
+}
+
+/// The sshd/sudoers rule (RFC §9.1): when the command's first token is a path to an existing
+/// file, refuse to run it unless it is owned by the host user (or root) and not
+/// group/world-writable — a world-writable hook script is privilege escalation bait. A bare
+/// command name (`systemctl`, `curl`) is left to PATH.
 #[cfg(unix)]
 fn exec_path_check(cmd: &str) -> Result<(), String> {
     use std::os::unix::fs::MetadataExt;
@@ -464,6 +479,7 @@ fn exec_path_check(cmd: &str) -> Result<(), String> {
         return Ok(());
     }
     // SAFETY: geteuid has no preconditions and touches no memory.
+    #[cfg(unix)]
     let euid = unsafe { libc::geteuid() };
     if meta.uid() != euid && meta.uid() != 0 {
         return Err(format!(
@@ -491,15 +507,27 @@ fn run_hook_process(
     timeout: Duration,
 ) -> bool {
     use std::io::Write;
+    #[cfg(unix)]
     use std::os::unix::process::CommandExt;
+    // Operator hook bodies are shell snippets (`sh -c` on Unix, `cmd /C` elsewhere — the
+    // Windows hook story lands with the platform todo; until then a hook runs its body
+    // through the native shell and surfaces stderr at spawn).
+    #[cfg(unix)]
     let mut c = std::process::Command::new("/bin/sh");
-    c.arg("-c")
-        .arg(cmd)
+    #[cfg(not(unix))]
+    let mut c = std::process::Command::new("cmd");
+    #[cfg(unix)]
+    c.arg("-c");
+    #[cfg(not(unix))]
+    c.arg("/C");
+    c.arg(cmd)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        // Its own process group, so the timeout can kill the whole tree the shell spawned.
-        .process_group(0);
+        .stderr(std::process::Stdio::null());
+    // Its own process group, so the timeout can kill the whole tree the shell spawned
+    // (Unix-only; the Windows job-object equivalent lands with the platform todo).
+    #[cfg(unix)]
+    c.process_group(0);
     c.envs(env.iter().map(|(k, v)| (k.as_str(), v.as_str())));
     let mut child = match c.spawn() {
         Ok(ch) => ch,
@@ -525,9 +553,17 @@ fn run_hook_process(
                 if Instant::now() >= deadline {
                     tracing::warn!(cmd = %cmd, timeout_s = timeout.as_secs(),
                         "hook command timed out — killing its process group");
-                    // SAFETY: kill(2) with a negative pid signals the process group we created
-                    // via process_group(0); no memory is touched.
-                    unsafe { libc::kill(-(child.id() as i32), libc::SIGKILL) };
+                    #[cfg(unix)]
+                    {
+                        // SAFETY: kill(2) with a negative pid signals the process group we created
+                        // via process_group(0); no memory is touched.
+                        unsafe { libc::kill(-(child.id() as i32), libc::SIGKILL) };
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        // No process group on this platform yet — kill the direct child.
+                        child.kill().ok();
+                    }
                     let _ = child.wait(); // reap — never leave a zombie
                     return false;
                 }

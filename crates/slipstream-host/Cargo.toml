@@ -115,6 +115,10 @@ semver = "1"
 utoipa = { version = "5", features = ["axum_extras"] }
 utoipa-axum = "0.2"
 utoipa-scalar = { version = "0.3", features = ["axum"] }
+# Opus encode for the host->client audio plane, including stereo and 5.1/7.1 surround. The crate
+# vendors libopus (cmake-built from source, no system lib or vcpkg) — portable, so it stays in
+# the main deps even though only the Linux backend opens it today (WASAPI lands with the audio todo).
+opus = "0.3"
 
 [dev-dependencies]
 # Drive the management API router in-process (no socket) in the handler tests.
@@ -122,11 +126,6 @@ tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 # Disposable directory fixtures for the Steam local-librarycache scan tests (library.rs).
 tempfile = "3"
-
-# Opus encode for the host->client audio plane, including stereo and 5.1/7.1 surround. The crate
-# vendors libopus (cmake-built from source, no system lib or vcpkg).
-[target.'cfg(target_os = "linux")'.dependencies]
-opus = "0.3"
 
 [target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
 # Direct-SDK NVENC is part of every supported Linux host build. Its CUDA and NVENC entry points are

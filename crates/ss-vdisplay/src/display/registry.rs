@@ -90,24 +90,41 @@ pub fn acquire(
     quit: std::sync::Arc<std::sync::atomic::AtomicBool>,
     supersedes: Option<u64>,
 ) -> Result<super::VirtualOutput> {
-    let backend = vd.name();
-    let out = linux::acquire(vd, mode, quit, supersedes);
-    if out.is_ok() {
-        crate::emit_display_event(crate::DisplayEvent::Created {
-            backend: backend.to_string(),
-            width: mode.width,
-            height: mode.height,
-            refresh_hz: mode.refresh_hz,
-        });
+    #[cfg(target_os = "linux")]
+    {
+        let backend = vd.name();
+        let out = linux::acquire(vd, mode, quit, supersedes);
+        if out.is_ok() {
+            crate::emit_display_event(crate::DisplayEvent::Created {
+                backend: backend.to_string(),
+                width: mode.width,
+                height: mode.height,
+                refresh_hz: mode.refresh_hz,
+            });
+        }
+        out
     }
-    out
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (vd, mode, quit, supersedes);
+        anyhow::bail!(
+            "no virtual-display backend on this platform yet (Windows support in progress)"
+        )
+    }
 }
 
 /// Snapshot the host's managed virtual displays. Cheap + side-effect-free (a state-lock read);
 /// safe per management request.
 pub fn snapshot() -> Snapshot {
-    Snapshot {
-        displays: linux::snapshot(),
+    #[cfg(target_os = "linux")]
+    {
+        Snapshot {
+            displays: linux::snapshot(),
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        Snapshot::default()
     }
 }
 
@@ -116,13 +133,21 @@ pub fn snapshot() -> Snapshot {
 /// refused (releasing a display with live sessions is session management). Returns the number
 /// released.
 pub fn release(slot: Option<u64>) -> usize {
-    let released = linux::force_release(slot);
-    if released > 0 {
-        crate::emit_display_event(crate::DisplayEvent::Released {
-            count: released as u32,
-        });
+    #[cfg(target_os = "linux")]
+    {
+        let released = linux::force_release(slot);
+        if released > 0 {
+            crate::emit_display_event(crate::DisplayEvent::Released {
+                count: released as u32,
+            });
+        }
+        released
     }
-    released
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = slot;
+        0
+    }
 }
 
 /// Tear down a **reused-but-dead** pool entry by its generation stamp (A2). Called by the pipeline
@@ -130,7 +155,14 @@ pub fn release(slot: Option<u64>) -> usize {
 /// loop's next `acquire` creates fresh instead of re-wedging on the same corpse. No-op if the entry
 /// is already gone (idempotent — the subsequent stale-gen lease drop no-ops too).
 pub fn mark_failed(gen: u64) {
-    linux::mark_failed(gen);
+    #[cfg(target_os = "linux")]
+    {
+        linux::mark_failed(gen);
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = gen;
+    }
 }
 
 /// Force-release a **superseded** kept display by its generation stamp
@@ -141,7 +173,14 @@ pub fn mark_failed(gen: u64) {
 /// (lingering/pinned) entry is released — an Active one is refused, like `/display/release` — and
 /// a gen that's already gone (immediate teardown) is a no-op.
 pub fn retire(gen: u64) {
-    linux::retire(gen);
+    #[cfg(target_os = "linux")]
+    {
+        linux::retire(gen);
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = gen;
+    }
 }
 
 /// Invalidate every kept display of `backend` — its compositor instance is gone (a Game↔Desktop switch
@@ -149,7 +188,14 @@ pub fn retire(gen: u64) {
 /// (`design/gamemode-and-dedicated-sessions.md` A4). Called from the session-switch watcher / a
 /// per-connect re-detect that finds the previous backend's compositor gone.
 pub fn invalidate_backend(backend: &str) {
-    linux::invalidate_backend(backend);
+    #[cfg(target_os = "linux")]
+    {
+        linux::invalidate_backend(backend);
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = backend;
+    }
 }
 
 // ---------------------------------------------------------------------------------------------

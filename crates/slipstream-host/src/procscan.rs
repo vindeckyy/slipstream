@@ -22,6 +22,33 @@ mod linux;
 #[cfg(target_os = "linux")]
 pub use linux::Scanner;
 
+/// Non-Linux baseline: process-scan matcher lands with the platform todo (Windows Toolhelp
+/// snapshot). Until then the matcher reports nothing adopted and no start-time filter, so
+/// game-lease lifetime tracking degrades to its no-opinion path instead of failing to build.
+#[cfg(not(target_os = "linux"))]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Scanner;
+
+#[cfg(not(target_os = "linux"))]
+impl Scanner {
+    pub fn system() -> Self {
+        Scanner
+    }
+    pub fn now_stamp(&self) -> Option<f64> {
+        None
+    }
+    pub fn find(
+        &self,
+        _spec: &crate::library::DetectSpec,
+        _min_start: Option<f64>,
+    ) -> Vec<ProcRef> {
+        Vec::new()
+    }
+    pub fn alive(&self, _procs: &[ProcRef]) -> Vec<ProcRef> {
+        Vec::new()
+    }
+}
+
 /// A process the matcher adopted: its pid plus a start stamp that pins that pid to *this* process,
 /// so a recycled pid can never be mistaken for it.
 ///

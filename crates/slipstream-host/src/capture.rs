@@ -6,7 +6,9 @@
 //! and hand ss-capture the pre-resolved facts it needs, so the capturer never reaches back into
 //! the orchestrator.
 
-use anyhow::{bail, Context, Result};
+#[cfg(target_os = "linux")]
+use anyhow::Context;
+use anyhow::{bail, Result};
 
 #[cfg(target_os = "linux")]
 use crate::session_plan::CaptureBackend;
@@ -102,6 +104,37 @@ pub fn open_portal_monitor(
 /// - `wlr` — [`ss_capture::open_wlr_desktop`]
 /// - `kms` — DRM primary-plane dma-buf capture
 /// - `nvfbc` — NVIDIA NvFBC shared-CUDA capture
+///
+/// Non-Linux baseline: no desktop capturer yet (WGC/DXGI land with the capture todo) —
+/// fails loudly so the console reports it honestly instead of serving a black stream.
+#[cfg(not(target_os = "linux"))]
+pub fn open_desktop_capture(
+    _want_hdr: bool,
+    _want_metadata_cursor: bool,
+) -> Result<Box<dyn Capturer>> {
+    bail!("no desktop capture backend on this platform yet (Windows support in progress)")
+}
+
+/// Non-Linux baseline: no portal capturer (WGC lands with the capture todo).
+#[cfg(not(target_os = "linux"))]
+pub fn open_portal_monitor(
+    _want_hdr: bool,
+    _want_metadata_cursor: bool,
+) -> Result<Box<dyn Capturer>> {
+    bail!("no portal capture backend on this platform yet (Windows support in progress)")
+}
+
+/// Non-Linux baseline: no virtual-output capturer yet (the IDD display + WGC capture land
+/// with the vdisplay/capture todos).
+#[cfg(not(target_os = "linux"))]
+pub fn capture_virtual_output(
+    _vout: crate::vdisplay::VirtualOutput,
+    _want: OutputFormat,
+    _capture: crate::session_plan::CaptureBackend,
+) -> Result<Box<dyn Capturer>> {
+    bail!("no virtual-output capture backend on this platform yet (Windows support in progress)")
+}
+
 #[cfg(target_os = "linux")]
 pub fn open_desktop_capture(
     want_hdr: bool,

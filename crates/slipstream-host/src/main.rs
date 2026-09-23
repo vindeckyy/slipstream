@@ -57,6 +57,21 @@ mod gamestream {
 #[cfg(target_os = "linux")]
 #[path = "linux/gpuclocks.rs"]
 mod gpuclocks;
+
+/// Non-Linux baseline: GPU clock management lands with the platform todo (NVML/NVAPI on
+/// Windows). The RAII pin handle exists so both streaming planes compile unchanged — it is
+/// always the no-op variant until the backend lands.
+#[cfg(not(target_os = "linux"))]
+mod gpuclocks {
+    /// RAII handle that keeps the box-wide clock pin armed while alive — always the no-op
+    /// variant on this platform (see the module doc).
+    pub struct SessionClockPin;
+
+    /// Arm the box-wide clock pin for one live client session — a no-op here.
+    pub fn session_pin() -> SessionClockPin {
+        SessionClockPin
+    }
+}
 // Host operations (power / hooks / plugins / update / store) live under `ops/`.
 // Flat shims keep `crate::hooks::*`, `crate::power::*`, etc. working.
 mod ops;
@@ -129,6 +144,15 @@ mod zerocopy {
     pub(crate) use ss_zerocopy::*;
 }
 
+/// Non-Linux baseline: no zero-copy GPU import yet (D3D11 texture sharing lands with the
+/// encode todo) — every session stages through CPU frames.
+#[cfg(not(target_os = "linux"))]
+mod zerocopy {
+    pub(crate) fn enabled() -> bool {
+        false
+    }
+}
+
 use anyhow::{bail, Context, Result};
 use encode::Codec;
 use spike::{Options, Source};
@@ -194,6 +218,11 @@ fn main() {
 /// depend on ss-inject (its crate doc), and the anchor is a host-level pin anyway — the injector is
 /// host-lifetime and shared by every concurrent session, so there is nothing per-session to track
 /// (`design/per-monitor-portal-capture.md` §7.2).
+/// Non-Linux baseline: no physical-monitor pin + anchor yet (the Windows monitor
+/// enumeration + `SendInput` anchor land with the vdisplay/input todos).
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn refresh_capture_monitor_anchor(_context: &str) {}
+
 #[cfg(target_os = "linux")]
 pub(crate) fn refresh_capture_monitor_anchor(context: &str) {
     let Some(want) = ss_vdisplay::capture_monitor() else {
@@ -477,6 +506,10 @@ fn real_main() -> Result<()> {
                     session_plan::CaptureBackend::X11 => x11_ok,
                     session_plan::CaptureBackend::NvFbc => nvfbc_ok,
                     session_plan::CaptureBackend::IddPush => false,
+                    // Windows-only sources never appear in the Linux candidate list, and
+                    // even an explicit `SLIPSTREAM_CAPTURE_METHOD=wgc` pin fails at open
+                    // on Linux — report them unavailable rather than panicking the probe.
+                    session_plan::CaptureBackend::Wgc | session_plan::CaptureBackend::Dxgi => false,
                 };
                 println!(
                     "{}: {}",

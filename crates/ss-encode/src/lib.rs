@@ -1,11 +1,11 @@
-//! Linux hardware and software video encode. Binds FFmpeg; never rewrites codecs. Low-latency
-//! preset, B-frames off. The backend is per-GPU: NVENC on NVIDIA (`*_nvenc`, accepts `bgr0` and
-//! does RGB→YUV on the GPU, so no host-side CSC) and VAAPI on AMD/Intel (`*_vaapi`; the CPU-input
-//! fallback swscales RGB→NV12, the zero-copy path imports the capture dmabuf straight into a VA
-//! surface). Vulkan Video and PyroWave provide Linux-specific zero-copy paths. One [`Encoder`]
+//! Video encode: hardware backends on Linux (NVENC/VAAPI/Vulkan Video/PyroWave) plus the
+//! portable software H.264 fallback (openh264). Low-latency preset, B-frames off. One [`Encoder`]
 //! trait, selected in [`open_video`]. The crate depends on the shared frame vocabulary (`ss-frame`)
 //! and zero-copy plumbing (`ss-zerocopy`), never on capture.
-#![cfg(target_os = "linux")]
+//!
+//! Windows baseline: only the software backend opens (the `WindowsBackend::Software` arm below).
+//! NVENC on Windows (D3D11 shared-texture input) lands with the encode todo; until then every
+//! capability mirror honestly reports the software path (H.264 only, 8-bit, no cursor blend).
 // NOTE: no crate-wide `#![allow(dead_code)]`. It was inherited from the pre-extraction host crate
 // root as scaffolding for backend paths defined ahead of the build that used them, but a census
 // across every feature combination found it was hiding exactly two items, so it
@@ -37,6 +37,7 @@ impl Codec {
     /// wrong-vendor pref), not that it encodes nothing — fall back to the superset so `resolve_codec`
     /// still lands on HEVC for an auto client, exactly the pre-probe behaviour. Fed to
     /// [`slipstream_core::quic::resolve_codec`] against the client's advertised codecs.
+    #[cfg(target_os = "linux")]
     pub fn host_wire_caps() -> u8 {
         // PyroWave rides on top of whatever H.26x set resolves below: feature-gated and inert in
         // negotiation unless the client explicitly prefers it (resolve_codec ignores the bit in its ladder). Advertised
@@ -118,6 +119,14 @@ impl Codec {
             }
         })();
         base | pyro
+    }
+
+    /// Non-Linux baseline: the software encoder (openh264) emits H.264 only, so the host
+    /// negotiates H.264 and nothing else. The Windows NVENC todo widens this to the probed
+    /// GPU set (mirroring the Linux arms above) instead of the static superset.
+    #[cfg(not(target_os = "linux"))]
+    pub fn host_wire_caps() -> u8 {
+        slipstream_core::quic::CODEC_H264
     }
 }
 
@@ -530,6 +539,7 @@ fn open_video_backend_linux(
 /// branch that actually opened (`nvenc`/`vaapi`/`vulkan`/`software`) — the label feeds
 /// the mgmt API's live-session record, and only the open site knows which internal fallback won
 /// (e.g. Vulkan Video falling back to VAAPI).
+#[cfg(target_os = "linux")]
 #[allow(clippy::too_many_arguments)]
 fn open_video_backend(
     codec: Codec,
@@ -580,6 +590,41 @@ fn open_video_backend(
         cursor_blend,
         max_slices,
     )
+}
+
+/// Open the non-Linux encoder backend (Windows baseline): the portable software H.264
+/// encoder only. Same validation + label contract as the Linux arm above, so every caller
+/// (initial Hello, GameStream ANNOUNCE, Reconfigure) shares the one chokepoint. The Windows
+/// NVENC todo adds a hardware arm here and narrows the H.264-only gate, mirroring the Linux
+/// `Software` arm's codec check.
+#[cfg(not(target_os = "linux"))]
+#[allow(clippy::too_many_arguments)]
+fn open_video_backend(
+    codec: Codec,
+    format: PixelFormat,
+    width: u32,
+    height: u32,
+    fps: u32,
+    bitrate_bps: u64,
+    cuda: bool,
+    bit_depth: u8,
+    chroma: ChromaFormat,
+    cursor_blend: bool,
+    max_slices: u32,
+) -> Result<(Box<dyn Encoder>, &'static str)> {
+    validate_dimensions(codec, width, height)?;
+    if fps == 0 || fps > 1000 {
+        anyhow::bail!("invalid refresh/fps {fps}: must be 1..=1000 Hz");
+    }
+    if codec != Codec::H264 {
+        anyhow::bail!(
+            "the software encoder emits H.264 only; the session negotiated {codec:?} \
+             (a client must advertise CODEC_H264 to reach a software host)"
+        );
+    }
+    let _ = (cuda, bit_depth, chroma, cursor_blend, max_slices); // CPU + 8-bit 4:2:0 only
+    sw::OpenH264Encoder::open(format, width, height, fps, bitrate_bps.min(SW_BITRATE_CEIL))
+        .map(|e| (Box::new(e) as Box<dyn Encoder>, "software"))
 }
 
 /// Open NVENC, probing this GPU's real max bitrate. NVENC rejects `avcodec_open2` with EINVAL
@@ -775,6 +820,12 @@ pub fn linux_native_nv12_ok(codec: Codec) -> bool {
     }
 }
 
+/// Non-Linux baseline: no producer-native NV12 ingest (software takes packed RGB only).
+#[cfg(not(target_os = "linux"))]
+pub fn linux_native_nv12_ok(_codec: Codec) -> bool {
+    false
+}
+
 /// Can this host's encode path ingest a **packed 10-bit PQ/BT.2020 CUDA payload** — i.e. may an
 /// HDR capture stay zero-copy on NVIDIA?
 ///
@@ -800,6 +851,12 @@ pub fn linux_hdr_cuda_ok() -> bool {
     {
         false
     }
+}
+
+/// Non-Linux baseline: no packed-10-bit GPU ingest — HDR (when it lands) takes the CPU path.
+#[cfg(not(target_os = "linux"))]
+pub fn linux_hdr_cuda_ok() -> bool {
+    false
 }
 
 /// Whether the encode backend this session will resolve to composites [`CapturedFrame::cursor`]
@@ -855,6 +912,13 @@ pub fn cursor_blend_capable(codec: Codec, cuda_planned: bool, ten_bit: bool) -> 
         cuda_planned,
     );
     cursor_blend_capable_for(backend, cuda_planned, direct_nvenc, vulkan_csc)
+}
+
+/// Non-Linux baseline: the software encoder blends no cursor — capture must EMBED the
+/// pointer. The Windows NVENC todo revisits this once a blending stage exists.
+#[cfg(not(target_os = "linux"))]
+pub fn cursor_blend_capable(_codec: Codec, _cuda_planned: bool, _ten_bit: bool) -> bool {
+    false
 }
 
 /// The dispatch-mirroring core of [`cursor_blend_capable`], device-free for the unit tests.
@@ -1063,6 +1127,14 @@ pub fn pyrowave_capture_modifiers(fourcc: u32) -> Vec<u64> {
 pub fn linux_zero_copy_is_vaapi() -> bool {
     linux_zero_copy_is_vaapi_for(linux_resolved_backend())
 }
+
+/// Non-Linux baseline: reports the CPU frame path (no GPU importer). The `linux_` name is kept
+/// so the host's one-way capture→encode facade needs no per-OS fork; the Windows NVENC todo
+/// replaces this with a real backend resolver.
+#[cfg(not(target_os = "linux"))]
+pub fn linux_zero_copy_is_vaapi() -> bool {
+    true
+}
 /// The zero-copy-plane decision for an ALREADY-resolved backend — so a caller that has just
 /// resolved (e.g. `host_wire_caps`, which consults several gates per call on a POLLED endpoint)
 /// pays for the resolution once instead of once per gate (the `serverinfo.rs` probe-cost class,
@@ -1163,6 +1235,19 @@ pub fn vaapi_codec_support() -> CodecSupport {
 /// encode — the honest-downgrade channel. 4:4:4 is HEVC-only; the probe opens a tiny encoder on the
 /// active backend (NVENC FREXT is broad on NVIDIA, but VAAPI 4:4:4 is hardware-specific, so it
 /// must be probed, never assumed). Non-HEVC codecs are always `false`.
+///
+/// Non-Linux baseline: always `false` — the software encoder is 4:2:0-only.
+#[cfg(not(target_os = "linux"))]
+pub fn can_encode_444(_codec: Codec) -> bool {
+    false
+}
+
+/// Whether the active GPU encode backend can actually produce a full-chroma **4:4:4** HEVC stream.
+/// Resolved (and cached, once) *before* the Welcome so the host advertises the chroma it will really
+/// encode — the honest-downgrade channel. 4:4:4 is HEVC-only; the probe opens a tiny encoder on the
+/// active backend (NVENC FREXT is broad on NVIDIA, but VAAPI 4:4:4 is hardware-specific, so it
+/// must be probed, never assumed). Non-HEVC codecs are always `false`.
+#[cfg(target_os = "linux")]
 pub fn can_encode_444(codec: Codec) -> bool {
     use std::collections::HashMap;
     use std::sync::{Mutex, OnceLock};
@@ -1219,6 +1304,24 @@ pub fn can_encode_444(codec: Codec) -> bool {
 /// Backend truth: Linux probes a tiny real Main10 open on the resolved backend, using libav NVENC
 /// or VAAPI for the HDR X2RGB10 to P010 path. The direct-SDK CUDA path and Vulkan Video stay 8-bit
 /// and a 10-bit session routes around them.
+///
+/// Non-Linux baseline: always `false` — the software encoder is 8-bit-only.
+#[cfg(not(target_os = "linux"))]
+pub fn can_encode_10bit(_codec: Codec) -> bool {
+    false
+}
+
+/// Whether the active GPU encode backend can actually produce a **10-bit** stream for `codec`
+/// (HEVC Main10 / AV1 10-bit). Resolved (and cached per selected GPU) *before* the Welcome so the
+/// negotiated bit depth — and the HDR/SDR colour label derived from it — matches what the encoder
+/// will really emit: the honest-downgrade channel, exactly like [`can_encode_444`]. Without this
+/// gate a default-on `SLIPSTREAM_10BIT` would negotiate 10-bit on a GPU/backend that then silently
+/// falls back to 8-bit post-Welcome (label HDR / stream SDR).
+///
+/// Backend truth: Linux probes a tiny real Main10 open on the resolved backend, using libav NVENC
+/// or VAAPI for the HDR X2RGB10 to P010 path. The direct-SDK CUDA path and Vulkan Video stay 8-bit
+/// and a 10-bit session routes around them.
+#[cfg(target_os = "linux")]
 pub fn can_encode_10bit(codec: Codec) -> bool {
     use std::collections::HashMap;
     use std::sync::{Mutex, OnceLock};
@@ -1286,8 +1389,20 @@ pub fn resolved_backend_is_gpu() -> bool {
     linux_resolved_backend() != LinuxBackend::Software
 }
 
+/// Non-Linux baseline: the software backend always stages on the CPU.
+#[cfg(not(target_os = "linux"))]
+pub fn resolved_backend_is_gpu() -> bool {
+    false
+}
+
 /// Linux capture does not expose a packed RGB source for an encoder-side 4:4:4 CSC.
 #[cfg(target_os = "linux")]
+pub fn resolved_backend_ingests_rgb_444() -> bool {
+    false
+}
+
+/// Non-Linux baseline: no packed-RGB 4:4:4 ingest (software is 4:2:0-only).
+#[cfg(not(target_os = "linux"))]
 pub fn resolved_backend_ingests_rgb_444() -> bool {
     false
 }
@@ -1320,8 +1435,8 @@ mod rfi;
 #[cfg(target_os = "linux")]
 #[path = "backend/libav.rs"]
 mod libav;
-// Software (openh264) H.264 encoder for headless and GPU-less Linux hosts.
-#[cfg(target_os = "linux")]
+// Software (openh264) H.264 encoder: the GPU-less path on Linux, the only path on the
+// non-Linux baseline (Windows software host until NVENC lands).
 #[path = "backend/sw.rs"]
 mod sw;
 #[cfg(target_os = "linux")]
