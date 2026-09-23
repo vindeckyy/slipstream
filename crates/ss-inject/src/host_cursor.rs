@@ -10,6 +10,8 @@ use ss_capture::host_cursor_flag;
 pub struct PlatformHide {
     #[cfg(target_os = "linux")]
     inner: linux::Inner,
+    #[cfg(target_os = "windows")]
+    inner: win_hide::WinHide,
 }
 
 impl PlatformHide {
@@ -22,11 +24,62 @@ impl PlatformHide {
         Some(Self { inner })
     }
 
-    /// Non-Linux baseline: cursor hide lands with the platform todo
-    /// (Windows `ShowCursor` accounting / IDD cursor suppression) — always `None` for now.
-    #[cfg(not(target_os = "linux"))]
+    /// Windows hide via `ShowCursor` display-counter accounting (restored on drop).
+    #[cfg(target_os = "windows")]
+    pub fn acquire() -> Option<Self> {
+        let inner = win_hide::WinHide::acquire()?;
+        host_cursor_flag::set_hidden_for_stream(true);
+        Some(Self { inner })
+    }
+
+    /// Baseline for platforms with no cursor-hide path yet — always `None` for now.
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     pub fn acquire() -> Option<Self> {
         None
+    }
+}
+
+/// Windows cursor hide: `ShowCursor` keeps a per-process display counter — the cursor is
+/// hidden while the counter is negative, so hide loops `FALSE` until it goes negative and
+/// restore loops `TRUE` until it goes non-negative (both bounded, in case another component
+/// moved the counter under us).
+#[cfg(target_os = "windows")]
+mod win_hide {
+    pub(super) struct WinHide;
+
+    impl WinHide {
+        pub(super) fn acquire() -> Option<Self> {
+            // SAFETY: `ShowCursor` takes no pointers — it only adjusts this process's
+            // cursor display counter and returns the new value (hidden while negative).
+            unsafe {
+                for _ in 0..64 {
+                    if windows::Win32::UI::WindowsAndMessaging::ShowCursor(
+                        windows::Win32::Foundation::BOOL::from(false),
+                    ) < 0
+                    {
+                        break;
+                    }
+                }
+            }
+            tracing::info!("host cursor hide: ShowCursor display counter (Windows)");
+            Some(Self)
+        }
+    }
+
+    impl Drop for WinHide {
+        fn drop(&mut self) {
+            // SAFETY: see `acquire` — restores the counter this hide consumed.
+            unsafe {
+                for _ in 0..64 {
+                    if windows::Win32::UI::WindowsAndMessaging::ShowCursor(
+                        windows::Win32::Foundation::BOOL::from(true),
+                    ) >= 0
+                    {
+                        break;
+                    }
+                }
+            }
+        }
     }
 }
 
