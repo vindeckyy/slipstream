@@ -106,6 +106,8 @@ mod power {
 // platform with neither (macOS, which has no launch path either) the module is an empty shell.
 mod procscan;
 mod send_pacing;
+#[cfg(target_os = "windows")]
+mod service;
 mod transport_state;
 mod session_plan {
     pub(crate) use crate::session::plan::*;
@@ -305,6 +307,12 @@ fn is_management_cli(args: &[String]) -> bool {
 }
 
 fn real_main() -> Result<()> {
+    // Windows service runs enter through the SCM (no CLI args); a console launch falls
+    // through to the normal CLI below.
+    #[cfg(target_os = "windows")]
+    if service::dispatch()? {
+        return Ok(());
+    }
     let args: Vec<String> = std::env::args().skip(1).collect();
 
     // `--version` prints the build-stamped version (build.rs) to stdout and exits — no logging.
@@ -702,6 +710,15 @@ fn env_flag_enabled(name: &str) -> bool {
 /// carry the inherent on-path #5/#9 weaknesses, so only on a trusted LAN). Returns the mgmt options,
 /// the native host config, and whether GameStream is enabled. Native pairing is **required by default**
 /// (an open host any LAN device can stream from is insecure); `--open` turns it off.
+/// Run the default `serve` set (mgmt API + native plane, GameStream per saved
+/// preference) with no CLI flags — the Windows service path. Mirrors the CLI `serve`
+/// arm exactly so service and console runs never diverge.
+#[cfg(target_os = "windows")]
+pub(crate) fn run_default_serve() -> Result<()> {
+    let (mgmt_opts, native, gamestream) = parse_serve(&[])?;
+    gamestream::serve(mgmt_opts, native, gamestream)
+}
+
 fn parse_serve(args: &[String]) -> Result<(mgmt::Options, native::NativeServe, bool)> {
     let mut opts = mgmt::Options::default();
     let mut native_port: u16 = 9777; // the native plane always runs now
