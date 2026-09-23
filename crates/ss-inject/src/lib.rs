@@ -65,8 +65,16 @@ pub enum Backend {
     GamescopeEi,
 }
 
-/// Preferred injection backend. No injector exists off Linux; [`open`] rejects it.
-#[cfg(not(target_os = "linux"))]
+/// Preferred injection backend. The Windows host injects through Win32 `SendInput`.
+#[cfg(target_os = "windows")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Backend {
+    /// Win32 `SendInput` keyboard/mouse/text (ViGEmBus pads land separately).
+    WindowsSendInput,
+}
+
+/// Preferred injection backend. No injector exists off Linux/Windows; [`open`] rejects it.
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Backend {
     /// Placeholder so the host still builds; the platform has no input injection.
@@ -89,8 +97,16 @@ pub fn open(backend: Backend) -> Result<Box<dyn InputInjector>> {
     }
 }
 
+/// Open the Windows `SendInput` injector.
+#[cfg(target_os = "windows")]
+pub fn open(backend: Backend) -> Result<Box<dyn InputInjector>> {
+    match backend {
+        Backend::WindowsSendInput => Ok(Box::new(sendinput::WindowsSendInput::open()?)),
+    }
+}
+
 /// No input-injection backend exists on this platform.
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 pub fn open(_backend: Backend) -> Result<Box<dyn InputInjector>> {
     anyhow::bail!("no input-injection backend on this platform")
 }
@@ -209,8 +225,25 @@ pub fn default_backend() -> Backend {
     }
 }
 
+/// Windows always injects through `SendInput`. `SLIPSTREAM_INPUT_BACKEND=windows` (or
+/// `sendinput`) selects it explicitly; any other value warns and falls through to it —
+/// the Linux backend names never apply here.
+#[cfg(target_os = "windows")]
+pub fn default_backend() -> Backend {
+    if let Ok(v) = std::env::var("SLIPSTREAM_INPUT_BACKEND") {
+        match v.trim().to_ascii_lowercase().as_str() {
+            "windows" | "sendinput" => {}
+            other => tracing::warn!(
+                value = other,
+                "unknown SLIPSTREAM_INPUT_BACKEND on Windows — using SendInput"
+            ),
+        }
+    }
+    Backend::WindowsSendInput
+}
+
 /// No injector on this platform.
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 pub fn default_backend() -> Backend {
     Backend::Unsupported
 }
@@ -226,8 +259,18 @@ pub fn text_input_supported() -> bool {
     matches!(default_backend(), Backend::WlrVirtual)
 }
 
+/// Whether the session's inject backend can type **committed text**
+/// ([`InputKind::TextInput`] — see `HOST_CAP_TEXT_INPUT`): Windows types it natively via
+/// `KEYEVENTF_UNICODE` (layout-independent UTF-16, surrogate pairs included).
+/// Consulted at Welcome time to advertise the cap; a mid-session backend switch away from a
+/// capable one just degrades to dropped text events (input is lossy by design).
+#[cfg(target_os = "windows")]
+pub fn text_input_supported() -> bool {
+    matches!(default_backend(), Backend::WindowsSendInput)
+}
+
 /// No injector ⇒ no text.
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 pub fn text_input_supported() -> bool {
     false
 }
@@ -417,6 +460,9 @@ mod kwin_fake_input;
 #[cfg(target_os = "linux")]
 #[path = "input/linux/libei.rs"]
 mod libei;
+#[cfg(target_os = "windows")]
+#[path = "input/windows/sendinput.rs"]
+mod sendinput;
 #[cfg(target_os = "linux")]
 #[path = "input/linux/wlr.rs"]
 mod wlr;

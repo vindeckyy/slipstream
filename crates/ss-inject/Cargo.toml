@@ -47,5 +47,13 @@ xkbcommon = "0.8"
 # Vendored + trimmed usbip server core — presents a virtual Steam Deck over USB/IP for Steam Input.
 usbip-sim = { path = "../slipstream-host/vendor/usbip-sim" }
 
+[target.'cfg(target_os = "windows")'.dependencies]
+# Win32 SendInput injection (keyboard/mouse/text) + virtual-screen metrics for absolute mapping.
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
 [lints]
 workspace = true
