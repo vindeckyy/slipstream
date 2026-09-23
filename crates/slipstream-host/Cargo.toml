@@ -127,6 +127,28 @@ http-body-util = "0.1"
 # Disposable directory fixtures for the Steam local-librarycache scan tests (library.rs).
 tempfile = "3"
 
+[target.'cfg(target_os = "windows")'.dependencies]
+# WASAPI loopback capture + Win32 desktop APIs for the Windows host (capture, input, audio).
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Graphics_Gdi",
+    "Win32_Media_Audio",
+    "Win32_Media_Multimedia",
+    "Win32_System_Com",
+    "Win32_System_WinRT",
+    "Win32_System_WinRT_Direct3D11",
+    "Win32_System_WinRT_Graphics_Capture",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging",
+    "Graphics_Capture",
+    "Graphics_DirectX",
+    "Graphics_DirectX_Direct3D11",
+] }
+
 [target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
 # Direct-SDK NVENC is part of every supported Linux host build. Its CUDA and NVENC entry points are
 # loaded at runtime, and encoder dispatch reaches it only for CUDA-backed NVIDIA capture, so the

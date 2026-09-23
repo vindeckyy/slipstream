@@ -3972,6 +3972,7 @@ dependencies = [
  "wayland-protocols-misc",
  "wayland-protocols-wlr",
  "wayland-scanner",
+ "windows",
  "x509-parser",
  "xkbcommon",
 ]
