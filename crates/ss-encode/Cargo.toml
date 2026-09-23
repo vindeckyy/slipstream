@@ -17,14 +17,15 @@ ss-host-config = { path = "../ss-host-config" }
 ss-zerocopy = { path = "../ss-zerocopy" }
 anyhow = "1"
 tracing = "0.1"
+# Software H.264 (openh264, BSD-2): the GPU-less path on Linux, the only path on the
+# non-Linux baseline (Windows software host until NVENC lands).
+openh264 = "0.9"
 
 [dev-dependencies]
 # A test writer for the NVENC backend's unit tests (`with_test_writer().try_init()`).
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-# Software H.264 (openh264, BSD-2) is the GPU-less encode path.
-openh264 = "0.9"
 # libavcodec (NVENC libav + VAAPI backends). `ffmpeg-sys-next` auto-detects the FFmpeg version.
 ffmpeg-next = "8"
 libc = "0.2"

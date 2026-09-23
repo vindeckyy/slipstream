@@ -39,6 +39,19 @@ pub(super) struct WireBatch {
 
 /// Send `pkts` with as few syscalls as possible (`sendmmsg`, up to 64 per call). The socket is
 /// connected, so no per-message address. Returns an error on the first send failure.
+///
+/// Non-Unix baseline: one `send` per packet (batched UDP lands with the net-perf todo).
+#[cfg(not(unix))]
+pub(super) fn sendmmsg_all(sock: &UdpSocket, pkts: &[Vec<u8>]) -> std::io::Result<()> {
+    for p in pkts {
+        sock.send(p)?;
+    }
+    Ok(())
+}
+
+/// Send `pkts` with as few syscalls as possible (`sendmmsg`, up to 64 per call). The socket is
+/// connected, so no per-message address. Returns an error on the first send failure.
+#[cfg(unix)]
 pub(super) fn sendmmsg_all(sock: &UdpSocket, pkts: &[Vec<u8>]) -> std::io::Result<()> {
     use std::os::fd::AsRawFd;
     const CHUNK: usize = 64;

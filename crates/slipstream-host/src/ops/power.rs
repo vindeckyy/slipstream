@@ -94,6 +94,34 @@ fn supervisor_decision(
 fn schedule_reexec() -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| format!("current_exe: {e}"))?;
     let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    #[cfg(unix)]
+    {
+        schedule_reexec_unix(&exe, &args)
+    }
+    #[cfg(not(unix))]
+    {
+        // Non-Unix baseline: no port-wait/detach dance yet (the Windows service-aware
+        // restart lands with the platform todo) — respawn directly and exit.
+        Command::new(&exe)
+            .args(&args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| format!("spawn replacement host: {e}"))?;
+        std::thread::Builder::new()
+            .name("ss-power-reexec-exit".into())
+            .spawn(|| {
+                std::thread::sleep(ACTION_DELAY);
+                graceful_exit();
+            })
+            .map_err(|e| format!("spawn re-exec exit thread: {e}"))?;
+        Ok(())
+    }
+}
+
+#[cfg(unix)]
+fn schedule_reexec_unix(exe: &std::path::Path, args: &[std::ffi::OsString]) -> Result<(), String> {
     let parent = std::process::id();
 
     // The replacement must not bind until this process has released the ports. Spawning the
@@ -119,8 +147,8 @@ fn schedule_reexec() -> Result<(), String> {
             Ok(())
         });
     }
-    cmd.arg("-c").arg(wait).arg(&exe);
-    for a in &args {
+    cmd.arg("-c").arg(wait).arg(exe);
+    for a in args {
         cmd.arg(a);
     }
     cmd.spawn()

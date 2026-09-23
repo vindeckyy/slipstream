@@ -492,6 +492,19 @@ fn run(
 /// Open a capturer on the **pinned physical monitor** for the compat plane's portal source
 /// (`design/per-monitor-portal-capture.md` §5.3). The pin is host-wide, so it has to be honored on
 /// every plane that captures a screen — and the portal source is the one that otherwise takes
+/// Non-Linux baseline: no monitor mirror yet (WGC capture + Windows monitor
+/// enumeration land with the capture/vdisplay todos).
+#[cfg(not(target_os = "linux"))]
+fn open_gs_mirror_source(
+    connector: &str,
+    _cfg: StreamConfig,
+    _metadata_cursor: bool,
+) -> Result<Box<dyn Capturer>> {
+    anyhow::bail!(
+        "cannot mirror monitor {connector:?} on this platform yet (Windows support in progress)"
+    )
+}
+
 /// "whichever head the portal hands back".
 ///
 /// Deliberately *not* the `open_gs_virtual_source` path: this source launches nothing and creates no

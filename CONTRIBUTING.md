@@ -54,6 +54,24 @@ sudo apt install build-essential clang libclang-dev pkg-config cmake \
 those crates. `scripts/bootstrap-ubuntu.sh` sets up an Ubuntu **capture-test host**, NVIDIA, Sway,
 PipeWire, and is not a substitute for the list above.)
 
+### Windows host builds
+
+The host cross-checks (and soon builds natively) for `x86_64-pc-windows-gnu`. The host is
+software-encode + synthetic-source capable there today; hardware capture/encode lands per the
+Windows bring-up plan. To reproduce the Windows check from Linux:
+
+```sh
+rustup target add x86_64-pc-windows-gnu
+sudo apt install mingw-w64 # provides x86_64-w64-mingw32-gcc for ring/opus/openh264 C builds
+cargo check -p slipstream-host --target x86_64-pc-windows-gnu --locked
+cargo clippy -p slipstream-host --target x86_64-pc-windows-gnu --all-targets --locked \
+  -- -D warnings
+```
+
+Native Windows builds need the same pinned Rust toolchain plus VS Build Tools (MSVC + Windows
+SDK), CMake, NASM (openh264/libopus vendored builds), and pkg-config; FFmpeg (`ffmpeg-next`)
+and Vulkan Video stay Linux-only and are never probed on Windows.
+
 ## Before you push
 
 Enable the repo git hooks once per clone. They run the exact rustfmt gates CI runs on every

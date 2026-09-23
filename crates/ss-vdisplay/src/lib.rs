@@ -76,6 +76,12 @@ pub use session::{
 #[cfg(target_os = "linux")]
 pub use session::{session_epoch, try_recover_session};
 
+/// Non-Linux baseline: no compositor session exists to recover — always `false`.
+#[cfg(not(target_os = "linux"))]
+pub fn try_recover_session() -> bool {
+    false
+}
+
 /// Gamescope-session routing.
 #[path = "display/routing.rs"]
 pub(crate) mod routing;
@@ -90,6 +96,30 @@ pub use routing::{
     launch_into_gamescope_session, launch_is_nested, steam_appid_from_launch,
     watch_steam_game_exit,
 };
+
+/// Non-Linux baselines for the gamescope-session helpers the session paths call
+/// unconditionally. Gamescope does not exist here (its routing + XFixes cursor source land
+/// with the Linux-only gamescope work, never on Windows), so every answer is the inert one.
+#[cfg(not(target_os = "linux"))]
+pub fn cancel_pending_tv_restore() {}
+
+/// Non-Linux baseline: no nested gamescope session exists, so it never exited.
+#[cfg(not(target_os = "linux"))]
+pub fn dedicated_game_exited(_node_id: u32) -> bool {
+    false
+}
+
+/// Non-Linux baseline: no gamescope Xwayland cursor targets exist.
+#[cfg(not(target_os = "linux"))]
+pub fn gamescope_xwayland_cursor_targets() -> Vec<(String, Option<String>)> {
+    Vec::new()
+}
+
+/// Non-Linux baseline: session launches never nest (title launch is unsupported here).
+#[cfg(not(target_os = "linux"))]
+pub fn launch_is_nested(_compositor: Compositor, _route: Option<&GamescopeRoute>) -> bool {
+    false
+}
 
 /// Compositors slipstream knows how to drive (plan §6).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -291,6 +321,12 @@ pub fn detect() -> Result<Compositor> {
             )
         }
     }
+    #[cfg(not(target_os = "linux"))]
+    {
+        anyhow::bail!(
+            "no virtual-display backend on this platform yet (Windows support in progress)"
+        )
+    }
 }
 
 /// Attach-only probes: while any scope is held, backend `create` paths must not stop, relaunch,
@@ -381,6 +417,13 @@ pub fn open(compositor: Compositor) -> Result<Box<dyn VirtualDisplay>> {
             Compositor::Hyprland => Ok(Box::new(hyprland::HyprlandDisplay::new()?)),
         }
     }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = compositor;
+        anyhow::bail!(
+            "no virtual-display backend on this platform yet (Windows support in progress)"
+        )
+    }
 }
 
 /// Open the **mirror** backend for a specific monitor, bypassing the `SLIPSTREAM_CAPTURE_MONITOR`
@@ -414,6 +457,13 @@ pub fn probe(compositor: Compositor) -> Result<()> {
             // wlroots creates the output on demand — nothing to pre-check beyond "Linux".
             Compositor::Gamescope | Compositor::Mutter | Compositor::Wlroots => Ok(()),
         }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = compositor;
+        anyhow::bail!(
+            "no virtual-display backend on this platform yet (Windows support in progress)"
+        )
     }
 }
 

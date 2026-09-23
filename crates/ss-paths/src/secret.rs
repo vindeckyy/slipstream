@@ -1,4 +1,8 @@
 /// Create `dir` and its parents owner-private at mode 0700. Tightens an already-existing dir too.
+///
+/// Windows has no POSIX mode bits: this creates the directory (parents included) with the
+/// default inherited DACL. Per-user `%APPDATA%` locations already restrict access to the user
+/// plus SYSTEM/Admins; tightening further needs an explicit DACL call and stays a follow-up.
 pub fn create_private_dir(dir: &std::path::Path) -> std::io::Result<()> {
     #[cfg(unix)]
     {
@@ -12,6 +16,10 @@ pub fn create_private_dir(dir: &std::path::Path) -> std::io::Result<()> {
             let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
         }
         r
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::DirBuilder::new().recursive(true).create(dir)
     }
 }
 

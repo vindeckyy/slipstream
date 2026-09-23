@@ -52,6 +52,8 @@ pub enum WorkerClass {
 static OUTCOMES: Mutex<BTreeMap<String, SchedOutcome>> = Mutex::new(BTreeMap::new());
 
 /// Whether the low-latency profile is active (parsed once — the env is constant for the process).
+/// Whether the low-latency profile is active (parsed once — the env is constant for the process).
+#[cfg(target_os = "linux")]
 fn profile_active() -> bool {
     std::env::var("SLIPSTREAM_PERFORMANCE_PROFILE")
         .map(|s| s.trim().eq_ignore_ascii_case("low_latency"))
@@ -59,6 +61,7 @@ fn profile_active() -> bool {
 }
 
 /// The explicitly configured `SCHED_FIFO` priority (default 10, clamped 1..=99).
+#[cfg(target_os = "linux")]
 fn sched_prio() -> i32 {
     std::env::var("SLIPSTREAM_SCHED_PRIO")
         .ok()
@@ -68,6 +71,7 @@ fn sched_prio() -> i32 {
 }
 
 /// Whether the operator explicitly enabled the raw `SCHED_FIFO` path (RTKit is preferred).
+#[cfg(target_os = "linux")]
 fn sched_fifo_enabled() -> bool {
     std::env::var("SLIPSTREAM_SCHED_FIFO")
         .map(|s| s.trim() == "1")
@@ -75,6 +79,7 @@ fn sched_fifo_enabled() -> bool {
 }
 
 /// The explicitly configured CPU affinity (e.g. `"2,3"`). `None` = never touch affinity.
+#[cfg(target_os = "linux")]
 fn affinity_cpus() -> Option<Vec<usize>> {
     std::env::var("SLIPSTREAM_WORKER_AFFINITY")
         .ok()
@@ -88,6 +93,7 @@ fn affinity_cpus() -> Option<Vec<usize>> {
 }
 
 /// The nice adjustment for the `SCHED_OTHER` fallback, per class (matches `thread_qos`).
+#[cfg(target_os = "linux")]
 fn fallback_nice(class: WorkerClass) -> i32 {
     match class {
         WorkerClass::Critical => -10,
@@ -99,6 +105,10 @@ fn fallback_nice(class: WorkerClass) -> i32 {
 /// top of each capture / encode-submit / send / input-injection worker thread, with the thread's
 /// name (the `thread::Builder::name`) for the outcome record. Never changes system-wide settings;
 /// never steals CPUs. See the module docs for the RTKit → SCHED_FIFO → nice ladder.
+///
+/// Non-Linux: no worker QoS exists yet (Windows MMCSS/AvSetMmThreadCharacteristics lands with
+/// the platform todo) — records nothing and returns [`SchedOutcome::NotApplicable`].
+#[cfg(target_os = "linux")]
 pub fn apply_worker_qos(thread_name: &str, class: WorkerClass) -> SchedOutcome {
     if !profile_active() {
         return SchedOutcome::NotApplicable;
@@ -121,6 +131,12 @@ pub fn apply_worker_qos(thread_name: &str, class: WorkerClass) -> SchedOutcome {
     sched
 }
 
+/// Non-Linux stub: no worker QoS exists yet — always [`SchedOutcome::NotApplicable`].
+#[cfg(not(target_os = "linux"))]
+pub fn apply_worker_qos(_thread_name: &str, _class: WorkerClass) -> SchedOutcome {
+    SchedOutcome::NotApplicable
+}
+
 /// Read the recorded outcome for a thread name (diagnostics; `None` = not yet recorded).
 pub fn recorded_outcome(thread_name: &str) -> Option<SchedOutcome> {
     OUTCOMES
@@ -134,6 +150,7 @@ pub fn recorded_outcomes() -> BTreeMap<String, SchedOutcome> {
     OUTCOMES.lock().map(|m| m.clone()).unwrap_or_default()
 }
 
+#[cfg(target_os = "linux")]
 fn record(thread_name: &str, outcome: SchedOutcome) {
     if let Ok(mut m) = OUTCOMES.lock() {
         m.insert(thread_name.to_string(), outcome);
@@ -144,6 +161,7 @@ fn record(thread_name: &str, outcome: SchedOutcome) {
 /// when the request succeeded, `Some(Rejected)` when it was refused, `None` when RTKit is absent
 /// (so the caller can try the explicit SCHED_FIFO path). The request is deliberately modest —
 /// a bounded realtime priority the service itself caps — so we never outrank the PipeWire graph.
+#[cfg(target_os = "linux")]
 fn try_rtkit(class: WorkerClass) -> Option<SchedOutcome> {
     let rtkit = rtkit_request(class).ok()?;
     match rtkit {
@@ -155,6 +173,7 @@ fn try_rtkit(class: WorkerClass) -> Option<SchedOutcome> {
 /// The explicit `SCHED_FIFO` path — only when `SLIPSTREAM_SCHED_FIFO=1` (RTKit is preferred and
 /// the operator must explicitly opt into raw realtime). Fails (→ `None`) without
 /// `CAP_SYS_NICE` / a raised `RLIMIT_RTPRIO`, so the caller falls back to nice.
+#[cfg(target_os = "linux")]
 fn try_sched_fifo(class: WorkerClass) -> Option<SchedOutcome> {
     if !sched_fifo_enabled() {
         return None;
@@ -178,6 +197,7 @@ fn try_sched_fifo(class: WorkerClass) -> Option<SchedOutcome> {
 }
 
 /// The documented `SCHED_OTHER` + nice fallback: lower the nice of the calling thread.
+#[cfg(target_os = "linux")]
 fn set_nice(nice: i32) {
     // SAFETY: `setpriority` takes three by-value integers and no pointers; `PRIO_PROCESS` with
     // `who == 0` targets the calling task on Linux, and `nice` is in range. It only adjusts this
@@ -196,6 +216,7 @@ fn set_nice(nice: i32) {
 /// Apply an explicit CPU affinity mask to the calling thread (only when the operator configured
 /// one). Returns false when the mask is invalid or the kernel refuses — the worker then runs
 /// un-pinned rather than failing the session.
+#[cfg(target_os = "linux")]
 fn set_affinity(cpus: &[usize]) -> bool {
     if cpus.is_empty() {
         return true;
@@ -233,6 +254,7 @@ fn set_affinity(cpus: &[usize]) -> bool {
 /// module working gets the same treatment. Returns `Ok(Ok(()))` = applied, `Ok(Err(()))` =
 /// refused, `Err(())` = RTKit/dbus unreachable (so the caller tries SCHED_FIFO). The requested
 /// priority is modest (the service caps it anyway); we never outrank the PipeWire graph.
+#[cfg(target_os = "linux")]
 fn rtkit_request(class: WorkerClass) -> Result<Result<(), ()>, ()> {
     let _ = class;
     // `dbus-send` needs a session (or system) bus; the host's stream workers run in the user
@@ -277,12 +299,13 @@ fn rtkit_request(class: WorkerClass) -> Result<Result<(), ()>, ()> {
 }
 
 /// `gettid` via `syscall` (Linux-specific).
+#[cfg(target_os = "linux")]
 fn gettid() -> u32 {
     // SAFETY: `syscall(SYS_gettid)` takes no pointers and returns the calling thread's id.
     unsafe { libc::syscall(libc::SYS_gettid) as u32 }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
 

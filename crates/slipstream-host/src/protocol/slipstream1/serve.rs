@@ -434,7 +434,6 @@ pub(super) async fn serve_session(
     let rich_tx = input_tx.clone();
     // The stream loop's handle into the same pipeline: it parks the seat pointer on the
     // streamed surface (stream.rs `park_pointer`) through exactly the path client input takes.
-    #[cfg(target_os = "linux")]
     let input_tx_stream = input_tx.clone();
     let input_handle = {
         let conn = conn.clone();
@@ -880,7 +879,6 @@ pub(super) async fn serve_session(
                         client_hdr,
                         bringup: bringup_dp,
                         resize_ms: resize_ms_dp,
-                        #[cfg(target_os = "linux")]
                         input_tx: input_tx_stream,
                     };
                     match prep {

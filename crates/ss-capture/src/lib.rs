@@ -51,6 +51,7 @@ pub struct CaptureTelemetry {
 /// Wall-clock nanoseconds used for the capture timestamp carried through the encoder and wire
 /// timing probes. Capturers that cannot expose a producer timestamp still get a consistent host
 /// arrival anchor at the moment their frame is materialized.
+#[cfg(target_os = "linux")]
 pub(crate) fn capture_now_ns() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -442,6 +443,13 @@ pub fn capturer_supports_444(_encoder_ingests_rgb_444: bool) -> bool {
     true
 }
 
+/// Non-Linux baseline: the software path negotiates 4:2:0 only (WGC/DXGI 444 + NVENC 444
+/// land with the capture/encode todos).
+#[cfg(not(target_os = "linux"))]
+pub fn capturer_supports_444(_encoder_ingests_rgb_444: bool) -> bool {
+    false
+}
+
 /// Whether the **native-plane** capturer (a compositor virtual output) can deliver an HDR (10-bit
 /// PQ/BT.2020) source **on this platform alone**, without knowing which compositor will be
 /// driven — the platform half of the gate the slipstream/1 handshake consults before negotiating
@@ -459,6 +467,12 @@ pub fn capturer_supports_444(_encoder_ingests_rgb_444: bool) -> bool {
 /// `want_hdr`) is gated separately by the GameStream plane (`host_hdr_capable` + the live monitor
 /// colour-mode probe).
 #[cfg(target_os = "linux")]
+pub fn capturer_supports_hdr() -> bool {
+    false
+}
+
+/// Non-Linux baseline: SDR only (the Windows HDR chain lands with the quality todo).
+#[cfg(not(target_os = "linux"))]
 pub fn capturer_supports_hdr() -> bool {
     false
 }
@@ -509,6 +523,20 @@ pub fn hdr_capture_failed(source: HdrSource) -> bool {
     HDR_CAPTURE_FAILED[source.slot()].load(std::sync::atomic::Ordering::Relaxed)
 }
 
+/// Non-Linux baseline: no HDR negotiation exists yet, so no source has failed it.
+#[cfg(not(target_os = "linux"))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HdrSource {
+    PortalMonitor,
+    VirtualOutput,
+}
+
+/// Non-Linux baseline: no HDR negotiation exists yet, so no source has failed it.
+#[cfg(not(target_os = "linux"))]
+pub fn hdr_capture_failed(_source: HdrSource) -> bool {
+    false
+}
+
 #[cfg(target_os = "linux")]
 pub(crate) fn note_hdr_capture_failed(source: HdrSource) {
     if !HDR_CAPTURE_FAILED[source.slot()].swap(true, std::sync::atomic::Ordering::Relaxed) {
@@ -539,6 +567,12 @@ pub use platform::linux::pwinit;
 // portal monitor path (see `open_portal_monitor`'s `want_hdr`).
 #[cfg(target_os = "linux")]
 pub use platform::linux::gnome_hdr_monitor_active;
+
+/// Non-Linux baseline: no HDR monitor exists yet — always `false`.
+#[cfg(not(target_os = "linux"))]
+pub fn gnome_hdr_monitor_active() -> bool {
+    false
+}
 
 /// Open the Linux xdg-ScreenCast portal capturer for a client-sized monitor. `anchored` drives
 /// ScreenCast off a RemoteDesktop session (KWin/GNOME) so it inherits that grant headlessly.

@@ -19,6 +19,13 @@ pub enum CaptureBackend {
     X11,
     /// Linux: NVIDIA NvFBC shared-CUDA capture.
     NvFbc,
+    /// Windows: Windows Graphics Capture (per-monitor `GraphicsCaptureItem` + D3D11 frame
+    /// pool) — the primary Windows source. The WGC capturer lands with the capture todo;
+    /// until then the name resolves but opening it fails loudly.
+    Wgc,
+    /// Windows: DXGI Desktop Duplication fallback (CPU `Bgrx`) for sessions where WGC is
+    /// unavailable. Lands with the capture todo, alongside [`CaptureBackend::Wgc`].
+    Dxgi,
     /// Legacy value retained so older diagnostic code can still deserialize its enum shape.
     #[doc(hidden)]
     IddPush,
@@ -36,6 +43,8 @@ impl CaptureBackend {
             "kms" => CaptureBackend::Kms,
             "x11" => CaptureBackend::X11,
             "nvfbc" => CaptureBackend::NvFbc,
+            "wgc" | "graphics-capture" => CaptureBackend::Wgc,
+            "dxgi" | "duplication" => CaptureBackend::Dxgi,
             _ => return None,
         })
     }
@@ -53,6 +62,21 @@ impl CaptureBackend {
             // auto: keep Portal as the resolve answer for virtual-output sessions; desktop-mirror
             // openers call [`Self::resolve_desktop`] which tries backends in SolarFlare order.
             None => CaptureBackend::Portal,
+        }
+    }
+
+    /// Non-Linux resolve: the operator's explicit `SLIPSTREAM_CAPTURE_METHOD` when it names a
+    /// Windows backend, else WGC (the primary). The capturer itself lands with the capture
+    /// todo; sessions that need frames today use the synthetic source instead.
+    #[cfg(not(target_os = "linux"))]
+    pub fn resolve() -> Self {
+        match ss_host_config::config()
+            .capture_method
+            .as_deref()
+            .and_then(Self::from_name)
+        {
+            Some(backend) => backend,
+            None => CaptureBackend::Wgc,
         }
     }
 
@@ -107,6 +131,8 @@ impl CaptureBackend {
             CaptureBackend::Kms => "kms",
             CaptureBackend::X11 => "x11",
             CaptureBackend::NvFbc => "nvfbc",
+            CaptureBackend::Wgc => "wgc",
+            CaptureBackend::Dxgi => "dxgi",
             _ => "unsupported",
         }
     }

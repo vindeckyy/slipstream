@@ -10,8 +10,11 @@ pub use qos::{grow_socket_buffers, set_dscp_default, set_media_qos, MediaClass, 
 pub use udp::{spawn_data_punch, UdpTransport, PUNCH_MAGIC};
 // Phase 5: the pacing-capability probe + GSO gate + low-latency socket-buffer target, surfaced
 // for the host's send thread (records them in the session stats / latency artifact).
+// `gso_enabled` + `low_latency_send_target_bytes` are portable (non-Linux: GSO off, same
+// buffer math via `qos`); only the `SO_TXTIME`/`SO_BUSY_POLL` probe is Linux-only.
 #[cfg(target_os = "linux")]
-pub use udp::{gso_enabled, low_latency_send_target_bytes, pacing_capabilities};
+pub use udp::pacing_capabilities;
+pub use udp::{gso_enabled, low_latency_send_target_bytes};
 
 /// A datagram transport. `recv` is non-blocking: it returns `Ok(None)` when no packet
 /// is currently available, so the caller (decode/present thread) never blocks here.

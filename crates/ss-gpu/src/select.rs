@@ -149,6 +149,24 @@ pub fn selected_gpu() -> Option<SelectedGpu> {
     })
 }
 
+/// The GPU the next session will run on (non-Linux baseline).
+///
+/// Uses the same pure [`pick`] precedence as everywhere else — manual preference, then
+/// `SLIPSTREAM_RENDER_ADAPTER` substring, then max VRAM — over whatever [`enumerate`]
+/// returns. With the baseline empty inventory this is `None`, which tells the encode
+/// dispatch to take the software path until DXGI enumeration lands.
+#[cfg(not(target_os = "linux"))]
+pub fn selected_gpu() -> Option<SelectedGpu> {
+    let gpus = enumerate();
+    let pref = prefs().get();
+    let env = std::env::var("SLIPSTREAM_RENDER_ADAPTER").ok();
+    let (i, source) = pick(&gpus, &pref, env.as_deref())?;
+    Some(SelectedGpu {
+        info: gpus.into_iter().nth(i)?,
+        source,
+    })
+}
+
 /// The manually preferred GPU, only when `mode == Manual` **and** it is currently present.
 /// The Linux encode dispatch consults this (auto mode keeps today's NVIDIA-presence behavior
 /// exactly).

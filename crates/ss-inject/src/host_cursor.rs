@@ -8,16 +8,25 @@ use ss_capture::host_cursor_flag;
 
 /// RAII hide of the host-local OS cursor. Restores on drop.
 pub struct PlatformHide {
+    #[cfg(target_os = "linux")]
     inner: linux::Inner,
 }
 
 impl PlatformHide {
     /// Best-effort hide. Returns `None` when the platform cannot hide (caller still holds the
     /// refcount share; stream continues).
+    #[cfg(target_os = "linux")]
     pub fn acquire() -> Option<Self> {
         let inner = linux::Inner::acquire()?;
         host_cursor_flag::set_hidden_for_stream(true);
         Some(Self { inner })
+    }
+
+    /// Non-Linux baseline: cursor hide lands with the platform todo
+    /// (Windows `ShowCursor` accounting / IDD cursor suppression) — always `None` for now.
+    #[cfg(not(target_os = "linux"))]
+    pub fn acquire() -> Option<Self> {
+        None
     }
 }
 

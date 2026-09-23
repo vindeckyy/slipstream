@@ -659,6 +659,16 @@ fn terminate_blocking(shared: &LeaseShared) {
 ///
 /// Every pid is re-verified against its recorded start time immediately before each signal, so a pid
 /// recycled during the grace window is never signalled ([`crate::procscan::Scanner::alive`]).
+///
+/// Non-Linux baseline: no game children can be launched here yet (title launch is
+/// unsupported), so there is nothing to terminate.
+#[cfg(not(target_os = "linux"))]
+fn unix_term_ladder(_shared: &LeaseShared) {}
+
+/// SIGTERM everything that belongs to the game, wait, then SIGKILL whatever ignored it.
+///
+/// Every pid is re-verified against its recorded start time immediately before each signal, so a pid
+/// recycled during the grace window is never signalled ([`crate::procscan::Scanner::alive`]).
 #[cfg(target_os = "linux")]
 fn unix_term_ladder(shared: &LeaseShared) {
     let scanner = crate::procscan::Scanner::system();

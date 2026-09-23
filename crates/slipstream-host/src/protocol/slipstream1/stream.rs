@@ -4310,6 +4310,10 @@ fn build_pipeline(
     // the connected display "are you drawing the pointer?" and gets "no"). The source re-runs this
     // every couple of seconds, so a stream that starts before the game converges, and a display
     // that dies is retried. The closure keeps capture discovery separate from the display backend.
+    // Linux-only: gamescope does not exist on other platforms (and `plan.gamescope_cursor` can
+    // never be set there — `gamescope_needs_host_cursor` is always false without the Linux
+    // gamescope backend), so the XFixes cursor source has nothing to attach to.
+    #[cfg(target_os = "linux")]
     if plan.gamescope_cursor {
         capturer.attach_gamescope_cursor(std::sync::Arc::new(
             ss_vdisplay::gamescope_xwayland_cursor_targets,

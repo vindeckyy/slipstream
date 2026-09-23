@@ -1,6 +1,8 @@
 //! The `/serverinfo` capability/status XML Moonlight GETs before pairing and each launch.
 
-use super::{Host, APP_VERSION, GFE_VERSION, SERVER_CODEC_MODE_SUPPORT};
+#[cfg(target_os = "linux")]
+use super::SERVER_CODEC_MODE_SUPPORT;
+use super::{Host, APP_VERSION, GFE_VERSION};
 
 /// Build the `<root status_code="200">…</root>` serverinfo document. `https` selects the
 /// paired-HTTPS variant (real MAC); `paired` is whether the HTTPS peer presented a client cert
@@ -101,23 +103,31 @@ fn base_codec_mode_support() -> u32 {
     ) {
         return super::SCM_H264;
     }
+    // Non-Linux baseline: the software encoder emits H.264 only (Windows NVENC widens this
+    // with the encode todo — mirroring `ss_encode::Codec::host_wire_caps`).
+    #[cfg(not(target_os = "linux"))]
+    {
+        super::SCM_H264
+    }
     #[cfg(target_os = "linux")]
-    if crate::encode::linux_zero_copy_is_vaapi() {
-        if let Some(m) = probed_mask(crate::encode::vaapi_codec_support()) {
-            return m;
+    {
+        if crate::encode::linux_zero_copy_is_vaapi() {
+            if let Some(m) = probed_mask(crate::encode::vaapi_codec_support()) {
+                return m;
+            }
         }
-    }
-    // Linux NVIDIA: the driver's own encode-GUID list (`nvenc_codec_support`, one throwaway
-    // direct-SDK session, cached) — the same probe `host_wire_caps` consults, so both planes
-    // stop advertising HEVC/AV1 on a chip without them (the GM107 dead-session field bug).
-    // Fail-open like every arm here: an unanswerable probe → `probed_mask` = None → superset.
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    if !crate::encode::linux_zero_copy_is_vaapi() {
-        if let Some(m) = probed_mask(crate::encode::nvenc_codec_support()) {
-            return m;
+        // Linux NVIDIA: the driver's own encode-GUID list (`nvenc_codec_support`, one throwaway
+        // direct-SDK session, cached) — the same probe `host_wire_caps` consults, so both planes
+        // stop advertising HEVC/AV1 on a chip without them (the GM107 dead-session field bug).
+        // Fail-open like every arm here: an unanswerable probe → `probed_mask` = None → superset.
+        #[cfg(target_arch = "x86_64")]
+        if !crate::encode::linux_zero_copy_is_vaapi() {
+            if let Some(m) = probed_mask(crate::encode::nvenc_codec_support()) {
+                return m;
+            }
         }
+        SERVER_CODEC_MODE_SUPPORT
     }
-    SERVER_CODEC_MODE_SUPPORT
 }
 
 /// Turn a probed [`CodecSupport`](crate::encode::CodecSupport) into a `ServerCodecModeSupport` mask,
@@ -142,7 +152,10 @@ fn probed_mask(caps: crate::encode::CodecSupport) -> Option<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gamestream::{SCM_AV1_MAIN10, SCM_AV1_MAIN8, SCM_H264, SCM_HEVC, SCM_HEVC_MAIN10};
+    use crate::gamestream::{
+        SCM_AV1_MAIN10, SCM_AV1_MAIN8, SCM_H264, SCM_HEVC, SCM_HEVC_MAIN10,
+        SERVER_CODEC_MODE_SUPPORT,
+    };
 
     /// The advertised codec mask: H.264 + HEVC + AV1 Main8 (= 65793), and explicitly *no*
     /// 10-bit bits — Moonlight gates its HDR mode on those, which we can't deliver (8-bit

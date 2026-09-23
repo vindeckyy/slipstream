@@ -344,6 +344,9 @@ impl Pads {
     /// force-feedback on the universal plane (every backend, tagged with its own pad index);
     /// `hidout` carries rich feedback (lightbar, player LEDs, and adaptive triggers) for the
     /// supported pads. The `&mut` closure re-borrows satisfy `FnMut` for each backend.
+    /// (Non-Linux baseline: no gamepad backends exist yet — ViGEmBus lands with the input
+    /// todo — so the sinks are unused there.)
+    #[cfg_attr(not(target_os = "linux"), allow(unused_mut, unused_variables))]
     fn pump(
         &mut self,
         mut rumble: impl FnMut(u16, u16, u16),

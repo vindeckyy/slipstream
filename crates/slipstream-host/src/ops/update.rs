@@ -375,6 +375,10 @@ pub(crate) enum ApplyError {
 
 /// Start the Linux apply pipeline. The request carries no version, URL, or channel. Everything
 /// comes from the verified cached manifest.
+///
+/// (Non-Linux baseline: `stage`/`serial` only feed the Linux legs below, hence the
+/// platform-scoped allow.)
+#[cfg_attr(not(target_os = "linux"), allow(unused_variables))]
 pub(crate) fn start_apply(force: bool, session_active: bool) -> Result<(), ApplyError> {
     if apply_disabled() {
         return Err(ApplyError::Disabled);
@@ -457,11 +461,20 @@ pub(crate) fn start_apply(force: bool, session_active: bool) -> Result<(), Apply
                 job.stage = s;
             }
         };
+        #[cfg(target_os = "linux")]
         let run = if detect::detect().0 == detect::InstallKind::SteamosSource {
             linux::run_apply_steamos(&target_version, serial, &stage)
         } else {
             linux::run_apply(&target_version, serial, &stage)
         };
+        // Non-Linux baseline: the update apply pipeline lands with the platform todo
+        // (signed MSI fetch/verify/apply). Unreachable today — `start_apply` already
+        // refused with `Unsupported` above — but it must still typecheck.
+        #[cfg(not(target_os = "linux"))]
+        let run: Result<(), (&'static str, String)> = Err((
+            "unsupported",
+            "updates are not supported on this platform yet".to_string(),
+        ));
         let outcome = run.map(|()| PostApply::Done);
         match outcome {
             Ok(PostApply::Done) => {

@@ -14,18 +14,26 @@ pub struct StreamHold(());
 struct State {
     count: u32,
     /// The logind inhibitor pipe fd — inhibition lasts exactly as long as it stays open.
+    #[cfg(target_os = "linux")]
     fd: Option<ashpd::zbus::zvariant::OwnedFd>,
 }
 
 fn state() -> &'static Mutex<State> {
     static S: OnceLock<Mutex<State>> = OnceLock::new();
-    S.get_or_init(|| Mutex::new(State { count: 0, fd: None }))
+    S.get_or_init(|| {
+        Mutex::new(State {
+            count: 0,
+            #[cfg(target_os = "linux")]
+            fd: None,
+        })
+    })
 }
 
 /// Take a share; the underlying inhibitor is acquired on the 0→1 edge.
 pub fn hold() -> StreamHold {
     let mut st = state().lock().unwrap_or_else(|e| e.into_inner());
     st.count += 1;
+    #[cfg(target_os = "linux")]
     if st.count == 1 && st.fd.is_none() {
         st.fd = acquire();
     }
@@ -36,6 +44,7 @@ impl Drop for StreamHold {
     fn drop(&mut self) {
         let mut st = state().lock().unwrap_or_else(|e| e.into_inner());
         st.count = st.count.saturating_sub(1);
+        #[cfg(target_os = "linux")]
         if st.count == 0 && st.fd.take().is_some() {
             tracing::info!("released the sleep/idle inhibitor (no live sessions)");
         }
@@ -45,6 +54,9 @@ impl Drop for StreamHold {
 /// One logind `Inhibit` call on a dedicated plain thread — zbus's blocking API must not run on
 /// a tokio worker (its internal `block_on` panics there), and callers of [`hold`] may be either.
 /// The join blocks the caller for the D-Bus round-trip (~ms), which every call site tolerates.
+///
+/// Linux-only: the Windows `SetThreadExecutionState` equivalent lands with the platform todo.
+#[cfg(target_os = "linux")]
 fn acquire() -> Option<ashpd::zbus::zvariant::OwnedFd> {
     let fd = std::thread::spawn(|| -> Option<ashpd::zbus::zvariant::OwnedFd> {
         use ashpd::zbus;

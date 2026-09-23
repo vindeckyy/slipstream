@@ -12,11 +12,13 @@ publish = false
 slipstream-core = { path = "../slipstream-core", features = ["quic"] }
 anyhow = "1"
 tracing = "0.1"
+# `worker_qos` reads thread scheduling state; `libc` is portable (Windows stubs compile,
+# Linux-only syscalls stay behind `cfg(target_os = "linux")` in the module).
+libc = "0.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-# `FramePayload::Cuda` owns a zero-copy `DeviceBuffer`; `libc` for the per-thread `setpriority`.
+# `FramePayload::Cuda` owns a zero-copy `DeviceBuffer`.
 ss-zerocopy = { path = "../ss-zerocopy" }
-libc = "0.2"
 
 [lints]
 workspace = true
