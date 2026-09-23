@@ -81,10 +81,16 @@ pub fn open_audio_capture(channels: u32) -> Result<Box<dyn AudioCapturer>> {
 
 /// Non-Linux baseline: no system-audio capture yet (WASAPI loopback lands with the audio
 /// todo). Returns an error so sessions degrade to video-only instead of failing to build.
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 pub fn open_audio_capture(channels: u32) -> Result<Box<dyn AudioCapturer>> {
     let _ = channels;
     anyhow::bail!("no audio capture backend on this platform yet (Windows support in progress)")
+}
+
+/// Windows loopback capture of the default render endpoint (WASAPI).
+#[cfg(target_os = "windows")]
+pub fn open_audio_capture(channels: u32) -> Result<Box<dyn AudioCapturer>> {
+    windows::WasapiLoopback::open(channels).map(|c| Box::new(c) as Box<dyn AudioCapturer>)
 }
 
 /// Park a capturer at session end. Linux: store it in the persistent slot so the next session
@@ -177,7 +183,9 @@ pub fn open_virtual_mic(channels: u32) -> Result<Box<dyn VirtualMic>> {
     linux::PwMicSource::open(channels).map(|m| Box::new(m) as Box<dyn VirtualMic>)
 }
 
-/// Non-Linux baseline: no virtual microphone yet (lands with the audio todo).
+/// Non-Linux baseline: no virtual microphone yet. On Windows this needs a virtual
+/// audio driver (packaging todo) — until then mic passthrough stays disabled and the
+/// pump never starts, instead of serving silence.
 #[cfg(not(target_os = "linux"))]
 pub fn open_virtual_mic(channels: u32) -> Result<Box<dyn VirtualMic>> {
     let _ = channels;
@@ -188,6 +196,10 @@ pub fn open_virtual_mic(channels: u32) -> Result<Box<dyn VirtualMic>> {
 
 #[cfg(target_os = "linux")]
 mod linux;
+
+#[cfg(target_os = "windows")]
+#[path = "audio/windows/mod.rs"]
+mod windows;
 
 mod mic_jitter;
 mod mic_pump;
