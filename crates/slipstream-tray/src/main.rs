@@ -7,13 +7,15 @@
 //! loopback-only unauthenticated `GET /api/v1/local/summary` supplies streaming details.
 // Unsafe-proof program: every `unsafe {}` in the tray carries a `// SAFETY:` proof.
 #![deny(clippy::undocumented_unsafe_blocks)]
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 mod platform;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 mod status;
 
 #[cfg(target_os = "linux")]
 use platform::linux;
+#[cfg(target_os = "windows")]
+use platform::windows;
 
 /// CLI configuration (hand-rolled parse, house style). The mgmt address/port default to the
 /// host's defaults; they are flags so an operator who moved `--mgmt-bind` can
@@ -80,7 +82,12 @@ fn run(args: Args) -> anyhow::Result<()> {
     linux::run(args)
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
+fn run(args: Args) -> anyhow::Result<()> {
+    windows::run(args)
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 fn run(_args: Args) -> anyhow::Result<()> {
-    anyhow::bail!("slipstream-tray supports Linux hosts only")
+    anyhow::bail!("slipstream-tray supports Linux and Windows hosts only")
 }

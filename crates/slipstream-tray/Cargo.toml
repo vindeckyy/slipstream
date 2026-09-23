@@ -17,14 +17,11 @@ path = "src/main.rs"
 # into a 2 MB helper and make it un-buildable standalone.
 [dependencies]
 anyhow = "1"
-
-[target.'cfg(target_os = "linux")'.dependencies]
+# Portable summary poll: serde + sync ureq/rustls(ring) + the fingerprint pin verifier.
+# (Unchanged on Linux; newly shared with the Windows tray. ureq/ring are pure-Rust or
+# vendored-CMake — no system SDK beyond what the platform modules already need.)
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# Loopback HTTPS poll of GET /api/v1/local/summary. Same sync ureq + rustls(ring) stack and
-# custom-verifier pattern as the Linux client's library fetch (crates/ss-client-core/src/library.rs) —
-# but ring-only (no default aws-lc-rs provider: it needs a C toolchain per target and the agent
-# pins the ring provider explicitly anyway).
 ureq = { version = "2", default-features = false, features = ["tls"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
 # The one shared cert-fingerprint pin verifier (`slipstream_core::tls::PinVerify`) + fingerprint
@@ -33,11 +30,23 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "logg
 # leaf (no C toolchain), unlike the host dependency ruled out above.
 slipstream-core = { path = "../slipstream-core", default-features = false, features = ["tls"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
 # StatusNotifierItem (pure Rust, zbus — the same zbus the host already pulls via ashpd). The tray
 # is a plain-threads poller, so the blocking API over the small async-io executor (`blocking`
 # alone is just the wrapper — zbus still needs an executor; no tokio runtime in a tray icon).
 ksni = { version = "0.3", default-features = false, features = ["async-io", "blocking"] }
 libc = "0.2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# Raw Win32 tray (Shell_NotifyIconW + message-only window) and Service Control Manager state.
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Services",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [lints]
 workspace = true

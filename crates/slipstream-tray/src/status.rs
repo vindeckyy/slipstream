@@ -275,24 +275,44 @@ fn load_pin() -> Option<[u8; 32]> {
     Some(slipstream_core::tls::cert_fingerprint(der.as_ref()))
 }
 
-/// The host's config dir, mirroring `gamestream::config_dir()` without linking the host crate:
-/// `SLIPSTREAM_CONFIG_DIR` override, else `$XDG_CONFIG_HOME`/`~/.config` + `slipstream`.
+/// The host's config dir, mirroring the host's own resolution without linking the host
+/// crate: `SLIPSTREAM_CONFIG_DIR` override, else the platform config location +
+/// `slipstream` (XDG on Linux, `%APPDATA%` on Windows).
 pub fn slipstream_config_dir() -> Option<std::path::PathBuf> {
     if let Some(d) = std::env::var_os("SLIPSTREAM_CONFIG_DIR") {
         if !d.is_empty() {
             return Some(std::path::PathBuf::from(d));
         }
     }
+    #[cfg(target_os = "windows")]
+    if let Some(appdata) = std::env::var_os("APPDATA") {
+        if !appdata.is_empty() {
+            return Some(std::path::PathBuf::from(appdata).join("slipstream"));
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
     if let Some(x) = std::env::var_os("XDG_CONFIG_HOME") {
         if !x.is_empty() {
             return Some(std::path::PathBuf::from(x).join("slipstream"));
         }
     }
-    std::env::var_os("HOME").map(|h| {
-        std::path::PathBuf::from(h)
-            .join(".config")
-            .join("slipstream")
-    })
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::env::var_os("HOME").map(|h| {
+            std::path::PathBuf::from(h)
+                .join(".config")
+                .join("slipstream")
+        })
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var_os("USERPROFILE").map(|h| {
+            std::path::PathBuf::from(h)
+                .join("AppData")
+                .join("Roaming")
+                .join("slipstream")
+        })
+    }
 }
 
 /// A sync HTTPS agent over the same rustls(ring) stack the rest of the workspace uses, with a
@@ -321,6 +341,73 @@ fn agent(pin: Option<[u8; 32]>) -> ureq::Agent {
 /// The systemd user unit the Linux packages install (scripts/slipstream-host.service).
 #[cfg(target_os = "linux")]
 pub const UNIT_NAME: &str = "slipstream-host.service";
+
+/// The Windows service name the MSI registers (must match the installer + `sc.exe` name).
+#[cfg(target_os = "windows")]
+pub const SERVICE_NAME: &str = "slipstream-host";
+
+#[cfg(target_os = "windows")]
+pub fn probe_service() -> ServiceState {
+    use windows::Win32::System::Services::*;
+    /// Whether `e` is Win32 `ERROR_SERVICE_DOES_NOT_EXIST` wrapped as an HRESULT
+    /// (`HRESULT_FROM_WIN32` keeps the code in the low 16 bits).
+    fn is_service_missing(e: &windows::core::Error) -> bool {
+        e.code().0 as u32 & 0xFFFF == windows::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST.0
+    }
+    // SAFETY: SCM handles are opened here and always closed (also on the early
+    // returns); the status struct is a live local filled synchronously.
+    unsafe {
+        use windows::core::PCWSTR;
+        let scm = match OpenSCManagerW(PCWSTR::null(), PCWSTR::null(), SC_MANAGER_CONNECT) {
+            Ok(h) => h,
+            Err(_) => return ServiceState::Stopped, // no SCM access — nothing to watch
+        };
+        // (`w!` needs a literal — keep in sync with `SERVICE_NAME` above.)
+        let svc = match OpenServiceW(
+            scm,
+            windows::core::w!("slipstream-host"),
+            SERVICE_QUERY_STATUS,
+        ) {
+            Ok(h) => h,
+            Err(e) if is_service_missing(&e) => {
+                let _ = CloseServiceHandle(scm);
+                return ServiceState::NotInstalled;
+            }
+            Err(e) => {
+                let _ = CloseServiceHandle(scm);
+                return ServiceState::Failed(format!("service query: {e}"));
+            }
+        };
+        let mut status = SERVICE_STATUS_PROCESS::default();
+        let mut needed = 0u32;
+        let state = match QueryServiceStatusEx(
+            svc,
+            SC_STATUS_PROCESS_INFO,
+            Some(std::slice::from_raw_parts_mut(
+                &mut status as *mut _ as *mut u8,
+                std::mem::size_of::<SERVICE_STATUS_PROCESS>(),
+            )),
+            &mut needed,
+        ) {
+            Ok(()) => match status.dwCurrentState {
+                SERVICE_STOPPED if status.dwWin32ExitCode != 0 => {
+                    ServiceState::Failed(format!("exit code {}", status.dwWin32ExitCode))
+                }
+                SERVICE_STOPPED => ServiceState::Stopped,
+                SERVICE_START_PENDING => ServiceState::StartPending,
+                SERVICE_STOP_PENDING => ServiceState::StopPending,
+                SERVICE_RUNNING => ServiceState::Running,
+                // Paused and anything new: not servable — report stopped so the menu
+                // offers Start rather than wedging on an unknown state.
+                _ => ServiceState::Stopped,
+            },
+            Err(e) => ServiceState::Failed(format!("service query: {e}")),
+        };
+        let _ = CloseServiceHandle(svc);
+        let _ = CloseServiceHandle(scm);
+        state
+    }
+}
 
 #[cfg(target_os = "linux")]
 pub fn probe_service() -> ServiceState {

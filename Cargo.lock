@@ -4003,6 +4003,7 @@ dependencies = [
  "serde_json",
  "slipstream-core",
  "ureq",
+ "windows",
 ]
 
 [[package]]
