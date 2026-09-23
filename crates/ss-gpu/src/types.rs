@@ -9,6 +9,9 @@ pub const VENDOR_INTEL: u32 = 0x8086;
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct GpuHandle {
     pub render_node: Option<PathBuf>,
+    /// DXGI adapter LUID (`AdapterLuid` combined to one `u64`) — the stable Windows
+    /// identity for the enumerated GPU (render-node equivalent for adapter selection).
+    pub dxgi_luid: Option<u64>,
 }
 
 /// One hardware GPU as enumerated on this host.
