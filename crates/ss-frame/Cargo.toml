@@ -20,5 +20,12 @@ libc = "0.2"
 # `FramePayload::Cuda` owns a zero-copy `DeviceBuffer`.
 ss-zerocopy = { path = "../ss-zerocopy" }
 
+[target.'cfg(target_os = "windows")'.dependencies]
+# MMCSS (`AvSetMmThreadCharacteristicsW`) for the low-latency worker profile.
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_System_Threading",
+] }
+
 [lints]
 workspace = true

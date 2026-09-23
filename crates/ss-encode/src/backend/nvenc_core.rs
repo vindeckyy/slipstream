@@ -112,8 +112,7 @@ pub(super) fn resolve_split_mode(bit_depth: u8, pixel_rate: u64) -> u32 {
 /// deserves a `warn`, a default being tuned an `info`. Callers LATCH this once next to their
 /// resolved subframe state (an env re-read at reconfigure would violate the "open and
 /// reconfigure present identical init params" invariant).
-/// The Linux direct-SDK backend latches this at its capability probe.
-#[cfg(target_os = "linux")]
+/// The direct-SDK backends latch this at their capability probe.
 pub(super) fn subframe_env_forced() -> bool {
     matches!(
         std::env::var("SLIPSTREAM_NVENC_SUBFRAME").as_deref(),
@@ -246,6 +245,7 @@ mod split_subframe_tests {
 /// rate selects the level), depth/chroma (they select the profile) and the split mode the
 /// sessions ACTUALLY opened with (a split session budgets per engine).
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub(super) struct CeilingKey {
     /// GPU identity: the process-global shared `CUcontext` pointer. Best effort: the cache is advisory (see
     /// [`cached_ceiling`]), so a colliding identity costs one failed open + re-search, never a
@@ -260,6 +260,7 @@ pub(super) struct CeilingKey {
     pub split_mode: u32,
 }
 
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn ceilings() -> &'static std::sync::Mutex<std::collections::HashMap<CeilingKey, u64>> {
     static CEILINGS: std::sync::OnceLock<
         std::sync::Mutex<std::collections::HashMap<CeilingKey, u64>>,
@@ -274,11 +275,13 @@ fn ceilings() -> &'static std::sync::Mutex<std::collections::HashMap<CeilingKey,
 /// overshoot on a config whose ceiling is already known opens (or in-place reconfigures) straight
 /// AT the ceiling instead of re-running the ~6-open binary search and its ~half-second of session
 /// churn per rebuild.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub(super) fn cached_ceiling(key: &CeilingKey) -> Option<u64> {
     ceilings().lock().unwrap().get(key).copied()
 }
 
 /// Record the clamp search's discovered max accepted bitrate (bps) for `key`.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub(super) fn store_ceiling(key: CeilingKey, bps: u64) {
     ceilings().lock().unwrap().insert(key, bps);
 }

@@ -146,6 +146,9 @@
 // gamescope (spawned nested).
 #define SLIPSTREAM_COMPOSITOR_GAMESCOPE 4
 
+// Windows desktop (mirror or IDD virtual display).
+#define SLIPSTREAM_COMPOSITOR_WINDOWS 5
+
 // Gamepad-backend preference for [`slipstream_connect_ex2`] (`gamepad` arg): which virtual pad
 // the host creates for this session's controllers. Precedence host-side: an explicit client
 // choice > the host's `SLIPSTREAM_GAMEPAD` env var > X-Box 360. `AUTO` (or any unrecognized

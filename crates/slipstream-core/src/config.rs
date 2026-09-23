@@ -80,10 +80,14 @@ pub enum CompositorPref {
     Mutter,
     /// gamescope (spawned nested — available wherever the binary is installed).
     Gamescope,
+    /// Windows desktop (mirror of a real head, or the IDD virtual display) — the only
+    /// backend a Windows host drives. Older peers decode it as `Auto` (forward-compatible).
+    Windows,
 }
 
 impl CompositorPref {
-    /// Wire byte. `0 = Auto`, `1 = Kwin`, `2 = Wlroots`, `3 = Mutter`, `4 = Gamescope`.
+    /// Wire byte. `0 = Auto`, `1 = Kwin`, `2 = Wlroots`, `3 = Mutter`, `4 = Gamescope`,
+    /// `5 = Windows`.
     pub fn to_u8(self) -> u8 {
         match self {
             CompositorPref::Auto => 0,
@@ -91,6 +95,7 @@ impl CompositorPref {
             CompositorPref::Wlroots => 2,
             CompositorPref::Mutter => 3,
             CompositorPref::Gamescope => 4,
+            CompositorPref::Windows => 5,
         }
     }
 
@@ -102,6 +107,7 @@ impl CompositorPref {
             2 => CompositorPref::Wlroots,
             3 => CompositorPref::Mutter,
             4 => CompositorPref::Gamescope,
+            5 => CompositorPref::Windows,
             _ => CompositorPref::Auto,
         }
     }
@@ -115,11 +121,13 @@ impl CompositorPref {
             "wlroots" | "sway" | "hyprland" | "wlr" => CompositorPref::Wlroots,
             "mutter" | "gnome" => CompositorPref::Mutter,
             "gamescope" => CompositorPref::Gamescope,
+            "windows" | "win" | "wgc" | "dxgi" => CompositorPref::Windows,
             _ => return None,
         })
     }
 
-    /// Canonical lowercase identifier (`"auto"`, `"kwin"`, `"wlroots"`, `"mutter"`, `"gamescope"`).
+    /// Canonical lowercase identifier (`"auto"`, `"kwin"`, `"wlroots"`, `"mutter"`, `"gamescope"`,
+    /// `"windows"`).
     pub fn as_str(self) -> &'static str {
         match self {
             CompositorPref::Auto => "auto",
@@ -127,6 +135,7 @@ impl CompositorPref {
             CompositorPref::Wlroots => "wlroots",
             CompositorPref::Mutter => "mutter",
             CompositorPref::Gamescope => "gamescope",
+            CompositorPref::Windows => "windows",
         }
     }
 }
@@ -567,6 +576,7 @@ mod tests {
             CompositorPref::Wlroots,
             CompositorPref::Mutter,
             CompositorPref::Gamescope,
+            CompositorPref::Windows,
         ] {
             assert_eq!(CompositorPref::from_u8(p.to_u8()), p);
             assert_eq!(CompositorPref::from_name(p.as_str()), Some(p));

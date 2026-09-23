@@ -84,8 +84,10 @@ fn apply_hdr(base: u32, hevc_10bit: bool, av1_10bit: bool) -> u32 {
 
 /// The **SDR baseline** mask. On the VAAPI (AMD/Intel) backend it reflects what the GPU can ACTUALLY
 /// encode (probed — AV1 is narrow, and an old iGPU might lack HEVC), so a Moonlight client never
-/// negotiates a codec the encoder can't open. NVENC and the GPU-less software path keep the
-/// Moonlight-validated static superset. HDR (Main10) is layered on by [`codec_mode_support`].
+/// negotiates a codec the encoder can't open. Linux NVENC keeps the Moonlight-validated static
+/// superset when its probe cannot answer. Windows follows [`crate::encode::Codec::host_wire_caps`]:
+/// the probed NVENC set, or H.264 only when the probe declines. HDR (Main10) is layered on by
+/// [`codec_mode_support`].
 fn base_codec_mode_support() -> u32 {
     // A GPU-less host encodes H.264 and nothing else (openh264), so advertising the superset made
     // Moonlight negotiate HEVC/AV1 and the session then died at encoder open with "the software
@@ -103,11 +105,12 @@ fn base_codec_mode_support() -> u32 {
     ) {
         return super::SCM_H264;
     }
-    // Non-Linux baseline: the software encoder emits H.264 only (Windows NVENC widens this
-    // with the encode todo — mirroring `ss_encode::Codec::host_wire_caps`).
+    // Windows: the same probed mask the native plane advertises (`Codec::host_wire_caps`).
+    // A missing or failed NVENC probe is H.264 only — never the static HEVC|AV1 superset,
+    // which would let Moonlight negotiate a codec `open` then refuses.
     #[cfg(not(target_os = "linux"))]
     {
-        super::SCM_H264
+        return scm_from_wire_caps(crate::encode::Codec::host_wire_caps());
     }
     #[cfg(target_os = "linux")]
     {
@@ -127,6 +130,28 @@ fn base_codec_mode_support() -> u32 {
             }
         }
         SERVER_CODEC_MODE_SUPPORT
+    }
+}
+
+/// Translate a `quic::CODEC_*` mask into GameStream `SCM_*` SDR bits.
+///
+/// An empty mask is H.264: that is the software encoder, and advertising nothing would
+/// make Moonlight refuse the host entirely.
+fn scm_from_wire_caps(mask: u8) -> u32 {
+    let mut m = 0u32;
+    if mask & slipstream_core::quic::CODEC_H264 != 0 {
+        m |= super::SCM_H264;
+    }
+    if mask & slipstream_core::quic::CODEC_HEVC != 0 {
+        m |= super::SCM_HEVC;
+    }
+    if mask & slipstream_core::quic::CODEC_AV1 != 0 {
+        m |= super::SCM_AV1_MAIN8;
+    }
+    if m == 0 {
+        super::SCM_H264
+    } else {
+        m
     }
 }
 
@@ -198,6 +223,18 @@ mod tests {
             apply_hdr(SCM_H264 | SCM_HEVC, true, true),
             SCM_H264 | SCM_HEVC | SCM_HEVC_MAIN10
         );
+    }
+
+    #[test]
+    fn scm_from_wire_caps_follows_the_native_mask() {
+        use slipstream_core::quic::{CODEC_AV1, CODEC_H264, CODEC_HEVC};
+        assert_eq!(scm_from_wire_caps(0), SCM_H264);
+        assert_eq!(scm_from_wire_caps(CODEC_H264), SCM_H264);
+        assert_eq!(
+            scm_from_wire_caps(CODEC_H264 | CODEC_HEVC | CODEC_AV1),
+            SCM_H264 | SCM_HEVC | SCM_AV1_MAIN8
+        );
+        assert_eq!(scm_from_wire_caps(CODEC_HEVC), SCM_HEVC);
     }
 
     #[test]

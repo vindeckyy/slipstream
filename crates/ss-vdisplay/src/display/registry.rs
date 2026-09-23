@@ -104,12 +104,29 @@ pub fn acquire(
         }
         out
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "windows")]
+    {
+        // No keep-alive pool yet (the IDD todo adds pooling beside the Linux one):
+        // create fresh per acquire, like the wlroots passthrough. The mirror backend
+        // reports `External` ownership and a mode-restore keepalive, so teardown is
+        // still RAII through the returned output.
+        let backend = vd.name();
+        let out = vd.create(mode);
+        if out.is_ok() {
+            crate::emit_display_event(crate::DisplayEvent::Created {
+                backend: backend.to_string(),
+                width: mode.width,
+                height: mode.height,
+                refresh_hz: mode.refresh_hz,
+            });
+        }
+        let _ = (quit, supersedes);
+        out
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     {
         let _ = (vd, mode, quit, supersedes);
-        anyhow::bail!(
-            "no virtual-display backend on this platform yet (Windows support in progress)"
-        )
+        anyhow::bail!("no virtual-display backend on this platform yet")
     }
 }
 

@@ -119,6 +119,9 @@ impl CaptureBackend {
                 CaptureBackend::X11,
                 CaptureBackend::Wlr,
             ],
+            // A Linux desktop-mirror session never runs on the Windows backend (an
+            // explicit compositor pin naming it fails at `detect` first).
+            Some(Compositor::Windows) => vec![CaptureBackend::Portal],
             None => Self::desktop_auto_order().to_vec(),
         }
     }

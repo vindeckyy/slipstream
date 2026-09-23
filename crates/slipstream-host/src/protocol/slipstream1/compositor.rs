@@ -51,6 +51,13 @@ pub(super) fn resolve_compositor(
     // Explicit operator override (legacy / CI / forcing a backend for a test) wins and is assumed
     // to come with a hand-set env — don't retarget the process env in that case.
     let overridden = ss_host_config::config().compositor.is_some();
+    #[cfg(target_os = "windows")]
+    let detected = {
+        // No session scan on Windows: the desktop backend is the default whenever the
+        // box has a head (an explicit pin is validated inside `detect` itself).
+        crate::vdisplay::detect().ok()
+    };
+    #[cfg(not(target_os = "windows"))]
     let detected = if overridden {
         crate::vdisplay::detect().ok()
     } else {

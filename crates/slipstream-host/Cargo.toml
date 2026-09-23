@@ -128,6 +128,10 @@ http-body-util = "0.1"
 tempfile = "3"
 
 [target.'cfg(target_os = "windows")'.dependencies]
+# Direct-SDK NVENC is part of every Windows host build. `nvEncodeAPI64.dll` loads at
+# runtime, and a missing driver falls back to openh264, so the same binary runs on AMD
+# and Intel boxes.
+ss-encode = { path = "../ss-encode", features = ["nvenc"] }
 # WASAPI loopback capture + Win32 desktop APIs for the Windows host (capture, input, audio).
 windows = { version = "0.58", features = [
     "Win32_Foundation",

@@ -3882,6 +3882,7 @@ dependencies = [
  "hmac",
  "if-addrs 0.13.4",
  "libc",
+ "libloading",
  "opus",
  "proptest",
  "quinn",
@@ -4174,6 +4175,7 @@ dependencies = [
  "ss-zerocopy",
  "tracing",
  "tracing-subscriber",
+ "windows",
 ]
 
 [[package]]
@@ -4194,6 +4196,7 @@ dependencies = [
  "slipstream-core",
  "ss-zerocopy",
  "tracing",
+ "windows",
 ]
 
 [[package]]
@@ -4310,6 +4313,7 @@ dependencies = [
  "wayland-backend",
  "wayland-client",
  "wayland-scanner",
+ "windows",
  "x11rb",
 ]
 

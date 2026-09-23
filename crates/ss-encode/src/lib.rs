@@ -3,9 +3,10 @@
 //! trait, selected in [`open_video`]. The crate depends on the shared frame vocabulary (`ss-frame`)
 //! and zero-copy plumbing (`ss-zerocopy`), never on capture.
 //!
-//! Windows baseline: only the software backend opens (the `WindowsBackend::Software` arm below).
-//! NVENC on Windows (D3D11 shared-texture input) lands with the encode todo; until then every
-//! capability mirror honestly reports the software path (H.264 only, 8-bit, no cursor blend).
+//! Windows: direct-SDK NVENC (D3D11 BGRA input) when the selected adapter is NVIDIA and
+//! `nvEncodeAPI64.dll` loads; otherwise the software H.264 encoder. Capability mirrors
+//! advertise the probed NVENC set, or H.264 only when the probe does not answer. 10-bit
+//! sessions are refused — capture is 8-bit BGRA, so an HDR label would be a lie.
 // NOTE: no crate-wide `#![allow(dead_code)]`. It was inherited from the pre-extraction host crate
 // root as scaffolding for backend paths defined ahead of the build that used them, but a census
 // across every feature combination found it was hiding exactly two items, so it
@@ -121,11 +122,15 @@ impl Codec {
         base | pyro
     }
 
-    /// Non-Linux baseline: the software encoder (openh264) emits H.264 only, so the host
-    /// negotiates H.264 and nothing else. The Windows NVENC todo widens this to the probed
-    /// GPU set (mirroring the Linux arms above) instead of the static superset.
+    /// Non-Linux: openh264 emits H.264 only, unless the Windows NVENC probe named a wider
+    /// set. A failed or absent probe advertises H.264 — never the static HEVC|AV1 superset,
+    /// which used to offer codecs the GPU could not open.
     #[cfg(not(target_os = "linux"))]
     pub fn host_wire_caps() -> u8 {
+        #[cfg(all(target_os = "windows", feature = "nvenc"))]
+        if let Some(mask) = nvenc_d3d11::advertised_wire_caps() {
+            return mask;
+        }
         slipstream_core::quic::CODEC_H264
     }
 }
@@ -592,11 +597,10 @@ fn open_video_backend(
     )
 }
 
-/// Open the non-Linux encoder backend (Windows baseline): the portable software H.264
-/// encoder only. Same validation + label contract as the Linux arm above, so every caller
-/// (initial Hello, GameStream ANNOUNCE, Reconfigure) shares the one chokepoint. The Windows
-/// NVENC todo adds a hardware arm here and narrows the H.264-only gate, mirroring the Linux
-/// `Software` arm's codec check.
+/// Open the non-Linux encoder backend. Windows tries direct-SDK NVENC when the selected
+/// adapter is NVIDIA (or the operator pinned `nvenc`) and the driver probe succeeded;
+/// everything else — including a failed NVENC open on an `auto` H.264 session — uses
+/// openh264. Same validation contract as the Linux arm.
 #[cfg(not(target_os = "linux"))]
 #[allow(clippy::too_many_arguments)]
 fn open_video_backend(
@@ -616,13 +620,55 @@ fn open_video_backend(
     if fps == 0 || fps > 1000 {
         anyhow::bail!("invalid refresh/fps {fps}: must be 1..=1000 Hz");
     }
+    #[cfg(all(target_os = "windows", feature = "nvenc"))]
+    {
+        let pref = ss_host_config::config()
+            .encoder_pref
+            .trim()
+            .to_ascii_lowercase();
+        if matches!(
+            pref.as_str(),
+            "vaapi" | "vulkan" | "pyrowave" | "amf" | "qsv"
+        ) {
+            anyhow::bail!(
+                "SLIPSTREAM_ENCODER={pref} is not available on Windows (nvenc|software|auto)"
+            );
+        }
+        let try_nvenc = nvenc_d3d11::hardware_selected()
+            || matches!(pref.as_str(), "nvenc" | "nvidia" | "cuda");
+        if try_nvenc {
+            match nvenc_d3d11::NvencD3d11Encoder::open(
+                codec,
+                format,
+                width,
+                height,
+                fps,
+                bitrate_bps,
+                cuda,
+                bit_depth,
+                chroma,
+                cursor_blend,
+                max_slices,
+            ) {
+                Ok(enc) => return Ok((Box::new(enc) as Box<dyn Encoder>, "nvenc")),
+                Err(e) if (pref.is_empty() || pref == "auto") && codec == Codec::H264 => {
+                    tracing::warn!(
+                        error = %format!("{e:#}"),
+                        "NVENC (Windows) failed to open — falling back to the software H.264 encoder"
+                    );
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    }
+    #[cfg(not(all(target_os = "windows", feature = "nvenc")))]
+    let _ = (cuda, bit_depth, chroma, cursor_blend, max_slices);
     if codec != Codec::H264 {
         anyhow::bail!(
             "the software encoder emits H.264 only; the session negotiated {codec:?} \
              (a client must advertise CODEC_H264 to reach a software host)"
         );
     }
-    let _ = (cuda, bit_depth, chroma, cursor_blend, max_slices); // CPU + 8-bit 4:2:0 only
     sw::OpenH264Encoder::open(format, width, height, fps, bitrate_bps.min(SW_BITRATE_CEIL))
         .map(|e| (Box::new(e) as Box<dyn Encoder>, "software"))
 }
@@ -1236,10 +1282,19 @@ pub fn vaapi_codec_support() -> CodecSupport {
 /// active backend (NVENC FREXT is broad on NVIDIA, but VAAPI 4:4:4 is hardware-specific, so it
 /// must be probed, never assumed). Non-HEVC codecs are always `false`.
 ///
-/// Non-Linux baseline: always `false` — the software encoder is 4:2:0-only.
+/// Non-Linux: HEVC 4:4:4 only when Windows NVENC probed `NV_ENC_CAPS_SUPPORT_YUV444_ENCODE`.
+/// The software encoder is 4:2:0-only, and a missing probe stays `false`.
 #[cfg(not(target_os = "linux"))]
-pub fn can_encode_444(_codec: Codec) -> bool {
-    false
+pub fn can_encode_444(codec: Codec) -> bool {
+    #[cfg(all(target_os = "windows", feature = "nvenc"))]
+    {
+        codec == Codec::H265 && nvenc_d3d11::hevc_444_supported()
+    }
+    #[cfg(not(all(target_os = "windows", feature = "nvenc")))]
+    {
+        let _ = codec;
+        false
+    }
 }
 
 /// Whether the active GPU encode backend can actually produce a full-chroma **4:4:4** HEVC stream.
@@ -1305,10 +1360,21 @@ pub fn can_encode_444(codec: Codec) -> bool {
 /// or VAAPI for the HDR X2RGB10 to P010 path. The direct-SDK CUDA path and Vulkan Video stay 8-bit
 /// and a 10-bit session routes around them.
 ///
-/// Non-Linux baseline: always `false` — the software encoder is 8-bit-only.
+/// Non-Linux: the GPU's 10-bit cap when Windows NVENC probed it. Capture on Windows is
+/// 8-bit BGRA, and [`NvencD3d11Encoder::open`] refuses a 10-bit session, so the handshake's
+/// capture-HDR gate (not this function) is what keeps the negotiated depth at 8. Reporting
+/// the GPU truth here lets that gate be the only one that has to move when HDR capture lands.
 #[cfg(not(target_os = "linux"))]
-pub fn can_encode_10bit(_codec: Codec) -> bool {
-    false
+pub fn can_encode_10bit(codec: Codec) -> bool {
+    #[cfg(all(target_os = "windows", feature = "nvenc"))]
+    {
+        codec.supports_10bit() && nvenc_d3d11::ten_bit_supported()
+    }
+    #[cfg(not(all(target_os = "windows", feature = "nvenc")))]
+    {
+        let _ = codec;
+        false
+    }
 }
 
 /// Whether the active GPU encode backend can actually produce a **10-bit** stream for `codec`
@@ -1389,10 +1455,18 @@ pub fn resolved_backend_is_gpu() -> bool {
     linux_resolved_backend() != LinuxBackend::Software
 }
 
-/// Non-Linux baseline: the software backend always stages on the CPU.
+/// Non-Linux: true when Windows dispatch will open NVENC (selected NVIDIA adapter, probe
+/// succeeded). The software fallback stages on the CPU.
 #[cfg(not(target_os = "linux"))]
 pub fn resolved_backend_is_gpu() -> bool {
-    false
+    #[cfg(all(target_os = "windows", feature = "nvenc"))]
+    {
+        nvenc_d3d11::hardware_selected()
+    }
+    #[cfg(not(all(target_os = "windows", feature = "nvenc")))]
+    {
+        false
+    }
 }
 
 /// Linux capture does not expose a packed RGB source for an encoder-side 4:4:4 CSC.
@@ -1401,10 +1475,18 @@ pub fn resolved_backend_ingests_rgb_444() -> bool {
     false
 }
 
-/// Non-Linux baseline: no packed-RGB 4:4:4 ingest (software is 4:2:0-only).
+/// Non-Linux: Windows NVENC ingests packed BGRA (full chroma) and does the 4:4:4 CSC itself
+/// when the chip supports it. The software encoder does not.
 #[cfg(not(target_os = "linux"))]
 pub fn resolved_backend_ingests_rgb_444() -> bool {
-    false
+    #[cfg(all(target_os = "windows", feature = "nvenc"))]
+    {
+        nvenc_d3d11::hardware_selected()
+    }
+    #[cfg(not(all(target_os = "windows", feature = "nvenc")))]
+    {
+        false
+    }
 }
 
 // Linux backends. `#[path]` keeps the `crate::*` module names flat.
@@ -1420,13 +1502,20 @@ mod linux;
 mod nvenc_cuda;
 // Actionable `NVENCSTATUS` → cause mapping, so a failed session open names its real cause instead
 // of the old misleading "(no NVIDIA GPU?)".
-#[cfg(all(target_os = "linux", feature = "nvenc"))]
+#[cfg(feature = "nvenc")]
 #[path = "backend/nvenc_status.rs"]
 mod nvenc_status;
-// Direct-SDK NVENC glue (`NvStatusExt`/`nv_ok`, `codec_guid`) shared by the Linux backend.
-#[cfg(all(target_os = "linux", feature = "nvenc"))]
+// Direct-SDK NVENC glue (`NvStatusExt`/`nv_ok`, `codec_guid`, low-latency config) shared by the
+// Linux CUDA backend and the Windows D3D11 backend.
+#[cfg(feature = "nvenc")]
 #[path = "backend/nvenc_core.rs"]
 mod nvenc_core;
+// Windows direct-SDK NVENC: D3D11 BGRA input uploaded from the capture's CPU frames.
+// `nvEncodeAPI64.dll` resolves at runtime, so a build with this feature still falls
+// back to openh264 when the driver is absent.
+#[cfg(all(target_os = "windows", feature = "nvenc"))]
+#[path = "backend/windows/nvenc_d3d11.rs"]
+mod nvenc_d3d11;
 // Slot-family RFI policy used by the Linux Vulkan Video backend.
 #[cfg(all(target_os = "linux", feature = "vulkan-encode"))]
 #[path = "backend/rfi.rs"]

@@ -109,7 +109,20 @@ pub fn list(compositor: Compositor) -> Result<Vec<PhysicalMonitor>> {
         // of them (and why the picker was permanently empty on a TV box).
         #[cfg(target_os = "linux")]
         Compositor::Gamescope => crate::gamescope::list_monitors(),
-        #[cfg(not(target_os = "linux"))]
+        // Windows reports its real heads via GDI (`EnumDisplayDevicesW`); the IDD virtual
+        // display reports its own heads once it lands (same `PhysicalMonitor` shape, so the
+        // picker + pin resolution work unchanged).
+        #[cfg(target_os = "windows")]
+        Compositor::Windows => crate::windows::list_monitors(),
+        #[cfg(target_os = "windows")]
+        _ => bail!("compositor '{compositor:?}' is Linux-only on this host"),
+        // A Linux host never drives the Windows backend (an explicit pin naming it
+        // fails at `detect` with the accepted names).
+        #[cfg(target_os = "linux")]
+        Compositor::Windows => {
+            bail!("the Windows desktop backend cannot run on Linux (SLIPSTREAM_COMPOSITOR=windows)")
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
         _ => bail!("physical-monitor enumeration is implemented for the Linux backends only"),
     }
 }

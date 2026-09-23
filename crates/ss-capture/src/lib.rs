@@ -442,11 +442,11 @@ pub fn capturer_supports_444(_encoder_ingests_rgb_444: bool) -> bool {
     true
 }
 
-/// Non-Linux baseline: the software path negotiates 4:2:0 only (WGC/DXGI 444 + NVENC 444
-/// land with the capture/encode todos).
+/// Non-Linux: Windows capture is packed BGRA, which is a full-chroma source. 4:4:4 is
+/// negotiated only when the encoder ingests that RGB (NVENC) — the software encoder does not.
 #[cfg(not(target_os = "linux"))]
-pub fn capturer_supports_444(_encoder_ingests_rgb_444: bool) -> bool {
-    false
+pub fn capturer_supports_444(encoder_ingests_rgb_444: bool) -> bool {
+    encoder_ingests_rgb_444
 }
 
 /// Whether the **native-plane** capturer (a compositor virtual output) can deliver an HDR (10-bit

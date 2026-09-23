@@ -17,9 +17,14 @@ ss-host-config = { path = "../ss-host-config" }
 ss-zerocopy = { path = "../ss-zerocopy" }
 anyhow = "1"
 tracing = "0.1"
-# Software H.264 (openh264, BSD-2): the GPU-less path on Linux, the only path on the
-# non-Linux baseline (Windows software host until NVENC lands).
+# Software H.264 (openh264, BSD-2): the GPU-less path on Linux and the Windows fallback
+# when NVENC is absent or the operator pins `SLIPSTREAM_ENCODER=software`.
 openh264 = "0.9"
+# Direct-SDK NVENC (raw `sys::nvEncodeAPI` types). Entry points are loaded at runtime
+# (`libnvidia-encode.so.1` on Linux, `nvEncodeAPI64.dll` on Windows), so a feature-on
+# build still runs on a box with no NVIDIA driver. `ci-check` vendors the headers.
+nvidia-video-codec-sdk = { version = "0.4", features = ["ci-check"], optional = true }
+libloading = { version = "0.8", optional = true }
 
 [dev-dependencies]
 # A test writer for the NVENC backend's unit tests (`with_test_writer().try_init()`).
@@ -32,18 +37,24 @@ libc = "0.2"
 # Vulkan bindings for the raw Vulkan-Video encode + PyroWave compute backends (feature-gated below;
 # the dep stays unconditional to mirror the host's Linux target — unused-but-declared is harmless).
 ash = "0.38"
-# `libnvidia-encode.so.1` is dlopen'd at runtime for the direct-SDK NVENC/CUDA backend.
-libloading = "0.8"
-# Direct-SDK NVENC (raw `sys::nvEncodeAPI` types; entry points resolved at runtime). `ci-check` =
-# vendored bindings, no CUDA toolkit at build.
-nvidia-video-codec-sdk = { version = "0.4", features = ["ci-check"], optional = true }
 # PyroWave (opt-in wired-LAN wavelet codec) — vendored codec + bindgen'd C API, only under `pyrowave`.
 pyrowave-sys = { path = "../pyrowave-sys", optional = true }
 
+[target.'cfg(target_os = "windows")'.dependencies]
+# D3D11 device + BGRA textures for the Windows direct-SDK NVENC backend.
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+] }
+
 [features]
 default = []
-# NVENC hardware encode on Linux; entry points resolved at runtime.
-nvenc = ["dep:nvidia-video-codec-sdk"]
+# Direct-SDK NVENC. Linux takes CUDA frames; Windows takes D3D11 BGRA textures uploaded
+# from the capture's CPU frames. The driver library is resolved at runtime.
+nvenc = ["dep:nvidia-video-codec-sdk", "dep:libloading"]
 # Raw Vulkan-Video HEVC/AV1 encode on Linux (reuses the `ash` bindings; no new dep).
 vulkan-encode = []
 # PyroWave — the opt-in wired-LAN intra-only wavelet codec (Linux encode backend).

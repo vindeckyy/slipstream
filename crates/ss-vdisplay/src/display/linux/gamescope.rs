@@ -343,6 +343,7 @@ impl VirtualDisplay for GamescopeDisplay {
                 ownership: DisplayOwnership::External,
                 reused_gen: None,
                 pool_gen: None,
+                windows_head: None,
                 expect_exact_dims: false,
             });
         }
@@ -503,6 +504,7 @@ fn create_managed_session(client: &str, mode: Mode, hdr: bool) -> Result<Virtual
             ownership: DisplayOwnership::External,
             reused_gen: None,
             pool_gen: None,
+            windows_head: None,
             expect_exact_dims: false,
         });
     }
@@ -580,6 +582,7 @@ fn managed_output(node_id: u32, mode: Mode) -> VirtualOutput {
         ownership: DisplayOwnership::SessionManaged,
         reused_gen: None,
         pool_gen: None,
+        windows_head: None,
         expect_exact_dims: false,
     }
 }

@@ -12,6 +12,7 @@ Read [Network](/docs/network-and-vpn) before exposing the host beyond your LAN.
 ## Requirements
 
 - **Linux** host (x86_64). Supported packaging: Ubuntu, Fedora, Arch, Bazzite, SteamOS, NixOS.
+  A Windows host is built from source; see [Windows (Host)](/docs/windows-host).
 - GPU: NVIDIA, AMD, or Intel preferred. Software H.264 encode works without a GPU encoder.
 - Desktop session for the user who runs the host (systemd **user** units).
 

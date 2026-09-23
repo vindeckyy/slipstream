@@ -22,7 +22,9 @@
 //! is applied ONLY when `SLIPSTREAM_WORKER_AFFINITY` is explicitly set — we never steal CPUs from
 //! the game or compositor automatically.
 //!
-//! The whole module is a no-op off Linux (`apply_worker_qos` returns `SchedOutcome::NotApplicable`).
+//! On Windows the same opt-in profile calls `AvSetMmThreadCharacteristicsW` (MMCSS task
+//! `Games` for the critical path, `Playback` for the others) and falls back to
+//! `SetThreadPriority` when MMCSS refuses. Off Linux and Windows the call records nothing.
 
 use std::collections::BTreeMap;
 use std::sync::Mutex;
@@ -52,8 +54,6 @@ pub enum WorkerClass {
 static OUTCOMES: Mutex<BTreeMap<String, SchedOutcome>> = Mutex::new(BTreeMap::new());
 
 /// Whether the low-latency profile is active (parsed once — the env is constant for the process).
-/// Whether the low-latency profile is active (parsed once — the env is constant for the process).
-#[cfg(target_os = "linux")]
 fn profile_active() -> bool {
     std::env::var("SLIPSTREAM_PERFORMANCE_PROFILE")
         .map(|s| s.trim().eq_ignore_ascii_case("low_latency"))
@@ -105,9 +105,6 @@ fn fallback_nice(class: WorkerClass) -> i32 {
 /// top of each capture / encode-submit / send / input-injection worker thread, with the thread's
 /// name (the `thread::Builder::name`) for the outcome record. Never changes system-wide settings;
 /// never steals CPUs. See the module docs for the RTKit → SCHED_FIFO → nice ladder.
-///
-/// Non-Linux: no worker QoS exists yet (Windows MMCSS/AvSetMmThreadCharacteristics lands with
-/// the platform todo) — records nothing and returns [`SchedOutcome::NotApplicable`].
 #[cfg(target_os = "linux")]
 pub fn apply_worker_qos(thread_name: &str, class: WorkerClass) -> SchedOutcome {
     if !profile_active() {
@@ -131,10 +128,63 @@ pub fn apply_worker_qos(thread_name: &str, class: WorkerClass) -> SchedOutcome {
     sched
 }
 
-/// Non-Linux stub: no worker QoS exists yet — always [`SchedOutcome::NotApplicable`].
-#[cfg(not(target_os = "linux"))]
+/// Windows: MMCSS (`AvSetMmThreadCharacteristicsW`) when the low-latency profile is on,
+/// then `SetThreadPriority` if MMCSS refuses. Profile off → [`SchedOutcome::NotApplicable`].
+#[cfg(target_os = "windows")]
+pub fn apply_worker_qos(thread_name: &str, class: WorkerClass) -> SchedOutcome {
+    if !profile_active() {
+        return SchedOutcome::NotApplicable;
+    }
+    let outcome = if mmcss(class) || boost_priority(class) {
+        SchedOutcome::Applied
+    } else {
+        SchedOutcome::Rejected
+    };
+    record(thread_name, outcome);
+    outcome
+}
+
+/// Other platforms: no worker QoS.
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 pub fn apply_worker_qos(_thread_name: &str, _class: WorkerClass) -> SchedOutcome {
     SchedOutcome::NotApplicable
+}
+
+/// Join the calling thread to an MMCSS task. The association lasts until process exit
+/// (workers outlive the stream); the returned handle is not reverted.
+#[cfg(target_os = "windows")]
+fn mmcss(class: WorkerClass) -> bool {
+    let task = match class {
+        WorkerClass::Critical => windows::core::w!("Games"),
+        WorkerClass::Background => windows::core::w!("Playback"),
+    };
+    let mut index = 0u32;
+    // SAFETY: `task` is a NUL-terminated static wide string of a documented MMCSS task
+    // name. `index` is a live local the call writes. The returned handle is leaked on
+    // purpose: MMCSS stays associated until `AvRevertMmThreadCharacteristics`, and the
+    // worker thread is the lifetime. `HANDLE` does not close itself on drop.
+    unsafe {
+        windows::Win32::System::Threading::AvSetMmThreadCharacteristicsW(task, &mut index).is_ok()
+    }
+}
+
+/// `SetThreadPriority` fallback when MMCSS is unavailable (Session 0 services sometimes
+/// cannot join a task).
+#[cfg(target_os = "windows")]
+fn boost_priority(class: WorkerClass) -> bool {
+    let priority = match class {
+        WorkerClass::Critical => windows::Win32::System::Threading::THREAD_PRIORITY_HIGHEST,
+        WorkerClass::Background => windows::Win32::System::Threading::THREAD_PRIORITY_ABOVE_NORMAL,
+    };
+    // SAFETY: `GetCurrentThread` returns a pseudohandle for this thread; `SetThreadPriority`
+    // takes that pseudohandle and a documented priority class. No memory is borrowed.
+    unsafe {
+        windows::Win32::System::Threading::SetThreadPriority(
+            windows::Win32::System::Threading::GetCurrentThread(),
+            priority,
+        )
+        .is_ok()
+    }
 }
 
 /// Read the recorded outcome for a thread name (diagnostics; `None` = not yet recorded).
@@ -150,7 +200,6 @@ pub fn recorded_outcomes() -> BTreeMap<String, SchedOutcome> {
     OUTCOMES.lock().map(|m| m.clone()).unwrap_or_default()
 }
 
-#[cfg(target_os = "linux")]
 fn record(thread_name: &str, outcome: SchedOutcome) {
     if let Ok(mut m) = OUTCOMES.lock() {
         m.insert(thread_name.to_string(), outcome);

@@ -141,6 +141,7 @@ impl std::error::Error for NvCallError {}
 /// and says THIS config is not encodable — the clamp search's "bitrate above the ceiling"
 /// evidence. Everything else (busy engine, session limit, OOM, device loss, version skew) is
 /// environmental and must propagate instead of steering the search.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub(super) fn is_param_rejection(err: &anyhow::Error) -> bool {
     matches!(
         err.downcast_ref::<NvCallError>(),
