@@ -51,7 +51,6 @@ pub struct CaptureTelemetry {
 /// Wall-clock nanoseconds used for the capture timestamp carried through the encoder and wire
 /// timing probes. Capturers that cannot expose a producer timestamp still get a consistent host
 /// arrival anchor at the moment their frame is materialized.
-#[cfg(target_os = "linux")]
 pub(crate) fn capture_now_ns() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -554,9 +553,9 @@ pub(crate) fn note_hdr_capture_failed(source: HdrSource) {
         }
     }
 }
-// The Linux platform backend lives under `platform/linux/`; crate-root shims keep the public
+// The OS platform backends live under `platform/`; crate-root shims keep the public
 // capture paths stable.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 mod platform;
 
 // One-time PipeWire library init, shared by the video (portal) and audio capture threads.
@@ -709,4 +708,72 @@ pub fn probe_nvfbc_for_monitor(monitor: Option<&str>) -> bool {
 #[cfg(target_os = "linux")]
 pub fn open_wlr_desktop() -> Result<Box<dyn Capturer>> {
     platform::linux::WlrCapturer::open().map(|c| Box::new(c) as Box<dyn Capturer>)
+}
+
+/// Open the Windows Graphics Capture desktop capturer on the primary monitor: per-monitor
+/// `GraphicsCaptureItem` + free-threaded `Bgra8` frame pool, cursor embedded. CPU frames
+/// only (no D3D11 texture sharing yet — see the module docs).
+#[cfg(target_os = "windows")]
+pub fn open_wgc_desktop() -> Result<Box<dyn Capturer>> {
+    platform::windows::WgcCapturer::open().map(|c| Box::new(c) as Box<dyn Capturer>)
+}
+
+/// Open WGC while honoring the host's effective physical-monitor pin (`\\.\DISPLAYn`).
+#[cfg(target_os = "windows")]
+pub fn open_wgc_desktop_for_monitor(monitor: Option<&str>) -> Result<Box<dyn Capturer>> {
+    platform::windows::WgcCapturer::open_for_monitor(monitor)
+        .map(|c| Box::new(c) as Box<dyn Capturer>)
+}
+
+/// Open the DXGI Desktop Duplication fallback capturer on the primary output. CPU `Bgra`
+/// frames, cursor included — for sessions where WGC is unavailable.
+#[cfg(target_os = "windows")]
+pub fn open_dxgi_desktop() -> Result<Box<dyn Capturer>> {
+    platform::windows::DxgiCapturer::open().map(|c| Box::new(c) as Box<dyn Capturer>)
+}
+
+/// Open DXGI duplication while honoring the host's effective physical-monitor pin.
+#[cfg(target_os = "windows")]
+pub fn open_dxgi_desktop_for_monitor(monitor: Option<&str>) -> Result<Box<dyn Capturer>> {
+    platform::windows::DxgiCapturer::open_for_monitor(monitor)
+        .map(|c| Box::new(c) as Box<dyn Capturer>)
+}
+
+/// True when Windows Graphics Capture sessions can be created on this box
+/// (`GraphicsCaptureSession::IsSupported` — needs Windows 10 1803+ with graphics capture).
+#[cfg(target_os = "windows")]
+pub fn probe_wgc() -> bool {
+    windows::Graphics::Capture::GraphicsCaptureSession::IsSupported().unwrap_or(false)
+}
+
+/// True when DXGI duplication can enumerate an attached output on this box.
+#[cfg(target_os = "windows")]
+pub fn probe_dxgi() -> bool {
+    use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, IDXGIFactory1};
+    // Cheap and side-effect-free: factory + adapter/output enumeration only (no duplication).
+    // SAFETY: synchronous enumeration only — every out-param is a live local, no frame
+    // is acquired, and each desc is returned by value.
+    unsafe {
+        let mut found = false;
+        if let Ok(factory) = CreateDXGIFactory1::<IDXGIFactory1>() {
+            let mut adapter_index = 0u32;
+            while let Ok(adapter) = factory.EnumAdapters1(adapter_index) {
+                let mut output_index = 0u32;
+                while let Ok(output) = adapter.EnumOutputs(output_index) {
+                    if let Ok(desc) = output.GetDesc() {
+                        if desc.AttachedToDesktop.as_bool() {
+                            found = true;
+                            break;
+                        }
+                    }
+                    output_index += 1;
+                }
+                if found {
+                    break;
+                }
+                adapter_index += 1;
+            }
+        }
+        found
+    }
 }

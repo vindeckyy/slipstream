@@ -29,6 +29,10 @@ pub enum Source {
     /// KWin virtual output created at `width`x`height` (zkde_screencast). Lets us validate
     /// capture (and zero-copy) at an arbitrary client resolution against a headless KWin.
     KwinVirtual,
+    /// Live monitor via Windows Graphics Capture (the primary Windows source).
+    Wgc,
+    /// Live output via DXGI Desktop Duplication (the Windows fallback source).
+    Dxgi,
 }
 
 #[derive(Clone, Debug)]
@@ -95,6 +99,28 @@ pub fn run(opts: Options) -> Result<()> {
                 crate::session_plan::CaptureBackend::resolve(),
             )
             .context("capture virtual output")?
+        }
+        Source::Wgc => {
+            tracing::info!("spike source: Windows Graphics Capture (live monitor)");
+            #[cfg(target_os = "windows")]
+            {
+                ss_capture::open_wgc_desktop().context("open WGC capturer")?
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                anyhow::bail!("spike --source wgc needs a Windows host");
+            }
+        }
+        Source::Dxgi => {
+            tracing::info!("spike source: DXGI Desktop Duplication (live output)");
+            #[cfg(target_os = "windows")]
+            {
+                ss_capture::open_dxgi_desktop().context("open DXGI capturer")?
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                anyhow::bail!("spike --source dxgi needs a Windows host");
+            }
         }
     };
 

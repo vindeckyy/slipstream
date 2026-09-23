@@ -523,6 +523,30 @@ fn real_main() -> Result<()> {
             }
             Ok(())
         }
+        // Non-Linux capture pipeline probe: WGC + DXGI availability without opening anything
+        // or changing display state (mirrors the Linux arm above for unattended hosts).
+        #[cfg(not(target_os = "linux"))]
+        Some("probe-capture") => {
+            let monitor = vdisplay::capture_monitor();
+            println!("capture monitor: {}", monitor.as_deref().unwrap_or("auto"));
+            println!(
+                "wgc: {}",
+                if ss_capture::probe_wgc() {
+                    "available"
+                } else {
+                    "unavailable"
+                }
+            );
+            println!(
+                "dxgi: {}",
+                if ss_capture::probe_dxgi() {
+                    "available"
+                } else {
+                    "unavailable"
+                }
+            );
+            Ok(())
+        }
         // Compositor readiness probe: exit 0 iff the (detected or SLIPSTREAM_COMPOSITOR-forced)
         // compositor is up and able to create a virtual output *now*. A session-bringup
         // script polls this to gate on real readiness instead of a blind `sleep`.
@@ -812,10 +836,12 @@ fn parse_spike(args: &[String]) -> Result<Options> {
                     "synthetic-nv12" => Source::SyntheticNv12,
                     "portal" => Source::Portal,
                     "kwin-virtual" => Source::KwinVirtual,
+                    "wgc" => Source::Wgc,
+                    "dxgi" => Source::Dxgi,
                     other => {
                         bail!(
                             "unknown --source '{other}' \
-                             (synthetic|synthetic-nv12|portal|kwin-virtual)"
+                             (synthetic|synthetic-nv12|portal|kwin-virtual|wgc|dxgi)"
                         )
                     }
                 }
@@ -953,9 +979,11 @@ SLIPSTREAM1-HOST OPTIONS:
                                  clients use --connect HOST:PORT). Also SLIPSTREAM_MDNS=0
 
 SPIKE OPTIONS:
-    --source <synthetic|portal|kwin-virtual>
+    --source <synthetic|portal|kwin-virtual|wgc|dxgi>
                                  frame source (default: portal). 'kwin-virtual' creates a
-                                 KWin virtual output at --width x --height and captures it
+                                 KWin virtual output at --width x --height and captures it.
+                                 'wgc'/'dxgi' capture the live Windows monitor/output
+                                 (Windows host only)
     --seconds <N>                capture duration in seconds (default: 5)
     --fps <N>                    target frame rate (default: 60)
     --codec <h264|h265|av1>      NVENC codec (default: h265)
