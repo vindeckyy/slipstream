@@ -61,7 +61,7 @@ flatpak remote-add --user --if-not-exists flathub \
 # flipped to 'false' plus --share=network in build-args.
 MANIFEST_SRC="packaging/flatpak/io.slipstream.yml"
 MANIFEST_TMP=""
-cleanup_manifest_tmp() { [ -n "$MANIFEST_TMP" ] && rm -f "$MANIFEST_TMP"; }
+cleanup_manifest_tmp() { if [ -n "$MANIFEST_TMP" ]; then rm -f "$MANIFEST_TMP"; fi; }
 trap cleanup_manifest_tmp EXIT
 if [ "${ONLINE:-0}" = "1" ]; then
   echo "==> ONLINE build (cargo fetches from crates.io; non-reproducible)"
