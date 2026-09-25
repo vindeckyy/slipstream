@@ -1,0 +1,3 @@
+• The Android app is unchanged in this release.
+• 0.24.0 is a host-side release: Slipstream can now stream from a Windows PC, with capture, NVENC encoding, WASAPI audio, and a system-tray app.
+• The web console got a polish pass: library empty state, pairing, and light/dark parity.
