@@ -61,7 +61,7 @@
 
   <!-- Bump on each release; the version/date should track the published bundle. -->
   <releases>
-    <release version="0.24.0" date="2026-09-24">
+    <release version="0.24.0" date="2026-09-25">
       <description>
         <p>Windows streaming host, web console polish, and host hardening.</p>
       </description>

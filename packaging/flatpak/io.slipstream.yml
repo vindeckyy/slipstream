@@ -182,9 +182,10 @@ modules:
   # ---------------------------------------------------------------------------------------
   # The client. cargo-sources.json is the GENERATED offline crate cache:
   #   python3 flatpak-cargo-generator.py Cargo.lock -o packaging/flatpak/cargo-sources.json
-  # (run from the repo root). With it present the build is fully
-  # offline (CARGO_NET_OFFLINE). For quick LOCAL iteration WITHOUT regenerating it, drop the
-  # cargo-sources.json source and pass  --build-args=--share=network  to flatpak-builder
+  # (run from the repo root). With it present the build is fully offline
+  # (CARGO_NET_OFFLINE=true in build-options below). For quick LOCAL iteration WITHOUT
+  # regenerating it, run  ONLINE=1 bash packaging/flatpak/build-flatpak.sh  -  the script
+  # builds from a temp manifest copy with network enabled and the offline flag flipped
   # (non-reproducible; cargo fetches from crates.io during the build).
   # ---------------------------------------------------------------------------------------
   - name: slipstream-client
@@ -193,6 +194,12 @@ modules:
       env:
         CARGO_HOME: /run/build/slipstream-client/cargo
         CARGO_INCREMENTAL: '0'
+        # Every crate comes from the cargo-sources.json archive below: keep cargo offline
+        # so a missing crate fails loudly instead of silently fetching from crates.io
+        # (reproducible builds). flatpak-builder has no CLI flag for build env/network -
+        # this lives in the manifest; ONLINE=1 in build-flatpak.sh flips it via a temp
+        # manifest copy.
+        CARGO_NET_OFFLINE: 'true'
         CARGO_PROFILE_RELEASE_STRIP: symbols
         # The session binary's Skia (ss-console-ui → skia-safe) fetches prebuilt libskia in
         # its build script  -  dead in the offline sandbox. skia-bindings accepts a file://
@@ -265,7 +272,7 @@ modules:
           - clients/android/.env
           - clients/android/release.jks
           - clients/android/release.keystore
-      # Generated offline crate cache (see the comment block above). Remove for --share=network.
+      # Generated offline crate cache (see the comment block above).
       - cargo-sources.json
       # Prebuilt Skia for skia-bindings 0.87.0 (SKIA_BINARIES_URL above). The key encodes the
       # crate's pinned skia commit + target + resolved features  -  when bumping skia-safe, build

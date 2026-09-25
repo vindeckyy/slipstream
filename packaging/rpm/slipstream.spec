@@ -597,7 +597,7 @@ echo "then enable the runner: systemctl --user enable --now slipstream-scripting
 %endif
 
 %changelog
-* Thu Sep 24 2026 slipstream <packages@unom.io> - 0.24.0-1
+* Fri Sep 25 2026 slipstream <packages@unom.io> - 0.24.0-1
 - New Windows streaming host (WGC/DXGI capture, NVENC/D3D11 with openh264 fallback, WASAPI loopback, service and tray), web console polish, host hardening.
 * Sat Aug 09 2026 slipstream <packages@unom.io> - 0.23.0-1
 - Public release: packaged host, Decky plugin, Flatpak client, updated RPM layout.

@@ -12,8 +12,9 @@
 #
 # Env knobs:
 #   VERSION=...        version string for the bundle name (default: git describe / 0.24.0-dev)
-#   ONLINE=1           skip offline cargo-sources.json; build with --share=network (fast local
-#                      iteration, non-reproducible). Default: offline (regenerates cargo-sources).
+#   ONLINE=1           cargo fetches from crates.io during the build (fast local
+#                      iteration, non-reproducible). Default: offline (regenerates
+#                      cargo-sources.json).
 #   BUILDER=...        override the flatpak-builder invocation (default: auto-detect host
 #                      flatpak-builder, else `flatpak run org.flatpak.Builder`).
 #   ARCH=...           target architecture (default: this machine's). `aarch64` builds the arm64
@@ -54,18 +55,38 @@ flatpak remote-add --user --if-not-exists flathub \
   https://dl.flathub.org/repo/flathub.flatpakrepo
 
 # --- offline crate cache (skip with ONLINE=1) -------------------------------------------
-EXTRA_ARGS=()
+# flatpak-builder exposes build env/network ONLY via the manifest's build-options
+# (there is no --env / --share / --build-args CLI flag): the manifest hardcodes
+# CARGO_NET_OFFLINE=true, and ONLINE=1 builds from a temp manifest copy with that
+# flipped to 'false' plus --share=network in build-args.
+MANIFEST_SRC="packaging/flatpak/io.slipstream.yml"
+MANIFEST_TMP=""
+cleanup_manifest_tmp() { [ -n "$MANIFEST_TMP" ] && rm -f "$MANIFEST_TMP"; }
+trap cleanup_manifest_tmp EXIT
 if [ "${ONLINE:-0}" = "1" ]; then
   echo "==> ONLINE build (cargo fetches from crates.io; non-reproducible)"
-  EXTRA_ARGS+=(--build-args=--share=network)
-  EXTRA_ARGS+=(--build-args=--env=CARGO_NET_OFFLINE=false)
+  MANIFEST_TMP="$(mktemp /tmp/io.slipstream.online.XXXXXX.yml)"
+  MANIFEST="$MANIFEST_TMP"
+  python3 - "$MANIFEST_SRC" "$MANIFEST_TMP" <<'PYEOF'
+import sys
+src, dst = sys.argv[1], sys.argv[2]
+text = open(src).read()
+old_env = "    build-options:\n      env:"
+new_env = "    build-options:\n      build-args:\n        - --share=network\n      env:"
+assert text.count(old_env) == 1, "build-options anchor not unique"
+text = text.replace(old_env, new_env)
+old_flag = "CARGO_NET_OFFLINE: 'true'"
+assert text.count(old_flag) == 1, "CARGO_NET_OFFLINE anchor not unique"
+text = text.replace(old_flag, "CARGO_NET_OFFLINE: 'false'")
+open(dst, "w").write(text)
+print("patched temp manifest for ONLINE build")
+PYEOF
   # The manifest references cargo-sources.json; provide an empty list so it stays valid.
   [ -f packaging/flatpak/cargo-sources.json ] || echo '[]' > packaging/flatpak/cargo-sources.json
 else
-  # Default: cargo stays offline (CARGO_NET_OFFLINE=true), fetching every crate from the
-  # cargo-sources.json archive flatpak-builder feeds it. The manifest no longer hardcodes the
-  # flag so the ONLINE override above actually takes effect.
-  EXTRA_ARGS+=(--build-args=--env=CARGO_NET_OFFLINE=true)
+  # Default: cargo stays offline (CARGO_NET_OFFLINE=true in the manifest), fetching every
+  # crate from the cargo-sources.json archive flatpak-builder feeds it.
+  MANIFEST="$MANIFEST_SRC"
   if [ -f packaging/flatpak/cargo-sources.json ] && [ "${FORCE_GEN:-0}" != "1" ]; then
     # Reuse a cargo-sources.json that was generated elsewhere (e.g. on a dev box with network +
     # python aiohttp/toml, then rsynced to a build host that lacks them  -  like the Deck). The
@@ -96,7 +117,6 @@ echo "==> flatpak-builder ($APP_ID, version $VERSION, arch $ARCH)"
   --default-branch=stable \
   --arch="$ARCH" \
   --install-deps-from=flathub \
-  "${EXTRA_ARGS[@]}" \
   --repo="$ROOTDIR/.flatpak-repo" \
   "$ROOTDIR/.flatpak-build" "$MANIFEST"
 
