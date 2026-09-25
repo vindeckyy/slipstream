@@ -12,7 +12,7 @@ import { visit } from "unist-util-visit";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const docsRoot = join(repoRoot, "docs-site", "content", "docs");
-const skippedSegments = new Set(["vendor"]);
+const skippedSegments = new Set(["vendor", ".opencode"]);
 
 const files = execFileSync(
   "git",

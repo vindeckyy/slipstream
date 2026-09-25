@@ -13,6 +13,7 @@ fail() {
 tracked_text() {
   git grep -I -n -i -E "$1" -- \
     ':!docs/releases/**' \
+    ':!.opencode/**' \
     ':!THIRD-PARTY-NOTICES.txt' \
     ':!scripts/ci/check-repository-policy.sh' 2>/dev/null || true
 }

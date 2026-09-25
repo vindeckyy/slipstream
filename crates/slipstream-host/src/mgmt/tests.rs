@@ -717,13 +717,17 @@ async fn compositors_lists_all_backends_with_flags() {
     let (status, body) = send(&app, get_req("/api/v1/compositors")).await;
     assert_eq!(status, StatusCode::OK);
     let arr = body.as_array().expect("array");
-    // Every backend the Linux host knows, in stable order.
+    // Every backend the host knows, in stable order — the Windows backend is
+    // listed but never available on Linux.
     let ids: Vec<&str> = arr.iter().map(|c| c["id"].as_str().unwrap()).collect();
-    assert_eq!(ids, ["kwin", "gamescope", "mutter", "wlroots", "hyprland"]);
+    assert_eq!(ids, ["kwin", "gamescope", "mutter", "wlroots", "hyprland", "windows"]);
     for c in arr {
         assert!(c["available"].is_boolean());
         assert!(c["default"].is_boolean());
         assert!(c["label"].as_str().is_some_and(|s| !s.is_empty()));
+        if c["id"] == "windows" {
+            assert_eq!(c["available"], false, "Windows backend is never available on Linux");
+        }
     }
     // At most one backend is the auto-detect default (none, if the test env has no desktop).
     assert!(arr.iter().filter(|c| c["default"] == true).count() <= 1);
