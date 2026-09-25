@@ -116,6 +116,9 @@ jobs:
         run: |
           set -euo pipefail
           version="${RELEASE_TAG#v}"
+          # Drop the stale checksums file first: `sha256sum -- *` below must not
+          # hash the previous SHA256SUMS into its own replacement (stale self-hash).
+          rm -f "release/slipstream-${version}-SHA256SUMS"
           (cd release && sha256sum -- *) > "release/.slipstream-${version}-SHA256SUMS.tmp"
           mv "release/.slipstream-${version}-SHA256SUMS.tmp" "release/slipstream-${version}-SHA256SUMS"
 
