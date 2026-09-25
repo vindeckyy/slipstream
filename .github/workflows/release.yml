@@ -53,6 +53,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential clang libclang-dev pkg-config cmake jq flatpak \
+            flatpak-builder \
             python3-aiohttp python3-tomlkit \
             libdrm-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libavfilter-dev \
             libavdevice-dev libpipewire-0.3-dev libopus-dev libwayland-dev libxkbcommon-dev \
@@ -77,12 +78,6 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm test
           pnpm run package
-
-      - name: Install Flatpak builder
-        run: |
-          flatpak remote-add --user --if-not-exists flathub \
-            https://dl.flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user -y flathub org.flatpak.Builder
 
       - name: Build Flatpak bundle
         env:
