@@ -7,7 +7,7 @@
 # the package names the target boxes ship. The client links no NVIDIA libs — no filter
 # needed.
 #
-# Usage: VERSION=0.23.0~ci42.gdeadbee [ARCH=amd64] [TARGET=<rust triple>] \
+# Usage: VERSION=0.24.0~ci42.gdeadbee [ARCH=amd64] [TARGET=<rust triple>] \
 #          bash packaging/debian/build-client-deb.sh
 # Output: dist/slipstream-client_<version>_<arch>.deb
 #
@@ -16,7 +16,7 @@
 # ci/rust-ci-arm64cross.Dockerfile image, which carries the matching :arm64 sysroot.
 set -euo pipefail
 
-VERSION="${VERSION:?set VERSION (e.g. 0.23.0 or 0.23.0~ci42.gdeadbee)}"
+VERSION="${VERSION:?set VERSION (e.g. 0.24.0 or 0.24.0~ci42.gdeadbee)}"
 ARCH="${ARCH:-amd64}"
 TARGET="${TARGET:-}"
 PKG="slipstream-client"

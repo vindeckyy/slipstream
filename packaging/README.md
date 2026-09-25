@@ -134,7 +134,7 @@ An RPM (or the bootc layer) installs into the host system where those just work.
 ## Building the SRPM/RPM locally (Fedora only)
 
 ```sh
-git archive --format=tar.gz --prefix=slipstream-0.23.0/ -o ~/rpmbuild/SOURCES/slipstream-0.23.0.tar.gz HEAD
+git archive --format=tar.gz --prefix=slipstream-0.24.0/ -o ~/rpmbuild/SOURCES/slipstream-0.24.0.tar.gz HEAD
 rpmbuild -ba packaging/rpm/slipstream.spec     # needs the BuildRequires from the spec
 # The archive prefix and filename must match the spec's default %{ss_version}.
 ```

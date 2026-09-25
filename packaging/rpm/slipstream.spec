@@ -18,11 +18,11 @@
 
 Name:           slipstream
 # Version/Release are overridable so CI can stamp a rolling snapshot: a canary main build passes
-#   --define "ss_version 0.23.0" --define "ss_release 0.ci42.gdeadbee"
+#   --define "ss_version 0.24.0" --define "ss_release 0.ci42.gdeadbee"
 # (Release starting "0." sorts BEFORE the eventual "1" release; the canary base stays one minor
 # ahead of the latest stable), a vX.Y.Z release tag passes the clean version with "ss_release 1".
-# A plain `rpmbuild` (or COPR) with no defines builds 0.23.0-1.
-Version:        %{?ss_version}%{!?ss_version:0.23.0}
+# A plain `rpmbuild` (or COPR) with no defines builds 0.24.0-1.
+Version:        %{?ss_version}%{!?ss_version:0.24.0}
 Release:        %{?ss_release}%{!?ss_release:1}%{?dist}
 Summary:        Low-latency desktop/game streaming host (Moonlight-compatible + slipstream/1)
 
@@ -597,6 +597,8 @@ echo "then enable the runner: systemctl --user enable --now slipstream-scripting
 %endif
 
 %changelog
+* Thu Sep 24 2026 slipstream <packages@unom.io> - 0.24.0-1
+- New Windows streaming host (WGC/DXGI capture, NVENC/D3D11 with openh264 fallback, WASAPI loopback, service and tray), web console polish, host hardening.
 * Sat Aug 09 2026 slipstream <packages@unom.io> - 0.23.0-1
 - Public release: packaged host, Decky plugin, Flatpak client, updated RPM layout.
 * Fri Jul 17 2026 slipstream <packages@unom.io> - 0.0.1-3

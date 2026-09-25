@@ -11,7 +11,7 @@
 # Output: dist/slipstream-client-<version>-<arch>.flatpak  (install with `flatpak install --user <file>`)
 #
 # Env knobs:
-#   VERSION=...        version string for the bundle name (default: git describe / 0.23.0-dev)
+#   VERSION=...        version string for the bundle name (default: git describe / 0.24.0-dev)
 #   ONLINE=1           skip offline cargo-sources.json; build with --share=network (fast local
 #                      iteration, non-reproducible). Default: offline (regenerates cargo-sources).
 #   BUILDER=...        override the flatpak-builder invocation (default: auto-detect host
@@ -29,7 +29,7 @@ cd "$ROOTDIR"
 
 APP_ID="io.slipstream.Slipstream"
 MANIFEST="packaging/flatpak/io.slipstream.yml"
-VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo 0.23.0-dev)}"
+VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo 0.24.0-dev)}"
 VERSION="${VERSION#v}"
 # `flatpak --default-arch` reports flatpak's own name for this machine (x86_64 / aarch64).
 ARCH="${ARCH:-$(flatpak --default-arch 2>/dev/null || uname -m)}"

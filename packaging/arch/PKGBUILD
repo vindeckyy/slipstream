@@ -31,7 +31,7 @@ fi
 # CI (GitHub Actions) drives the version: stable tags -> X.Y.Z-1, main pushes ->
 # X.Y.Z-0.<run#> in the separate slipstream-canary repo (mirrors the RPM's 0.ciN release; pkgrel
 # allows only digits+dots, so the run number carries the monotonic ordering).
-pkgver="${PF_PKGVER:-0.23.0}"
+pkgver="${PF_PKGVER:-0.24.0}"
 pkgrel="${PF_PKGREL:-1}"
 # The CLIENT builds and runs on aarch64 (Arch Linux ARM); the HOST does not  -  its encode stack is
 # NVENC/QSV/AMF, all x86. On aarch64 the split below drops slipstream-host from `pkgname`, so

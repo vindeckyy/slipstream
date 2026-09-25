@@ -20,11 +20,11 @@
 # FFMPEG_PREFIX to that FFmpeg's install prefix (default /opt/ffmpeg, as the noble image sets it).
 # See packaging/debian/README.md → "Ubuntu 24.04 LTS".
 #
-# Usage: VERSION=0.23.0~ci42.gdeadbee [ARCH=amd64] [BUNDLE_FFMPEG=1] bash packaging/debian/build-deb.sh
+# Usage: VERSION=0.24.0~ci42.gdeadbee [ARCH=amd64] [BUNDLE_FFMPEG=1] bash packaging/debian/build-deb.sh
 # Output: dist/slipstream-host_<version>_<arch>.deb
 set -euo pipefail
 
-VERSION="${VERSION:?set VERSION (e.g. 0.23.0 or 0.23.0~ci42.gdeadbee)}"
+VERSION="${VERSION:?set VERSION (e.g. 0.24.0 or 0.24.0~ci42.gdeadbee)}"
 ARCH="${ARCH:-amd64}"
 PKG="slipstream-host"
 BUNDLE_FFMPEG="${BUNDLE_FFMPEG:-0}"

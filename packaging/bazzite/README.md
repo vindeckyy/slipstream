@@ -508,8 +508,8 @@ Debian/Ubuntu - the host links system FFmpeg/PipeWire and won't build there), pe
 `packaging/README.md`:
 
 ```sh
-git archive --format=tar.gz --prefix=slipstream-0.23.0/ \
-  -o ~/rpmbuild/SOURCES/slipstream-0.23.0.tar.gz HEAD    # 0.23.0 = the spec's default version
+git archive --format=tar.gz --prefix=slipstream-0.24.0/ \
+  -o ~/rpmbuild/SOURCES/slipstream-0.24.0.tar.gz HEAD    # 0.24.0 = the spec's default version
 rpmbuild -ba packaging/rpm/slipstream.spec    # needs the spec's BuildRequires + RPM Fusion
 ```
 

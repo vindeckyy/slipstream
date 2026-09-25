@@ -933,7 +933,7 @@ dependencies = [
 
 [[package]]
 name = "cursor-probe"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "slipstream-core",
@@ -2199,7 +2199,7 @@ dependencies = [
 
 [[package]]
 name = "latency-probe"
-version = "0.23.0"
+version = "0.24.0"
 
 [[package]]
 name = "lazy_static"
@@ -2331,7 +2331,7 @@ checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
 name = "loss-harness"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "slipstream-core",
 ]
@@ -3019,7 +3019,7 @@ checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
 name = "pyrowave-sys"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "bindgen",
  "cmake",
@@ -3813,7 +3813,7 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
 name = "slipstream-cli"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "serde_json",
  "slipstream-core",
@@ -3824,7 +3824,7 @@ dependencies = [
 
 [[package]]
 name = "slipstream-client-android"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "android_logger",
  "jni",
@@ -3840,7 +3840,7 @@ dependencies = [
 
 [[package]]
 name = "slipstream-client-linux"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "async-channel",
@@ -3857,7 +3857,7 @@ dependencies = [
 
 [[package]]
 name = "slipstream-client-session"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "serde_json",
@@ -3871,7 +3871,7 @@ dependencies = [
 
 [[package]]
 name = "slipstream-core"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "aes-gcm",
  "bytes",
@@ -3903,7 +3903,7 @@ dependencies = [
 
 [[package]]
 name = "slipstream-host"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -3980,7 +3980,7 @@ dependencies = [
 
 [[package]]
 name = "slipstream-probe"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "mdns-sd",
@@ -3994,7 +3994,7 @@ dependencies = [
 
 [[package]]
 name = "slipstream-tray"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "ksni",
@@ -4079,7 +4079,7 @@ dependencies = [
 
 [[package]]
 name = "ss-capture"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "ashpd",
@@ -4102,7 +4102,7 @@ dependencies = [
 
 [[package]]
 name = "ss-client-core"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "ash",
@@ -4126,7 +4126,7 @@ dependencies = [
 
 [[package]]
 name = "ss-clipboard"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "ashpd",
@@ -4144,7 +4144,7 @@ dependencies = [
 
 [[package]]
 name = "ss-console-ui"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "ash",
@@ -4158,7 +4158,7 @@ dependencies = [
 
 [[package]]
 name = "ss-encode"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "ash",
@@ -4180,7 +4180,7 @@ dependencies = [
 
 [[package]]
 name = "ss-ffvk"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "ash",
  "bindgen",
@@ -4189,7 +4189,7 @@ dependencies = [
 
 [[package]]
 name = "ss-frame"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "libc",
@@ -4201,7 +4201,7 @@ dependencies = [
 
 [[package]]
 name = "ss-gpu"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -4215,11 +4215,11 @@ dependencies = [
 
 [[package]]
 name = "ss-host-config"
-version = "0.23.0"
+version = "0.24.0"
 
 [[package]]
 name = "ss-inject"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "ashpd",
@@ -4248,14 +4248,14 @@ dependencies = [
 
 [[package]]
 name = "ss-paths"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "tracing",
 ]
 
 [[package]]
 name = "ss-presenter"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "ash",
@@ -4269,7 +4269,7 @@ dependencies = [
 
 [[package]]
 name = "ss-update"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -4277,7 +4277,7 @@ dependencies = [
 
 [[package]]
 name = "ss-update-check"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -4289,7 +4289,7 @@ dependencies = [
 
 [[package]]
 name = "ss-vdisplay"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "ashpd",
@@ -4319,7 +4319,7 @@ dependencies = [
 
 [[package]]
 name = "ss-zerocopy"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "ash",

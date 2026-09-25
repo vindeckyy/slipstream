@@ -10,7 +10,7 @@ body:
     id: version
     attributes:
       label: Slipstream version
-      placeholder: v0.23.0 or commit
+      placeholder: v0.24.0 or commit
     validations:
       required: true
   - type: textarea

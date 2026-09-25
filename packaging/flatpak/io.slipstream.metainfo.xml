@@ -61,6 +61,11 @@
 
   <!-- Bump on each release; the version/date should track the published bundle. -->
   <releases>
+    <release version="0.24.0" date="2026-09-24">
+      <description>
+        <p>Windows streaming host, web console polish, and host hardening.</p>
+      </description>
+    </release>
     <release version="0.23.0" date="2026-08-09">
       <description>
         <p>Initial flatpak packaging of the native Linux client for the Steam Deck and Wayland desktops.</p>
