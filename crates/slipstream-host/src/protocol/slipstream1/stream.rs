@@ -1991,12 +1991,39 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
         mut cur_display_gen,
         built_bitrate,
     ) = pipe;
+    // The geometry the CURRENT encoder is open at. `build_pipeline` opens it at the first
+    // delivered frame's dims, so this starts there and is updated by every in-place encoder
+    // rebuild. The loop re-reads it against each fresh frame: capture, encoder and the
+    // client's mode slot must stay ONE value (see the geometry guard on a fresh frame).
+    let mut enc_dims = (frame.width, frame.height);
     let capture_diag = Arc::new(SharedCaptureTelemetry::default());
     capture_diag.update(capturer.backend_name(), capturer.telemetry());
     // The encoder may have opened at a re-resolved rate (a mirrored head delivering a size this
     // session never negotiated). Adopt it before anything downstream reads `bitrate_kbps`.
     adopt_built_bitrate(&mut bitrate_kbps, built_bitrate, &live_bitrate);
 
+    // Rebuild-in-place on capture loss: track the live mode (a mode switch or bring-up correction
+    // updates it) so a rebuild targets the CURRENT mode, and cap consecutive rebuilds so a flapping
+    // source can't loop the client through endless cold restarts.
+    let mut cur_mode;
+    // Bring-up can also land on an effective mode the Welcome never promised (a mirrored Windows
+    // head that refused the ask, a compositor that capped the refresh). `build_pipeline` opened
+    // the encoder at the frame's real dims, so the client's mode slot is the only side still
+    // holding the request. Correct it here, before the first AU, so capture, encoder and what the
+    // client believes are ONE value for the whole life of the session.
+    {
+        let actual = delivered_mode(frame.width, frame.height, interval);
+        // P83-2: the ack alone only corrects the client's slot. The loop's cached mode must agree
+        // with the first delivered frame too, or the next capture-loss rebuild targets a request
+        // the display never honored.
+        cur_mode = actual;
+        if actual != mode {
+            let _ = reconfig_result_tx.send(Reconfigured {
+                accepted: true,
+                mode: actual,
+            });
+        }
+    }
     // Capture is live, so launch the requested title into the active session. Gamescope may have
     // nested the command already, in which case launching again would start it twice. A failure
     // leaves the stream running on the current desktop.
@@ -2112,12 +2139,15 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
     // control task: a mid-stream adaptive bitrate change (bitrate_rx below) stores the
     // encoder-APPLIED rate, so the console, pacer and climb-refusal acks all see the truth.
     // Live session mode, same pattern (H3): a mid-stream mode switch (reconfig below) updates it so
-    // a stats capture armed after a resize registers the real mode. Seeded with the refresh the
-    // initial build actually achieved (`interval_hz`), not the request  -  KWin may cap a virtual
-    // output at 60 Hz.
+    // a stats capture armed after a resize registers the real mode. Seeded from the FIRST DELIVERED
+    // FRAME and the refresh the initial build actually achieved (`interval_hz`), never from the
+    // request: KWin may cap a virtual output at 60 Hz, and a mirrored Windows head can ignore the
+    // mode change outright (a `1920x1080@144` ask on a `2560x1440@144` panel stays at 1440p). The
+    // frame's dims are the same source of truth the encoder opened at, so this is what the client
+    // is really being sent  -  seeding from `mode` advertised a stream that did not exist.
     let live_mode = Arc::new(AtomicU64::new(pack_mode(
-        mode.width,
-        mode.height,
+        frame.width,
+        frame.height,
         interval_hz(interval),
     )));
     // One-shot force-keyframe flag driven by the management API (`POST /session/idr`, the web-console
@@ -2244,10 +2274,6 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
     // encoder-internal counter desyncs on the first adaptive-bitrate rebuild, so reference
     // recovery can silently fail or anchor after a loss.
     let mut au_seq: u32 = 0;
-    // Rebuild-in-place on capture loss: track the live mode (a mode switch updates it) so a rebuild
-    // targets the CURRENT mode, and cap consecutive rebuilds so a flapping source can't loop the
-    // client through endless cold restarts.
-    let mut cur_mode = mode;
     const MAX_CAPTURE_REBUILDS: u32 = 5;
     let mut capture_rebuilds: u32 = 0;
     // Encode-stall watchdog: asynchronous encoders poll non-blocking, so a wedged driver
@@ -2261,6 +2287,21 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
     const ENCODE_STALL_WINDOW: std::time::Duration = std::time::Duration::from_secs(2);
     const MAX_ENCODER_RESETS: u32 = 5;
     let mut encoder_resets: u32 = 0;
+    // Bounded retries for transient failures while reopening the encoder after a geometry change.
+    // Encoder-reopen retry state for a capture-geometry change. Time-based, not frame-counted: the
+    // same class of transient (NVENC busy, driver hiccup during a head transition) is ridden out
+    // with 100 ms..1.6 s exponential backoff on the encoder-submit path, while five frames is only
+    // 35-83 ms at 60-144 Hz — too short to outlast the condition it is retrying through.
+    const GEOMETRY_RETRY_BUDGET: std::time::Duration = std::time::Duration::from_secs(5);
+    const GEOMETRY_RETRY_BASE: std::time::Duration = std::time::Duration::from_millis(100);
+    const GEOMETRY_RETRY_MAX: std::time::Duration = std::time::Duration::from_millis(1_600);
+    #[derive(Clone, Copy)]
+    struct GeometryRetry {
+        first_attempt: std::time::Instant,
+        next_attempt: std::time::Instant,
+        delay: std::time::Duration,
+    }
+    let mut geometry_retry: Option<GeometryRetry> = None;
     let mut last_au_at = std::time::Instant::now();
     // Last HDR mastering metadata we forwarded  -  re-sent as 0xCE on change/keyframe (see below).
     let mut last_hdr_meta: Option<slipstream_core::quic::HdrMeta> = None;
@@ -2439,6 +2480,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                         capturer = new_cap;
                         enc = new_enc;
                         frame = new_frame;
+                        enc_dims = (frame.width, frame.height);
                         interval = new_interval;
                         cur_node_id = new_node_id;
                         cur_display_gen = new_gen;
@@ -2454,6 +2496,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                         inflight.clear();
                         last_au_at = std::time::Instant::now();
                         encoder_resets = 0;
+                        geometry_retry = None;
                         tracing::info!(
                             compositor = compositor.id(),
                             "session switch  -  backend rebuilt, stream continues"
@@ -2491,7 +2534,9 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
             let mode_bitrate = if bitrate_auto && plan.codec == crate::encode::Codec::PyroWave {
                 resolve_bitrate_kbps_for(plan.codec, 0, &new_mode, plan.chroma, plan.bit_depth)
             } else {
-                bitrate_kbps
+                // H.26x ABR has moved since startup; rebuilding from the stale default would undo
+                // the rate controller's work (the same defect as the geometry-change path).
+                live_bitrate.load(Ordering::Relaxed)
             };
             // The rate the rebuilt encoder ends up opened at. A full rebuild may adjust it when
             // the source delivers a size different from the requested mode.
@@ -2530,6 +2575,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                         cur_display_gen,
                         built_bitrate,
                     ) = next_pipe;
+                    enc_dims = (frame.width, frame.height);
                     // H4: the old display's lease drop above is indistinguishable from a
                     // disconnect to the keep-alive machinery  -  under linger/forever policies
                     // every resize would ACCUMULATE kept monitors at stale modes. Retire the
@@ -2560,7 +2606,6 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
             };
             if rebuilt {
                 adopt_built_bitrate(&mut bitrate_kbps, built_bitrate, &live_bitrate);
-                cur_mode = new_mode;
                 next = std::time::Instant::now();
                 // H2/H3: the backend may have honored a different mode than requested. `frame` is
                 // the new pipeline's first frame (just rebound above), so its
@@ -2572,12 +2617,13 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                     pack_mode(actual.width, actual.height, actual.refresh_hz),
                     Ordering::Relaxed,
                 );
-                if actual != new_mode {
+                if actual != cur_mode {
                     let _ = reconfig_result_tx.send(Reconfigured {
                         accepted: true,
                         mode: actual,
                     });
                 }
+                cur_mode = actual;
                 // The owed AUs died with the old encoder  -  drop their in-flight records
                 // and restart the encode-stall clock for the fresh one.
                 inflight.clear();
@@ -2871,6 +2917,138 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
             Ok(Some(f)) => {
                 frame = f;
                 diag_new += 1;
+                // ONE geometry, re-read from the live source. `build_pipeline` makes capture,
+                // encoder and the Welcome agree at build time, but a Windows mirror is
+                // display-wide and last-writer-wins across sessions: another session's
+                // create()/restore (or the operator) can re-program the head under this live
+                // session. WGC follows the head on the very next frame while the encoder stays
+                // at its open size, and NVENC then rejects every submit ("frame WxH does not
+                // match the open session WxH") and the stream dies black with zero frames. So
+                // the invariant is enforced continuously, not assumed: when the delivered size
+                // differs from the encoder's open size, reopen the encoder at the delivered
+                // size and correct the client's mode slot - exactly what a mode switch does.
+                if (frame.width, frame.height) != enc_dims {
+                    let (old_w, old_h) = enc_dims;
+                    // P83-1: a driver may briefly refuse an encoder reopen while another session
+                    // releases its budget or reprograms the head. Retry on a wall-clock budget with
+                    // exponential backoff (see `GEOMETRY_RETRY_*`), never a bare frame count: a
+                    // transient that lasts 200 ms must not end the session just because the head
+                    // runs at 144 Hz.
+                    // P83-4: mirror the mode-switch path. PyroWave's Automatic rate is a per-mode
+                    // bpp pin and must be re-resolved for the delivered geometry. H.26x Automatic
+                    // is managed by the encoder's rate controller; resetting it here drops the
+                    // ~35 Mbps operating point back to the flat 20 Mbps default.
+                    let new_kbps = if bitrate_auto && plan.codec == crate::encode::Codec::PyroWave {
+                        resolve_bitrate_kbps_for(
+                            plan.codec,
+                            0,
+                            &delivered_mode(frame.width, frame.height, interval),
+                            plan.chroma,
+                            bit_depth,
+                        )
+                    } else {
+                        // Includes explicit rates and H.26x ABR: use the CURRENT live value, not
+                        // the stale startup default.
+                        live_bitrate.load(Ordering::Relaxed)
+                    };
+                    let reopened = crate::encode::open_video(
+                        plan.codec,
+                        frame.format,
+                        frame.width,
+                        frame.height,
+                        interval_hz(interval),
+                        new_kbps as u64 * 1000,
+                        frame.is_cuda(),
+                        bit_depth,
+                        plan.chroma,
+                        plan.cursor_blend,
+                        plan.max_slices,
+                    );
+                    match reopened {
+                        Ok(mut new_enc) => {
+                            let applied_kbps = new_enc
+                                .applied_bitrate_bps()
+                                .map(|b| (b / 1000) as u32)
+                                .filter(|&k| k > 0)
+                                .unwrap_or(new_kbps);
+                            if let Some(c) = plan.wire_chunk {
+                                new_enc.set_wire_chunking(c);
+                            }
+                            new_enc.set_input_ring_depth(capturer.pipeline_depth().max(1));
+                            new_enc.request_keyframe();
+                            enc = new_enc;
+                            enc_dims = (frame.width, frame.height);
+                            bitrate_kbps = applied_kbps;
+                            live_bitrate.store(applied_kbps, Ordering::Relaxed);
+                            // Tell the client the truth: the mode it decodes is now this one.
+                            let actual = delivered_mode(frame.width, frame.height, interval);
+                            cur_mode = actual;
+                            live_mode.store(
+                                pack_mode(actual.width, actual.height, actual.refresh_hz),
+                                Ordering::Relaxed,
+                            );
+                            let _ = reconfig_result_tx.send(Reconfigured {
+                                accepted: true,
+                                mode: actual,
+                            });
+                            // The owed AUs died with the old encoder.
+                            inflight.clear();
+                            last_au_at = std::time::Instant::now();
+                            encoder_resets = 0;
+                            geometry_retry = None;
+                            last_forced_idr = Some(std::time::Instant::now());
+                            behind_score = 0;
+                            depth_frames = 0;
+                            ahead_run = 0;
+                            tracing::warn!(
+                                from_w = old_w,
+                                from_h = old_h,
+                                to_w = frame.width,
+                                to_h = frame.height,
+                                hz = actual.refresh_hz,
+                                "capture geometry changed under the live session  -  encoder \
+                                 reopened at the delivered size and the client's mode corrected"
+                            );
+                        }
+                        Err(e) => {
+                            let now = std::time::Instant::now();
+                            let retry = geometry_retry.get_or_insert(GeometryRetry {
+                                first_attempt: now,
+                                next_attempt: now + GEOMETRY_RETRY_BASE,
+                                delay: GEOMETRY_RETRY_BASE,
+                            });
+                            let spent = now.saturating_duration_since(retry.first_attempt);
+                            if spent >= GEOMETRY_RETRY_BUDGET {
+                                return Err(e).context(
+                                    "reopen encoder for the changed capture geometry  -  \
+                                     retries exhausted",
+                                );
+                            }
+                            // Back off before the next attempt instead of hammering `open_video`
+                            // once per frame; the session is already not delivering, so the sleep
+                            // costs nothing a retry storm would not cost twice.
+                            let wait = retry.next_attempt.saturating_duration_since(now);
+                            retry.delay = (retry.delay * 2).min(GEOMETRY_RETRY_MAX);
+                            retry.next_attempt = now + wait + retry.delay;
+                            tracing::warn!(
+                                error = %format!("{e:#}"),
+                                spent_ms = spent.as_millis() as u64,
+                                backoff_ms = retry.delay.as_millis() as u64,
+                                "capture geometry changed but the encoder reopen failed  -  \
+                                 backing off before retrying"
+                            );
+                            if !wait.is_zero() {
+                                std::thread::sleep(wait);
+                            }
+                            continue;
+                        }
+                    }
+                } else {
+                    // The delivered geometry matches the open encoder again, so any earlier reopen
+                    // failure has recovered: release the retry budget instead of carrying it into
+                    // the next, unrelated episode.
+                    geometry_retry = None;
+                }
                 // Phase-locked capture: hold the fresh frame so its ARRIVAL at the client lands a
                 // constant small lead before the client's display latch (§3 hold-then-submit; the
                 // capture slot is newest-wins, so a long hold samples fresher content next tick,
@@ -3121,6 +3299,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                 capturer = new_cap;
                 enc = new_enc;
                 frame = new_frame;
+                enc_dims = (frame.width, frame.height);
                 interval = new_interval;
                 cur_node_id = new_node_id;
                 cur_display_gen = new_display_gen;
@@ -3128,6 +3307,22 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                 // re-detects the session every cycle, precisely so it can follow a switch), so the
                 // delivered size  -  and with it an Automatic rate  -  may have changed under us.
                 adopt_built_bitrate(&mut bitrate_kbps, new_bitrate, &live_bitrate);
+                // P83-3: the rebuild may have landed on a source with a different geometry or a
+                // capped refresh. The client already believes the old mode, so publish the actual
+                // one in both the stats slot and a corrective accepted ack, and rebuild from it
+                // next time.
+                let actual = delivered_mode(frame.width, frame.height, interval);
+                live_mode.store(
+                    pack_mode(actual.width, actual.height, actual.refresh_hz),
+                    Ordering::Relaxed,
+                );
+                if actual != cur_mode {
+                    let _ = reconfig_result_tx.send(Reconfigured {
+                        accepted: true,
+                        mode: actual,
+                    });
+                }
+                cur_mode = actual;
                 enc.request_keyframe(); // belt-and-suspenders; a fresh encoder opens on an IDR anyway
                 last_forced_idr = Some(std::time::Instant::now()); // anchor the IDR cooldown from the rebuild
                 next = std::time::Instant::now();
@@ -3137,6 +3332,7 @@ pub(super) fn virtual_stream(ctx: SessionContext, prepared: Option<PreparedDispl
                 inflight.clear();
                 last_au_at = std::time::Instant::now();
                 encoder_resets = 0;
+                geometry_retry = None;
                 tracing::info!(
                     compositor = compositor.id(),
                     "capture loss: pipeline rebuilt  -  stream resumes"
@@ -4213,6 +4409,11 @@ fn is_permanent_build_error(chain: &str) -> bool {
         "could not find output", // KWin < 6.5.6: createVirtualOutput unsupported
         "must be a node id",     // SLIPSTREAM_GAMESCOPE_NODE not an integer
         "is it installed",       // gamescope / kscreen-doctor not on PATH
+        // The head could not hold the requested mode AND its effective mode cannot be captured
+        // (zero-sized, or capture refuses it). Deterministic on this host and per-mode: retrying the
+        // same ask eight times cannot change either answer, and a silent zero-frame session is
+        // exactly what this check exists to prevent.
+        "head mode readback",
         // 4:4:4 NVENC got a CUDA frame  -  should never happen now the Linux capturer honors gpu=false,
         // but fail fast instead of 8× retry (~90 s) rather than wedge the session if it ever recurs.
         "capture/encoder negotiation mismatch",
@@ -4418,11 +4619,16 @@ fn build_pipeline(
     // stuttering picture rather than as the mismatch it actually is. Re-resolve for what we will
     // really encode.
     //
-    // Automatic ONLY. An explicit client rate is the operator's statement about their own link and is
-    // never second-guessed  -  the same contract `resolve_bitrate_kbps_for` keeps everywhere else. The
-    // refresh is left at the negotiated one so this changes exactly one input (the pixel count) to a
-    // formula that is otherwise untouched.
-    let bitrate_kbps = if bitrate_auto && (frame.width, frame.height) != (mode.width, mode.height) {
+    // PyroWave ONLY. Its Automatic rate is a per-mode bpp pin, so the pixel count is a real input to
+    // the formula. H.26x Automatic is owned by the encoder's rate controller: an ABR session that has
+    // climbed to 35 Mbps reports that through `adopt_built_bitrate`, and re-resolving from a zero
+    // hint here would snap it back to the flat 20 Mbps default on every rebuild. An explicit client
+    // rate is the operator's statement about their own link and is never second-guessed for any
+    // codec. The refresh is left at the negotiated one so this changes exactly one input.
+    let bitrate_kbps = if bitrate_auto
+        && plan.codec == crate::encode::Codec::PyroWave
+        && (frame.width, frame.height) != (mode.width, mode.height)
+    {
         let delivered = slipstream_core::Mode {
             width: frame.width,
             height: frame.height,

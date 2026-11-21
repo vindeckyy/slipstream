@@ -61,6 +61,7 @@ x11rb = { version = "0.13", default-features = false }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 # GDI monitor enumeration + display-mode set/restore for the Windows mirror backend.
+ss-capture = { path = "../ss-capture" }
 windows = { version = "0.58", features = [
     "Win32_Devices_DeviceAndDriverInstallation",
     "Win32_Foundation",

@@ -4301,6 +4301,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "slipstream-core",
+ "ss-capture",
  "ss-encode",
  "ss-frame",
  "ss-gpu",

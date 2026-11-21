@@ -160,6 +160,71 @@ use encode::Codec;
 use spike::{Options, Source};
 use std::path::PathBuf;
 
+/// Windows timer resolution, held for the lifetime of the process.
+///
+/// The video pacer (`send_pacing.rs`) deliberately spreads a frame over several chunks with
+/// sub-millisecond sleeps (`sleep_floor` defaults to 500 µs), and the capture loop sleeps toward
+/// cadence deadlines measured in single-digit milliseconds. Windows only honours sleeps at the
+/// current system timer resolution, and an unpromoted process gets ~15.6 ms.
+///
+/// Measured on this host: `Thread.Sleep(5)` returns after **15.44 ms** with the default resolution
+/// and **5.33 ms** after `timeBeginPeriod(1)` — a 10.4 ms overshoot that applies to every short
+/// sleep in the pipeline. With clients reporting a 13-14 ms p50 residual (`xfer`, derived as
+/// `host_total − queue − encode − pace`) that is invariant to frame rate and frame size, timer
+/// quantisation is the leading explanation for it.
+///
+/// Dropping the guard restores the previous resolution.
+#[cfg(target_os = "windows")]
+mod timer_resolution {
+    // Declared directly against `winmm` rather than through the `windows` crate: the pinned 0.58
+    // surface does not expose these two symbols under `Win32::Media::Multimedia`, and two externs
+    // are cheaper than a feature audit across every crate in the workspace.
+    #[link(name = "winmm")]
+    unsafe extern "system" {
+        fn timeBeginPeriod(period_ms: u32) -> u32;
+        pub(crate) fn timeEndPeriod(period_ms: u32) -> u32;
+    }
+
+    /// Best-effort: a failure is reported but never fatal, because a coarse timer degrades
+    /// smoothness rather than correctness.
+    pub(crate) struct TimerResolution {
+        acquired: bool,
+    }
+
+    impl TimerResolution {
+        pub(crate) fn acquire() -> Self {
+            // 1 ms is the finest period the API accepts.
+            let rc = unsafe { timeBeginPeriod(1) };
+            if rc != 0 {
+                tracing::warn!(
+                    timer_period_ms = 1,
+                    rc,
+                    "timeBeginPeriod failed; short sleeps will quantise to the system tick (~15.6 ms)"
+                );
+            } else {
+                tracing::debug!(timer_period_ms = 1, "raised Windows timer resolution");
+            }
+            Self { acquired: rc == 0 }
+        }
+
+        pub(crate) fn release(&mut self) {
+            if !self.acquired {
+                return;
+            }
+            unsafe {
+                timeEndPeriod(1);
+            }
+            self.acquired = false;
+        }
+    }
+
+    impl Drop for TimerResolution {
+        fn drop(&mut self) {
+            self.release();
+        }
+    }
+}
+
 fn main() {
     let filter =
         tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
@@ -203,11 +268,34 @@ fn main() {
         );
         default_panic(info);
     }));
+    // P83-9: install tracing first so the acquire failure warning is captured by the ring and
+    // stderr layers. The guard still outlives every thread that paces or sleeps.
+    #[cfg(target_os = "windows")]
+    let mut timer_resolution = timer_resolution::TimerResolution::acquire();
     if let Err(e) = real_main() {
         tracing::error!("{e:#}");
+        // P83-10: `process::exit` skips Drop; release explicitly before every exit path.
+        #[cfg(target_os = "windows")]
+        timer_resolution.release();
         std::process::exit(1);
     }
+    #[cfg(target_os = "windows")]
+    timer_resolution.release();
 }
+
+/// Release the Windows timer guard before an early `process::exit` inside argument parsing.
+///
+/// These paths run under `main`'s guard, but `process::exit` never unwinds `main`'s stack.
+#[cfg(target_os = "windows")]
+fn release_timer_resolution_before_exit() {
+    // SAFETY: no Windows timer was acquired on non-Windows targets.
+    unsafe {
+        timer_resolution::timeEndPeriod(1);
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn release_timer_resolution_before_exit() {}
 
 /// A lightweight management/CLI subcommand, such as a plugin or API operation, skips streaming
 /// startup work.
@@ -390,6 +478,7 @@ fn real_main() -> Result<()> {
                 Ok(())
             } else {
                 print!("{}", detect::render_report(&found));
+                release_timer_resolution_before_exit();
                 std::process::exit(1);
             }
         }
@@ -569,7 +658,6 @@ fn real_main() -> Result<()> {
         // List the host's physical monitors — the connector names `SLIPSTREAM_CAPTURE_MONITOR`
         // takes. An operator configuring an unattended host has to learn those names from
         // somewhere, and "curl the management API before the host is configured" is not it.
-        #[cfg(target_os = "linux")]
         Some("list-monitors") => {
             let compositor = vdisplay::detect()?;
             let monitors = vdisplay::monitors::list(compositor)
@@ -785,6 +873,7 @@ fn parse_serve(args: &[String]) -> Result<(mgmt::Options, native::NativeServe, b
             "--no-mdns" => no_mdns = true,
             "-h" | "--help" => {
                 print_usage();
+                release_timer_resolution_before_exit();
                 std::process::exit(0);
             }
             other => bail!("unknown argument '{other}' (try --help)"),
@@ -898,6 +987,7 @@ fn parse_spike(args: &[String]) -> Result<Options> {
             "--no-loopback" => loopback = false,
             "-h" | "--help" => {
                 print_usage();
+                release_timer_resolution_before_exit();
                 std::process::exit(0);
             }
             other => bail!("unknown argument '{other}' (try --help)"),
@@ -947,8 +1037,7 @@ USAGE:
     slipstream-host slipstream1-host [OPTIONS]  native slipstream/1 host (QUIC control + UDP data plane)
      slipstream-host probe-compositor           exit 0 iff the compositor is up + ready (bringup gate)
      slipstream-host probe-capture              show the compositor-aware Linux capture pipeline
-     slipstream-host list-monitors              list the host's physical monitors (Linux) — the
-                                              connector names SLIPSTREAM_CAPTURE_MONITOR takes
+     slipstream-host list-monitors              list the host's physical heads and the names SLIPSTREAM_CAPTURE_MONITOR takes
     slipstream-host spike [OPTIONS]            capture→encode→file pipeline spike (dev tool)
 
 SERVE OPTIONS:
