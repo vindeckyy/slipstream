@@ -1,22 +1,27 @@
-// POST /_auth/setup {password, confirmation} - create the console credential on first run.
-// This route is public only while the console has no configured password. The helper writes with
-// exclusive create semantics, so a second first visitor cannot replace the first password.
+// POST /_auth/setup {setupToken, password, confirmation} - create the console credential on first run.
+// This route is gate-free only in the sense that no PASSWORD is needed: it requires the one-time
+// setup token, a secret from the host's private config directory (see `setupToken` in util/auth.ts).
+// The peer address is deliberately NOT used for authorization: behind `tailscale serve` or any
+// loopback-terminating proxy every remote caller arrives as 127.0.0.1, so loopback proves nothing.
+// The helper writes with exclusive create semantics, so a second visitor cannot replace the first
+// password.
 import {
 	createError,
 	defineEventHandler,
+	getRequestHeader,
 	readBody,
 	setResponseHeader,
 	useSession,
 } from "h3";
 import {
 	configureUiPassword,
-	isLoopbackAddress,
 	MIN_UI_PASSWORD_LENGTH,
 	peerAddress,
 	type SessionData,
 	sessionConfig,
 	sessionEpoch,
 	uiPassword,
+	verifySetupToken,
 } from "../../util/auth";
 import {
 	recordLoginFailure,
@@ -32,13 +37,8 @@ export default defineEventHandler(async (event) => {
 		});
 	}
 
+	// Throttle bucket only. The peer address is never an authorization decision.
 	const ip = peerAddress(event);
-	if (!isLoopbackAddress(ip)) {
-		throw createError({
-			statusCode: 403,
-			statusMessage: "first-time setup must be completed from the host",
-		});
-	}
 	const wait = throttleRetryAfterMs(ip);
 	if (wait > 0) {
 		setResponseHeader(event, "Retry-After", Math.ceil(wait / 1000));
@@ -51,7 +51,23 @@ export default defineEventHandler(async (event) => {
 	const body = await readBody<{
 		password?: unknown;
 		confirmation?: unknown;
+		setupToken?: unknown;
 	}>(event);
+
+	// The token is checked BEFORE any password validation, so an unauthorized caller learns nothing
+	// about the password rules and cannot use this route as an oracle.
+	const submittedToken =
+		typeof body?.setupToken === "string"
+			? body.setupToken
+			: (getRequestHeader(event, "x-slipstream-setup-token") ?? "");
+	if (!verifySetupToken(submittedToken)) {
+		recordLoginFailure(ip);
+		throw createError({
+			statusCode: 403,
+			statusMessage:
+				"first-time setup requires the setup token from the host's config directory (web-setup-token, or SLIPSTREAM_UI_SETUP_TOKEN)",
+		});
+	}
 	const password = typeof body?.password === "string" ? body.password : "";
 	const confirmation =
 		typeof body?.confirmation === "string" ? body.confirmation : "";

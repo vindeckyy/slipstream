@@ -19,7 +19,7 @@ use std::sync::{
 };
 use windows::{
     core::Interface,
-    Foundation::TypedEventHandler,
+    Foundation::{TimeSpan, TypedEventHandler},
     Graphics::{
         Capture::{
             Direct3D11CaptureFrame, Direct3D11CaptureFramePool, GraphicsCaptureItem,
@@ -100,6 +100,23 @@ impl WgcCapturer {
             .SetIsCursorCaptureEnabled(true)
             .context("wgc: cursor capture")?;
 
+        // Experiment knob, default OFF (unset keeps today's change-driven behaviour): a minimum
+        // update interval makes WGC deliver on a tick instead of only on content change. Duration
+        // is in 100 ns units, so 1/hz seconds = 10_000_000 / hz.
+        if let Some(hz) = std::env::var("SLIPSTREAM_WGC_MIN_UPDATE_HZ")
+            .ok()
+            .and_then(|v| v.trim().parse::<i64>().ok())
+            .filter(|hz| *hz > 0)
+        {
+            let interval = TimeSpan {
+                Duration: 10_000_000 / hz,
+            };
+            session
+                .SetMinUpdateInterval(interval)
+                .context("wgc: SetMinUpdateInterval")?;
+            tracing::info!(hz, "wgc: minimum update interval requested");
+        }
+
         let slot = FrameSlot::new();
         let stop = Arc::new(AtomicBool::new(false));
         // The arrival event only wakes the worker — frame processing stays on the worker
@@ -110,6 +127,7 @@ impl WgcCapturer {
                 move |_pool: &Option<Direct3D11CaptureFramePool>,
                       _args: &Option<windows::core::IInspectable>| {
                     waker.note_arrival();
+                    waker.note_frame_arrived();
                     Ok(())
                 },
             ))
@@ -262,8 +280,17 @@ fn wgc_worker(
         }
         // Drain the pool; only the freshest materialization is published.
         let mut pending: Option<Direct3D11CaptureFrame> = None;
-        while let Ok(frame) = pool.TryGetNextFrame() {
-            pending = Some(frame);
+        loop {
+            match pool.TryGetNextFrame() {
+                Ok(frame) => {
+                    slot.note_try_next(true);
+                    pending = Some(frame);
+                }
+                Err(_) => {
+                    slot.note_try_next(false);
+                    break;
+                }
+            }
         }
         let Some(frame) = pending else {
             continue;

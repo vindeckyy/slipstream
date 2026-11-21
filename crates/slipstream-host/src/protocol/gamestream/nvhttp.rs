@@ -206,12 +206,45 @@ async fn h_launch(
             // waiting out its reconnect window — is reprieved by the stream thread, which resolves
             // the title anyway and so needs no second library scan here.
             st.quit.store(false, std::sync::atomic::Ordering::SeqCst);
-            *st.launch.lock().unwrap() = Some(session);
+            // Commit under the lock, re-deciding against whatever is live *now*. The admission
+            // check above is advisory (it also avoids starting an encoder for an obvious reject);
+            // between that check and this point another launch can store a session, and blindly
+            // overwriting it here would admit a second client past the single-session rule.
+            let (width, height, fps, rikeyid) = {
+                let mut slot = st.launch.lock().unwrap();
+                let live = slot
+                    .as_ref()
+                    .map(|s| (s.owner_fp, (s.width, s.height, s.fps)));
+                match gamestream_admission(
+                    live,
+                    req_fp,
+                    crate::vdisplay::admission::effective_conflict(),
+                ) {
+                    GsDecision::Serve => {}
+                    GsDecision::Join((w, h, f)) => {
+                        tracing::info!(
+                            "GameStream launch JOIN — admitting at the live session's mode {w}x{h}@{f}"
+                        );
+                        session.width = w;
+                        session.height = h;
+                        session.fps = f;
+                    }
+                    GsDecision::Reject => {
+                        tracing::warn!(
+                            "GameStream launch REJECTED — another launch claimed the session first"
+                        );
+                        return (StatusCode::SERVICE_UNAVAILABLE, xml(error_xml())).into_response();
+                    }
+                }
+                let committed = (session.width, session.height, session.fps, session.rikeyid);
+                *slot = Some(session);
+                committed
+            };
             tracing::info!(
-                w = session.width,
-                h = session.height,
-                fps = session.fps,
-                rikeyid = session.rikeyid,
+                w = width,
+                h = height,
+                fps = fps,
+                rikeyid = rikeyid,
                 "launch — session created; RTSP at rtsp://{}:{RTSP_PORT}",
                 st.host.local_ip
             );
@@ -461,8 +494,18 @@ mod tests {
         );
 
         // After pinning, the same fingerprint is accepted but a different cert still isn't.
-        st.paired.lock().unwrap().push(der);
+        st.paired.lock().unwrap().push(der.clone());
         assert!(peer_is_paired(&peer, &st), "pinned cert must be accepted");
+
+        // Unpair (what `mgmt::clients::unpair_client` does to this store) must revoke: the cert
+        // that was just accepted is refused once its record is gone, so the device cannot launch
+        // again without re-pairing.
+        let pinned_fp = fp_of(&der);
+        st.paired.lock().unwrap().retain(|d| fp_of(d) != pinned_fp);
+        assert!(
+            !peer_is_paired(&peer, &st),
+            "unpaired cert must be rejected on the next launch"
+        );
         let other = Some(Extension(PeerCertFingerprint(Some(fp_of(
             b"different-der",
         )))));

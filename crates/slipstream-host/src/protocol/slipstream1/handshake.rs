@@ -80,6 +80,9 @@ pub(super) async fn negotiate(
     // than published to process env, where a concurrent connect could overwrite it.
     Option<crate::vdisplay::GamescopeRoute>,
     Option<super::stream::PrepHandle>,
+    // This session's live-admission claim, taken before any pipeline exists. Held by
+    // `serve_session` for the whole session; dropping it releases the identity.
+    crate::vdisplay::admission::LiveGuard,
 )> {
     let peer = conn.remote_address();
     let mut hello = Hello::decode(first).map_err(|e| anyhow!("Hello decode: {e:?}"))?;
@@ -124,26 +127,55 @@ pub(super) async fn negotiate(
     // session is live is resolved by the `mode_conflict` policy BEFORE the Welcome — `separate`
     // (default, no change), `join` (serve at the live mode — an honest downgrade the client
     // renders from the Welcome), `steal` (preempt the victim), or `reject` (refuse the handshake).
-    // A same-client reconnect never conflicts. THIS session registers in the live set once its
-    // data plane is up (below the handshake), so a later client can see + steal it.
-    {
-        use crate::vdisplay::admission::{admit, preempt_same_identity, Admission};
+    // A same-client reconnect never conflicts.
+    //
+    // The decision and this session's live entry are ONE table access (`claim`). They used to be
+    // two — `preempt_same_identity` + `admit` here, `register` only once the data plane was up —
+    // and a burst of simultaneous Hellos from one identity all read the same empty table, all
+    // resolved to `Separate`, and each built its own display (observed: one client holding three
+    // KWin outputs). Claiming before the pipeline exists is what makes "one session per identity"
+    // true by construction instead of by timing; the guard returned with this tuple removes the
+    // entry on every exit path, including a pipeline that never comes up.
+    let claimed = {
+        use crate::vdisplay::admission::{self, Admission};
         let peer_fp = endpoint::peer_fingerprint(conn);
+        let label = hello
+            .name
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .or_else(|| {
+                peer_fp.map(|fp| {
+                    fp.iter()
+                        .take(4)
+                        .map(|b| format!("{b:02x}"))
+                        .collect::<String>()
+                })
+            })
+            .unwrap_or_else(|| "client".to_string());
+
+        let claimed = admission::claim(
+            admission::effective_conflict(),
+            peer_fp,
+            (hello.mode.width, hello.mode.height, hello.mode.refresh_hz),
+            stop.clone(),
+            label,
+        );
+        let guard = claimed.guard;
+        let own_zombies = claimed.own_zombies;
 
         // Same-client RECONNECT preempt (design §5.3 "preempts downstream"): if THIS client
-        // already has a live session, it's the zombie of an unwanted disconnect whose QUIC idle
-        // timer hasn't fired yet (detection lags a drop by up to `max_idle_timeout`). Signal it to
-        // stop and give it the release grace so it tears its display down — which, keep-alive on,
-        // lingers — and THIS reconnect REUSES that kept display below instead of landing on a
-        // fresh SECOND one. Independent of the mode_conflict arm (it's our OWN prior session, not
-        // a conflict with a different client), and it runs before we register ourselves so we
-        // never signal our own stop flag.
-        let own_zombies = preempt_same_identity(peer_fp);
+        // already had a live session, it's the zombie of an unwanted disconnect whose QUIC idle
+        // timer hasn't fired yet. Signal it and give it the release grace so it tears its display
+        // down — which, keep-alive on, lingers — and THIS reconnect REUSES that kept display
+        // instead of landing on a fresh SECOND one. The claim above already owns this session's
+        // own entry, so the list can only contain PRIOR sessions.
         if !own_zombies.is_empty() {
             tracing::info!(
-                    count = own_zombies.len(),
-                    "reconnect: preempting this client's own zombie session(s) so the kept display is reused"
-                );
+                count = own_zombies.len(),
+                "reconnect: preempting this client's own zombie session(s) so the kept display is reused"
+            );
             for z in &own_zombies {
                 z.store(true, Ordering::SeqCst);
             }
@@ -152,7 +184,7 @@ pub(super) async fn negotiate(
             tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
         }
 
-        match admit(peer_fp) {
+        match claimed.decision {
             Admission::Separate => {}
             Admission::Join(m) => {
                 tracing::info!(
@@ -164,6 +196,7 @@ pub(super) async fn negotiate(
                 hello.mode.width = m.0;
                 hello.mode.height = m.1;
                 hello.mode.refresh_hz = m.2;
+                admission::set_mode(&guard, m);
             }
             Admission::Steal(victims) => {
                 tracing::info!(
@@ -181,12 +214,14 @@ pub(super) async fn negotiate(
                 // Deliver the reason to the client as a TYPED refusal: close the QUIC connection
                 // with the BUSY application code + the reason bytes, which the client reads from
                 // the `ApplicationClosed` error (so its UI can say "host is streaming X to <name>")
-                // instead of seeing a bare connection drop. Then end the handshake.
+                // instead of seeing a bare connection drop. Then end the handshake. `guard` drops
+                // on this return, so the refused session leaves no claim behind.
                 conn.close(REJECT_BUSY_CODE.into(), reason.as_bytes());
                 anyhow::bail!("{reason}");
             }
         }
-    }
+        guard
+    };
 
     crate::encode::validate_dimensions(codec, hello.mode.width, hello.mode.height)
         .context("client-requested mode")?;
@@ -553,5 +588,6 @@ pub(super) async fn negotiate(
         compositor,
         gamescope_route,
         prep,
+        claimed,
     ))
 }

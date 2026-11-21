@@ -130,7 +130,7 @@ export const PairedDevices: FC<{
 					{m.pairing_native_devices()}
 					<HelpTip
 						label={m.pairing_native_devices()}
-						text="Every device trusted by this host, across Slipstream (native) and Moonlight. After pairing, reconnects need no PIN. Unpair removes trust so the device must pair again to stream."
+						text="Every device trusted by this host, across Slipstream (native) and Moonlight. After pairing, reconnects need no PIN. Unpair removes trust: that device is refused on its next stream and must pair again. A stream already running is not cut off."
 					/>
 				</CardTitle>
 				<RecommendedMark value="Keep only devices you still use. Unpair lost, shared, or retired clients." />

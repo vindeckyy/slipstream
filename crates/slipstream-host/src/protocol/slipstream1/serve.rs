@@ -248,24 +248,34 @@ pub(super) async fn serve_session(
         });
     }
 
-    let (hello, welcome, udp_port, data_sock, direct, start, compositor, gamescope_route, prep) =
-        tokio::time::timeout(
-            HANDSHAKE_TIMEOUT,
-            handshake::negotiate(
-                &conn,
-                &mut send,
-                &mut recv,
-                &first,
-                source,
-                frames,
-                data_port,
-                &bringup,
-                quit.clone(),
-                stop.clone(),
-            ),
-        )
-        .await
-        .map_err(|_| anyhow!("handshake timed out after {HANDSHAKE_TIMEOUT:?}"))??;
+    let (
+        hello,
+        welcome,
+        udp_port,
+        data_sock,
+        direct,
+        start,
+        compositor,
+        gamescope_route,
+        prep,
+        claim_guard,
+    ) = tokio::time::timeout(
+        HANDSHAKE_TIMEOUT,
+        handshake::negotiate(
+            &conn,
+            &mut send,
+            &mut recv,
+            &first,
+            source,
+            frames,
+            data_port,
+            &bringup,
+            quit.clone(),
+            stop.clone(),
+        ),
+    )
+    .await
+    .map_err(|_| anyhow!("handshake timed out after {HANDSHAKE_TIMEOUT:?}"))??;
     let (ctrl_send, ctrl_recv) = (send, recv);
     // Can this session's backend live-reconfigure (mid-stream Reconfigure)? Gated OFF for:
     //   * gamescope (all sub-modes): a spawn respawn restarts the game, managed restarts the box's
@@ -535,30 +545,12 @@ pub(super) async fn serve_session(
         });
     }
 
-    // Register this now-live session for mode-conflict admission (Stage 4): carry its identity, the
-    // negotiated mode, and its stop flag so a LATER connecting client's admission can see it and
-    // (under `steal`) signal it. The guard removes the entry when this session ends.
-    let _live_guard = {
-        let id = endpoint::peer_fingerprint(&conn);
-        let label = id
-            .map(|fp| {
-                fp.iter()
-                    .take(4)
-                    .map(|b| format!("{b:02x}"))
-                    .collect::<String>()
-            })
-            .unwrap_or_else(|| "client".to_string());
-        crate::vdisplay::admission::register(
-            id,
-            (
-                welcome.mode.width,
-                welcome.mode.height,
-                welcome.mode.refresh_hz,
-            ),
-            stop.clone(),
-            label,
-        )
-    };
+    // This session was registered for mode-conflict admission during the handshake, BEFORE any
+    // pipeline existed (`handshake::negotiate` → `admission::claim`), so a simultaneous Hello
+    // from the same identity cannot slip past a still-empty table and build a second display.
+    // Holding the guard here is the whole lifetime contract: it releases the identity on every
+    // exit path of this function, including a pipeline that fails to come up.
+    let _live_guard = claim_guard;
 
     // Audio plane (virtual source only — synthetic runs are protocol tests): desktop Opus
     // → host→client QUIC datagrams, on its own native thread. Best-effort on every failure
@@ -777,6 +769,12 @@ pub(super) async fn serve_session(
     // stages ride the same per-session trace; resizes write their totals into the shared slot.
     let bringup_dp = bringup.clone();
     let resize_ms_dp = resize_ms.clone();
+    // See `SessionContext::abandoned`: flipped below if the stream thread has to be abandoned so it
+    // can never submit against a torn-down capture. Hoisted above the `spawn_blocking` so BOTH the
+    // closure (which puts a clone in the session context) and the outer `tokio::select!` (which
+    // flips it on a wedged teardown) can reach the same flag.
+    let abandoned = Arc::new(AtomicBool::new(false));
+    let abandoned_watch = abandoned.clone();
     let result: Result<()> = async {
         let stream_thread = tokio::task::spawn_blocking(move || -> Result<()> {
             // Bring up the (already-bound) data-plane socket. Default: hole-punch — wait briefly
@@ -838,6 +836,7 @@ pub(super) async fn serve_session(
                         .expect("the Virtual source resolves a compositor during the handshake");
                     let ctx = SessionContext {
                         session,
+                        abandoned,
                         mode,
                         seconds,
                         stop: stop_stream,
@@ -922,6 +921,10 @@ pub(super) async fn serve_session(
         tokio::select! {
             joined = stream_thread => joined.context("stream thread")??,
             () = stop_overdue(&stop) => {
+                // Teardown below releases the virtual output (and with it the capture buffers).
+                // Tell the still-running thread to stop submitting before that happens — that
+                // ordering is what keeps `NvencCudaEncoder::submit` off unmapped dmabufs.
+                abandoned_watch.store(true, Ordering::SeqCst);
                 tracing::error!(
                     grace_s = STREAM_STOP_GRACE.as_secs(),
                     "stream thread has not returned since the session was stopped — abandoning it so \
@@ -933,6 +936,11 @@ pub(super) async fn serve_session(
         }
         // Give the client a moment to drain before the close.
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        // The stream thread has returned, so its capturer and virtual-output guards have unwound
+        // on that thread before `spawn_blocking` reported completion. It is now safe to clear the
+        // abandonment marker; the wedged path above left it set precisely so no late submission
+        // could touch a released dmabuf.
+        abandoned_watch.store(false, Ordering::SeqCst);
         Ok(())
     }
     .await;

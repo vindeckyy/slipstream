@@ -7,14 +7,18 @@ export const SectionSetup: FC<{ next?: string }> = ({ next }) => {
 	const [error, setError] = useState<SetupError | null>(null);
 	const [busy, setBusy] = useState(false);
 
-	const onSubmit = async (password: string, confirmation: string) => {
+	const onSubmit = async (
+		setupToken: string,
+		password: string,
+		confirmation: string,
+	) => {
 		setBusy(true);
 		setError(null);
 		try {
 			const res = await fetch("/_auth/setup", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ password, confirmation }),
+				body: JSON.stringify({ setupToken, password, confirmation }),
 			});
 			if (!res.ok) {
 				const body = (await res.json().catch(() => null)) as {
@@ -23,6 +27,12 @@ export const SectionSetup: FC<{ next?: string }> = ({ next }) => {
 				const message = body?.statusMessage?.toLowerCase() ?? "";
 				if (res.status === 409) {
 					window.location.href = "/login";
+					return;
+				}
+				// 403 is the setup-token gate: the caller has not proven filesystem access to the host.
+				if (res.status === 403) {
+					setError("setup-token");
+					setBusy(false);
 					return;
 				}
 				setError(

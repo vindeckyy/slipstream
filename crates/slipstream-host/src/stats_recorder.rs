@@ -76,6 +76,16 @@ pub struct StatsSample {
     /// the encoder is not consuming the one-deep newest-frame slot quickly enough.
     #[serde(default)]
     pub capture_frames_overwritten: u64,
+    /// Cumulative source-side arrival callbacks (WGC `FrameArrived`). Compare with
+    /// `capture_frames_published` to separate a delivery ceiling from a consumer ceiling.
+    #[serde(default)]
+    pub capture_frames_arrived: u64,
+    /// Cumulative pool drain attempts that returned a frame.
+    #[serde(default)]
+    pub capture_try_next_ok: u64,
+    /// Cumulative pool drain attempts that returned nothing.
+    #[serde(default)]
+    pub capture_try_next_empty: u64,
     /// Cumulative extra PipeWire buffers discarded while selecting the newest buffer.
     #[serde(default)]
     pub capture_buffers_drained: u64,
@@ -557,6 +567,11 @@ mod tests {
             capture_age_us: 0,
             capture_age_over_limit: false,
             capture_backend: String::new(),
+            // Cadence counters added with the WGC drain instrumentation; zero is the "not
+            // measured" value this fixture wants.
+            capture_frames_arrived: 0,
+            capture_try_next_ok: 0,
+            capture_try_next_empty: 0,
             capture_frames_published: 0,
             capture_frames_overwritten: 0,
             capture_buffers_drained: 0,

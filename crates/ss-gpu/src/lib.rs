@@ -46,6 +46,7 @@ mod tests {
             occurrence: 0,
             vram_bytes: vram_gb * 1024 * 1024 * 1024,
             handle: GpuHandle::default(),
+            pci_identity: None,
         }
     }
 

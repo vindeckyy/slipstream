@@ -25,6 +25,10 @@ pub struct GpuInfo {
     pub occurrence: u32,
     pub vram_bytes: u64,
     pub handle: GpuHandle,
+    /// PCI bus/slot identity of the physical card (Linux: sysfs `0000:01:00.0`; Windows: DXGI
+    /// LUID). `None` means the backend could not establish physical identity, so dedup must keep
+    /// the adapter: a duplicate listing is preferable to hiding a real card.
+    pub pci_identity: Option<String>,
 }
 
 /// Lowercase vendor tag for the API.

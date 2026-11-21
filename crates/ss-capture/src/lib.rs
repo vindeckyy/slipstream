@@ -32,6 +32,15 @@ pub struct CaptureTelemetry {
     pub frames_published: u64,
     /// Published frames that replaced a frame the consumer had not taken yet.
     pub frames_overwritten: u64,
+    /// Source-side arrival callbacks since the capturer was opened (WGC: `FrameArrived`
+    /// invocations). Separating this from `frames_published` tells a delivery ceiling apart from a
+    /// consumer ceiling: arrivals at the display rate with far fewer publishes means the compositor
+    /// is offering frames the host does not take.
+    pub frames_arrived: u64,
+    /// Pool drain attempts that yielded a frame (WGC: `TryGetNextFrame` returning `Ok`).
+    pub try_next_ok: u64,
+    /// Pool drain attempts that yielded nothing (WGC: `TryGetNextFrame` returning an error).
+    pub try_next_empty: u64,
     /// Extra PipeWire buffers discarded while selecting the newest buffer in a callback.
     pub buffers_drained: u64,
     /// Negotiated frame width and height. Zero means negotiation has not completed.

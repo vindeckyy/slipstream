@@ -18,16 +18,22 @@ import { m } from "@/paraglide/messages";
 
 const ERROR_ID = "setup-password-error";
 
-export type SetupError = "too-short" | "mismatch" | "unavailable";
+export type SetupError =
+	| "too-short"
+	| "mismatch"
+	| "unavailable"
+	| "setup-token";
 
 export const SetupView: FC<{
-	onSubmit: (password: string, confirmation: string) => void;
+	onSubmit: (setupToken: string, password: string, confirmation: string) => void;
 	error: SetupError | null;
 	busy: boolean;
 }> = ({ onSubmit, error, busy }) => {
 	const [password, setPassword] = useState("");
 	const [confirmation, setConfirmation] = useState("");
-	const canSubmit = password.length > 0 && confirmation.length > 0 && !busy;
+	const [setupToken, setSetupToken] = useState("");
+	const canSubmit =
+		setupToken.length > 0 && password.length > 0 && confirmation.length > 0 && !busy;
 	const errorMessage =
 		error === "too-short"
 			? m.setup_error_too_short()
@@ -35,7 +41,9 @@ export const SetupView: FC<{
 				? m.setup_error_mismatch()
 				: error === "unavailable"
 					? m.setup_error_unavailable()
-					: null;
+					: error === "setup-token"
+? "That setup token is missing or wrong. It is the contents of web-setup-token in the host's slipstream config directory (~/.config/slipstream on both Windows and Linux, or the host's config-dir override)."
+						: null;
 
 	return (
 		<TooltipProvider>
@@ -98,11 +106,36 @@ export const SetupView: FC<{
 							<form
 								onSubmit={(event) => {
 									event.preventDefault();
-									onSubmit(password, confirmation);
+									onSubmit(setupToken, password, confirmation);
 								}}
 								className="flex flex-col gap-5"
 								aria-busy={busy || undefined}
 							>
+								{/* First-run proof of locality: a secret only the host's filesystem holds. The peer
+								    address cannot serve as this gate — a loopback-terminating proxy (tailscale serve,
+								    nginx proxy_pass) makes every remote caller look local. */}
+								<div className="flex flex-col gap-2">
+									<OptionLabel
+										htmlFor="setup-token"
+										label="Setup token"
+										help="From web-setup-token in the host's slipstream config directory (~/.config/slipstream on both Windows and Linux, or the host's config-dir override)."
+									/>
+									<Input
+										id="setup-token"
+										name="setupToken"
+										type="text"
+										required
+										aria-required="true"
+										autoComplete="off"
+										spellCheck={false}
+										value={setupToken}
+										disabled={busy}
+										aria-invalid={error ? true : undefined}
+										aria-describedby={error ? ERROR_ID : undefined}
+										onChange={(event) => setSetupToken(event.target.value)}
+									/>
+								</div>
+
 								<div className="flex flex-col gap-2">
 									<OptionLabel
 										htmlFor="setup-password"
