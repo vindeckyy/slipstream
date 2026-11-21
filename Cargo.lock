@@ -4008,6 +4008,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "slipstream-windows"
+version = "0.24.0"
+dependencies = [
+ "anyhow",
+ "mdns-sd",
+ "quinn",
+ "slipstream-core",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "windows",
+]
+
+[[package]]
 name = "smallvec"
 version = "1.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -23,6 +23,7 @@ members = [
     "crates/ss-vdisplay",
     "crates/pyrowave-sys",
     "clients/probe",
+    "clients/windows",
     "clients/cli",
     "clients/linux",
     "clients/session",
