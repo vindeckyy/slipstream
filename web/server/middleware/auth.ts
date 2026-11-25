@@ -12,6 +12,7 @@ import {
 	useSession,
 } from "h3";
 import {
+	ensureSetupToken,
 	isPublicPath,
 	isPluginUiEmbedPath,
 	type SessionData,
@@ -60,8 +61,12 @@ export default defineEventHandler(async (event) => {
 
 	const configured = Boolean(uiPassword());
 	if (pathname === "/setup") {
-		if (!configured) return;
-		return sendRedirect(event, "/login", 302);
+		if (configured) return sendRedirect(event, "/login", 302);
+		// Create the first-run token BEFORE the page tells the operator to read it. It is otherwise
+		// created lazily by the POST handler, so a fresh install served a form pointing at a file
+		// nothing had written yet.
+		ensureSetupToken();
+		return;
 	}
 	if (pathname === "/login") {
 		if (configured) return;

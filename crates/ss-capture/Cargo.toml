@@ -18,6 +18,8 @@ ss-frame = { path = "../ss-frame" }
 ss-zerocopy = { path = "../ss-zerocopy" }
 ss-gpu = { path = "../ss-gpu" }
 ss-host-config = { path = "../ss-host-config" }
+# One authenticated resolver for every compositor socket (SO_PEERCRED + /proc identity).
+ss-wayland = { path = "../ss-wayland" }
 anyhow = "1"
 tracing = "0.1"
 

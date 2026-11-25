@@ -563,32 +563,33 @@ fn load_paired() -> Vec<Vec<u8>> {
     }
 }
 
-/// Persist the paired-client allow-list (called after each successful pairing). Written
-/// atomically (temp file + rename) so a crash mid-write can't truncate `paired.json` — a partial
-/// write would otherwise lock out every paired client until they re-pair.
-pub(crate) fn save_paired(paired: &[Vec<u8>]) {
-    let Some(path) = paired_path() else { return };
-    if let Some(dir) = path.parent() {
-        let _ = ss_paths::create_private_dir(dir);
-    }
-    let bytes = match serde_json::to_vec(paired) {
-        Ok(b) => b,
-        Err(e) => {
-            tracing::warn!(error = %e, "serializing pairings failed");
-            return;
-        }
+/// Persist the paired-client allow-list (called after each successful pairing and after each
+/// unpair). Written atomically (temp file + rename) so a crash mid-write can't truncate
+/// `paired.json`; callers must treat an error as authoritative, because discarding an in-memory
+/// change that could not be persisted would make a revocation disappear on the next restart.
+pub(crate) fn save_paired(paired: &[Vec<u8>]) -> anyhow::Result<()> {
+    let Some(path) = paired_path() else {
+        anyhow::bail!("no config directory available for the pairing store");
     };
+    if let Some(dir) = path.parent() {
+        ss_paths::create_private_dir(dir)
+            .with_context(|| format!("creating pairing store directory {}", dir.display()))?;
+    }
+    let bytes = serde_json::to_vec(paired).context("serializing pairings")?;
     // Write to a sibling temp file (owner-only, so a local user can't tamper the allow-list), then
     // rename over the target atomically. Never write `path` in place.
     let tmp = path.with_extension("json.tmp");
-    if let Err(e) = ss_paths::write_secret_file(&tmp, &bytes) {
-        tracing::warn!(error = %e, "persisting pairings failed (temp write)");
-        return;
-    }
+    ss_paths::write_secret_file(&tmp, &bytes)
+        .with_context(|| format!("persisting pairings to temporary file {}", tmp.display()))?;
     if let Err(e) = std::fs::rename(&tmp, &path) {
-        tracing::warn!(error = %e, "persisting pairings failed (rename)");
         let _ = std::fs::remove_file(&tmp);
+        return Err(anyhow::Error::new(e).context(format!(
+            "persisting pairings: renaming {} to {}",
+            tmp.display(),
+            path.display()
+        )));
     }
+    Ok(())
 }
 
 #[cfg(test)]

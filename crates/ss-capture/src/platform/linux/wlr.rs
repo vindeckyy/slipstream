@@ -403,9 +403,14 @@ impl WlrCapturer {
                 "wlroots screencopy needs WAYLAND_DISPLAY (no Wayland session in this environment)"
             );
         }
-        let conn = Connection::connect_to_env().context(
-            "connect to Wayland for screencopy (is WAYLAND_DISPLAY / XDG_RUNTIME_DIR set?)",
-        )?;
+        // Screencopy is implemented by several compositors, so the rule is "our uid, a real
+        // executable image"; the peer is still authenticated (SO_PEERCRED + /proc/<pid>/exe)
+        // before any frame is read, instead of being taken from the environment alone.
+        let conn = ss_wayland::connect_env(
+            ss_wayland::PeerRule::SameUid,
+            ss_wayland::default_proc_root(),
+        )
+        .context("connect to Wayland for screencopy (is WAYLAND_DISPLAY / XDG_RUNTIME_DIR set?)")?;
         let mut queue = conn.new_event_queue();
         let qh = queue.handle();
         let _registry = conn.display().get_registry(&qh, ());

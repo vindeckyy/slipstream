@@ -273,7 +273,11 @@ impl Pairing {
                 // De-dup: re-pairing an already-trusted cert must not append a duplicate DER.
                 if !store.iter().any(|der| der == &client_cert_der) {
                     store.push(client_cert_der.clone());
-                    super::save_paired(&store);
+                    if let Err(error) = super::save_paired(&store) {
+                        store.pop();
+                        tracing::error!(%error, uniqueid, "pairing phase 4: could not persist pairing");
+                        return Ok(paired_xml("", false));
+                    }
                 }
             }
             tracing::info!(uniqueid, "pairing phase 4 complete — client cert pinned");

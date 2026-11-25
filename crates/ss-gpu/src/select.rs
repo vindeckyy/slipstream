@@ -40,25 +40,51 @@ pub struct SelectedGpu {
 }
 
 /// Find the manually preferred GPU in the inventory. Match order: exact stable identity
-/// (vendor, device, occurrence) → same model (vendor, device; a twin renumbered) → exact name
-/// (ids changed across a driver/firmware quirk but the marketing name survived).
+/// (vendor, device, occurrence) → a **unique** same-model card (vendor, device; a twin renumbered)
+/// → a **unique** exact name (ids changed across a driver/firmware quirk but the marketing name
+/// survived).
+///
+/// The fallbacks are deliberately ambiguity-free. Occurrences are assigned after duplicate adapter
+/// instances are collapsed, so a card's occurrence can change when the OS stops reporting a
+/// duplicate for an earlier card. Two physically identical cards are then told apart only by that
+/// occurrence, and picking "the first same-model card" would silently stream from the wrong
+/// physical GPU. Reporting the preference as missing instead (selection falls back to auto, and the
+/// console shows `preference_missing`) is the honest answer: a wrong card is worse than a visible
+/// fallback.
 pub fn find_preferred(gpus: &[GpuInfo], want: &PreferredGpu) -> Option<usize> {
-    gpus.iter()
-        .position(|g| {
-            g.vendor_id == want.vendor_id
-                && g.device_id == want.device_id
-                && g.occurrence == want.occurrence
-        })
-        .or_else(|| {
-            gpus.iter()
-                .position(|g| g.vendor_id == want.vendor_id && g.device_id == want.device_id)
-        })
-        .or_else(|| {
-            if want.name.is_empty() {
+    if let Some(i) = gpus.iter().position(|g| {
+        g.vendor_id == want.vendor_id
+            && g.device_id == want.device_id
+            && g.occurrence == want.occurrence
+    }) {
+        return Some(i);
+    }
+    if let Some(i) = unique_position(gpus, |g| {
+        g.vendor_id == want.vendor_id && g.device_id == want.device_id
+    }) {
+        return Some(i);
+    }
+    if want.name.is_empty() {
+        return None;
+    }
+    unique_position(gpus, |g| g.name == want.name)
+}
+
+/// The only index matching `pred`, or `None` when zero or several match.
+///
+/// Used where a match is a *recovery* from a stale preference: with several candidates the recovery
+/// would be a guess, and a guess that lands on the wrong physical card is worse than no recovery.
+fn unique_position(gpus: &[GpuInfo], pred: impl Fn(&GpuInfo) -> bool) -> Option<usize> {
+    let mut found = None;
+    for (i, gpu) in gpus.iter().enumerate() {
+        if pred(gpu) {
+            if found.is_some() {
                 return None;
             }
-            gpus.iter().position(|g| g.name == want.name)
-        })
+            found = Some(i);
+        }
+    }
+    found
 }
 
 /// Pure selection over an inventory: **manual preference > env substring > max VRAM**. Returns

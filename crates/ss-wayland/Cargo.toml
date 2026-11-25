@@ -1,0 +1,23 @@
+# Shared Wayland peer authentication: SO_PEERCRED + /proc/<pid>/exe identity for every socket the
+# host connects to on a compositor's behalf. A leaf crate so ss-vdisplay (KWin virtual output),
+# ss-inject (KWin fake_input + wlroots input) and ss-clipboard (ext-data-control) all refuse the
+# same impostors instead of each re-deriving the check (or skipping it).
+[package]
+name = "ss-wayland"
+version.workspace = true
+edition = "2021"
+rust-version.workspace = true
+license = "MIT OR Apache-2.0"
+description = "slipstream host Wayland socket authentication: SO_PEERCRED credential checks, /proc/<pid>/exe identity, symlink-rejecting socket resolution."
+publish = false
+
+[dependencies]
+anyhow = "1"
+tracing = "0.1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+wayland-client = "0.31"
+
+[lints]
+workspace = true

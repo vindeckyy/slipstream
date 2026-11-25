@@ -149,7 +149,17 @@ impl PwAudioCapturer {
         // release is `idle()` (parked between sessions) or Drop.
         let claimed = match &sink_name {
             Some(name) => {
-                stream_sink::claim(name);
+                // A false return means host apps were NOT rerouted into our sink, so nothing ever
+                // links to it and `process()` never runs: audio is dead for this session
+                // (quantum_ms=0, ring_len=0, underruns climbing) even though video flows.
+                if !stream_sink::claim(name) {
+                    tracing::error!(
+                        sink = %name,
+                        "audio capture will produce NO samples this session — the stream sink is \
+                         not the default sink (see the claim error above; \
+                         `SLIPSTREAM_STREAM_SINK=0` captures the default sink's monitor instead)"
+                    );
+                }
                 true
             }
             None => false,
@@ -215,7 +225,13 @@ impl AudioCapturer for PwAudioCapturer {
         // A parked capturer being reused = a new session starting: re-claim the default sink
         // (released by `idle()` when the previous session parked us).
         if let (Some(name), false) = (&self.sink_name, self.claimed) {
-            stream_sink::claim(name);
+            if !stream_sink::claim(name) {
+                tracing::error!(
+                    sink = %name,
+                    "audio capture will produce NO samples this session — the stream sink is not \
+                     the default sink (see the claim error above)"
+                );
+            }
             self.claimed = true;
         }
     }

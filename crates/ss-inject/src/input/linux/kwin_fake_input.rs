@@ -253,8 +253,12 @@ const GEO_REFRESH: Duration = Duration::from_millis(500);
 
 impl KwinFakeInjector {
     pub fn open() -> Result<Self> {
-        let conn = Connection::connect_to_env()
-            .context("connect to KWin Wayland (is WAYLAND_DISPLAY set to the KWin socket?)")?;
+        // Authenticate like every other KWin socket: `org_kde_kwin_fake_input` hands over raw
+        // input, so the peer must prove it is KWin (SO_PEERCRED + /proc/<pid>/exe), not merely
+        // answer on a path the environment named.
+        let conn =
+            ss_wayland::connect_env(ss_wayland::PeerRule::KWin, ss_wayland::default_proc_root())
+                .context("connect to KWin Wayland (is WAYLAND_DISPLAY set to the KWin socket?)")?;
         let mut queue = conn.new_event_queue();
         let qh = queue.handle();
         let _registry = conn.display().get_registry(&qh, ());

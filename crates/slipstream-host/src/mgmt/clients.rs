@@ -76,10 +76,14 @@ pub(crate) fn client_info(der: &[u8]) -> PairedClient {
 
 /// Unpair a client
 ///
-/// Removes the client's certificate from the pairing store. Caveat: the nvhttp TLS layer
-/// does not yet reject unlisted certificates (`gamestream/tls.rs` accepts any well-formed
-/// client cert — a planned hardening step), so until that lands this removes the client
-/// from the listing without severing its ability to reconnect.
+/// Removes the client's certificate from the pairing store and persists the removal, so the
+/// GameStream/nvhttp launch surface (`nvhttp::peer_is_paired`) refuses the device's future
+/// streams and it must pair again. The nvhttp TLS layer accepts any well-formed client cert at
+/// the handshake; authorization is the per-request fingerprint check against this store, so
+/// removal here is the revocation point. The removal is written to disk before the in-memory
+/// entry is dropped; if persisting fails the entry is restored and the API returns 503, so a
+/// reported 204 is always durable. A stream already running is not torn down (its RTSP media
+/// window is bound to the launch session and peer IP); revocation applies to the next launch.
 #[utoipa::path(
     delete,
     path = "/clients/{fingerprint}",
@@ -94,6 +98,7 @@ pub(crate) fn client_info(der: &[u8]) -> PairedClient {
         (status = BAD_REQUEST, description = "Malformed fingerprint", body = ApiError),
         (status = UNAUTHORIZED, description = "Missing or invalid bearer token", body = ApiError),
         (status = NOT_FOUND, description = "No paired client with that fingerprint", body = ApiError),
+        (status = SERVICE_UNAVAILABLE, description = "Pairing store could not be persisted; the client is still paired", body = ApiError),
     )
 )]
 pub(crate) async fn unpair_client(
@@ -107,9 +112,23 @@ pub(crate) async fn unpair_client(
         );
     }
     let mut paired = st.app.paired.lock().unwrap_or_else(|e| e.into_inner());
+    let original = paired.clone();
     let before = paired.len();
     paired.retain(|der| !hex::encode(Sha256::digest(der)).eq_ignore_ascii_case(&fingerprint));
     if paired.len() < before {
+        // Write through, or a host restart would reload the cert from `paired.json` and silently
+        // undo the revocation. `peer_is_paired` reads this store live, so the removal already
+        // blocks the next launch; the save is what makes it survive a restart. If the save fails,
+        // restore the in-memory entry so the API does not report a revocation that will vanish on
+        // the next restart, and answer 503 so the caller can retry.
+        if let Err(error) = crate::protocol::gamestream::save_paired(&paired) {
+            tracing::error!(%error, fingerprint, "management API: unpair could not be persisted");
+            *paired = original;
+            return api_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "pairing store could not be persisted; client is still paired",
+            );
+        }
         tracing::info!(fingerprint, "management API: client unpaired");
         StatusCode::NO_CONTENT.into_response()
     } else {

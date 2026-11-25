@@ -122,6 +122,11 @@ struct SlotState {
     frame: Option<CapturedFrame>,
     published: u64,
     overwritten: u64,
+    /// `FrameArrived` callbacks the source raised (see `CaptureTelemetry::frames_arrived`).
+    arrived: u64,
+    /// Pool drain attempts that returned a frame / returned nothing.
+    try_ok: u64,
+    try_empty: u64,
     width: u32,
     height: u32,
     /// Terminal failure: the worker thread died; every consumer call after this is an `Err`.
@@ -136,6 +141,9 @@ impl FrameSlot {
                 frame: None,
                 published: 0,
                 overwritten: 0,
+                arrived: 0,
+                try_ok: 0,
+                try_empty: 0,
                 width: 0,
                 height: 0,
                 dead: None,
@@ -163,6 +171,21 @@ impl FrameSlot {
         let mut st = self.state.lock().unwrap_or_else(|e| e.into_inner());
         st.seq += 1;
         self.changed.notify_all();
+    }
+
+    /// Count a source-side arrival callback (`FrameArrived`), separate from the wakeup itself.
+    pub fn note_frame_arrived(&self) {
+        self.state.lock().unwrap_or_else(|e| e.into_inner()).arrived += 1;
+    }
+
+    /// Count one pool drain attempt and its outcome.
+    pub fn note_try_next(&self, got_frame: bool) {
+        let mut st = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        if got_frame {
+            st.try_ok += 1;
+        } else {
+            st.try_empty += 1;
+        }
     }
 
     /// Take the freshest frame, if any.
@@ -236,6 +259,9 @@ impl FrameSlot {
             last_frame_ns: capture_now_ns(),
             frames_published: st.published,
             frames_overwritten: st.overwritten,
+            frames_arrived: st.arrived,
+            try_next_ok: st.try_ok,
+            try_next_empty: st.try_empty,
             width: st.width,
             height: st.height,
             zerocopy: false,

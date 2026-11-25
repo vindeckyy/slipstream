@@ -4090,6 +4090,7 @@ dependencies = [
  "ss-frame",
  "ss-gpu",
  "ss-host-config",
+ "ss-wayland",
  "ss-zerocopy",
  "tokio",
  "tracing",
@@ -4135,6 +4136,7 @@ dependencies = [
  "libc",
  "quinn",
  "slipstream-core",
+ "ss-wayland",
  "tokio",
  "tracing",
  "wayland-client",
@@ -4232,6 +4234,7 @@ dependencies = [
  "ss-frame",
  "ss-host-config",
  "ss-paths",
+ "ss-wayland",
  "tokio",
  "tracing",
  "usbip-sim",
@@ -4307,6 +4310,7 @@ dependencies = [
  "ss-gpu",
  "ss-host-config",
  "ss-paths",
+ "ss-wayland",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -4316,6 +4320,16 @@ dependencies = [
  "wayland-scanner",
  "windows",
  "x11rb",
+]
+
+[[package]]
+name = "ss-wayland"
+version = "0.24.0"
+dependencies = [
+ "anyhow",
+ "libc",
+ "tracing",
+ "wayland-client",
 ]
 
 [[package]]

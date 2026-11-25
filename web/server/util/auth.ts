@@ -1,5 +1,6 @@
 import {
 	createHash,
+	randomBytes,
 	timingSafeEqual as nodeTimingSafeEqual,
 } from "node:crypto";
 import {
@@ -207,6 +208,97 @@ function storedUiPassword(): string {
 	} catch {
 		return "";
 	}
+}
+
+/**
+ * The one-time FIRST-RUN SETUP TOKEN, and why it exists.
+ *
+ * First-run setup used to be authorized by `isLoopbackAddress(peerAddress(event))`. That is not a
+ * trust signal: a reverse proxy that terminates locally (`tailscale serve`, nginx with
+ * `proxy_pass http://127.0.0.1:PORT`) connects to us FROM 127.0.0.1 no matter who the real caller
+ * is, so every remote peer passes the check. `X-Forwarded-For` cannot fix it either — a direct
+ * caller sets it freely.
+ *
+ * So the gate is a SECRET THAT LIVES ON THE HOST'S FILESYSTEM: 32 random bytes, hex encoded, in
+ * `<config>/web-setup-token` (same private directory as `web-password`, mode 0600). Anyone who can
+ * read that file can already read `web-password` and `mgmt-token`, so it grants nothing a local
+ * user does not already have; a remote caller cannot read it at all. The local operator copies it
+ * from the file, or from `SLIPSTREAM_UI_SETUP_TOKEN` when an installer wants to pre-seed it.
+ *
+ * It is one-time by construction: once a password exists the setup route answers 409 and never
+ * consults the token again.
+ */
+function setupTokenFile(): string {
+	if (process.env.SLIPSTREAM_UI_SETUP_TOKEN_FILE) {
+		return process.env.SLIPSTREAM_UI_SETUP_TOKEN_FILE;
+	}
+	return join(dirname(uiPasswordFile()), "web-setup-token");
+}
+
+let cachedSetupToken = "";
+
+/** The current setup token, created on first use. Empty only if creation failed. */
+export function setupToken(): string {
+	const fromEnv = process.env.SLIPSTREAM_UI_SETUP_TOKEN?.trim();
+	if (fromEnv) return fromEnv;
+	if (cachedSetupToken) return cachedSetupToken;
+
+	const path = setupTokenFile();
+	// An operator (or a test) may have placed one already.
+	try {
+		const existing = readFileSync(path, "utf8").trim();
+		if (existing) {
+			cachedSetupToken = existing;
+			return existing;
+		}
+	} catch {
+		// absent: fall through and create it
+	}
+
+	const fresh = randomBytes(32).toString("hex");
+	mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+	try {
+		// `wx`: never clobber a token another process is already showing the operator.
+		const fd = openSync(path, "wx", 0o600);
+		try {
+			writeFileSync(fd, `${fresh}\n`);
+		} finally {
+			closeSync(fd);
+		}
+		cachedSetupToken = fresh;
+		return fresh;
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+		cachedSetupToken = readFileSync(path, "utf8").trim();
+		return cachedSetupToken;
+	}
+}
+
+/**
+ * Make sure the first-run token EXISTS, for the request that serves the setup page.
+ *
+ * `setupToken` is created lazily on first use, and the only other caller is the POST handler that
+ * checks a submission. So on a fresh install nothing had created the file when the page told the
+ * operator to read it: the documented path simply did not exist yet. Serving the page is the right
+ * moment - it is the first look at the token the operator is meant to copy.
+ *
+ * Best-effort: an unwritable config directory must not turn the setup page into a 500. The page
+ * still renders, and the POST handler's `setupToken` reports the real failure to whoever submits.
+ */
+export function ensureSetupToken(): void {
+	try {
+		setupToken();
+	} catch {
+		// Leave it to the POST handler, which surfaces the failure with a status code.
+	}
+}
+
+/** Constant-time check of a submitted setup token. Empty submissions never pass. */
+export function verifySetupToken(candidate: string): boolean {
+	const expected = setupToken();
+	const submitted = candidate.trim();
+	if (!expected || !submitted) return false;
+	return timingSafeEqual(submitted, expected);
 }
 
 /** The login password. Empty string means first-run setup is still required. */

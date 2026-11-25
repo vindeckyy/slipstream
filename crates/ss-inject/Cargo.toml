@@ -15,6 +15,8 @@ publish = false
 slipstream-core = { path = "../slipstream-core", features = ["quic"] }
 ss-host-config = { path = "../ss-host-config" }
 ss-paths = { path = "../ss-paths" }
+# One authenticated resolver for every compositor socket (SO_PEERCRED + /proc identity).
+ss-wayland = { path = "../ss-wayland" }
 # The shared frame vocabulary — `worker_qos` (Phase-7 opt-in worker scheduling) rides here.
 ss-frame = { path = "../ss-frame" }
 # The host cursor state is shared with the Linux capture path.

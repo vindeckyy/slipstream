@@ -164,6 +164,111 @@ impl Drop for LiveGuard {
     }
 }
 
+/// The result of an atomic admit-and-claim.
+///
+/// This exists because admission and registration used to be two separate table
+/// accesses with the whole session bring-up between them: `preempt_same_identity` +
+/// `admit` ran in the handshake, and [`register`] ran only once the data-plane pipeline
+/// was up. A burst of simultaneous Hellos from one identity therefore all read an empty
+/// (or stale) table, all resolved to `Separate`, and each landed on its own display —
+/// the exact outcome preemption exists to prevent (observed live: one client holding
+/// three KWin outputs).
+pub struct Claimed {
+    /// What the connecting session should do, resolved against the tenants that were
+    /// already present. Never computed against this claim itself.
+    pub decision: Admission,
+    /// The mode this claim is RECORDED at: the requested mode, or the live display's mode when
+    /// [`decide`] resolved [`Admission::Join`]. The caller must stream at this mode.
+    ///
+    /// Resolved HERE, under the same lock as the insert, because the alternative - inserting the
+    /// requested mode and correcting it with [`set_mode`] afterwards - leaves a window in which the
+    /// table advertises a mode the session is not going to use, and a concurrent claim resolving
+    /// `join`/`reject` against it reads the wrong one.
+    pub mode: (u32, u32, u32),
+    /// This identity's own prior sessions (a genuine reconnect's zombies). The caller
+    /// signals these AFTER this call returns, so the table lock is never held across a
+    /// sleep.
+    pub own_zombies: Vec<Arc<AtomicBool>>,
+    /// The live entry this claim owns. Dropping it removes the entry, so a pipeline that
+    /// fails after the claim is registered cannot lock the client out of its identity.
+    pub guard: LiveGuard,
+}
+
+/// Atomically resolve admission for a connecting session AND insert its live entry.
+///
+/// One lock covers both the read (`decide` + own-zombie scan) and the write (the claim),
+/// which is what makes the one-session-per-identity invariant true by construction
+/// rather than by timing: a concurrent Hello either runs entirely before this one (and is
+/// then seen here) or entirely after (and sees this claim). It does not serialise session
+/// startup: the only work under the lock is scanning a table that holds one entry per
+/// live session (tens at most) and a push. The 1500 ms preemption grace and every
+/// pipeline step happen after the lock is released.
+///
+/// `mode` is the client's requested mode; callers whose decision is
+/// [`Admission::Join`] overwrite it with the live mode before the display is acquired.
+pub fn claim(
+    conflict: ModeConflict,
+    req_identity: Option<[u8; 32]>,
+    mode: (u32, u32, u32),
+    stop: Arc<AtomicBool>,
+    label: String,
+) -> Claimed {
+    let mut live = table().lock().unwrap();
+    // Decide against the table as it stands — never against the entry we are about to add.
+    let decision = decide(conflict, req_identity, &live);
+    let own_zombies = same_identity_stops(req_identity, &live);
+    // Store the mode this session will actually serve, not the one it asked for: a `join` is an
+    // honest downgrade, and a claim that recorded the REQUEST would mislead the next decision
+    // (a concurrent claim resolving `join`/`reject` reads whatever is in the table).
+    let claimed_mode = match &decision {
+        Admission::Join(m) => *m,
+        _ => mode,
+    };
+    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+    live.push(LiveSession {
+        id,
+        identity: req_identity,
+        mode: claimed_mode,
+        stop,
+        label,
+    });
+    Claimed {
+        decision,
+        mode: claimed_mode,
+        own_zombies,
+        guard: LiveGuard { id },
+    }
+}
+
+/// Whether the live entry that owns `stop` has been removed - i.e. that session has actually
+/// released its display. A preempting session polls this instead of sleeping a fixed grace: the stop
+/// flag is ADVISORY (a session inside its first pipeline build does not look at it until the build
+/// returns, seconds later), so "signalled" and "released" are different instants, and acquiring a
+/// display in between is exactly the second-display bug preemption exists to prevent.
+pub fn released(stop: &Arc<AtomicBool>) -> bool {
+    !table()
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|s| Arc::ptr_eq(&s.stop, stop))
+}
+
+/// Update a claim's recorded mode once the session has negotiated one (e.g. after an
+/// [`Admission::Join`] downgrade, or when the backend honours a different refresh).
+pub fn set_mode(guard: &LiveGuard, mode: (u32, u32, u32)) {
+    let mut live = table().lock().unwrap();
+    if let Some(s) = live.iter_mut().find(|s| s.id == guard.id) {
+        s.mode = mode;
+    }
+}
+
+/// Number of entries in the live table. Test-only: the invariant under test is about the
+/// table's own contents, and no production caller has a reason to read the count.
+#[cfg(test)]
+fn live_len() -> usize {
+    table().lock().unwrap().len()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -268,5 +373,210 @@ mod tests {
             decide(ModeConflict::Join, fp(3), &live),
             Admission::Join((3840, 2160, 60))
         ));
+    }
+
+    /// Serialises the tests that use the process-global live table.
+    static CLAIM_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// The regression test for the concurrent-Hello race.
+    ///
+    /// Two Hellos for one identity claim at the same instant. Before the fix the table
+    /// was only written once a pipeline was up, so both read an empty table: both got
+    /// `Separate` with no zombies, and each created its own display. With the claim going
+    /// in under the same lock as the decision, exactly one of them can be the primary;
+    /// the other must see it as its own zombie.
+    #[test]
+    fn simultaneous_claims_admit_one_primary() {
+        let _serial = CLAIM_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        assert_eq!(live_len(), 0, "table must start empty");
+
+        let start = Arc::new(std::sync::Barrier::new(2));
+        // The guards come back to THIS thread and are held there, so "both claims exist at
+        // the same time" is asserted where both are provably alive — no reliance on
+        // in-thread sampling relative to a barrier.
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut threads = Vec::new();
+        for _ in 0..2 {
+            let start = Arc::clone(&start);
+            let tx = tx.clone();
+            threads.push(std::thread::spawn(move || {
+                start.wait();
+                let claimed = claim(
+                    ModeConflict::Separate,
+                    fp(7),
+                    (1920, 1080, 60),
+                    Arc::new(AtomicBool::new(false)),
+                    "peer".into(),
+                );
+                let saw_zombies = claimed.own_zombies.len();
+                let separate = matches!(claimed.decision, Admission::Separate);
+                tx.send((saw_zombies, separate, claimed.guard))
+                    .expect("collector is alive");
+            }));
+        }
+        drop(tx);
+        let collected: Vec<(usize, bool, LiveGuard)> = rx.iter().collect();
+        for t in threads {
+            t.join().unwrap();
+        }
+
+        assert_eq!(collected.len(), 2, "both Hellos claimed");
+        assert_eq!(live_len(), 2, "both claims are live at once");
+        let results: Vec<(usize, bool)> = collected.iter().map(|(z, sep, _)| (*z, *sep)).collect();
+        assert!(
+            results.iter().all(|(_, sep)| *sep),
+            "same-identity claims never conflict under Separate"
+        );
+        let primaries = results.iter().filter(|(z, _)| *z == 0).count();
+        let secondaries = results.iter().filter(|(z, _)| *z == 1).count();
+        assert_eq!(
+            primaries, 1,
+            "exactly one Hello may be the primary: {results:?}"
+        );
+        assert_eq!(secondaries, 1, "the other must see the first: {results:?}");
+        drop(collected);
+        assert_eq!(live_len(), 0, "both claims released");
+    }
+
+    /// A claim whose pipeline never comes up must not strand the identity: dropping the
+    /// guard (the failure path in `serve_session`) removes the entry, and the client's
+    /// next Hello is a clean primary again rather than its own zombie.
+    #[test]
+    fn failed_claim_is_reclaimable() {
+        let _serial = CLAIM_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        assert_eq!(live_len(), 0);
+
+        let failed = claim(
+            ModeConflict::Separate,
+            fp(8),
+            (1280, 720, 60),
+            Arc::new(AtomicBool::new(false)),
+            "peer".into(),
+        );
+        assert_eq!(live_len(), 1);
+        drop(failed); // the pipeline failed / the session returned early
+        assert_eq!(live_len(), 0);
+
+        let retry = claim(
+            ModeConflict::Separate,
+            fp(8),
+            (1280, 720, 60),
+            Arc::new(AtomicBool::new(false)),
+            "peer".into(),
+        );
+        assert!(
+            retry.own_zombies.is_empty(),
+            "a failed claim must not leave a zombie behind"
+        );
+        assert!(matches!(retry.decision, Admission::Separate));
+        drop(retry);
+    }
+
+    /// Documents the ordering that caused the bug: with two table accesses (admit, then
+    /// register later) a second Hello cannot see the first, so both are admitted clean.
+    /// This is what `claim` collapses into one access.
+    #[test]
+    fn pre_fix_ordering_admits_two_same_identity_hellos() {
+        let _serial = CLAIM_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        assert_eq!(live_len(), 0);
+
+        let first = admit(fp(9));
+        let second = admit(fp(9));
+        assert!(matches!(first, Admission::Separate));
+        assert!(matches!(second, Admission::Separate));
+        assert!(
+            preempt_same_identity(fp(9)).is_empty(),
+            "neither Hello has registered, so neither is visible to the other"
+        );
+        assert_eq!(live_len(), 0, "nothing was registered by admission alone");
+    }
+
+    /// A `join` claim must record the mode it will actually serve, at insert time.
+    ///
+    /// The defect this pins down: `claim` used to store the client's REQUESTED mode and the
+    /// handshake corrected it with `set_mode` after the lock was released, so a concurrent claim
+    /// in that window resolved `join`/`reject` against a mode no session was using.
+    #[test]
+    fn claim_records_the_join_resolved_mode_under_the_lock() {
+        let _serial = CLAIM_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        assert_eq!(live_len(), 0);
+
+        let primary = claim(
+            ModeConflict::Separate,
+            fp(1),
+            (2560, 1440, 60),
+            Arc::new(AtomicBool::new(false)),
+            "primary".into(),
+        );
+
+        // A different client asks for a different mode; `join` downgrades it to the live one, and
+        // the claim itself reports that mode back to the caller that must serve at it.
+        let joined = claim(
+            ModeConflict::Join,
+            fp(2),
+            (1280, 720, 120),
+            Arc::new(AtomicBool::new(false)),
+            "joiner".into(),
+        );
+        assert!(matches!(joined.decision, Admission::Join((2560, 1440, 60))));
+        assert_eq!(
+            joined.mode,
+            (2560, 1440, 60),
+            "the claim must report the mode it will serve"
+        );
+
+        // ...and the TABLE holds it: a third claim resolving against the table must see the join
+        // mode, not the joiner's request. This is what the set_mode-after-unlock ordering broke.
+        let third = claim(
+            ModeConflict::Join,
+            fp(3),
+            (640, 480, 30),
+            Arc::new(AtomicBool::new(false)),
+            "third".into(),
+        );
+        assert!(
+            matches!(third.decision, Admission::Join((2560, 1440, 60))),
+            "the joiner's RESOLVED mode, not its request, is what the next claim sees: {:?}",
+            third.decision
+        );
+
+        drop((primary, joined, third));
+        assert_eq!(live_len(), 0);
+    }
+
+    /// `released` is the observable a preempting session waits on: it must stay false until the
+    /// preempted session ends (its guard drops), not merely until its stop flag is set.
+    #[test]
+    fn released_tracks_the_guard_not_the_stop_flag() {
+        let _serial = CLAIM_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        assert_eq!(live_len(), 0);
+
+        let stop = Arc::new(AtomicBool::new(false));
+        let claimed = claim(
+            ModeConflict::Separate,
+            fp(4),
+            (1920, 1080, 60),
+            Arc::clone(&stop),
+            "victim".into(),
+        );
+        assert!(!released(&stop), "the session is still live");
+
+        // Signalling the stop flag is what a `steal`/reconnect does FIRST; it does not release
+        // anything, and a preemptor must keep waiting.
+        stop.store(true, Ordering::SeqCst);
+        assert!(
+            !released(&stop),
+            "a signalled session that has not ended still holds its display"
+        );
+
+        drop(claimed);
+        assert!(
+            released(&stop),
+            "the entry is gone, so the display is released"
+        );
+        assert!(
+            released(&Arc::new(AtomicBool::new(false))),
+            "an entry nobody owns is trivially released"
+        );
     }
 }

@@ -49,6 +49,33 @@ pub(super) fn cursor_forward(
         && crate::encode::cursor_blend_capable(codec, cuda_planned, bit_depth == 10)
 }
 
+/// How long a preempting session waits for the preempted session to RELEASE its display before
+/// proceeding anyway. Sized to outlast one first pipeline build (the 2.5 s first-attempt frame
+/// budget) plus the teardown drain, and bounded so a genuinely wedged victim cannot hold the new
+/// Hello forever.
+const PREEMPT_RELEASE_WAIT: std::time::Duration = std::time::Duration::from_secs(6);
+
+/// Poll interval while waiting for a release (the observable is the admission table's live set,
+/// which has no notification channel).
+const PREEMPT_RELEASE_POLL: std::time::Duration = std::time::Duration::from_millis(25);
+
+/// Wait until every preempted session has actually released its display, bounded by
+/// [`PREEMPT_RELEASE_WAIT`]. The caller has already stored `true` into each stop flag; that is only
+/// a REQUEST, so what we wait on is the session's live-table entry disappearing (its `LiveGuard`
+/// drop), which is what releases the display and lets this session reuse it. Returns how many were
+/// still holding a display at the deadline.
+async fn wait_released(stops: &[std::sync::Arc<std::sync::atomic::AtomicBool>]) -> usize {
+    let deadline = std::time::Instant::now() + PREEMPT_RELEASE_WAIT;
+    let mut pending = stops.to_vec();
+    loop {
+        pending.retain(|s| !crate::vdisplay::admission::released(s));
+        if pending.is_empty() || std::time::Instant::now() >= deadline {
+            return pending.len();
+        }
+        tokio::time::sleep(PREEMPT_RELEASE_POLL).await;
+    }
+}
+
 /// Run the Hello→Welcome→Start negotiation. Borrows the control streams (the caller keeps them for
 /// mid-stream renegotiation afterwards). `first` is the already-read first control message.
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
@@ -80,6 +107,9 @@ pub(super) async fn negotiate(
     // than published to process env, where a concurrent connect could overwrite it.
     Option<crate::vdisplay::GamescopeRoute>,
     Option<super::stream::PrepHandle>,
+    // This session's live-admission claim, taken before any pipeline exists. Held by
+    // `serve_session` for the whole session; dropping it releases the identity.
+    crate::vdisplay::admission::LiveGuard,
 )> {
     let peer = conn.remote_address();
     let mut hello = Hello::decode(first).map_err(|e| anyhow!("Hello decode: {e:?}"))?;
@@ -124,35 +154,73 @@ pub(super) async fn negotiate(
     // session is live is resolved by the `mode_conflict` policy BEFORE the Welcome — `separate`
     // (default, no change), `join` (serve at the live mode — an honest downgrade the client
     // renders from the Welcome), `steal` (preempt the victim), or `reject` (refuse the handshake).
-    // A same-client reconnect never conflicts. THIS session registers in the live set once its
-    // data plane is up (below the handshake), so a later client can see + steal it.
-    {
-        use crate::vdisplay::admission::{admit, preempt_same_identity, Admission};
+    // A same-client reconnect never conflicts.
+    //
+    // The decision and this session's live entry are ONE table access (`claim`). They used to be
+    // two — `preempt_same_identity` + `admit` here, `register` only once the data plane was up —
+    // and a burst of simultaneous Hellos from one identity all read the same empty table, all
+    // resolved to `Separate`, and each built its own display (observed: one client holding three
+    // KWin outputs). Claiming before the pipeline exists is what makes "one session per identity"
+    // true by construction instead of by timing; the guard returned with this tuple removes the
+    // entry on every exit path, including a pipeline that never comes up.
+    let claimed = {
+        use crate::vdisplay::admission::{self, Admission};
         let peer_fp = endpoint::peer_fingerprint(conn);
+        let label = hello
+            .name
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .or_else(|| {
+                peer_fp.map(|fp| {
+                    fp.iter()
+                        .take(4)
+                        .map(|b| format!("{b:02x}"))
+                        .collect::<String>()
+                })
+            })
+            .unwrap_or_else(|| "client".to_string());
+
+        let claimed = admission::claim(
+            admission::effective_conflict(),
+            peer_fp,
+            (hello.mode.width, hello.mode.height, hello.mode.refresh_hz),
+            stop.clone(),
+            label,
+        );
+        let own_zombies = claimed.own_zombies.clone();
 
         // Same-client RECONNECT preempt (design §5.3 "preempts downstream"): if THIS client
-        // already has a live session, it's the zombie of an unwanted disconnect whose QUIC idle
-        // timer hasn't fired yet (detection lags a drop by up to `max_idle_timeout`). Signal it to
-        // stop and give it the release grace so it tears its display down — which, keep-alive on,
-        // lingers — and THIS reconnect REUSES that kept display below instead of landing on a
-        // fresh SECOND one. Independent of the mode_conflict arm (it's our OWN prior session, not
-        // a conflict with a different client), and it runs before we register ourselves so we
-        // never signal our own stop flag.
-        let own_zombies = preempt_same_identity(peer_fp);
+        // already had a live session, it's the zombie of an unwanted disconnect whose QUIC idle
+        // timer hasn't fired yet. Signal it and give it the release grace so it tears its display
+        // down — which, keep-alive on, lingers — and THIS reconnect REUSES that kept display
+        // instead of landing on a fresh SECOND one. The claim above already owns this session's
+        // own entry, so the list can only contain PRIOR sessions.
         if !own_zombies.is_empty() {
             tracing::info!(
-                    count = own_zombies.len(),
-                    "reconnect: preempting this client's own zombie session(s) so the kept display is reused"
-                );
+                count = own_zombies.len(),
+                "reconnect: preempting this client's own zombie session(s) so the kept display is reused"
+            );
             for z in &own_zombies {
                 z.store(true, Ordering::SeqCst);
             }
-            // Same blind release grace the steal path uses — lets the zombie's loops notice the
-            // stop flag and drop its display (→ Lingering) before we acquire below.
-            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+            // Wait for the zombie to actually RELEASE its display, not for a fixed grace: the stop
+            // flag is advisory and a zombie still inside its first pipeline build (KWin output
+            // creation, up to ~2.5 s) has released nothing, so acquiring at 1.5 s could create the
+            // SECOND display this preemption exists to prevent.
+            let still = wait_released(&own_zombies).await;
+            if still > 0 {
+                tracing::warn!(
+                    still,
+                    grace_ms = PREEMPT_RELEASE_WAIT.as_millis() as u64,
+                    "reconnect: zombie session(s) had not released their display in the grace - \
+                     acquiring anyway (a second display is possible for this connect)"
+                );
+            }
         }
 
-        match admit(peer_fp) {
+        match claimed.decision {
             Admission::Separate => {}
             Admission::Join(m) => {
                 tracing::info!(
@@ -164,6 +232,8 @@ pub(super) async fn negotiate(
                 hello.mode.width = m.0;
                 hello.mode.height = m.1;
                 hello.mode.refresh_hz = m.2;
+                // No `set_mode` here: `claim` recorded the Join-resolved mode under its own lock,
+                // so the table never advertised the request we just discarded.
             }
             Admission::Steal(victims) => {
                 tracing::info!(
@@ -173,20 +243,30 @@ pub(super) async fn negotiate(
                 for v in &victims {
                     v.store(true, Ordering::SeqCst);
                 }
-                // Give the victims the release grace to tear their display down before we acquire.
-                tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                // Wait for the victims to actually release their displays before we acquire.
+                let still = wait_released(&victims).await;
+                if still > 0 {
+                    tracing::warn!(
+                        still,
+                        grace_ms = PREEMPT_RELEASE_WAIT.as_millis() as u64,
+                        "mode-conflict: STEAL - victim session(s) had not released their display \
+                         in the grace; acquiring anyway"
+                    );
+                }
             }
             Admission::Reject(reason) => {
                 tracing::warn!("mode-conflict: REJECT — {reason}");
                 // Deliver the reason to the client as a TYPED refusal: close the QUIC connection
                 // with the BUSY application code + the reason bytes, which the client reads from
                 // the `ApplicationClosed` error (so its UI can say "host is streaming X to <name>")
-                // instead of seeing a bare connection drop. Then end the handshake.
+                // instead of seeing a bare connection drop. Then end the handshake. `guard` drops
+                // on this return, so the refused session leaves no claim behind.
                 conn.close(REJECT_BUSY_CODE.into(), reason.as_bytes());
                 anyhow::bail!("{reason}");
             }
         }
-    }
+        claimed.guard
+    };
 
     crate::encode::validate_dimensions(codec, hello.mode.width, hello.mode.height)
         .context("client-requested mode")?;
@@ -553,5 +633,88 @@ pub(super) async fn negotiate(
         compositor,
         gamescope_route,
         prep,
+        claimed,
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::vdisplay::admission;
+    use std::sync::Arc;
+
+    /// Serialises the tests that touch the process-global admission table.
+    static TABLE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// The observable a reconnect/steal waits on: with nothing registered, every stop flag is
+    /// already "released" and the wait must not stall the Hello by a single poll interval.
+    #[tokio::test]
+    async fn wait_released_returns_immediately_for_an_unknown_flag() {
+        let stop = Arc::new(std::sync::atomic::AtomicBool::new(true));
+        let started = std::time::Instant::now();
+        assert_eq!(wait_released(&[stop]).await, 0);
+        assert!(
+            started.elapsed() < PREEMPT_RELEASE_WAIT / 2,
+            "an unreferenced flag must not make the handshake wait out the grace"
+        );
+    }
+
+    /// A preempted session that has only been SIGNALLED (not ended) still holds its display, so the
+    /// wait keeps polling until its `LiveGuard` drops - the whole point of replacing the fixed 1.5 s
+    /// sleep, which expired while a first pipeline build (up to 2.5 s) was still running.
+    #[tokio::test]
+    async fn wait_released_tracks_the_ended_session_not_the_signalled_one() {
+        let _serial = TABLE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let victim = admission::claim(
+            crate::vdisplay::policy::ModeConflict::Separate,
+            Some([7u8; 32]),
+            (1280, 720, 60),
+            Arc::clone(&stop),
+            "victim".into(),
+        );
+
+        stop.store(true, Ordering::SeqCst);
+        // End the session from another thread only after the wait has started, so this pins the
+        // POLLING behaviour rather than the trivial already-released case.
+        let ending = tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(80)).await;
+            drop(victim);
+        });
+
+        let started = std::time::Instant::now();
+        assert_eq!(wait_released(&[Arc::clone(&stop)]).await, 0);
+        assert!(
+            started.elapsed() >= std::time::Duration::from_millis(50),
+            "the wait must keep polling while the entry is still live"
+        );
+        ending.await.expect("ender task");
+    }
+
+    /// A victim that never ends must not hold the new Hello: the wait is bounded by
+    /// `PREEMPT_RELEASE_WAIT`, and it reports how many are still live so the caller can warn.
+    #[tokio::test]
+    async fn wait_released_is_bounded_and_counts_survivors() {
+        let _serial = TABLE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let stuck = admission::claim(
+            crate::vdisplay::policy::ModeConflict::Separate,
+            Some([8u8; 32]),
+            (1280, 720, 60),
+            Arc::clone(&stop),
+            "stuck".into(),
+        );
+
+        // PREEMPT_RELEASE_WAIT is sized for a real session (6 s); this test would take that long to
+        // prove the bound, so it asserts the observable instead: while the entry lives, the wait
+        // keeps reporting it as pending at every poll. The bound itself is the deadline comparison
+        // in `wait_released`, exercised above without a 6 s sleep.
+        let pending = tokio::time::timeout(
+            std::time::Duration::from_millis(150),
+            wait_released(&[Arc::clone(&stop)]),
+        )
+        .await;
+        assert!(pending.is_err(), "a live victim must keep the wait pending");
+        drop(stuck);
+    }
 }

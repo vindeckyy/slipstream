@@ -120,8 +120,14 @@ struct TextKeyboard {
 
 impl WlrootsInjector {
     pub fn open() -> Result<Self> {
-        let conn = Connection::connect_to_env()
-            .context("connect to Wayland (is Sway up + WAYLAND_DISPLAY/XDG_RUNTIME_DIR set?)")?;
+        // Several compositors implement the wlroots virtual-input protocols, so the rule is "our
+        // uid, a real executable image" rather than a KWin name match — but it is still a check:
+        // the peer is authenticated by SO_PEERCRED and /proc/<pid>/exe before any input is sent.
+        let conn = ss_wayland::connect_env(
+            ss_wayland::PeerRule::SameUid,
+            ss_wayland::default_proc_root(),
+        )
+        .context("connect to Wayland (is Sway up + WAYLAND_DISPLAY/XDG_RUNTIME_DIR set?)")?;
         let mut queue = conn.new_event_queue();
         let qh = queue.handle();
         let _registry = conn.display().get_registry(&qh, ());

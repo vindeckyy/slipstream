@@ -235,8 +235,20 @@ impl ClipboardBackend {
         ClipboardBackend,
         tokio::sync::mpsc::UnboundedReceiver<ClipEvent>,
     )> {
-        let conn = Connection::connect_to_env()
-            .context("connect to Wayland for clipboard (WAYLAND_DISPLAY/XDG_RUNTIME_DIR set?)")?;
+        // `ext-data-control` is implemented by KWin, wlroots, Hyprland and Sway, so the rule is
+        // "our uid, a real executable image" — not "the session compositor". It is a real check but
+        // a narrower one than it looks: the socket must be a non-symlink socket owned by this uid,
+        // and the peer is authenticated by SO_PEERCRED plus /proc/<pid>/exe before any selection
+        // crosses it. That stops another *user* (or a non-executable / unattributable peer) from
+        // reading or replacing the host clipboard. It is deliberately not a same-uid boundary: any
+        // process running as this user that can bind the env-named path is accepted, because an
+        // executable-name allowlist would refuse legitimate compositors and is not a security
+        // boundary anyway.
+        let conn = ss_wayland::connect_env(
+            ss_wayland::PeerRule::SameUid,
+            ss_wayland::default_proc_root(),
+        )
+        .context("connect to Wayland for clipboard (WAYLAND_DISPLAY/XDG_RUNTIME_DIR set?)")?;
         let mut queue = conn.new_event_queue();
         let qh = queue.handle();
         let _registry = conn.display().get_registry(&qh, ());

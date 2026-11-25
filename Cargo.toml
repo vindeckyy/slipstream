@@ -18,6 +18,7 @@ members = [
     "crates/ss-zerocopy",
     "crates/ss-frame",
     "crates/ss-encode",
+    "crates/ss-wayland",
     "crates/ss-capture",
     "crates/ss-inject",
     "crates/ss-vdisplay",

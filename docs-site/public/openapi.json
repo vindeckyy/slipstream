@@ -88,7 +88,7 @@
           "clients"
         ],
         "summary": "Unpair a client",
-        "description": "Removes the client's certificate from the pairing store. Caveat: the nvhttp TLS layer\ndoes not yet reject unlisted certificates (`gamestream/tls.rs` accepts any well-formed\nclient cert — a planned hardening step), so until that lands this removes the client\nfrom the listing without severing its ability to reconnect.",
+        "description": "Removes the client's certificate from the pairing store and persists the removal, so the\nGameStream/nvhttp launch surface (`nvhttp::peer_is_paired`) refuses the device's future\nstreams and it must pair again. The nvhttp TLS layer accepts any well-formed client cert at\nthe handshake; authorization is the per-request fingerprint check against this store, so\nremoval here is the revocation point. The removal is written to disk before the in-memory\nentry is dropped; if persisting fails the entry is restored and the API returns 503, so a\nreported 204 is always durable. A stream already running is not torn down (its RTSP media\nwindow is bound to the launch session and peer IP); revocation applies to the next launch.",
         "operationId": "unpairClient",
         "parameters": [
           {
@@ -127,6 +127,16 @@
           },
           "404": {
             "description": "No paired client with that fingerprint",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Pairing store could not be persisted; the client is still paired",
             "content": {
               "application/json": {
                 "schema": {
@@ -7977,6 +7987,12 @@
             "description": "Cumulative extra PipeWire buffers discarded while selecting the newest buffer.",
             "minimum": 0
           },
+          "capture_frames_arrived": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Cumulative source-side arrival callbacks (WGC `FrameArrived`). Compare with\n`capture_frames_published` to separate a delivery ceiling from a consumer ceiling.",
+            "minimum": 0
+          },
           "capture_frames_overwritten": {
             "type": "integer",
             "format": "int64",
@@ -7998,6 +8014,18 @@
             "type": "integer",
             "format": "int64",
             "description": "Negotiated source modifier, or zero for linear/unknown.",
+            "minimum": 0
+          },
+          "capture_try_next_empty": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Cumulative pool drain attempts that returned nothing.",
+            "minimum": 0
+          },
+          "capture_try_next_ok": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Cumulative pool drain attempts that returned a frame.",
             "minimum": 0
           },
           "capture_width": {

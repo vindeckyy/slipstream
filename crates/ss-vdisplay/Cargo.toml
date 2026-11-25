@@ -20,6 +20,8 @@ ss-frame = { path = "../ss-frame" }
 ss-gpu = { path = "../ss-gpu" }
 ss-host-config = { path = "../ss-host-config" }
 ss-paths = { path = "../ss-paths" }
+# One authenticated resolver for every compositor socket (SO_PEERCRED + /proc identity).
+ss-wayland = { path = "../ss-wayland" }
 # The admission gate consults the encoder's session budget.
 ss-encode = { path = "../ss-encode" }
 anyhow = "1"

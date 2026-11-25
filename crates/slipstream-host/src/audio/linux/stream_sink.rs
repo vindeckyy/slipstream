@@ -93,9 +93,15 @@ impl Ledger {
 static LEDGER: Mutex<Ledger> = Mutex::new(Ledger::new());
 
 /// Point the configured default sink at `sink_name` (refcounted; see the module docs). Never
-/// fails the caller: a box where the metadata write doesn't work (WirePlumber absent) still
-/// gets a working capture — apps just aren't rerouted, which is exactly the legacy behaviour.
-pub(super) fn claim(sink_name: &str) {
+/// fails the caller, but reports whether the write landed.
+///
+/// **A failed claim in stream-sink mode is a DEAD capture, not a cosmetic routing miss.** The
+/// stream-sink capturer only receives samples when host apps are linked into its node, and apps
+/// only reach it because this claim made it the default sink. With the claim unwritten, nothing
+/// upstream ever schedules the node's `process()` callback — `quantum_ms` stays 0 and the ring
+/// stays empty (the "audio is dead but video flows" health line). The legacy monitor follower is
+/// the only mode where "apps just aren't rerouted" is a benign outcome.
+pub(super) fn claim(sink_name: &str) -> bool {
     let mut ledger = LEDGER.lock().unwrap();
     let first = ledger.on_claim();
     // Latest claim wins: even with an existing holder, route to the newest session's sink.
@@ -108,6 +114,7 @@ pub(super) fn claim(sink_name: &str) {
                 sink = sink_name,
                 "claimed default sink for the stream session"
             );
+            true
         }
         Err(e) => {
             if first {
@@ -115,8 +122,12 @@ pub(super) fn claim(sink_name: &str) {
                 // WirePlumber (Delete), which is also correct if IT starts working by then.
                 ledger.note_previous(None);
             }
-            tracing::warn!(error = %format!("{e:#}"),
-                "could not claim the default sink — host apps may keep playing to the previous output");
+            tracing::error!(error = %format!("{e:#}"),
+                "could not claim the default sink — in stream-sink mode this means NO audio will \
+                 be captured at all (apps stay on the previous output, so nothing ever links to \
+                 the stream sink and its process() never runs). Confirm with `pw-metadata -n \
+                 default | grep default.configured.audio.sink` and `pw-top` while a session runs");
+            false
         }
     }
 }
